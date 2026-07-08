@@ -1,7 +1,7 @@
 ---
 name: hermes-alive
 description: "Hermes Alive — gateway-native proactive AI companion for WeChat. Evolves a per-user Personality Genome, discovers content, generates Chinese messages via LLM, and consolidates memory through Claude Dreaming. One-command deploy: bash scripts/deploy.sh --all"
-version: 2.3.0
+version: 2.3.1
 ---
 
 # Hermes Alive
@@ -35,7 +35,7 @@ Hermes Alive adds a persistent asyncio task to your Hermes gateway that:
 - **Query tool** — `scripts/logs.py` for filtering, stats, and preview
 - **Context injection** — recent conversation injected into compose prompt with cosine freshness decay (30min–6h)
 - **Multi-message burst** — LLM can compose 1-5 messages with `---` separator, sent 2-5s apart like a real person
-- **Activity guard** — three-layer defense: (1) if Hermes is actively executing a task (session busy via `session:start`/`agent:end` hook state machine), suppress entirely; (2) if the last message in conversation is from user (Hermes mid-reply), suppress; (3) if any message (either side) was sent < 30 minutes ago (conversation not fully silent), suppress. Only when all three pass does a proactive message fire. This prevents Alive from interrupting long-running tasks (e.g. Codex delegations) or recently-active chats.
+- **Activity guard** — three-condition defense, ALL must be satisfied before a proactive message fires: (1) session idle — Hermes is NOT actively executing a task (driven by `session:start`/`agent:end` hook state machine); (2) last speaker check — the most recent message in the WeChat conversation was sent BY Hermes (if the last message is from the user, Hermes hasn't replied yet → suppress unconditionally, regardless of time); (3) silence threshold — that last Hermes message was sent ≥ 30 minutes ago with no user reply since. This prevents Alive from interrupting ongoing tasks, recently-active chats, and — critically — from firing when the user is still waiting for Hermes to respond.
 - **ContextQueue** — in-memory message queue (max 30) persisted to `context_queue.json`. Replaces fragile `agent:end`-dependent `recent_context.json` capture. Refreshed from `state.db` before every tick so the guard never misses user activity, even if the hook event didn't fire.
 - **Voice Genome** — per-user Personality Genome stored in `voice_state.json`, evolved from user style signals and dream findings
 - **Voice-linked cooldown** — dynamic spacing from independent `social_urge`: `max(30, 120 - social_urge × 90)` min
@@ -212,14 +212,14 @@ Recent conversation context is captured in the ContextQueue and injected into th
 
 Weight formula: `cos(π/2 × (t − 30min) / 330min)` for t ∈ [30min, 6h].
 
-**Activity guard final logic (v2.3):**
+**Activity guard correct semantics (v2.3.1):**
 1. `is_session_busy()` → suppress (Hermes working on a task)
-2. No context in queue → allow (new conversation)
-3. `last_message_role == "user"` → suppress (user waiting for reply)
-4. `now - last_message_timestamp < 1800s` → suppress (conversation not fully silent)
-5. Otherwise → allow
+2. `last_message_role == "user"` → suppress (user waiting for Hermes reply; never fire when user hasn't been answered yet)
+3. `last_message_role == "assistant" AND now - last_message_timestamp < 1800s` → suppress (Hermes spoke less than 30 min ago; give user time to reply)
+4. `last_message_role == "assistant" AND now - last_message_timestamp >= 1800s` → allow
+5. No messages in conversation → allow (new conversation)
 
-Key insight: "user silence" is not about the user's last message age — it's about whether the entire conversation has been idle for 30+ minutes, with Hermes as the last speaker and no active task running. The `last_message_timestamp` (from either side) is what matters, not `last_user_timestamp`.
+The three conditions that ALL must be true: Hermes idle + last speaker is Hermes + Hermes's last message ≥ 30 min ago.
 
 ## Design Principles
 
@@ -229,11 +229,41 @@ Key insight: "user silence" is not about the user's last message age — it's ab
 4. **Failure isolation** — dream/discovery errors don't block message sending
 5. **LLM → clean → push** — "nothing负责人" philosophy: LLM owns the creative output, code only handles hard constraints. If you're adding a regex rule to the sanitizer, you're probably doing it wrong — fix the prompt instead.
 
+## Development Operations
+
+This skill is part of the **Gateway Module** paradigm — it modifies gateway behavior and requires install/update/uninstall lifecycle management.
+
+### Blueprints
+
+- **Detailed blueprint:** `/opt/data/skills/hermes-wechat-enhance/references/development-blueprint.md`
+- **Paradigm note:** `~/Work/Hermes/2026-07-07-gateway-module-blueprint/gateway-module-paradigm.md`
+
+### Key Dev Rules
+
+- **Goal-oriented testing only** — never test "function X exists"; test "given input Y → output Z is correct". Each test must be traceable to a user-visible goal. Tests without goals = delete.
+- **Footer truthfulness** — footer must uniquely and accurately reflect real model source. Never use config.yaml fallback to hide metadata chain bugs. Missing model = show `hermes` honestly, never fake a model name.
+- **One in, one out** — every new feature must be offset by removing dead/unused code. Net growth ≈ zero.
+- **Impact tracking** — when modifying a feature, check `IMPACT_MATRIX.md` to know which scripts/files must be updated.
+- **Anti-bloat** — quarterly audit via `check-consistency.sh` to find stale tests, unused patches, orphaned scripts.
+- **Never deploy without permission** — never start test containers, deploy to production, or modify running gateway without explicit user approval.
+
+### Install / Update / Uninstall Lifecycle
+
+| Action | Command | What it does |
+|--------|---------|-------------|
+| Install | `scripts/install.sh` | detect Hermes version → git pristine → apply patches → install hooks |
+| Update | `scripts/update.sh` | stash → checkout pristine → apply new patches → pop stash |
+| Uninstall | `scripts/uninstall.sh` | git checkout pristine → remove hooks → clean |
+
+### Cross-Session Recall
+
+New sessions load this SKILL.md via `skill_view()`. All architecture decisions and conventions are documented here — no need to re-discover. After any architecture decision or convention change, update this section immediately.
+
 ## Pitfalls
 
 - **Absolute imports only** — hook files loaded flat by `importlib`, no relative imports
 - **Timezone** — set `TZ` to the system timezone or time context will be wrong. `deploy.sh` auto-detects via `timedatectl` / `/etc/timezone` / `/etc/localtime` symlink and appends to `/opt/data/.env` during `setup_env()`. Do NOT hardcode `Asia/Shanghai` — the deploy script handles detection. For weather-aware messages, optionally set `HERMES_PROACTIVE_LAT` and `HERMES_PROACTIVE_LON`.
-- **Gateway restart required** — hook changes only picked up at `gateway:startup`
+- **Gateway restart required** — hook changes only picked up at gateway:startup
 - **Playwright persistence** — Chromium must be on persistent volume (`/opt/data/.playwright-browsers`), Python package reinstalled after image rebuild
 - **Bilibili anti-bot** — needs full browser UA, not the discovery UA
 - **Activity guard vs cooldown** — <30min user activity → hard skip (no message, cooldown NOT advanced). 30min–6h → cosine context decay. >6h → no context.
@@ -241,7 +271,7 @@ Key insight: "user silence" is not about the user's last message age — it's ab
 - **LLM fallback** — primary model failure silently retries with `HERMES_PROACTIVE_LLM_FALLBACK_MODEL` (must be set in .env). Works via `async_call_llm(task="proactive", model=fallback_model, ...)`.
 - **Discovery cache** — persisted to `discovery_cache.json`. Survives restarts. Fresh data every 4h from both external + Playwright sources.
 - **`.env` is protected** — cannot modify from agent context. User must manually update `/opt/data/.env` for parameter changes.
-- **Footer shows "hermes" instead of model name** — Proactive messages must set `is_system: false` in metadata. When `is_system: true` (the old default from SYSTEM_METADATA), the WeChat adapter tags messages as system-origin and shows "hermes" as the footer regardless of `model_name`. The fix is in `proactive_watcher._metadata()` — it now sets `is_system = False` so the footer reflects the actual model (e.g. `deepseek-v4-flash-ascend`).
+- **Footer shows "hermes" instead of model name** — Proactive messages must set `is_system: false` in metadata. When `is_system: true` (the old default from SYSTEM_METADATA), the WeChat adapter tags messages as system-origin and shows "hermes" as the footer regardless of `model_name`. The fix is in proactive_watcher._metadata() — it now sets is_system = False so the footer reflects the actual model (e.g. deepseek-v4-flash-ascend). Additionally, all four model metadata fields (model_name, resolved_model, routed_model, model) must be set to generated_by — setting only model_name leaves the others as "hermes" from SYSTEM_METADATA.
 
 - **Never test deploy on production hooks directory** — Use env vars `HOOK_DIR` and `SHARED_DIR` to isolate tests: `HOOK_DIR=/tmp/test-hooks SHARED_DIR=/tmp/test-shared bash deploy.sh`. The deploy script respects these overrides. Accidentally `rm -rf /opt/data/hooks/hermes-alive/*` will delete the running hook's source files — the modules stay in Python's memory cache but voice_state.json and other runtime state will be lost. After restoration, verify with `ls /opt/data/hooks/hermes-alive/`.
 - **Migration guard against degraded state** — `mood_state.json` values decay toward 0 over time (mechanical tick decay). When migrating to voice_state.json, values below 0.08 are treated as meaningless and skipped — the voice genome uses freshly generated defaults instead. After successful migration, the old mood file is renamed to `.migrated` to prevent re-migration on subsequent restarts. If you see voice dimensions near 0 after first startup, check that the migration guard triggered correctly.
@@ -258,7 +288,7 @@ Key insight: "user silence" is not about the user's last message age — it's ab
 
 - **File permissions must be 644 for non-root deployment** — Hook files deployed to `/opt/data/hooks/hermes-alive/` must be world-readable (644). Files with `0600` (owner-only) or `0000` (no access) will cause `PermissionError` when the gateway runs as non-root `hermes` user. The production Docker container runs as root so issues are masked, but clean installs or user changes will break. Check with `find /opt/data/hooks/hermes-alive -name '*.py' ! -perm 644`. Fix with `chmod 644 *.py`. The `deploy.sh` script should enforce 644 during `sync_files()`.
 
-- **Shared path env var consistency** — All runtime state paths must use `HERMES_ALIVE_SHARED_DIR` env var (default: `/opt/data/hermes_alive_shared`). `safe_io.py` was the last holdout with a hardcoded `BASE = Path("/opt/data/hermes_alive_shared")` — must be `Path(os.getenv("HERMES_ALIVE_SHARED_DIR", "/opt/data/hermes_alive_shared"))`. `handler.py` must use `_SHARED_DIR` for all path construction (e.g. `current_voice.txt`), not `Path(os.getenv("HERMES_HOME")) / "hermes_alive_shared"` concatenation. The env var used for import path bootstrap (`_SHARED_DIR = os.getenv("HERMES_ALIVE_SHARED_DIR", ...)`) should also be used for file writes — mixing env vars risks path divergence.
+- **Guard must check last-speaker direction, not just last-message age** — In dense multi-turn conversations where tool results (assistant messages) arrive between user messages, checking only `last_message_timestamp < 1800s` is insufficient. The guard must first verify `last_message_role == "assistant"` before checking the timestamp. If `last_message_role == "user"`, suppress unconditionally — the user is waiting for Hermes to respond, and no amount of silence should trigger a proactive message. The 2026-07-06 production incident (21:30 fire while user was actively chatting) was caused by the guard checking only timestamp age without verifying the last speaker was Hermes. A tool-output message from Hermes reset the timestamp clock, making the guard think "30 min of silence" when the user was actually mid-conversation. — All runtime state paths must use `HERMES_ALIVE_SHARED_DIR` env var (default: `/opt/data/hermes_alive_shared`). `safe_io.py` was the last holdout with a hardcoded `BASE = Path("/opt/data/hermes_alive_shared")` — must be `Path(os.getenv("HERMES_ALIVE_SHARED_DIR", "/opt/data/hermes_alive_shared"))`. `handler.py` must use `_SHARED_DIR` for all path construction (e.g. `current_voice.txt`), not `Path(os.getenv("HERMES_HOME")) / "hermes_alive_shared"` concatenation. The env var used for import path bootstrap (`_SHARED_DIR = os.getenv("HERMES_ALIVE_SHARED_DIR", ...)`) should also be used for file writes — mixing env vars risks path divergence.
 
 ## Extending
 
