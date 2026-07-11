@@ -1,0 +1,10 @@
+{
+  "name": "Hermes Alive",
+  "skills": [
+    {
+      "name": "hermes-alive",
+      "path": "skills/hermes-alive",
+      "description": "Gateway-native proactive companion for Hermes Agent."
+    }
+  ]
+}

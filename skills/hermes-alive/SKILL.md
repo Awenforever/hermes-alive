@@ -1,30 +1,97 @@
 ---
 name: hermes-alive
-description: "Hermes Alive — gateway-native proactive AI companion for WeChat. Evolves a per-user Personality Genome, discovers content, generates Chinese messages via LLM, and consolidates memory through Claude Dreaming. One-command deploy: bash scripts/deploy.sh --all"
-version: 2.3.1
+description: "Hermes Alive — gateway-native proactive AI companion for WeChat, with atomic lifecycle install, Provider guidance, managed personalization, verification, and clean uninstall."
+version: 2.4.0
 ---
-
 # Hermes Alive
 
-A self-contained, installable skill that turns Hermes Agent into a proactive WeChat companion. Drops into any Hermes installation — copy one directory, run one script, restart gateway.
+Markers:
 
-## Quick Start
+- `HERMES_ALIVE_LIFECYCLE_V1`
+- `HERMES_ALIVE_GITHUB_SELF_INSTALL_V1`
+- `HERMES_ALIVE_PUBLIC_DOCUMENTATION_CONTRACT_V1`
+
+## Installation contract for Hermes
+
+The distribution unit is the complete GitHub repository, not a standalone
+`SKILL.md`.
+
+Canonical repository layout:
+
+```text
+hermes-alive/
+├── README.md
+├── README_CN.md
+├── bootstrap.sh
+├── configure.sh
+├── verify.sh
+├── uninstall.sh
+├── .github/workflows/ci.yml
+└── skills/
+    └── hermes-alive/
+        ├── SKILL.md
+        ├── hooks/
+        ├── scripts/
+        ├── tests/
+        ├── docs/
+        ├── templates/
+        └── references/
+```
+
+When the user asks Hermes to install this repository, Hermes may use either
+supported path:
+
+### Official Hermes GitHub skill transport
 
 ```bash
-# 1. Install the skill (copy to /opt/data/skills/hermes/hermes-alive/)
-# 2. Deploy + install dependencies
+/opt/hermes/.venv/bin/hermes skills install \
+  Awenforever/hermes-alive/skills/hermes-alive \
+  --category hermes \
+  --yes
+
 cd /opt/data/skills/hermes/hermes-alive
-bash scripts/deploy.sh --all
-
-# 3. Set your WeChat chat ID in /opt/data/.env:
-#    HERMES_PROACTIVE_WEIXIN_CHAT_ID=<your-id>
-
-# 4. Restart gateway
-docker-compose up -d hermes
-
-# 5. Verify
-bash scripts/verify.sh
+scripts/hermes-alive-lifecycle install
 ```
+
+### Git clone plus repository bootstrap
+
+```bash
+git clone --depth 1 \
+  https://github.com/Awenforever/hermes-alive.git \
+  /tmp/hermes-alive
+
+bash /tmp/hermes-alive/bootstrap.sh \
+  --hermes-home /opt/data
+```
+
+The test harness must not pre-copy source into the final skill or hook
+directories. It may provide only the Git repository URL or an isolated Git
+origin. The repository bootstrap owns source installation, hook activation,
+manifest creation, permission normalization and rollback.
+
+After installation:
+
+```bash
+/opt/data/skills/hermes/hermes-alive/scripts/hermes-alive-lifecycle \
+  configure --provider-check-only
+```
+
+When Provider/model configuration is missing, guide the user through the
+official Hermes command:
+
+```bash
+/opt/hermes/.venv/bin/hermes setup model
+```
+
+Then configure non-secret personalization and verify:
+
+```bash
+/opt/data/skills/hermes/hermes-alive/scripts/hermes-alive-lifecycle configure
+/opt/data/skills/hermes/hermes-alive/scripts/hermes-alive-lifecycle verify
+```
+
+Do not restart a production gateway or send a real message without explicit
+approval.
 
 ## What It Does
 
@@ -95,42 +162,65 @@ All logged to `proactive_log.jsonl` with `voice_after` snapshot.
 
 ## Files
 
-```
+```text
 hermes-alive/
-├── SKILL.md                 ← This file
-├── hooks/                   ← Gateway hook source (deployed to /opt/data/hooks/)
-│   ├── HOOK.yaml
-│   ├── handler.py           ← Event dispatcher (wires context_tracker on agent:end)
-│   ├── proactive_watcher.py ← Main loop (multi-message burst + pipeline logging)
-│   ├── discovery.py         ← Multi-platform content engine
-│   ├── llm_message_composer.py ← LLM prompt + sanitize + multi-message split
-│   ├── context_tracker.py   ← Captures recent conversation for freshness injection
-│   ├── dream_engine.py      ← Memory consolidation
-│   ├── dream_prompt.py      ← Claude Dreaming prompt
-│   ├── voice_engine.py      ← Personality Genome + social_urge migration/evolution
-│   ├── cooldown_manager.py  ← Rate limiting + social_urge dynamic cooldown
-│   ├── dream_diff_store.py  ← Dream diff persistence
-│   ├── log_rotate.py        ← Daily log rotation + retention
-│   ├── safe_io.py           ← Thread-safe file I/O helpers
-│   ├── alive_control.py     ← Runtime lifecycle control (enable/disable/restart)
-│   └── __init__.py          ← Package marker
+├── SKILL.md
+├── hooks/                       ← Gateway hook source
 ├── scripts/
-│   ├── deploy.sh            ← One-command setup
-│   ├── verify.sh            ← Health check
-│   └── logs.py              ← Log query tool (filter, stats, preview)
+│   ├── hermes-alive-lifecycle   ← Primary lifecycle CLI
+│   ├── hermes-alive-lifecycle.py
+│   ├── install.sh               ← Compatibility wrapper for lifecycle install
+│   ├── uninstall.sh             ← Compatibility wrapper for uninstall/purge
+│   ├── verify-self-install.py
+│   ├── verify.sh
+│   └── logs.py
+├── tests/
+│   ├── run_matrix.py
+│   ├── run_stress.py
+│   ├── run_all.sh
+│   └── fakes.py
 ├── templates/
-│   ├── .env.template        ← Required env vars
-│   └── sources.yaml         ← Content source config
+│   ├── .env.template            ← Optional environment overrides
+│   └── sources.yaml
+├── docs/
 └── references/
-    ├── codex-patterns.md
-    ├── message-style-guidelines.md   ← Discovery ref style + multi-message + context freshness
-    ├── platform-discovery-patterns.md
-    └── session-id-format-change.md   ← Debugging guide for activity guard failure after Hermes update
 ```
+
+The active hook is installed separately at
+`/opt/data/hooks/hermes-alive`. Persistent configuration and learning state
+live under `/opt/data/hermes_alive_shared`; they are not stored inside the
+source skill.
 
 ## Configuration
 
-All settings via environment variables. See `templates/.env.template` for the complete list.
+Non-secret personalization is managed by the lifecycle CLI and stored in
+`/opt/data/hermes_alive_shared/config/hermes-alive.json`. Explicit process
+environment variables take precedence at runtime. Provider credentials and
+model configuration remain owned by Hermes and must never be written into the
+managed Hermes Alive configuration.
+
+```bash
+LIFECYCLE=/opt/data/skills/hermes/hermes-alive/scripts/hermes-alive-lifecycle
+
+# Check whether Hermes has a usable model configuration.
+"$LIFECYCLE" configure --provider-check-only
+
+# Run the official Hermes model setup when required.
+"$LIFECYCLE" configure --run-provider-setup
+
+# Configure non-secret personalization.
+"$LIFECYCLE" configure \
+  --enable \
+  --weixin-chat-id '<chat-id>' \
+  --timezone Asia/Singapore \
+  --quiet-start 23:00 \
+  --quiet-end 08:00 \
+  --emoji-policy contextual
+
+"$LIFECYCLE" verify
+```
+
+`templates/.env.template` documents optional advanced environment overrides.
 
 Key variables:
 
@@ -153,9 +243,6 @@ Key variables:
 | `HERMES_ALIVE_LOG_RETENTION_DAYS` | 7 | Log archive retention |
 | `PLAYWRIGHT_BROWSERS_PATH` | `/opt/data/.playwright-browsers` | Chromium location |
 
-**Removed in v2.2**: `HERMES_PROACTIVE_ACTIVE_COOLDOWN_MINUTES` — replaced by activity guard (hard skip <30min) + voice-linked cooldown.
-
-**Changed in v2.3**: `MOOD_ENABLED`/`COMPOSER_ENABLED`, `mood_engine.py`, `message_composer.py`, and `recent_context.json` were removed. Replaced by ContextQueue (`context_queue.json`) for activity guard and freshness injection. Session busy/idle state machine added via `session:start`/`agent:end` hooks — prevents proactive messages while Hermes is executing tasks. Activity guard upgraded from two-condition to three-layer (busy → user → silence). Deploy script now auto-detects timezone and appends all env vars. README includes AI agent installation guide.
 
 ## Logging
 
@@ -249,11 +336,22 @@ This skill is part of the **Gateway Module** paradigm — it modifies gateway be
 
 ### Install / Update / Uninstall Lifecycle
 
-| Action | Command | What it does |
-|--------|---------|-------------|
-| Install | `scripts/install.sh` | detect Hermes version → git pristine → apply patches → install hooks |
-| Update | `scripts/update.sh` | stash → checkout pristine → apply new patches → pop stash |
-| Uninstall | `scripts/uninstall.sh` | git checkout pristine → remove hooks → clean |
+The complete GitHub repository is the distribution unit. The repository
+bootstrap and lifecycle CLI own installation; public instructions must not
+depend on an unpublished branch, a pristine checkout, or manual copying into
+the final hook directory.
+
+| Action | Command | Contract |
+|--------|---------|----------|
+| Fresh install | `bash /tmp/hermes-alive/bootstrap.sh --hermes-home /opt/data` | Atomically installs source and active hook, compiles Python, writes manifest and normalizes permissions |
+| Configure | `scripts/hermes-alive-lifecycle configure` | Checks Provider readiness and writes only non-secret managed personalization |
+| Verify | `scripts/hermes-alive-lifecycle verify` | Verifies manifest, source/active-hook parity, compilation and configuration |
+| Upgrade | Re-clone/pull the repository, then run its root `bootstrap.sh` | Transactional replacement with rollback to the previous working source/hook on failure |
+| Default uninstall | `scripts/hermes-alive-lifecycle uninstall` | Removes source, active hook and managed config while preserving learning/runtime state |
+| Purge | `scripts/hermes-alive-lifecycle purge` | Removes source, active hook and all Hermes Alive shared state |
+
+A gateway restart may be required for a changed active hook to load, but it
+must be performed only after explicit approval.
 
 ### Cross-Session Recall
 
@@ -262,18 +360,19 @@ New sessions load this SKILL.md via `skill_view()`. All architecture decisions a
 ## Pitfalls
 
 - **Absolute imports only** — hook files loaded flat by `importlib`, no relative imports
-- **Timezone** — set `TZ` to the system timezone or time context will be wrong. `deploy.sh` auto-detects via `timedatectl` / `/etc/timezone` / `/etc/localtime` symlink and appends to `/opt/data/.env` during `setup_env()`. Do NOT hardcode `Asia/Shanghai` — the deploy script handles detection. For weather-aware messages, optionally set `HERMES_PROACTIVE_LAT` and `HERMES_PROACTIVE_LON`.
+- **Timezone** — configure it explicitly with `hermes-alive-lifecycle configure --timezone <IANA-zone>` or provide an explicit `TZ` environment override. Do not assume a fixed region. For weather-aware messages, optionally configure latitude and longitude through lifecycle options.
 - **Gateway restart required** — hook changes only picked up at gateway:startup
-- **Playwright persistence** — Chromium must be on persistent volume (`/opt/data/.playwright-browsers`), Python package reinstalled after image rebuild
+- **Startup notification** — handler.py _startup() sends a "Hermes 已就绪" notification to all connected adapters with home_channel after watcher creation. Metadata: is_system=True, model_name=hermes. Requires HERMES_PROACTIVE_PLATFORM_ENABLED=true for the watcher to start.
+- **Optional browser-backed discovery** — Playwright/Chromium is not part of the core lifecycle contract. When browser-only sources are enabled in a container, keep browser assets on a persistent path such as `/opt/data/.playwright-browsers` and validate them separately.
 - **Bilibili anti-bot** — needs full browser UA, not the discovery UA
 - **Activity guard vs cooldown** — <30min user activity → hard skip (no message, cooldown NOT advanced). 30min–6h → cosine context decay. >6h → no context.
 - **Voice-linked cooldown** — `set_mood_cooldown(social_urge)` must be called before `can_send()` each tick. Formula: `max(30, 120 − urge × 90)`.
 - **LLM fallback** — primary model failure silently retries with `HERMES_PROACTIVE_LLM_FALLBACK_MODEL` (must be set in .env). Works via `async_call_llm(task="proactive", model=fallback_model, ...)`.
 - **Discovery cache** — persisted to `discovery_cache.json`. Survives restarts. Fresh data every 4h from both external + Playwright sources.
-- **`.env` is protected** — cannot modify from agent context. User must manually update `/opt/data/.env` for parameter changes.
+- **Configuration ownership** — Provider credentials remain in Hermes configuration. Hermes Alive stores only non-secret personalization in its managed JSON; explicit environment variables override managed values. Do not place API keys in Hermes Alive files.
 - **Footer shows "hermes" instead of model name** — Proactive messages must set `is_system: false` in metadata. When `is_system: true` (the old default from SYSTEM_METADATA), the WeChat adapter tags messages as system-origin and shows "hermes" as the footer regardless of `model_name`. The fix is in proactive_watcher._metadata() — it now sets is_system = False so the footer reflects the actual model (e.g. deepseek-v4-flash-ascend). Additionally, all four model metadata fields (model_name, resolved_model, routed_model, model) must be set to generated_by — setting only model_name leaves the others as "hermes" from SYSTEM_METADATA.
 
-- **Never test deploy on production hooks directory** — Use env vars `HOOK_DIR` and `SHARED_DIR` to isolate tests: `HOOK_DIR=/tmp/test-hooks SHARED_DIR=/tmp/test-shared bash deploy.sh`. The deploy script respects these overrides. Accidentally `rm -rf /opt/data/hooks/hermes-alive/*` will delete the running hook's source files — the modules stay in Python's memory cache but voice_state.json and other runtime state will be lost. After restoration, verify with `ls /opt/data/hooks/hermes-alive/`.
+- **Never test against production paths** — use a disposable container with a fresh persistent Hermes Home and `network=none`, clone the Git repository, and let `bootstrap.sh` create the final source/hook paths. Do not pre-copy the skill or hook into place. Run matrix, full stress, default uninstall, reinstall and purge before considering production.
 - **Migration guard against degraded state** — `mood_state.json` values decay toward 0 over time (mechanical tick decay). When migrating to voice_state.json, values below 0.08 are treated as meaningless and skipped — the voice genome uses freshly generated defaults instead. After successful migration, the old mood file is renamed to `.migrated` to prevent re-migration on subsequent restarts. If you see voice dimensions near 0 after first startup, check that the migration guard triggered correctly.
 
 - **ContextQueue reliability** — `context_tracker.py` refreshes from `state.db` using `WHERE source = 'weixin' AND user_id = ?` JOIN on every `activity_snapshot(refresh=True)` call. The watcher calls this before each tick's guard decision, so even if `agent:end` hook fails to fire, the queue stays current. `context_queue.json` persists to disk for crash recovery. Stale `recent_context.json` was removed in v2.3 — it is no longer written or read.
@@ -286,7 +385,7 @@ New sessions load this SKILL.md via `skill_view()`. All architecture decisions a
 
 - **Activity guard correct semantics** — The guard checks `last_message_timestamp` (most recent message from EITHER side), NOT `last_user_timestamp`. Checking user's last message age is wrong: if Hermes replied after a 40-min LLM delay, the user message is 40-min old but Hermes just spoke — the conversation is NOT idle. The correct check is "has the entire conversation been silent for 30+ min?" This prevents Alive from firing immediately after a delayed Hermes reply. Additionally, `is_session_busy()` (driven by `session:start`/`agent:end` hook events) blocks all proactive messages while Hermes is executing a task. If the watcher detects Hermes is mid-task, it suppresses unconditionally even if the conversation appears silent.
 
-- **File permissions must be 644 for non-root deployment** — Hook files deployed to `/opt/data/hooks/hermes-alive/` must be world-readable (644). Files with `0600` (owner-only) or `0000` (no access) will cause `PermissionError` when the gateway runs as non-root `hermes` user. The production Docker container runs as root so issues are masked, but clean installs or user changes will break. Check with `find /opt/data/hooks/hermes-alive -name '*.py' ! -perm 644`. Fix with `chmod 644 *.py`. The `deploy.sh` script should enforce 644 during `sync_files()`.
+- **Permissions are lifecycle-owned** — source and active-hook files are normalized to readable non-world-writable modes, lifecycle metadata/configuration directories are private, and install/upgrade verification rejects unsafe results. Do not repair permissions with broad recursive `chmod` over user/runtime state.
 
 - **Guard must check last-speaker direction, not just last-message age** — In dense multi-turn conversations where tool results (assistant messages) arrive between user messages, checking only `last_message_timestamp < 1800s` is insufficient. The guard must first verify `last_message_role == "assistant"` before checking the timestamp. If `last_message_role == "user"`, suppress unconditionally — the user is waiting for Hermes to respond, and no amount of silence should trigger a proactive message. The 2026-07-06 production incident (21:30 fire while user was actively chatting) was caused by the guard checking only timestamp age without verifying the last speaker was Hermes. A tool-output message from Hermes reset the timestamp clock, making the guard think "30 min of silence" when the user was actually mid-conversation. — All runtime state paths must use `HERMES_ALIVE_SHARED_DIR` env var (default: `/opt/data/hermes_alive_shared`). `safe_io.py` was the last holdout with a hardcoded `BASE = Path("/opt/data/hermes_alive_shared")` — must be `Path(os.getenv("HERMES_ALIVE_SHARED_DIR", "/opt/data/hermes_alive_shared"))`. `handler.py` must use `_SHARED_DIR` for all path construction (e.g. `current_voice.txt`), not `Path(os.getenv("HERMES_HOME")) / "hermes_alive_shared"` concatenation. The env var used for import path bootstrap (`_SHARED_DIR = os.getenv("HERMES_ALIVE_SHARED_DIR", ...)`) should also be used for file writes — mixing env vars risks path divergence.
 
@@ -296,9 +395,19 @@ To add a new content platform:
 1. Research: official API → robots.txt → curl test → Playwright fallback
 2. Add extractor method in `hooks/discovery.py`
 3. Add site config in `templates/sources.yaml`
-4. Redeploy: `bash scripts/deploy.sh`
+4. From the repository checkout, run `bash bootstrap.sh --hermes-home /opt/data`, then run matrix tests before any approved gateway restart
 5. See `references/platform-discovery-patterns.md` for detailed workflow
 
 To customize the personality:
 - Edit `hooks/llm_message_composer.py` SYSTEM_PROMPT
 - Follow the "positive guidance" principle — don't add prohibitions
+
+
+## Validation
+
+```bash
+python3 tests/run_matrix.py
+python3 tests/run_stress.py
+```
+
+Markers: `HERMES_ALIVE_MATRIX_SUITE_V1`, `HERMES_ALIVE_STRESS_SUITE_V1`.

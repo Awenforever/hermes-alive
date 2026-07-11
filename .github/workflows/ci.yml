@@ -1,0 +1,49 @@
+name: ci
+
+permissions:
+  contents: read
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_stress:
+        description: "Run full stress suite"
+        required: false
+        default: false
+        type: boolean
+jobs:
+  compile-and-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: |
+          python -m pip install --disable-pip-version-check PyYAML==6.0.3
+          python - <<'PY'
+          from pathlib import Path
+          for path in sorted(Path("skills/hermes-alive").rglob("*.py")):
+              if "__pycache__" in path.parts:
+                  continue
+              compile(path.read_text(encoding="utf-8"), str(path), "exec")
+              print("OK", path)
+          PY
+          bash -n bootstrap.sh configure.sh verify.sh uninstall.sh
+          bash -n skills/hermes-alive/scripts/*.sh
+          bash -n skills/hermes-alive/tests/*.sh
+      - run: python3 skills/hermes-alive/tests/run_matrix.py
+  stress:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_stress }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --disable-pip-version-check PyYAML==6.0.3
+      - run: python3 skills/hermes-alive/tests/run_stress.py

@@ -17,6 +17,8 @@ Design:
 
 from __future__ import annotations
 
+# Marker: RICH_CONTENT_IMAGE_SOURCE_V1
+
 import asyncio
 import logging
 import os
@@ -290,6 +292,10 @@ class ExternalDiscovery:
                     "title": title,
                     "summary": summary,
                     "url": video_url,
+                    "image_url": (
+                        video.get("pic")
+                        or ""
+                    ).strip(),
                 })
         return results
 
@@ -1342,6 +1348,18 @@ class DiscoveryEngine:
         self._in_progress: bool = False
         # URL-based dedup cache (in-memory, resets on gateway restart)
         self._url_cache: set[str] = set()
+        self._interest_engine: Any | None = None
+
+    def _interest(self) -> Any | None:
+        # INTEREST_LEARNING_DISCOVERY_V1
+        if self._interest_engine is None:
+            try:
+                from interest_learning import InterestLearningEngine
+                self._interest_engine = InterestLearningEngine()
+            except Exception:
+                logger.exception("Failed to initialize interest learning engine")
+                self._interest_engine = False
+        return None if self._interest_engine is False else self._interest_engine
 
     def _load_sources_config(self) -> dict[str, Any]:
         """Load sources.yaml config with fallback to defaults."""
@@ -1425,21 +1443,33 @@ class DiscoveryEngine:
             self._in_progress = False
 
     def _apply_pipeline(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Apply dedup, scoring, budget, and threshold filtering to items."""
-        # 1. Deduplication
+        """Apply persistent dedup and interest-aware ranking."""
+        interest = self._interest()
+        if interest is not None:
+            try:
+                interest.sync_feedback_from_context()
+            except Exception:
+                logger.exception("Interest feedback sync failed")
+
         items = self._dedup(items)
-
-        # 2. Scoring
+        ranked: list[dict[str, Any]] = []
         for item in items:
-            item["score"] = _score_item(item)
+            base_score = _score_item(item)
+            if interest is not None:
+                try:
+                    item = interest.rank_item(item, base_score)
+                    interest.record_ranked_item(item)
+                except Exception:
+                    logger.exception("Interest ranking failed")
+                    item["score"] = base_score
+            else:
+                item["score"] = base_score
+            ranked.append(item)
 
-        # 3. Budget enforcement
-        items = self._enforce_budget(items)
-
-        # 4. Filter by share threshold
-        items = self._filter_by_threshold(items)
-
-        return items
+        ranked.sort(key=lambda value: float(value.get("score", 0.0)), reverse=True)
+        ranked = self._filter_by_threshold(ranked)
+        ranked = self._enforce_budget(ranked)
+        return ranked
 
     def _dedup(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Filter out items with URLs already seen."""
@@ -1448,6 +1478,13 @@ class DiscoveryEngine:
             url = item.get("url", "")
             if url and url in self._url_cache:
                 continue
+            interest = self._interest()
+            if interest is not None:
+                try:
+                    if interest.was_seen(item):
+                        continue
+                except Exception:
+                    logger.exception("Persistent content dedup failed")
             if url:
                 self._url_cache.add(url)
             new_items.append(item)

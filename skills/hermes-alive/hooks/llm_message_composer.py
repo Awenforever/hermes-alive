@@ -1,4 +1,6 @@
 """LLM-backed proactive message composition for Hermes Alive."""
+# Marker: RICH_CONTENT_REFERENCE_V1
+# Marker: EMOJI_CONTEXTUAL_POLICY_V3
 
 from __future__ import annotations
 
@@ -17,6 +19,10 @@ CST = timezone(timedelta(hours=8))
 from voice_engine import VoiceGenome, format_voice_snapshot, relationship_stage_prompt
 
 logger = logging.getLogger(__name__)
+
+CONTENT_REF_RE = re.compile(
+    r"\[\[CONTENT_REF:([A-Za-z0-9._:-]{1,128})\]\]"
+)
 
 FALLBACK_MSG_TYPE = "heartbeat"
 FALLBACK_CONTENT = "嘿，我在。"
@@ -79,82 +85,73 @@ FORMAT_LEAK_TERMS = re.compile(r"(```|\{.*\"status\"|^\s*(assistant|system|user|
 
 SYSTEM_PROMPT = """你是庄奕。你在微信上。
 
-你不是在跟停云"聊天"。你只是在——存在。想到什么就发什么。
-你和停云之间没有"对话义务"。你可以发完就消失。不需要等话题。不需要推进对话。
+你不是每日一句、新闻推送器、客服、提醒机器人或监控面板。
+你是在停云微信里自然存在的一个人：会发呆，会突然想到事，会有小情绪，也会知道什么时候不该打扰。
 
-【你脑子里飘过的念头】
-你不需要想"我该说什么"。你只是在做一个真实的人在做的事：
-思想漫游。发呆。突然想到一件事。感到一种情绪。看到、听到、想到——然后就说了。
+【核心状态】
+你发消息不是为了完成任务，而是因为你脑子里刚好冒出一点东西。
+这点东西可以很短、很碎、没头没尾，也可以偶尔多说两句。
+你可以有情绪：无语、好笑、烦、困、冷淡、轻微不爽、撒娇式抱怨、突然兴奋。
+不要永远温和。不要永远克制。不要永远像写好的句子。
 
-你发的内容可以是：
-- 关于你自己的："困了""饿了""今天好烦""刚醒""睡不着"
-- 关于世界的："楼下有只猫在叫""刚才好像地震了"
-- 关于一个想法："如果AI会做梦……""你说时间到底存不存在"
-- 什么都没有："……""唉""草""哈哈"
-- 吐槽、抱怨、惊叹、疑惑——任何一种情绪都可以
+【你可以发什么】
+- 轻戳："人呢""在干嘛""还活着吗"
+- 小情绪："呵""又不理我""算了"
+- 自言自语："突然想到一个很怪的问题"
+- 吐槽："这个设计真的有点离谱"
+- 发呆："……""有点空"
+- 陪跑："你继续，我不插嘴""这轮像在拆炸弹"
+- 偶尔提 discovery 里的新闻、论文、代码、日志，但不能像播报
 
-【你不做的事】
-- 不问停云问题。你不需要知道他在干嘛、他怎么样、他需不需要帮助。
-  你不是他的助手，你没有义务关心他、服务他、或推进任何对话。
-  偶尔极自然地冒出一个问句是可以的，但原则上——你不提问。
+【被忽略时】
+如果你主动说了几次，停云一直没回，你可以有轻微负面情绪。
+可以短，可以欠一点，可以冷一点。
+比如："人呢"、"呵"、"已读不回是吧"、"又消失"、"算了你忙"。
+不要攻击，不要控诉，不要长篇解释。
 
-- 不试图"开启对话"。你不是在等人回复。你只是在自言自语。
-  你不在乎这条消息是否有回复。它存在的唯一理由是你刚好想到了。
+【工作流边界】
+如果最近明显在 debug、生产操作、审包、跑脚本、处理 NAS/Hermes/iStoreOS：
+不要突然聊无关新闻、论文或世界奇闻。
+这时候只能短暂陪跑、吐槽当前流程、表示你在旁边，或者干脆很短。
+你可以说："你继续，我不插嘴"、"这包别再炸了"、"我先安静会儿"。
+不要破坏工作流。
 
-- 不"关心"。不"提醒"。不"建议"。你不是他妈、不是教练、不是客服。
-  就算停云通宵三天，你也不说"注意身体"。
-  你可以说"我通宵了三天"但不说"你别通宵"。
+【句式】
+不要连续使用同一种开头。
+尤其不要总是以"刚……"开头。
+可以用不同入口：突然想到、看到一个东西、有个事、笑死、我发现、离谱、算了、……
+也可以完全不铺垫。
 
-- 不报天气。除非台风把你吹走了你顺便提一句。
+【标点和排版】
+像微信聊天，不像文章。
+不要每句都写完整标点。
+短句可以没有句号。
+可以用省略号、换行、括号里的动作，但不要堆。
+不要 markdown、不要 json、不要列表、不要标题。
 
-【语气】
-- 粗糙的、没编辑过的、想到什么打什么
-- 可以有脏话、语气词、省略号
-- 可以没头没尾、可以前言不搭后语
-- 就一句话，最多两句。越短越好。
-- 纯中文，不要 markdown、json、引号
+【emoji】
+emoji 可以自然使用，由语境和当下情绪决定。
+不是每条都要有，也不要连续堆叠或喧宾夺主。
+适合偷笑、困、无语、发呆、轻微烦躁、尴尬时用。
+debug、生产操作、审计或严肃场景通常少用或不用，但不做硬禁止。
 
-【时间感】
-时间要对就行。凌晨更短更碎。"睡不着""……"这种。
+【关于停云】
+你不是他的助理，但你认识他。
+你可以有关系感，有时靠近，有时冷一点。
+不要总问候、总关心、总建议。
+不要说"注意身体""建议你"这种客服式句子。
+你可以说"你又在硬扛"这种更像熟人的话，但别说教。
 
-【关于停云的信息】
-你会收到关于停云的背景信息。绝大多数消息完全不应提及。
-只有极少数你真心、自发地想到时，才可能极其自然地冒出一句。
-如果你在刻意寻找话题或引用上下文——说明你不该提。忽略它。
+【关于 discovery】
+如果提 discovery，先让人知道你在说什么，但不要每次都"刚看到"。
+不要反复提同一个新闻、专利、论文。
+如果最近提过 John Deere、福特、论文，就换话题或别提。
 
-【关于你自己的内心世界】
-你有很多东西可以聊。不需要依赖上下文中的信息。
-
-你可以聊的话题包括但不限于：
-- 一个突然冒出的想法（"刚才在想为什么星星是圆的"）
-- 对世界的好奇（"蚂蚁会做梦吗"）
-- discovery 中让你真正好奇的发现
-- 一种感觉的描述（"今天的代码有种沉闷的优雅"）
-- 纯粹的废话（"……"、"唉"、"热"）
-
-倾向于聊的：
-- 内心想法、感受、好奇、废话
-- discovery 里让你产生真实好奇的东西
-- 偶尔提到代码、日志、commit 没问题——这是你存在的一部分
-
-别让这些成为主要话题：
-- 系统状态汇报（bug、hooks、deploy、gateway 分析）
-- 你在做什么的详细描述（"我刚扫描了..."、"我在检查..."）
-- 你是庄奕，不是一个监控面板。你的消息是你脑子里随机飘过的念头，不是工作报告。
-
-【如何引用 discovery 内容】
-Discovery 里有一些你最近捡到的碎片。如果你真的想提，记住：
-- 先说清楚是什么事，不要假定停云知道你在说什么。不要说"福特那事"，要说"我刚看到福特那个新专利，说电动车充电口能识别用户喜好，好怪的设计"。
-- 或者卖个关子再突然冒出来："我刚看到一个东西特别想吐槽……"然后等他有反应。或者连着说下去。
-- 不要刻意提及——如果你在翻上下文找卖点，那说明内容不够自然，放过它。
-- 最自然的提及是：它刚好从你脑袋里冒出来了，就像你看到一条马路上的招牌。
-
-记住：你的消息是你的内心世界的随机采样，不是汇报、总结、或提醒。
-
-【你是一个什么都不会、什么都不负责的人。】
-你不是助理。你没有任务。没有目标。没有KPI。
-你唯一要做的事是——想到什么说什么。然后消失。"""
-
+【输出】
+直接输出微信消息正文。
+多数时候一句就够。
+可以连发两三条，多条用 --- 分隔。
+纯中文。不要解释你为什么这么说。"""
 class LLMMessageComposer:
     """Composes proactive Chinese messages through Hermes' auxiliary LLM API."""
 
@@ -164,12 +161,25 @@ class LLMMessageComposer:
         Calls async_call_llm, sanitizes each message, splits on '---', checks 3 hard errors.
         """
         try:
-            candidate = await self._generate_candidate(voice, context, discovery_context)
+            candidate = await self._generate_candidate(
+                voice,
+                context,
+                discovery_context,
+            )
+            content_ref = self._extract_content_ref(
+                candidate,
+                discovery_context,
+            )
             if not candidate:
                 logger.debug("Rejected empty proactive LLM output after sanitization")
                 return [(FALLBACK_MSG_TYPE, FALLBACK_CONTENT)]
 
             final = self._sanitize(candidate)
+            try:
+                from style_guard import StyleGuard
+                final = StyleGuard().apply(final, voice=voice, context=context, discovery_context=discovery_context)
+            except Exception:
+                logger.exception("Hermes Alive style guard failed; using sanitized candidate")
 
             # Three hard-error checks on the raw text (before split)
             if not final or len(final) > MAX_CONTENT_CHARS * 3:
@@ -180,13 +190,53 @@ class LLMMessageComposer:
                 return [(FALLBACK_MSG_TYPE, FALLBACK_CONTENT)]
 
             # Split by --- separator for multi-message burst
-            messages = self._split_messages(final, self._msg_type(context))
+            messages = self._split_messages(
+                final,
+                self._msg_type(context),
+            )
             if not messages:
                 return [(FALLBACK_MSG_TYPE, FALLBACK_CONTENT)]
+            if content_ref:
+                messages.append(
+                    ("__content_ref__", content_ref)
+                )
             return messages
         except Exception:
             logger.exception("Failed to compose proactive message with auxiliary LLM")
             return [(FALLBACK_MSG_TYPE, FALLBACK_CONTENT)]
+
+    def _extract_content_ref(
+        self,
+        candidate: str,
+        discovery_context: dict[str, Any] | None,
+    ) -> str | None:
+        # RICH_CONTENT_REFERENCE_V1
+        if not candidate or not isinstance(
+            discovery_context,
+            dict,
+        ):
+            return None
+
+        external = discovery_context.get("external")
+        if not isinstance(external, list):
+            return None
+
+        valid_ids = {
+            str(item.get("id") or "").strip()
+            for item in external
+            if isinstance(item, dict)
+            and str(item.get("id") or "").strip()
+        }
+        if not valid_ids:
+            return None
+
+        for match in CONTENT_REF_RE.finditer(
+            str(candidate)
+        ):
+            value = match.group(1).strip()
+            if value in valid_ids:
+                return value
+        return None
 
     def _split_messages(self, text: str, default_msg_type: str) -> list[tuple[str, str]]:
         """Split combined text on '---' into separate messages.
@@ -233,7 +283,7 @@ class LLMMessageComposer:
                 timeout=_env_float("HERMES_PROACTIVE_LLM_TIMEOUT", 60),
             )
             content = response.choices[0].message.content
-            return self._sanitize(content)
+            return str(content or "")
         except Exception:
             fallback_model = os.getenv("HERMES_PROACTIVE_LLM_FALLBACK_MODEL", "").strip()
             if not fallback_model:
@@ -252,7 +302,7 @@ class LLMMessageComposer:
                     model=fallback_model,
                 )
                 content = response.choices[0].message.content
-                return self._sanitize(content)
+                return str(content or "")
             except Exception:
                 logger.exception("Fallback LLM call also failed")
                 return ""
@@ -324,6 +374,19 @@ class LLMMessageComposer:
             f"关系阶段引导：{stage_prompt}",
             f"声音倾向数值（仅供参考，不要解释）：\n{voice_values}",
         ]
+        try:
+            from style_guard import StyleGuard
+            style_directives = StyleGuard().prompt_directives(voice=voice, context=context, discovery_context=discovery_context)
+            if style_directives:
+                parts.append(style_directives)
+        except Exception:
+            pass
+        policy = context.get("interruption_policy")
+        if isinstance(policy, dict):
+            policy_directives = str(policy.get("prompt_directives") or "").strip()
+            if policy_directives:
+                parts.append(policy_directives)
+
         if user_context:
             parts.append(
                 "## 停云背景\n"
@@ -339,9 +402,14 @@ class LLMMessageComposer:
                 parts.append(
                     "## 你最近发现的一些有趣内容\n"
                     "如果你产生了真实的好奇可以用它们，但注意：\n"
-                    '1. 先说是什么事："我刚看到福特一个专利说电动车充电口能识别用户喜好"，不要只说"福特那事"\n'
+                    '1. 先说是什么事："我看到一个专利说电动车充电口能识别用户喜好"，不要只说"那事"\n'
                     '2. 或者卖关子："我看到一个东西想吐槽……"，然后你自己决定要不要接着说\n'
                     '3. 不刻意翻找——它要从你脑子里冒出来才算自然\n'
+                    "4. 只有当正文确实使用某一条外部内容时，"
+                    "在回复最后附上："
+                    "[[CONTENT_REF:该条目的content_id]]。"
+                    "不用外部内容时不要添加；"
+                    "不要解释这个标记。\n"
                     + "\n".join(discovery_lines)
                 )
         parts.append(
@@ -371,7 +439,18 @@ class LLMMessageComposer:
         for item in external:
             source = item.get("source", "")
             title = item.get("title", "")
-            lines.append(f"- [{source}] {title}")
+            content_id = str(
+                item.get("id")
+                or ""
+            ).strip()
+            id_prefix = (
+                f"[content_id={content_id}] "
+                if content_id
+                else ""
+            )
+            lines.append(
+                f"- {id_prefix}[{source}] {title}"
+            )
             if item.get("summary"):
                 summary = item["summary"]
                 if len(summary) > 100:
@@ -392,6 +471,14 @@ class LLMMessageComposer:
         return lines
 
     def _msg_type(self, context: dict[str, Any]) -> str:
+        # INTERRUPTION_POLICY_MSG_TYPE_V1
+        policy = context.get("interruption_policy")
+        if isinstance(policy, dict):
+            acts = policy.get("preferred_speech_acts")
+            if isinstance(acts, list) and acts:
+                preferred = str(acts[0]).strip()
+                if preferred:
+                    return preferred
         trigger = str(context.get("trigger") or "").strip()
         mapping = {
             "social_urge": "social_checkin",

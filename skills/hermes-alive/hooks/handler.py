@@ -14,6 +14,14 @@ for _p in (_HOOK_DIR, _SHARED_DIR):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+# Marker: HERMES_ALIVE_MANAGED_CONFIG_BOOTSTRAP_V1
+try:
+    from managed_config import load_managed_env
+    load_managed_env(overwrite=False)
+except Exception:
+    # Configuration loading must never prevent hook import.
+    pass
+
 from pathlib import Path
 
 
@@ -76,6 +84,8 @@ async def _startup(context: dict):
 
     _watcher_task.add_done_callback(_done)
     logger.warning("Hermes Alive: watcher task created")
+
+    # Startup ready notification is owned by hermes-wechat-enhance.
 
 async def _on_session_start(context: dict):
     try:

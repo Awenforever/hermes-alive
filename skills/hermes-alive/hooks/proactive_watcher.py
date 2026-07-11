@@ -1,5 +1,8 @@
 
 """Gateway-native proactive platform watcher for Hermes Alive."""
+# Marker: RICH_CONTENT_DELIVERY_V1
+# Marker: RICH_CONTENT_METADATA_V1
+# Marker: RICH_CONTENT_REFERENCE_V1
 
 from __future__ import annotations
 
@@ -7,6 +10,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import sys
 # Hermes Alive import path bootstrap
 _HOOK_DIR = os.getenv("HERMES_HOOK_DIR", "/opt/data/hooks/hermes-alive")
@@ -75,6 +79,8 @@ class ProactivePlatformWatcher:
         self._llm_message_composer: Any | None = None
         self._discovery_engine: Any | None = None
         self._dream_engine: Any | None = None
+        self._interruption_policy: Any | None = None
+        self._content_delivery_engine: Any | None = None
         self.watcher_id = f"{os.getpid()}-{uuid.uuid4().hex[:8]}"
         self.started_at = datetime.now().astimezone().isoformat()
 
@@ -126,9 +132,27 @@ class ProactivePlatformWatcher:
 
         voice = self._voice_state()
 
-        # ── Activity check: suppress unless Hermes is idle and conversation is quiet ──
-        if self._user_active_recently():
-            self._log("skip", tick_id=tick_id, reason="user_active")
+        # ── Interruption policy: decide if/how Alive may speak ──
+        user_active = self._user_active_recently()
+        policy_decision = self._evaluate_interruption_policy(
+            user_active=user_active,
+            discovery_available=False,
+            cooldown_allowed=True,
+            cooldown_reason=None,
+        )
+        if policy_decision is not None:
+            self._log("policy", tick_id=tick_id, interruption_policy=policy_decision)
+            if not bool(policy_decision.get("allow_send", True)):
+                self._log(
+                    "skip",
+                    tick_id=tick_id,
+                    reason=str(policy_decision.get("skip_reason") or "interruption_policy_silent"),
+                    interruption_policy=policy_decision,
+                )
+                return False
+
+        if user_active and not (policy_decision and bool(policy_decision.get("allow_when_user_active", False))):
+            self._log("skip", tick_id=tick_id, reason="user_active", interruption_policy=policy_decision)
             return False
 
         cooldown = self._cooldown()
@@ -138,34 +162,144 @@ class ProactivePlatformWatcher:
             cooldown.set_mood_cooldown(social_urge)
             allowed, reason = cooldown.can_send("proactive")
             if not allowed:
-                self._log("skip", tick_id=tick_id, reason=reason, quiet_hours=(reason == "quiet_hours"))
+                cooldown_policy = self._evaluate_interruption_policy(
+                    user_active=user_active,
+                    discovery_available=False,
+                    cooldown_allowed=False,
+                    cooldown_reason=reason,
+                )
+                self._log("skip", tick_id=tick_id, reason=reason, quiet_hours=(reason == "quiet_hours"), interruption_policy=cooldown_policy)
                 return False
 
         import random
-        discovery_context = await self._check_discovery()
+        if policy_decision is not None and not bool(policy_decision.get("allow_content_share", True)):
+            discovery_context = None
+            self._log("policy", tick_id=tick_id, reason="content_share_disabled", interruption_policy=policy_decision)
+        else:
+            discovery_context = await self._check_discovery()
         if discovery_context is not None:
             self._log_discovery(tick_id, discovery_context)
         await self._check_dream()
-        messages = await self._compose_message(voice, discovery_context)
-        if not messages:
-            self._log("skip", tick_id=tick_id, reason="empty_messages")
+        messages = await self._compose_message(
+            voice,
+            discovery_context,
+            policy_decision=policy_decision,
+        )
+        messages, content_ref = (
+            self._extract_content_reference(
+                messages,
+            )
+        )
+        messages = self._enforce_policy_messages(
+            messages,
+            policy_decision,
+        )
+
+        delivery = self._content_delivery()
+        delivery_plan: Any | None = None
+        rich_payload: Any | None = None
+        selected_delivery_item: dict[str, Any] | None = None
+        if delivery is not None:
+            try:
+                delivery_plan = delivery.plan(
+                    messages,
+                    discovery_context,
+                    policy_decision,
+                    content_ref=content_ref,
+                )
+                messages = delivery_plan.text_messages
+                rich_payload = delivery_plan.rich_payload
+                selected_delivery_item = delivery_plan.selected_item
+                self._log(
+                    "delivery_plan",
+                    tick_id=tick_id,
+                    text_units=len(messages),
+                    rich_kind=(
+                        rich_payload.kind
+                        if rich_payload is not None
+                        else None
+                    ),
+                    evidence_score=delivery_plan.evidence_score,
+                    max_units=delivery_plan.max_units,
+                    content_ref=content_ref,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to build rich-content delivery plan"
+                )
+                delivery_plan = None
+                rich_payload = None
+                selected_delivery_item = None
+
+        if not messages and rich_payload is None:
+            self._log(
+                "skip",
+                tick_id=tick_id,
+                reason="empty_delivery_plan",
+            )
             return False
 
         msg_count = len(messages)
+        sent_messages: list[tuple[str, str, str]] = []
         for msg_index, (msg_type, content, generated_by) in enumerate(messages, start=1):
             self._log_compose(tick_id, voice, discovery_context, msg_type, generated_by)
 
             metadata = self._metadata(generated_by)
-            try:
-                await adapter.send(chat_id, content, metadata=metadata)
-            except Exception as exc:
-                self._log("error", tick_id=tick_id, reason="adapter_send_failed", error=type(exc).__name__, msg_type=msg_type, msg_index=msg_index, msg_count=msg_count)
-                logger.exception("Failed to send proactive platform heartbeat")
-                continue
+            if delivery is not None:
+                outcome = await delivery.send_text(
+                    adapter,
+                    chat_id,
+                    content,
+                    metadata=metadata,
+                )
+                if not outcome.success:
+                    self._log(
+                        "error",
+                        tick_id=tick_id,
+                        reason="adapter_send_failed",
+                        error=outcome.error or "send_result_unsuccessful",
+                        msg_type=msg_type,
+                        msg_index=msg_index,
+                        msg_count=msg_count,
+                    )
+                    continue
+            else:
+                try:
+                    result = await adapter.send(
+                        chat_id,
+                        content,
+                        metadata=metadata,
+                    )
+                    if getattr(result, "success", True) is False:
+                        self._log(
+                            "error",
+                            tick_id=tick_id,
+                            reason="adapter_send_unsuccessful",
+                            error=str(
+                                getattr(result, "error", "")
+                                or "send_result_unsuccessful"
+                            ),
+                            msg_type=msg_type,
+                            msg_index=msg_index,
+                            msg_count=msg_count,
+                        )
+                        continue
+                except Exception as exc:
+                    self._log(
+                        "error",
+                        tick_id=tick_id,
+                        reason="adapter_send_failed",
+                        error=type(exc).__name__,
+                        msg_type=msg_type,
+                        msg_index=msg_index,
+                        msg_count=msg_count,
+                    )
+                    logger.exception(
+                        "Failed to send proactive platform message"
+                    )
+                    continue
 
-            # Only record cooldown once (on the first message)
-            if msg_index == 1 and cooldown is not None:
-                cooldown.record_send(msg_type)
+            sent_messages.append((msg_type, content, generated_by))
 
             self._log(
                 "sent",
@@ -185,7 +319,69 @@ class ProactivePlatformWatcher:
             if msg_index < msg_count:
                 await asyncio.sleep(random.uniform(2, 5))
 
-        return True
+        rich_outcome: Any | None = None
+        if (
+            delivery is not None
+            and rich_payload is not None
+        ):
+            rich_metadata = self._metadata(
+                rich_payload.generated_by
+            )
+            rich_outcome = await delivery.send_rich(
+                adapter,
+                chat_id,
+                rich_payload,
+                metadata=rich_metadata,
+            )
+            self._log(
+                "rich_delivery"
+                if rich_outcome.success
+                else "rich_delivery_error",
+                tick_id=tick_id,
+                rich_kind=rich_outcome.kind,
+                delivery_mode=rich_outcome.mode,
+                content_delivered=rich_outcome.content_delivered,
+                fallback_used=rich_outcome.fallback_used,
+                error=rich_outcome.error,
+                content_item_id=rich_payload.content_item_id,
+                generated_by=rich_payload.generated_by,
+            )
+
+        rich_success = bool(
+            rich_outcome is not None
+            and rich_outcome.success
+        )
+        sent_any = bool(sent_messages) or rich_success
+
+        if sent_any and cooldown is not None:
+            cooldown_type = (
+                sent_messages[0][0]
+                if sent_messages
+                else str(
+                    getattr(rich_payload, "kind", "proactive")
+                )
+            )
+            cooldown.record_send(cooldown_type)
+
+        if (
+            rich_outcome is not None
+            and rich_outcome.content_delivered
+            and isinstance(selected_delivery_item, dict)
+        ):
+            self._record_interest_delivery(
+                discovery_context,
+                tick_id,
+                sent_messages,
+                delivered_item=selected_delivery_item,
+            )
+        elif sent_messages:
+            self._record_interest_delivery(
+                discovery_context,
+                tick_id,
+                sent_messages,
+            )
+
+        return sent_any
 
     @property
     def enabled(self) -> bool:
@@ -325,19 +521,275 @@ class ProactivePlatformWatcher:
                 self._cooldown_manager = False
         return None if self._cooldown_manager is False else self._cooldown_manager
 
-    async def _compose_message(self, voice: Any | None = None, discovery_context: dict[str, Any] | None = None) -> list[tuple[str, str, str]]:
+    def _policy(self) -> Any | None:
+        if self._interruption_policy is None:
+            try:
+                from interruption_policy import InterruptionPolicy
+                self._interruption_policy = InterruptionPolicy()
+            except Exception:
+                logger.exception("Failed to initialize interruption policy")
+                self._interruption_policy = False
+        return None if self._interruption_policy is False else self._interruption_policy
+
+    def _evaluate_interruption_policy(
+        self,
+        *,
+        user_active: bool,
+        discovery_available: bool,
+        cooldown_allowed: bool,
+        cooldown_reason: str | None,
+    ) -> dict[str, Any] | None:
+        # INTERRUPTION_POLICY_V1
+        policy = self._policy()
+        if policy is None:
+            return None
+        try:
+            return policy.evaluate(
+                user_active=user_active,
+                discovery_available=discovery_available,
+                cooldown_allowed=cooldown_allowed,
+                cooldown_reason=cooldown_reason,
+            )
+        except Exception:
+            logger.exception("Interruption policy failed")
+            return None
+
+    def _extract_content_reference(
+        self,
+        messages: list[tuple[str, str, str]],
+    ) -> tuple[
+        list[tuple[str, str, str]],
+        str | None,
+    ]:
+        # RICH_CONTENT_REFERENCE_V1
+        visible: list[tuple[str, str, str]] = []
+        content_ref: str | None = None
+
+        for msg_type, content, generated_by in messages:
+            if msg_type == "__content_ref__":
+                candidate = str(
+                    content or ""
+                ).strip()
+                if candidate and content_ref is None:
+                    content_ref = candidate
+                continue
+            visible.append(
+                (
+                    msg_type,
+                    content,
+                    generated_by,
+                )
+            )
+
+        return visible, content_ref
+
+    def _content_delivery_evidence_score(
+        self,
+        item: dict[str, Any],
+        sent_messages: list[tuple[str, str, str]],
+    ) -> int:
+        # INTEREST_LEARNING_DELIVERY_EVIDENCE_V1
+        combined = "\n".join(str(message[1]) for message in sent_messages).lower()
+        url = str(item.get("url") or "").strip().lower()
+        title = str(item.get("title") or "").strip().lower()
+        source = str(item.get("source") or "").strip().lower()
+
+        if url and url in combined:
+            return 100
+        if title and len(title) >= 5 and title in combined:
+            return 90
+
+        score = 0
+        ascii_tokens = [
+            token for token in re.findall(r"[a-z0-9+#.]{3,}", title)
+            if token not in {"with", "from", "that", "this", "the", "and", "for"}
+        ]
+        for token in set(ascii_tokens):
+            if re.search(rf"(?<![a-z0-9]){re.escape(token)}(?![a-z0-9])", combined):
+                score += 12
+
+        chinese = "".join(re.findall(r"[\u4e00-\u9fff]", title))
+        bigrams = {chinese[index:index + 2] for index in range(max(0, len(chinese) - 1))}
+        matched_bigrams = sum(1 for pair in bigrams if pair in combined)
+        score += min(48, matched_bigrams * 8)
+
+        if source and source in combined:
+            score += 10
+
+        content_types = {str(message[0]) for message in sent_messages}
+        if content_types & {"news_reaction", "research_ping", "memory_recall"}:
+            score += 10
+        return score
+
+    def _record_interest_delivery(
+        self,
+        discovery_context: dict[str, Any] | None,
+        tick_id: str,
+        sent_messages: list[tuple[str, str, str]],
+        delivered_item: dict[str, Any] | None = None,
+    ) -> bool:
+        # INTEREST_LEARNING_DELIVERY_EVIDENCE_V1
+        # RICH_CONTENT_DELIVERY_V1
+        if isinstance(delivered_item, dict):
+            try:
+                from interest_learning import InterestLearningEngine
+                normalized = InterestLearningEngine().record_delivery(
+                    delivered_item,
+                    tick_id=tick_id,
+                )
+                self._log(
+                    "content_delivery",
+                    tick_id=tick_id,
+                    content_item_id=normalized.get("id"),
+                    content_source=normalized.get("source"),
+                    content_tags=normalized.get("tags"),
+                    evidence_score="structured_delivery",
+                )
+                return True
+            except Exception:
+                logger.exception(
+                    "Failed to record structured content delivery"
+                )
+                return False
+
+        if not isinstance(discovery_context, dict) or not sent_messages:
+            return False
+        external = discovery_context.get("external")
+        if not isinstance(external, list) or not external:
+            return False
+
+        candidates: list[tuple[int, dict[str, Any]]] = []
+        for item in external:
+            if isinstance(item, dict):
+                candidates.append((self._content_delivery_evidence_score(item, sent_messages), item))
+        if not candidates:
+            return False
+
+        score, item = max(candidates, key=lambda value: value[0])
+        if score < 20:
+            self._log(
+                "content_delivery_skipped",
+                tick_id=tick_id,
+                reason="no_delivery_evidence",
+                evidence_score=score,
+            )
+            return False
+
+        try:
+            from interest_learning import InterestLearningEngine
+            normalized = InterestLearningEngine().record_delivery(item, tick_id=tick_id)
+            self._log(
+                "content_delivery",
+                tick_id=tick_id,
+                content_item_id=normalized.get("id"),
+                content_source=normalized.get("source"),
+                content_tags=normalized.get("tags"),
+                evidence_score=score,
+            )
+            return True
+        except Exception:
+            logger.exception("Failed to record interest-learning delivery")
+            return False
+
+    def _content_delivery(self) -> Any | None:
+        # RICH_CONTENT_DELIVERY_V1
+        if self._content_delivery_engine is None:
+            try:
+                from content_delivery import ContentDeliveryEngine
+                self._content_delivery_engine = ContentDeliveryEngine()
+            except Exception:
+                logger.exception(
+                    "Failed to initialize content delivery engine"
+                )
+                self._content_delivery_engine = False
+        return (
+            None
+            if self._content_delivery_engine is False
+            else self._content_delivery_engine
+        )
+
+    def _policy_fallback_message(self, policy_decision: dict[str, Any] | None) -> str:
+        # INTERRUPTION_POLICY_ENFORCEMENT_V1
+        # EMOJI_SOFT_POLICY_V1: emoji is guided by context, never hard-stripped.
+        if not isinstance(policy_decision, dict):
+            return "嘿，我在"
+        if not bool(policy_decision.get("allow_send", True)):
+            return ""
+        try:
+            level = int(policy_decision.get("level", 2))
+        except Exception:
+            level = 2
+        acts = policy_decision.get("preferred_speech_acts")
+        preferred = [str(x) for x in acts] if isinstance(acts, list) else []
+        if level <= 0:
+            return ""
+        if level == 1:
+            if "debug_companion" in preferred:
+                return "你继续，我不插嘴"
+            if "care" in preferred:
+                return "这会儿先别把自己拧太紧"
+            return "我在"
+        if level >= 3:
+            if "sulk" in preferred:
+                return "呵，又不理我"
+            if "poke" in preferred:
+                return "人呢"
+            return "算了你忙"
+        return "嘿，我在"
+
+    def _enforce_policy_messages(
+        self,
+        messages: list[tuple[str, str, str]],
+        policy_decision: dict[str, Any] | None,
+    ) -> list[tuple[str, str, str]]:
+        # INTERRUPTION_POLICY_ENFORCEMENT_V1
+        if not isinstance(policy_decision, dict):
+            return messages[:5]
+        if not bool(policy_decision.get("allow_send", True)):
+            return []
+
+        try:
+            max_bubbles = int(policy_decision.get("max_bubbles", 1))
+        except Exception:
+            max_bubbles = 1
+        max_bubbles = max(1, min(5, max_bubbles))
+        allow_emoji = bool(policy_decision.get("allow_emoji", True))  # compatibility metadata only
+        allow_content_share = bool(policy_decision.get("allow_content_share", True))
+
+        emoji_re = re.compile(
+            "[\U0001F300-\U0001FAFF\U00002700-\U000027BF\U00002600-\U000026FF]"
+        )
+        url_re = re.compile(r"https?://\S+", re.I)
+
+        out: list[tuple[str, str, str]] = []
+        for msg_type, content, generated_by in messages:
+            cleaned = str(content).strip()
+            if not cleaned:
+                continue
+            if not allow_content_share and (url_re.search(cleaned) or re.search(r"^\s*链接\s*[:：]", cleaned)):
+                continue
+            if cleaned:
+                out.append((msg_type, cleaned, generated_by))
+            if len(out) >= max_bubbles:
+                break
+        return out
+
+    async def _compose_message(self, voice: Any | None = None, discovery_context: dict[str, Any] | None = None, policy_decision: dict[str, Any] | None = None) -> list[tuple[str, str, str]]:
         default_voice = self._voice_state_or_default(voice)
         if self._feature_enabled(LLM_ENABLED_ENV):
-            llm_result = await self._compose_llm_message(default_voice, discovery_context)
+            llm_result = await self._compose_llm_message(default_voice, discovery_context, policy_decision=policy_decision)
             if llm_result is not None and len(llm_result) > 0:
                 # Check if LLM result is actually a fallback
                 msg_type, content = llm_result[0]
                 if not self._is_llm_fallback(msg_type, content):
                     return [(m_type, m_content, self._llm_model_name()) for m_type, m_content in llm_result]
                 logger.debug("LLM composer returned fallback; using heartbeat")
-        return [("heartbeat", self._heartbeat_message(), "hermes")]
+        fallback_content = self._policy_fallback_message(policy_decision)
+        if not fallback_content:
+            return []
+        return [("heartbeat", fallback_content, "hermes")]
 
-    async def _compose_llm_message(self, voice: Any, discovery_context: dict[str, Any] | None = None) -> list[tuple[str, str]] | None:
+    async def _compose_llm_message(self, voice: Any, discovery_context: dict[str, Any] | None = None, policy_decision: dict[str, Any] | None = None) -> list[tuple[str, str]] | None:
         if self._llm_message_composer is None:
             try:
                 from llm_message_composer import LLMMessageComposer
@@ -348,7 +800,10 @@ class ProactivePlatformWatcher:
         if self._llm_message_composer is False:
             return None
         try:
-            return await self._llm_message_composer.compose(voice, context={"trigger": self._dominant_voice(voice)}, discovery_context=discovery_context)
+            compose_context = {"trigger": self._dominant_voice(voice)}
+            if policy_decision is not None:
+                compose_context["interruption_policy"] = policy_decision
+            return await self._llm_message_composer.compose(voice, context=compose_context, discovery_context=discovery_context)
         except Exception:
             logger.exception("LLM message composer failed")
             self._llm_message_composer = False
@@ -411,17 +866,11 @@ class ProactivePlatformWatcher:
             return False
 
     def _user_active_recently(self) -> bool:
-        """Check if proactive message should be suppressed due to recent activity.
+        """Return True when Alive should suppress proactive sending.
 
-        Returns True (suppress) if ANY of:
-        - Hermes is currently processing a session
-        - The last message is from the user (user is waiting for a reply)
-        - The last message (from either side) was < 30 minutes ago
-
-        Only allows proactive messages when the conversation is truly idle:
-        no session is running, Hermes sent the last message, and the entire
-        conversation has been silent for 30+ minutes.  This prevents Alive from
-        interrupting while Hermes is still working on a long task.
+        Allow only when all three activity-guard conditions are true:
+        session is idle, the latest Weixin message is from Hermes, and that
+        Hermes message is at least 30 minutes old.
         """
         try:
             from context_tracker import activity_snapshot, is_session_busy
@@ -432,20 +881,23 @@ class ProactivePlatformWatcher:
 
             snapshot = activity_snapshot(refresh=True)
             if not snapshot.get("has_context"):
+                logger.debug("Activity guard: no conversation context, allowing")
                 return False
 
-            now = time.time()
             last_role = snapshot.get("last_message_role")
-            if last_role == "user":
-                logger.debug("Activity guard: last message is from user, suppressing")
+            if last_role != "assistant":
+                logger.debug("Activity guard: last message role is %r, suppressing", last_role)
                 return True
 
             last_msg_ts = snapshot.get("last_message_timestamp")
-            if last_msg_ts is not None:
-                seconds_since_last = now - float(last_msg_ts)
-                if seconds_since_last < 1800:
-                    logger.debug("Activity guard: last message %.0fs ago (< 1800s), suppressing", seconds_since_last)
-                    return True
+            if last_msg_ts is None:
+                logger.debug("Activity guard: Hermes last-message timestamp missing, suppressing")
+                return True
+
+            seconds_since_last = time.time() - float(last_msg_ts)
+            if seconds_since_last < 1800:
+                logger.debug("Activity guard: Hermes last message %.0fs ago (< 1800s), suppressing", seconds_since_last)
+                return True
 
             return False
         except Exception:
@@ -506,18 +958,23 @@ class ProactivePlatformWatcher:
                 logger.exception("Dream consolidation failed")
 
     def _metadata(self, generated_by: str) -> dict[str, Any]:
+        # RICH_CONTENT_METADATA_V1
+        resolved = str(generated_by or "hermes").strip() or "hermes"
+        if resolved == "hermes":
+            return dict(SYSTEM_METADATA)
+
         metadata = dict(SYSTEM_METADATA)
         metadata.update({
             "actor": "model",
             "source": "model",
             "message_origin": "model",
             "origin": "model",
-            "model_name": generated_by,
-            "resolved_model": generated_by,
-            "routed_model": generated_by,
-            "model": generated_by,
+            "model_name": resolved,
+            "resolved_model": resolved,
+            "routed_model": resolved,
+            "model": resolved,
         })
-        metadata["is_system"] = False  # proactive messages are from the model, not the system
+        metadata["is_system"] = False
         return metadata
 
     def _log(self, decision: str, **extra: Any) -> None:
