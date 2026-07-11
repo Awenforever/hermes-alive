@@ -37,6 +37,10 @@ from safe_io import (
     atomic_write_text,
     file_lock,
 )
+from weixin_peer import (
+    adapter_context_token_present,
+    resolve_weixin_peer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -431,68 +435,224 @@ class ProactivePlatformWatcher:
         return data if isinstance(data, dict) else {}
 
     def _resolve_adapter_and_chat_id(self) -> tuple[Any | None, str | None]:
-        """Resolve the first available adapter with a matching chat_id.
+        """Resolve the first adapter and a canonical platform chat target.
 
-        Weixin takes priority if both a weixin adapter exists and
-        HERMES_PROACTIVE_WEIXIN_CHAT_ID is set. Otherwise, iterate all
-        adapters in order, looking for HERMES_PROACTIVE_{PLATFORM}_CHAT_ID.
+        Weixin QR credentials identify the bot account, while inbound DM
+        sessions and context tokens are keyed by the human peer. Resolve the
+        configured value to a context-bearing peer when runtime evidence is
+        unambiguous; never guess between multiple peers.
         """
         weixin_adapter: Any | None = None
+
         for key, adapter in self.adapters.items():
             key_value = getattr(key, "value", key)
-            if key_value == "weixin":
+
+            if str(key_value) == "weixin":
                 weixin_adapter = adapter
                 continue
-            # Non-weixin platform: check env var
+
             platform = str(key_value).upper()
-            chat_id = os.getenv(f"HERMES_PROACTIVE_{platform}_CHAT_ID", "").strip()
+            chat_id = os.getenv(
+                f"HERMES_PROACTIVE_{platform}_CHAT_ID",
+                "",
+            ).strip()
+
             if chat_id:
-                logger.debug("Found adapter for platform=%s with configured chat_id", key_value)
+                logger.debug(
+                    "Found adapter for platform=%s with configured chat_id",
+                    key_value,
+                )
                 return adapter, chat_id
 
-        # Try weixin last, so it overrides if both are available
         if weixin_adapter is not None:
-            chat_id = os.getenv("HERMES_PROACTIVE_WEIXIN_CHAT_ID", "").strip()
-            if chat_id:
-                logger.debug("Found weixin adapter with configured chat_id")
-                return weixin_adapter, chat_id
+            configured = os.getenv(
+                CHAT_ID_ENV,
+                "",
+            ).strip()
 
-        logger.warning("No adapter with a configured HERMES_PROACTIVE_{PLATFORM}_CHAT_ID found")
+            resolved, reason = resolve_weixin_peer(
+                configured,
+                account_id=str(
+                    getattr(
+                        weixin_adapter,
+                        "_account_id",
+                        "",
+                    )
+                    or ""
+                ),
+            )
+
+            if resolved:
+                token_present = (
+                    adapter_context_token_present(
+                        weixin_adapter,
+                        resolved,
+                    )
+                )
+
+                self._log(
+                    "peer_resolution",
+                    reason="weixin_peer_resolution",
+                    configured_chat_hash=(
+                        sha256_text(configured)
+                        if configured
+                        else None
+                    ),
+                    resolved_chat_hash=sha256_text(
+                        resolved
+                    ),
+                    chat_resolution=reason,
+                    context_token_present=token_present,
+                )
+
+                logger.debug(
+                    "Resolved Weixin proactive target mode=%s token=%s",
+                    reason,
+                    token_present,
+                )
+                return weixin_adapter, resolved
+
+        logger.warning(
+            "No adapter with a configured "
+            "HERMES_PROACTIVE_{PLATFORM}_CHAT_ID found"
+        )
         return None, None
 
-    async def _process_control_queue(self, adapter: Any, chat_id: str, tick_id: str) -> bool:
+    async def _process_control_queue(
+        self,
+        adapter: Any,
+        chat_id: str,
+        tick_id: str,
+    ) -> bool:
         if not QUEUE.exists():
             return False
+
         from safe_io import LOCK_DIR
-        queue_lock = LOCK_DIR / "control_queue_process.lock"
+
+        queue_lock = (
+            LOCK_DIR
+            / "control_queue_process.lock"
+        )
+
         with file_lock(queue_lock):
             try:
-                lines = QUEUE.read_text(encoding="utf-8").splitlines()
+                lines = QUEUE.read_text(
+                    encoding="utf-8"
+                ).splitlines()
             except Exception:
                 return False
+
             if not lines:
                 return False
+
             remaining: list[str] = []
             sent_any = False
+
             for line in lines:
                 try:
                     item = json.loads(line)
                 except Exception:
                     continue
-                if item.get("type") == "test" and not sent_any:
-                    content = str(item.get("message") or "Hermes Alive 主动推送测试。")
+
+                if (
+                    item.get("type") == "test"
+                    and not sent_any
+                ):
+                    content = str(
+                        item.get("message")
+                        or "Hermes Alive 主动推送测试。"
+                    )
+                    generated_by = str(
+                        item.get("generated_by")
+                        or "hermes"
+                    )
+
                     try:
-                        await adapter.send(chat_id, content, metadata=self._metadata(item.get("generated_by", "hermes")))
-                        self._log("sent", tick_id=tick_id, reason="alive_test", msg_type="test", generated_by=item.get("generated_by", "hermes"), message_hash=sha256_text(content), message_preview=redact_preview(content), adapter_result="ok")
-                        sent_any = True
+                        result = await adapter.send(
+                            chat_id,
+                            content,
+                            metadata=self._metadata(
+                                generated_by
+                            ),
+                        )
                     except Exception as exc:
-                        self._log("error", tick_id=tick_id, reason="alive_test_send_failed", error=type(exc).__name__)
+                        self._log(
+                            "error",
+                            tick_id=tick_id,
+                            reason=(
+                                "alive_test_send_exception"
+                            ),
+                            error=type(exc).__name__,
+                        )
                         remaining.append(line)
+                        continue
+
+                    if (
+                        getattr(
+                            result,
+                            "success",
+                            True,
+                        )
+                        is False
+                    ):
+                        self._log(
+                            "error",
+                            tick_id=tick_id,
+                            reason=(
+                                "alive_test_send_unsuccessful"
+                            ),
+                            error=str(
+                                getattr(
+                                    result,
+                                    "error",
+                                    "",
+                                )
+                                or "send_result_unsuccessful"
+                            ),
+                            adapter_result_type=type(
+                                result
+                            ).__name__,
+                        )
+                        remaining.append(line)
+                        continue
+
+                    self._log(
+                        "sent",
+                        tick_id=tick_id,
+                        reason="alive_test",
+                        msg_type="test",
+                        generated_by=generated_by,
+                        message_hash=sha256_text(
+                            content
+                        ),
+                        message_preview=redact_preview(
+                            content
+                        ),
+                        adapter_result="ok",
+                        adapter_result_type=type(
+                            result
+                        ).__name__,
+                    )
+                    sent_any = True
                 else:
                     remaining.append(line)
-            locked_write_json(BASE / "control_queue_state.json", {"last_processed_at": datetime.now().astimezone().isoformat()}, "control_queue.lock")
-            atomic_write_text(QUEUE, "\n".join(remaining) + ("\n" if remaining else ""))
-        return sent_any
+
+            locked_write_json(
+                BASE / "control_queue_state.json",
+                {
+                    "last_processed_at":
+                        datetime.now()
+                        .astimezone()
+                        .isoformat()
+                },
+                "control_queue.lock",
+            )
+            atomic_write_text(
+                QUEUE,
+                "\n".join(remaining)
+                + ("\n" if remaining else ""),
+            )
+            return sent_any
 
     def _heartbeat_message(self) -> str:
         return "Hermes proactive platform heartbeat."

@@ -11,6 +11,7 @@ import importlib.util
 import json
 import os
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -38,7 +39,9 @@ from interruption_policy import InterruptionPolicy
 from interest_learning import InterestLearningEngine
 from llm_message_composer import LLMMessageComposer
 from managed_config import load_managed_env, managed_config_path
+import proactive_watcher as proactive_watcher_module
 from proactive_watcher import ProactivePlatformWatcher
+from weixin_peer import resolve_weixin_peer
 from fakes import FakeAdapter
 
 
@@ -363,6 +366,350 @@ def watcher_metadata_and_reference() -> None:
     assert ref == "abc" and len(visible) == 1
 
 
+class _TokenStore:
+    def __init__(self, values: dict[tuple[str, str], str]) -> None:
+        self.values = values
+
+    def get(self, account_id: str, peer: str) -> str | None:
+        return self.values.get((account_id, peer))
+
+
+class _WeixinAdapter:
+    def __init__(
+        self,
+        account_id: str,
+        values: dict[tuple[str, str], str],
+        *,
+        success: bool = True,
+    ) -> None:
+        self._account_id = account_id
+        self._token_store = _TokenStore(values)
+        self.success = success
+        self.calls: list[dict[str, Any]] = []
+
+    async def send(
+        self,
+        chat_id: str,
+        content: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> Any:
+        self.calls.append(
+            {
+                "chat_id": chat_id,
+                "content": content,
+                "metadata": metadata,
+            }
+        )
+        return SimpleNamespace(
+            success=self.success,
+            error=(
+                None
+                if self.success
+                else "synthetic failure"
+            ),
+        )
+
+
+def weixin_peer_resolution_matrix() -> None:
+    home = Path(
+        tempfile.mkdtemp(
+            prefix="weixin-peer-matrix-"
+        )
+    )
+    accounts = home / "weixin" / "accounts"
+    accounts.mkdir(parents=True)
+    account_id = "bot-account@im.bot"
+    token_path = (
+        accounts
+        / f"{account_id}.context-tokens.json"
+    )
+
+    token_path.write_text(
+        json.dumps(
+            {
+                "human-peer": "token-1",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    exact = resolve_weixin_peer(
+        "human-peer",
+        home=home,
+        account_id=account_id,
+    )
+    assert exact == (
+        "human-peer",
+        "exact_context_peer",
+    )
+
+    suffixed = resolve_weixin_peer(
+        "human-peer@im.wechat",
+        home=home,
+        account_id=account_id,
+    )
+    assert suffixed == (
+        "human-peer",
+        "stripped_platform_suffix",
+    )
+
+    fallback = resolve_weixin_peer(
+        account_id,
+        home=home,
+        account_id=account_id,
+    )
+    assert fallback == (
+        "human-peer",
+        "single_context_peer",
+    )
+
+    db = home / "state.db"
+    conn = sqlite3.connect(str(db))
+    try:
+        conn.execute(
+            """
+            CREATE TABLE sessions (
+                id TEXT PRIMARY KEY,
+                source TEXT,
+                user_id TEXT,
+                started_at REAL,
+                ended_at REAL
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO sessions (
+                id,
+                source,
+                user_id,
+                started_at,
+                ended_at
+            ) VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                "session-1",
+                "weixin",
+                "human-peer",
+                1.0,
+                2.0,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    latest = resolve_weixin_peer(
+        "other-configured-value",
+        home=home,
+        account_id=account_id,
+    )
+    assert latest == (
+        "human-peer",
+        "latest_weixin_session_peer",
+    )
+
+    token_path.write_text(
+        json.dumps(
+            {
+                "human-peer": "token-1",
+                "other-peer": "token-2",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    unresolved = resolve_weixin_peer(
+        "unknown",
+        home=home,
+        account_id=account_id,
+    )
+    assert unresolved == (
+        "human-peer",
+        "latest_weixin_session_peer",
+    )
+
+    db.unlink()
+    ambiguous = resolve_weixin_peer(
+        "unknown",
+        home=home,
+        account_id=account_id,
+    )
+    assert ambiguous == (
+        "unknown",
+        "configured_unresolved",
+    )
+
+
+def watcher_weixin_resolution() -> None:
+    home = Path(
+        tempfile.mkdtemp(
+            prefix="watcher-weixin-resolve-"
+        )
+    )
+    accounts = home / "weixin" / "accounts"
+    accounts.mkdir(parents=True)
+    account_id = "bot-account@im.bot"
+    peer = "human-peer"
+    (
+        accounts
+        / f"{account_id}.context-tokens.json"
+    ).write_text(
+        json.dumps({peer: "token"}),
+        encoding="utf-8",
+    )
+
+    previous_home = os.environ.get(
+        "HERMES_HOME"
+    )
+    previous_chat = os.environ.get(
+        "HERMES_PROACTIVE_WEIXIN_CHAT_ID"
+    )
+
+    try:
+        os.environ["HERMES_HOME"] = str(home)
+        os.environ[
+            "HERMES_PROACTIVE_WEIXIN_CHAT_ID"
+        ] = account_id
+
+        adapter = _WeixinAdapter(
+            account_id,
+            {
+                (account_id, peer): "token",
+            },
+        )
+        watcher = ProactivePlatformWatcher(
+            {"weixin": adapter},
+            SimpleNamespace(),
+        )
+        resolved_adapter, resolved_chat = (
+            watcher._resolve_adapter_and_chat_id()
+        )
+        assert resolved_adapter is adapter
+        assert resolved_chat == peer
+    finally:
+        if previous_home is None:
+            os.environ.pop(
+                "HERMES_HOME",
+                None,
+            )
+        else:
+            os.environ[
+                "HERMES_HOME"
+            ] = previous_home
+
+        if previous_chat is None:
+            os.environ.pop(
+                "HERMES_PROACTIVE_WEIXIN_CHAT_ID",
+                None,
+            )
+        else:
+            os.environ[
+                "HERMES_PROACTIVE_WEIXIN_CHAT_ID"
+            ] = previous_chat
+
+
+async def watcher_control_send_result() -> None:
+    shared = Path(
+        tempfile.mkdtemp(
+            prefix="watcher-control-result-"
+        )
+    )
+    queue = shared / "control_queue.jsonl"
+    log = shared / "proactive_log.jsonl"
+    base = shared
+    queue.write_text(
+        json.dumps(
+            {
+                "type": "test",
+                "message": "test message",
+                "generated_by": "hermes",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    old_queue = proactive_watcher_module.QUEUE
+    old_log = proactive_watcher_module.PROACTIVE_LOG
+    old_base = proactive_watcher_module.BASE
+
+    try:
+        proactive_watcher_module.QUEUE = queue
+        proactive_watcher_module.PROACTIVE_LOG = log
+        proactive_watcher_module.BASE = base
+
+        failed_adapter = _WeixinAdapter(
+            "account",
+            {},
+            success=False,
+        )
+        watcher = ProactivePlatformWatcher(
+            {"weixin": failed_adapter},
+            SimpleNamespace(),
+        )
+        sent = await watcher._process_control_queue(
+            failed_adapter,
+            "peer",
+            "tick-failed",
+        )
+        assert sent is False
+        assert queue.read_text(
+            encoding="utf-8"
+        ).strip()
+
+        records = [
+            json.loads(line)
+            for line in log.read_text(
+                encoding="utf-8"
+            ).splitlines()
+        ]
+        assert any(
+            item.get("reason")
+            == "alive_test_send_unsuccessful"
+            for item in records
+        )
+        assert not any(
+            item.get("decision") == "sent"
+            and item.get("reason") == "alive_test"
+            for item in records
+        )
+
+        success_adapter = _WeixinAdapter(
+            "account",
+            {},
+            success=True,
+        )
+        sent = await watcher._process_control_queue(
+            success_adapter,
+            "peer",
+            "tick-success",
+        )
+        assert sent is True
+        assert queue.read_text(
+            encoding="utf-8"
+        ) == ""
+
+        records = [
+            json.loads(line)
+            for line in log.read_text(
+                encoding="utf-8"
+            ).splitlines()
+        ]
+        assert any(
+            item.get("decision") == "sent"
+            and item.get("reason") == "alive_test"
+            and item.get(
+                "adapter_result_type"
+            ) == "SimpleNamespace"
+            for item in records
+        )
+    finally:
+        proactive_watcher_module.QUEUE = old_queue
+        proactive_watcher_module.PROACTIVE_LOG = old_log
+        proactive_watcher_module.BASE = old_base
+
+
 def lifecycle_matrix() -> None:
     home = Path(tempfile.mkdtemp(prefix="lifecycle-matrix-"))
     env = dict(os.environ)
@@ -514,6 +861,9 @@ def main() -> int:
         ("content_ref_hidden", content_ref_hidden),
         ("learning_matrix", learning_matrix),
         ("watcher_metadata_and_reference", watcher_metadata_and_reference),
+        ("weixin_peer_resolution_matrix", weixin_peer_resolution_matrix),
+        ("watcher_weixin_resolution", watcher_weixin_resolution),
+        ("watcher_control_send_result", watcher_control_send_result),
         ("lifecycle_matrix", lifecycle_matrix),
         ("lifecycle_compile_failure_preserves_previous", lifecycle_compile_failure_preserves_previous),
         ("swap_rollback_injection", swap_rollback_injection),

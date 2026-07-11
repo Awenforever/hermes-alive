@@ -32,10 +32,28 @@ QUEUE_FILE = SHARED_DIR / "context_queue.json"
 PROACTIVE_LOG = SHARED_DIR / "proactive_log.jsonl"
 
 WEIXIN_SOURCE = "weixin"
-WEIXIN_USER_ID = os.getenv("HERMES_PROACTIVE_WEIXIN_CHAT_ID", "").strip()
 
 HERMES_HOME = os.getenv("HERMES_HOME", "/opt/data")
 STATE_DB = Path(os.getenv("HERMES_STATE_DB", os.path.join(HERMES_HOME, "state.db")))
+
+
+def _weixin_user_id() -> str:
+    try:
+        from weixin_peer import resolve_weixin_peer
+
+        resolved, _reason = resolve_weixin_peer(
+            os.getenv(
+                "HERMES_PROACTIVE_WEIXIN_CHAT_ID",
+                "",
+            )
+        )
+        return resolved
+    except Exception:
+        return os.getenv(
+            "HERMES_PROACTIVE_WEIXIN_CHAT_ID",
+            "",
+        ).strip()
+
 
 _session_busy = False
 _session_busy_lock = threading.Lock()
@@ -131,7 +149,7 @@ class ContextQueue:
                 "version": 1,
                 "updated_at": datetime.now(CST).isoformat(),
                 "source": WEIXIN_SOURCE,
-                "user_id": WEIXIN_USER_ID,
+                "user_id": _weixin_user_id(),
                 "max_messages": self.max_messages,
                 "message_count": len(merged),
                 "messages": merged,
@@ -176,7 +194,7 @@ class ContextQueue:
             "version": int(data.get("version") or 1),
             "updated_at": str(data.get("updated_at") or ""),
             "source": str(data.get("source") or WEIXIN_SOURCE),
-            "user_id": str(data.get("user_id") or WEIXIN_USER_ID),
+            "user_id": str(_weixin_user_id() or data.get("user_id") or ""),
             "max_messages": int(data.get("max_messages") or self.max_messages),
             "message_count": len(messages),
             "messages": messages,
@@ -187,7 +205,7 @@ class ContextQueue:
             "version": 1,
             "updated_at": "",
             "source": WEIXIN_SOURCE,
-            "user_id": WEIXIN_USER_ID,
+            "user_id": _weixin_user_id(),
             "max_messages": self.max_messages,
             "message_count": 0,
             "messages": [],
@@ -297,7 +315,8 @@ def read_recent_context() -> str:
 
 
 def _fetch_latest_rows(limit: int) -> list[dict[str, Any]]:
-    if not WEIXIN_USER_ID:
+    user_id = _weixin_user_id()
+    if not user_id:
         logger.debug("No WEIXIN_CHAT_ID configured; cannot refresh context queue")
         return []
     if not STATE_DB.exists():
@@ -315,7 +334,7 @@ def _fetch_latest_rows(limit: int) -> list[dict[str, Any]]:
             "WHERE s.source = ? AND s.user_id = ? AND m.active = 1 "
             "AND m.role IN ('user', 'assistant') "
             "ORDER BY m.timestamp DESC, m.id DESC LIMIT ?",
-            (WEIXIN_SOURCE, WEIXIN_USER_ID, limit),
+            (WEIXIN_SOURCE, user_id, limit),
         )
         rows = [dict(row) for row in cursor.fetchall()]
     finally:

@@ -91,7 +91,7 @@ Hook (gateway:startup) -> ProactivePlatformWatcher (asyncio)
 | Key | Required | Default | Purpose |
 |---|---|---|---|
 | `HERMES_PROACTIVE_PLATFORM_ENABLED` | Yes | `false` | Master enable. |
-| `HERMES_PROACTIVE_WEIXIN_CHAT_ID` | Yes | — | Target WeChat chat ID. |
+| `HERMES_PROACTIVE_WEIXIN_CHAT_ID` | Yes | — | Target WeChat chat ID. iLink bot/home IDs are normalized to the canonical inbound peer only when context-token/session evidence is unambiguous. |
 | `TZ` | Yes | — | Your timezone (e.g. `Asia/Shanghai`, `America/New_York`). |
 | `VOICE_ENABLED` | No | `false` | Personality Genome. |
 | `HERMES_DREAM_ENABLED` | No | `false` | Dream memory consolidation. |

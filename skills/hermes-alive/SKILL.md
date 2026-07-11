@@ -227,7 +227,7 @@ Key variables:
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `HERMES_PROACTIVE_PLATFORM_ENABLED` | false | Master enable |
-| `HERMES_PROACTIVE_WEIXIN_CHAT_ID` | — | Target chat (required) |
+| `HERMES_PROACTIVE_WEIXIN_CHAT_ID` | — | Target chat. For iLink DMs, Hermes Alive safely normalizes bot/home IDs to the canonical inbound peer when token/session evidence is unambiguous. |
 | `HERMES_PROACTIVE_PLATFORM_INTERVAL_SECONDS` | 300 | Tick interval |
 | `HERMES_PROACTIVE_LLM_ENABLED` | false | Use LLM generation |
 | `HERMES_PROACTIVE_LLM_MODEL` | deepseek-v4-flash-ascend | Primary model |

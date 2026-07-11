@@ -70,4 +70,25 @@ def load_managed_env(*, overwrite: bool = False) -> dict[str, str]:
         if overwrite or not os.getenv(env_name):
             os.environ[env_name] = text
             loaded[env_name] = text
+
+    # Weixin QR credentials identify the bot account, while inbound DM
+    # sessions and context tokens are keyed by the human peer. Normalize the
+    # proactive target only when the persisted runtime evidence makes the
+    # choice unambiguous.
+    try:
+        from weixin_peer import normalize_weixin_chat_env
+
+        before = os.getenv(
+            "HERMES_PROACTIVE_WEIXIN_CHAT_ID",
+            "",
+        ).strip()
+        resolved, _reason = normalize_weixin_chat_env()
+        if resolved and resolved != before:
+            loaded[
+                "HERMES_PROACTIVE_WEIXIN_CHAT_ID"
+            ] = resolved
+    except Exception:
+        # Managed configuration must remain import-safe.
+        pass
+
     return loaded

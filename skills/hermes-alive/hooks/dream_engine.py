@@ -35,9 +35,26 @@ logger = logging.getLogger(__name__)
 
 # The Weixin user to track (matched by source + user_id in sessions table)
 WEIXIN_SOURCE = "weixin"
-WEIXIN_USER_ID = os.getenv("HERMES_PROACTIVE_WEIXIN_CHAT_ID", "").strip()
 HERMES_HOME = os.getenv("HERMES_HOME", "/opt/data")
 STATE_DB_PATH = os.getenv("HERMES_STATE_DB", os.path.join(HERMES_HOME, "state.db"))
+
+
+def _weixin_user_id() -> str:
+    try:
+        from weixin_peer import resolve_weixin_peer
+
+        resolved, _reason = resolve_weixin_peer(
+            os.getenv(
+                "HERMES_PROACTIVE_WEIXIN_CHAT_ID",
+                "",
+            )
+        )
+        return resolved
+    except Exception:
+        return os.getenv(
+            "HERMES_PROACTIVE_WEIXIN_CHAT_ID",
+            "",
+        ).strip()
 
 
 def _now_iso() -> str:
@@ -184,7 +201,8 @@ class DreamEngine:
         try:
             cursor = conn.cursor()
 
-            if not WEIXIN_USER_ID:
+            user_id = _weixin_user_id()
+            if not user_id:
                 logger.debug("No WEIXIN_CHAT_ID configured; cannot read session transcripts")
                 return []
 
@@ -192,7 +210,7 @@ class DreamEngine:
             cursor.execute(
                 "SELECT id, started_at FROM sessions "
                 "WHERE source = ? AND user_id = ? ORDER BY started_at DESC LIMIT 5",
-                (WEIXIN_SOURCE, WEIXIN_USER_ID)
+                (WEIXIN_SOURCE, user_id)
             )
             sessions = cursor.fetchall()
             if not sessions:
