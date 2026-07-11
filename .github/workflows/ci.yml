@@ -18,8 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
       - run: |
@@ -35,14 +35,32 @@ jobs:
           bash -n bootstrap.sh configure.sh verify.sh uninstall.sh
           bash -n skills/hermes-alive/scripts/*.sh
           bash -n skills/hermes-alive/tests/*.sh
-      - run: python3 skills/hermes-alive/tests/run_matrix.py
+      - name: Prepare fake Hermes CLI boundary
+        run: |
+          mkdir -p "$RUNNER_TEMP/hermes-alive-ci"
+          cat > "$RUNNER_TEMP/hermes-alive-ci/hermes" <<'SH'
+          #!/usr/bin/env bash
+          set -Eeuo pipefail
+          if [ "${1:-}" = "config" ] && [ "${2:-}" = "path" ]; then
+            printf '%s\n' "${HERMES_HOME:-$HOME}/config.yaml"
+            exit 0
+          fi
+          if [ "${1:-}" = "setup" ] && [ "${2:-}" = "model" ]; then
+            exit 0
+          fi
+          exit 2
+          SH
+          chmod 700 "$RUNNER_TEMP/hermes-alive-ci/hermes"
+          echo "HERMES_CLI=$RUNNER_TEMP/hermes-alive-ci/hermes" >> "$GITHUB_ENV"
+      - name: Run matrix
+        run: python3 skills/hermes-alive/tests/run_matrix.py
   stress:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_stress }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
       - run: python -m pip install --disable-pip-version-check PyYAML==6.0.3
