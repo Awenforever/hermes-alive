@@ -382,15 +382,33 @@ def profile_values(
 
 
 def candidate_from_profile(values: dict[str, Any]) -> LocationCandidate:
-    """Rebuild a safe candidate from managed profile values."""
+    """Rebuild a safe candidate from managed profile values without duplicating labels."""
+
+    admin1 = _text(values.get("weather_admin1"))
+    admin2 = _text(values.get("weather_admin2"))
+    admin3 = _text(values.get("weather_admin3"))
+    location_name = _text(values.get("weather_location_name"))
+
+    # ``weather_location_name`` is normally the already-composed public label.
+    # Reusing that full label as ``locality`` duplicates every administrative
+    # component when ``display_name`` is reconstructed. Keep it only as a
+    # fallback for unresolved free-text locations.
+    component_keys = {
+        value.casefold()
+        for value in (admin1, admin2, admin3)
+        if value
+    }
+    locality = location_name
+    if " · " in location_name or location_name.casefold() in component_keys:
+        locality = ""
 
     return LocationCandidate(
         country_code=_text(values.get("weather_country_code")).upper(),
         country_name="",
-        admin1=_text(values.get("weather_admin1")),
-        admin2=_text(values.get("weather_admin2")),
-        admin3=_text(values.get("weather_admin3")),
-        locality=_text(values.get("weather_location_name")),
+        admin1=admin1,
+        admin2=admin2,
+        admin3=admin3,
+        locality=locality,
         latitude=_coord(values.get("weather_lat"), latitude=True),
         longitude=_coord(values.get("weather_lon"), latitude=False),
         timezone=_text(values.get("weather_timezone")),
@@ -501,7 +519,11 @@ def location_confirmation_prompt(values: dict[str, Any]) -> str:
     """Return one natural-language question for Hermes to ask in chat."""
 
     candidate = candidate_from_profile(values)
-    name = candidate.display_name or candidate.timezone
+    name = (
+        _text(values.get("weather_location_name"))
+        or candidate.display_name
+        or candidate.timezone
+    )
     if name:
         if candidate.source.startswith("network"):
             basis = "我根据系统时区和网络出口做了粗略判断"

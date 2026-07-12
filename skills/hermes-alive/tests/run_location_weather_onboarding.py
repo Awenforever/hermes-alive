@@ -153,6 +153,8 @@ def test_chat_prompt_is_natural_and_single_question() -> None:
     )
     prompt = location_confirmation_prompt(values)
     check("Tampines" in prompt, "district missing from chat prompt")
+    check(prompt.count("Tampines") == 1, "district duplicated in chat prompt")
+    check(prompt.count("Singapore") == 1, "country/city duplicated in chat prompt")
     check(prompt.count("？") == 1, "chat onboarding should ask one question")
     for forbidden in (
         "Timezone [",
