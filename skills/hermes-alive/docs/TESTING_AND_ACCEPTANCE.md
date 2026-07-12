@@ -60,7 +60,8 @@ Before production consideration, complete all of the following from a fresh
 container and the real GitHub repository:
 
 1. clone/install without pre-copying source into final directories;
-2. complete Provider and personalization onboarding;
+2. verify zero-touch configuration: automatic timezone, default quiet hours,
+   no terminal questionnaire, and at most one chat-based weather confirmation;
 3. verify source, active hook, managed config, and permissions;
 4. run the complete matrix and default-scale stress suites;
 5. recreate the container and confirm persistent state behavior;

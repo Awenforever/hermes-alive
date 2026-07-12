@@ -165,14 +165,13 @@ The Quality Governor also rejects unsupported task-state claims such as “还�
 
 Weather is a lightweight context provider, not the main onboarding experience.
 
-During `configure`, Hermes Alive asks one compact location question only when no confirmed profile exists. It may use:
+Installation itself is zero-touch. Hermes Alive detects timezone locally, applies default quiet hours, and may prepare one network-assisted weather suggestion. The terminal never asks the user to enter a timezone, quiet-hour syntax, or weather coordinates.
 
-- system timezone and locale;
-- an existing confirmed profile;
-- optional network-assisted coarse lookup;
-- a district, county, planning area, borough, or equivalent region entered by the user.
+When no confirmed weather profile exists, Hermes may ask one short question in the normal chat, for example:
 
-The inferred location is always confirmable and correctable. Network location can be wrong because of VPNs, proxies, mobile routing, or remote servers.
+> “I roughly place you near Tampines from the system timezone and network exit. Should I use that for local weather? If not, just tell me your district or county.”
+
+The user may confirm, correct the district/county-level area, or decline weather context. Installation does not block while waiting for the answer, and weather stays disabled until confirmation. Network location can be wrong because of VPNs, proxies, mobile routing, or remote servers.
 
 Privacy behavior:
 
@@ -223,24 +222,30 @@ cd /opt/data/skills/hermes/hermes-alive
 scripts/hermes-alive-lifecycle install
 ```
 
-### Configure Provider and personalization
+### Automatic configuration
 
-Hermes owns Provider credentials. Hermes Alive stores only non-secret personalization.
+Hermes already owns Provider credentials and model selection. Installing Hermes Alive does not launch another Provider wizard.
 
 ```bash
 LIFECYCLE=/opt/data/skills/hermes/hermes-alive/scripts/hermes-alive-lifecycle
 
 "$LIFECYCLE" configure --provider-check-only
 
-# Run only when Hermes reports that no usable model is configured:
-/opt/hermes/.venv/bin/hermes setup model
-
-# Interactive personalization, including compact location confirmation:
-"$LIFECYCLE" configure
+"$LIFECYCLE" configure \
+  --non-interactive \
+  --enable \
+  --llm-enabled \
+  --discovery-enabled \
+  --dream-enabled \
+  --circadian-enabled \
+  --circadian-mode shadow \
+  --allow-network-location
 
 "$LIFECYCLE" verify
 "$LIFECYCLE" status
 ```
+
+The lifecycle command automatically detects timezone, applies the default quiet window (`23:00`–`08:00`), and prints a structured `onboarding_json` result for Hermes. If a weather location still needs confirmation, Hermes asks once in the existing chat. Users never need to type timezone identifiers, quiet-hour values, CLI flags, or coordinates.
 
 A changed active hook may require a gateway restart. Restarting a production gateway or sending a real message should always be an explicit operational decision, not an automatic installation side effect.
 
@@ -248,44 +253,28 @@ A changed active hook may require a gateway restart. Restarting a production gat
 
 ## ⚙️ Configuration
 
-The interactive configuration is intentionally small. Most users only need to confirm:
+Normal installation is conversational and automatic:
 
-- whether Hermes Alive is enabled;
-- the target WeChat conversation;
-- timezone and quiet preference;
-- model-backed composition;
-- discovery and dream preferences;
-- one compact location/weather confirmation.
+- Hermes verifies that its existing Provider is usable;
+- timezone is detected from the Hermes environment and local system;
+- quiet hours default to `23:00`–`08:00`;
+- Circadian starts from safe defaults and learns gradually;
+- optional weather context requires at most one natural chat confirmation;
+- no terminal questionnaire is shown.
 
-Advanced non-secret settings can be supplied through the lifecycle CLI:
+Advanced operators may still override non-secret settings explicitly:
 
 ```bash
 "$LIFECYCLE" configure \
+  --non-interactive \
   --enable \
-  --weixin-chat-id '<chat-id>' \
   --timezone Asia/Singapore \
   --quiet-start 23:00 \
   --quiet-end 08:00 \
   --emoji-policy contextual \
   --circadian-enabled \
-  --circadian-mode shadow \
-  --base-sleep-time 23:00 \
-  --base-wake-time 07:00
+  --circadian-mode shadow
 ```
-
-Useful groups:
-
-| Group | Examples |
-|---|---|
-| Platform | enable, WeChat peer, tick interval, cooldown |
-| Models | LLM enabled, primary model, fallback model, timeout |
-| Content | discovery enabled, discovery interval, dream enabled |
-| Expression | emoji policy, multi-message composition, voice profile |
-| Circadian | chronotype, sleep/wake preference, learning bounds, sleep debt |
-| Weather | confirmed local name, administrative levels, coordinates, timezone |
-| Lifecycle | install paths, verify, state-preserving uninstall, purge |
-
-Explicit process environment variables override managed values. API keys, tokens, passwords, and Provider secrets must remain in Hermes configuration, never in Hermes Alive managed JSON.
 
 ---
 

@@ -165,14 +165,13 @@ Quality Governor 还会拒绝“还没跑完？”之类没有新鲜结构化证
 
 天气只是轻量上下文能力，不是安装引导的主角。
 
-首次 `configure` 且尚无已确认位置时，Hermes Alive 只提出一次简短位置确认。它可以参考：
+安装本身是零配置的。Hermes Alive 会自动检测时区、采用默认静默时间，并可准备一个基于网络的天气地点建议。终端不会要求用户输入时区、静默时间、坐标或内部参数。
 
-- 系统时区和区域；
-- 已有确认位置；
-- 用户允许后的网络粗定位；
-- 用户直接输入的区、县、规划区、borough 或同等级别区域。
+尚无已确认天气位置时，Hermes 最多只在原本的聊天中问一次，例如：
 
-所有推断都允许确认和修正。VPN、代理、移动网络或远程服务器都可能让网络位置判断失真。
+> “我根据系统时区和网络出口粗略判断，你可能在淡滨尼附近。以后天气先按这里查询，可以吗？如果不对，直接告诉我所在的区、县或同等级别区域就行。”
+
+用户可以直接确认、纠正区县级地点，或拒绝天气上下文。安装不会等待这条回复；位置未确认前天气保持关闭。VPN、代理、移动网络或远程服务器都可能让网络位置判断失真。
 
 隐私边界：
 
@@ -223,24 +222,30 @@ cd /opt/data/skills/hermes/hermes-alive
 scripts/hermes-alive-lifecycle install
 ```
 
-### 配置 Provider 与个性化
+### 自动配置
 
-Provider 凭据归 Hermes 管理。Hermes Alive 只保存非敏感个性化配置。
+Provider 凭据和模型选择本来就归 Hermes 管理。安装 Hermes Alive 不会再启动一套 Provider 或个性化终端向导。
 
 ```bash
 LIFECYCLE=/opt/data/skills/hermes/hermes-alive/scripts/hermes-alive-lifecycle
 
 "$LIFECYCLE" configure --provider-check-only
 
-# 仅当 Hermes 报告没有可用模型时执行：
-/opt/hermes/.venv/bin/hermes setup model
-
-# 交互式个性化配置，其中包含一次简短位置确认：
-"$LIFECYCLE" configure
+"$LIFECYCLE" configure \
+  --non-interactive \
+  --enable \
+  --llm-enabled \
+  --discovery-enabled \
+  --dream-enabled \
+  --circadian-enabled \
+  --circadian-mode shadow \
+  --allow-network-location
 
 "$LIFECYCLE" verify
 "$LIFECYCLE" status
 ```
+
+生命周期命令会自动检测时区、采用默认静默窗口 `23:00`–`08:00`，并输出结构化 `onboarding_json` 供 Hermes 处理。天气地点需要确认时，由 Hermes 在现有聊天中自然地问一次。用户不需要理解时区标识、静默时间格式、CLI 参数或经纬度。
 
 active hook 发生变化后可能需要重启 Gateway。生产 Gateway 重启和真实消息发送必须是明确的运维决策，不能作为安装脚本的隐式副作用。
 
@@ -248,44 +253,28 @@ active hook 发生变化后可能需要重启 Gateway。生产 Gateway 重启和
 
 ## ⚙️ 配置
 
-交互式配置会尽量保持简洁。多数用户只需要确认：
+普通用户的安装体验应当是自动且对话化的：
 
-- 是否启用 Hermes Alive；
-- 目标微信会话；
-- 时区与静默偏好；
-- 是否使用模型生成；
-- 内容发现与 Dream 偏好；
-- 一次简短的位置和天气确认。
+- Hermes 检查自己已有的 Provider 是否可用；
+- 从 Hermes 环境和本地系统自动检测时区；
+- 静默时间默认使用 `23:00`–`08:00`；
+- Circadian 从安全默认值开始并逐步学习；
+- 天气上下文最多只需一次自然语言地点确认；
+- 不出现终端式配置问卷。
 
-高级非敏感配置可以通过生命周期 CLI 传入：
+高级运维仍可显式覆盖非敏感设置：
 
 ```bash
 "$LIFECYCLE" configure \
+  --non-interactive \
   --enable \
-  --weixin-chat-id '<chat-id>' \
   --timezone Asia/Singapore \
   --quiet-start 23:00 \
   --quiet-end 08:00 \
   --emoji-policy contextual \
   --circadian-enabled \
-  --circadian-mode shadow \
-  --base-sleep-time 23:00 \
-  --base-wake-time 07:00
+  --circadian-mode shadow
 ```
-
-常用配置组：
-
-| 配置组 | 示例 |
-|---|---|
-| 平台 | 总开关、微信 peer、tick 间隔、冷却时间 |
-| 模型 | LLM 开关、主模型、回退模型、超时 |
-| 内容 | Discovery 开关与间隔、Dream 开关 |
-| 表达 | emoji 策略、多消息生成、性格画像 |
-| 作息 | chronotype、睡眠偏好、学习限幅、睡眠债 |
-| 天气 | 已确认位置、行政区层级、坐标、时区 |
-| 生命周期 | 安装路径、验证、保留状态卸载、彻底清理 |
-
-显式进程环境变量优先于 managed config。API Key、Token、密码和 Provider 凭据必须继续保存在 Hermes 配置中，不得写入 Hermes Alive 的 managed JSON。
 
 ---
 

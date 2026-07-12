@@ -15,6 +15,10 @@ All notable public repository changes are documented here.
 
 ### Changed
 
+- Replaced the terminal-style personalization questionnaire with zero-touch
+  configuration: timezone is auto-detected, quiet hours use safe defaults, and
+  Hermes asks at most one optional weather-location question in the existing
+  chat.
 - Restored the polished bilingual public README and consolidated historical phase notes, duplicate skill READMEs, obsolete policy generations, and internal references into a small canonical documentation set.
 - Public documentation now uses the GitHub repository and lifecycle contract.
 - CI declares least-privilege permissions, job timeouts, and a fixed PyYAML

@@ -10,6 +10,7 @@ Marker: HERMES_ALIVE_LIFECYCLE_PERMISSION_HARDENING_V1
 Marker: HERMES_ALIVE_RUNTIME_PERMISSION_PRESERVATION_V1
 Marker: HERMES_ALIVE_INSTALL_TRANSACTION_ROLLBACK_V1
 Marker: HERMES_ALIVE_CIRCADIAN_MANAGED_CONFIG_V1
+Marker: HERMES_ALIVE_ZERO_TOUCH_ONBOARDING_V1
 """
 
 from __future__ import annotations
@@ -37,7 +38,7 @@ except Exception:  # pragma: no cover - Hermes normally ships PyYAML
 SKILL_NAME = "hermes-alive"
 HOOK_NAME = "hermes-alive"
 MANIFEST_VERSION = 1
-CONFIG_VERSION = 3
+CONFIG_VERSION = 4
 
 MANAGED_ENV_KEYS = {
     "enabled": "HERMES_PROACTIVE_PLATFORM_ENABLED",
@@ -104,7 +105,6 @@ CIRCADIAN_DEFAULT_VALUES: dict[str, Any] = {
     "circadian_enabled": True,
     "circadian_mode": "shadow",
     "chronotype": "adaptive",
-    "circadian_timezone": "Asia/Singapore",
     "base_sleep_time": "23:00",
     "base_wake_time": "07:00",
     "learned_sleep_offset_minutes": 0,
@@ -695,44 +695,76 @@ def _location_weather_module(source_root: Path):
 def _apply_noninteractive_location_args(
     values: dict[str, Any], args: argparse.Namespace, paths: Paths
 ) -> None:
+    """Apply location state without ever reading terminal input."""
+
     module = _location_weather_module(paths.source_root)
+
+    if args.skip_weather:
+        values.update(module.disable_location_onboarding(values))
+        return
+
     if args.weather_location:
-        candidate = module.LocationCandidate(
-            country_code=str(args.weather_country_code or "").strip().upper(),
-            country_name="",
-            admin1=str(args.weather_admin1 or "").strip(),
-            admin2=str(args.weather_admin2 or "").strip(),
-            admin3=str(args.weather_admin3 or "").strip(),
-            locality=str(args.weather_location or "").strip(),
-            latitude=None if args.weather_lat is None else float(args.weather_lat),
-            longitude=None if args.weather_lon is None else float(args.weather_lon),
-            timezone=str(args.weather_timezone or args.timezone or "").strip(),
-            source="explicit_cli",
-            precision="district_or_county" if (args.weather_admin2 or args.weather_admin3) else "user_text",
-            confidence=1.0,
-        )
-        values.update(
-            module.profile_values(
-                candidate,
-                confirmed=(
-                    True
-                    if args.weather_location_confirmed is None
-                    else bool(args.weather_location_confirmed)
-                ),
-                enabled=args.weather_enabled,
+        has_structured_fields = any(
+            value not in (None, "")
+            for value in (
+                args.weather_lat,
+                args.weather_lon,
+                args.weather_country_code,
+                args.weather_admin1,
+                args.weather_admin2,
+                args.weather_admin3,
+                args.weather_timezone,
             )
         )
-    elif args.allow_network_location:
-        candidate = module.infer_network_location()
-        values.update(
-            module.profile_values(
-                candidate,
-                confirmed=(
-                    False
-                    if args.weather_location_confirmed is None
-                    else bool(args.weather_location_confirmed)
+        if has_structured_fields:
+            candidate = module.LocationCandidate(
+                country_code=str(args.weather_country_code or "").strip().upper(),
+                country_name="",
+                admin1=str(args.weather_admin1 or "").strip(),
+                admin2=str(args.weather_admin2 or "").strip(),
+                admin3=str(args.weather_admin3 or "").strip(),
+                locality=str(args.weather_location or "").strip(),
+                latitude=None if args.weather_lat is None else float(args.weather_lat),
+                longitude=None if args.weather_lon is None else float(args.weather_lon),
+                timezone=str(args.weather_timezone or args.timezone or "").strip(),
+                source="explicit_cli",
+                precision=(
+                    "district_or_county"
+                    if (args.weather_admin2 or args.weather_admin3)
+                    else "user_text"
                 ),
-                enabled=args.weather_enabled,
+                confidence=1.0,
+            )
+            values.update(module.profile_values(candidate, confirmed=True))
+            values["weather_onboarding_complete"] = True
+        else:
+            values.update(
+                module.confirm_location_onboarding(
+                    values,
+                    user_location=str(args.weather_location),
+                )
+            )
+        if args.weather_enabled is False:
+            values["weather_enabled"] = False
+        return
+
+    if args.weather_location_confirmed is True:
+        values.update(module.confirm_location_onboarding(values))
+        if args.weather_enabled is False:
+            values["weather_enabled"] = False
+        return
+
+    if args.weather_location_confirmed is False:
+        values["weather_location_confirmed"] = False
+        values["weather_enabled"] = False
+
+    if not values.get("weather_location_confirmed") and not values.get(
+        "weather_onboarding_complete"
+    ):
+        values.update(
+            module.prepare_location_onboarding(
+                values,
+                allow_network=bool(args.allow_network_location),
             )
         )
 
@@ -803,6 +835,8 @@ def configure(args: argparse.Namespace) -> int:
     if args.weather_location_confirmed is not None:
         assign("weather_location_confirmed", args.weather_location_confirmed)
     _apply_noninteractive_location_args(values, args, paths)
+    if values.get("weather_location_confirmed"):
+        values["weather_onboarding_complete"] = True
     assign("emoji_policy", args.emoji_policy)
     if args.circadian_enabled is not None:
         assign("circadian_enabled", args.circadian_enabled)
@@ -841,30 +875,34 @@ def configure(args: argparse.Namespace) -> int:
     if args.sleep_debt_recovery_enabled is not None:
         assign("sleep_debt_recovery_enabled", args.sleep_debt_recovery_enabled)
 
+    location_module = _location_weather_module(paths.source_root)
+    detected_timezone = (
+        str(values.get("timezone") or "").strip()
+        or location_module.detect_system_timezone()
+        or "UTC"
+    )
+
+    # Zero-touch defaults: installation must not ask the user to understand
+    # timezone names, quiet-hour syntax, or lifecycle CLI options.
+    values.setdefault("enabled", False)
+    values.setdefault("timezone", detected_timezone)
+    values.setdefault("quiet_start", "23:00")
+    values.setdefault("quiet_end", "08:00")
+    values.setdefault("emoji_policy", "contextual")
+
     for name, default in CIRCADIAN_DEFAULT_VALUES.items():
         values.setdefault(name, default)
+    values.setdefault("circadian_timezone", str(values.get("timezone") or "UTC"))
 
-    if not args.non_interactive and sys.stdin.isatty():
-        if "enabled" not in values:
-            values["enabled"] = (
-                input("Enable Hermes Alive now? [y/N]: ").strip().lower()
-                in {"y", "yes"}
-            )
-        if "timezone" not in values:
-            entered = input("Timezone [system default]: ").strip()
-            if entered:
-                values["timezone"] = entered
-        if not values.get("weather_location_confirmed"):
-            module = _location_weather_module(paths.source_root)
-            values = module.interactive_location_onboarding(values)
-        if "quiet_start" not in values:
-            entered = input("Quiet hours start [23:00]: ").strip()
-            values["quiet_start"] = entered or "23:00"
-        if "quiet_end" not in values:
-            entered = input("Quiet hours end [08:00]: ").strip()
-            values["quiet_end"] = entered or "08:00"
-        if "emoji_policy" not in values:
-            values["emoji_policy"] = "contextual"
+    # A user-confirmed weather location is a stronger timezone signal than a
+    # container default such as UTC. Explicit --timezone still wins.
+    if (
+        args.timezone is None
+        and values.get("weather_location_confirmed")
+        and values.get("weather_timezone")
+    ):
+        values["timezone"] = str(values["weather_timezone"])
+        values["circadian_timezone"] = str(values["weather_timezone"])
 
     payload = {
         "config_version": CONFIG_VERSION,
@@ -884,10 +922,35 @@ def configure(args: argparse.Namespace) -> int:
     if not provider.get("ready"):
         print("HERMES_ALIVE_PROVIDER_SETUP_REQUIRED")
         print(f"provider_setup_command={provider['setup_command']}")
+    location_confirmation_required = not bool(
+        values.get("weather_onboarding_complete")
+        or values.get("weather_location_confirmed")
+    )
+    onboarding = {
+        "mode": "zero_touch",
+        "timezone": values.get("timezone"),
+        "quiet_start": values.get("quiet_start"),
+        "quiet_end": values.get("quiet_end"),
+        "provider_ready": bool(provider.get("ready")),
+        "location_confirmation_required": location_confirmation_required,
+        "location_suggestion": values.get("weather_location_name") or "",
+        "location_question": (
+            location_module.location_confirmation_prompt(values)
+            if location_confirmation_required
+            else ""
+        ),
+    }
+
+    print("HERMES_ALIVE_ZERO_TOUCH_CONFIG_OK")
     print(f"weather_enabled={str(bool(values.get('weather_enabled'))).lower()}")
     print(f"weather_location_confirmed={str(bool(values.get('weather_location_confirmed'))).lower()}")
+    print(
+        "location_confirmation_required="
+        f"{str(location_confirmation_required).lower()}"
+    )
     if values.get("weather_location_name"):
         print(f"weather_location={values['weather_location_name']}")
+    print("onboarding_json=" + json.dumps(onboarding, ensure_ascii=False))
     print("gateway_restart_required=true")
     return 0
 
@@ -1144,6 +1207,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
     )
     configure_parser.add_argument("--allow-network-location", action="store_true")
+    configure_parser.add_argument(
+        "--skip-weather",
+        action="store_true",
+        help="finish onboarding with weather context disabled",
+    )
     configure_parser.add_argument(
         "--emoji-policy",
         choices=("contextual", "minimal", "off"),

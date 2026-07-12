@@ -20,8 +20,9 @@ scripts/hermes-alive-lifecycle purge
 
 - Install/update atomically replaces source and active hook and rolls back when
   validation fails.
-- Configure writes only non-secret personalization and guides Provider setup
-  through Hermes.
+- Configure writes only non-secret personalization, automatically detects
+  timezone, applies default quiet hours, and emits a structured onboarding result
+  for Hermes. It never opens a terminal questionnaire.
 - Verify checks manifest integrity, source/hook parity, compilation,
   configuration, and permissions.
 - Default uninstall preserves learning/runtime state.
@@ -29,15 +30,33 @@ scripts/hermes-alive-lifecycle purge
 
 ## Provider ownership
 
-Provider credentials and model configuration belong to Hermes. Readiness is
-checked through Hermes configuration, and missing setup is handled with:
-
-```bash
-/opt/hermes/.venv/bin/hermes setup model
-```
+Provider credentials and model configuration belong to Hermes. Hermes Alive
+checks readiness but does not launch `hermes setup model` during skill
+installation. A missing Provider is a Hermes prerequisite, not a second
+Hermes Alive onboarding flow.
 
 Hermes Alive managed configuration must not store API keys or Provider secrets.
 Explicit process environment variables take precedence over managed values.
+
+## Zero-touch onboarding contract
+
+Normal installation uses:
+
+```bash
+scripts/hermes-alive-lifecycle configure   --non-interactive   --enable   --allow-network-location
+```
+
+The command:
+
+1. detects timezone from the Hermes process, local environment, or system;
+2. applies default quiet hours `23:00`–`08:00`;
+3. prepares an optional unconfirmed district/county-level weather suggestion;
+4. leaves weather disabled until confirmation;
+5. emits `onboarding_json` for Hermes to interpret.
+
+Hermes may then ask one natural question in the existing chat. Confirmation,
+correction, or decline is applied with a second non-interactive lifecycle call.
+Installation itself never waits for terminal input.
 
 ## Source versus persistent state
 

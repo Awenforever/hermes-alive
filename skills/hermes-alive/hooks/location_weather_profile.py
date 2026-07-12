@@ -4,11 +4,13 @@ Markers:
 - HERMES_ALIVE_LOCATION_WEATHER_ONBOARDING_V1
 - HERMES_ALIVE_LOCATION_PRIVACY_MINIMIZATION_V1
 - HERMES_ALIVE_FINE_GRAINED_LOCATION_V1
+- HERMES_ALIVE_CHAT_LOCATION_CONFIRMATION_V1
 
 The module keeps onboarding lightweight:
-- infer local timezone/locale without network access;
-- optionally use one network-assisted lookup after the user selects it;
+- infer local timezone/locale without terminal questions;
+- optionally use one network-assisted lookup during automated installation;
 - refine latitude/longitude to a district/county-like address level when data exists;
+- let Hermes ask at most one natural-language confirmation in the normal chat;
 - require confirmation before a profile is marked usable;
 - persist no public IP and no raw lookup response.
 """
@@ -378,83 +380,145 @@ def profile_values(
     return values
 
 
-def _is_skip(text: str) -> bool:
-    return _text(text).casefold() in {"skip", "no", "n", "off", "disable", "不用", "跳过", "关闭"}
+
+def candidate_from_profile(values: dict[str, Any]) -> LocationCandidate:
+    """Rebuild a safe candidate from managed profile values."""
+
+    return LocationCandidate(
+        country_code=_text(values.get("weather_country_code")).upper(),
+        country_name="",
+        admin1=_text(values.get("weather_admin1")),
+        admin2=_text(values.get("weather_admin2")),
+        admin3=_text(values.get("weather_admin3")),
+        locality=_text(values.get("weather_location_name")),
+        latitude=_coord(values.get("weather_lat"), latitude=True),
+        longitude=_coord(values.get("weather_lon"), latitude=False),
+        timezone=_text(values.get("weather_timezone")),
+        source=_text(values.get("weather_location_source")) or "managed_profile",
+        precision=_text(values.get("weather_location_precision")) or "unknown",
+        confidence=1.0 if values.get("weather_location_confirmed") else 0.5,
+    )
 
 
-def interactive_location_onboarding(
+def prepare_location_onboarding(
     current_values: dict[str, Any],
     *,
-    input_fn: Callable[[str], str] = input,
-    output_fn: Callable[[str], None] = print,
+    allow_network: bool,
     fetch_json: FetchJson = default_fetch_json,
     environ: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Run a compact, one-feature onboarding embedded in normal configure.
+    """Prepare one optional chat confirmation without using terminal prompts.
 
-    First prompt: Enter means network-assisted inference; a typed place means manual
-    geocoding; skip disables weather. The prompt itself explains the external data
-    boundary. A second prompt confirms or corrects the candidate.
+    Installation never blocks on stdin. System timezone/locale are read locally.
+    When ``allow_network`` is true, a single coarse network lookup may refine the
+    suggestion to a district/county-like level. The candidate stays disabled
+    until Hermes asks the user once in the normal chat and applies the answer.
     """
 
     values = dict(current_values)
     if values.get("weather_location_confirmed"):
+        values["weather_onboarding_complete"] = True
         return values
-    system = infer_system_location(environ)
-    hint = system.display_name or system.timezone or "system location unavailable"
-    choice = input_fn(
-        "Weather location (Enter=network-assisted inference; type district/county="
-        "manual; skip=off). Only the network exit IP or typed place is sent to "
-        f"location services; chat content is never sent. System hint: {hint}: "
-    ).strip()
-    if _is_skip(choice):
-        values.update(profile_values(system, confirmed=False, enabled=False))
+    if values.get("weather_onboarding_complete"):
         return values
 
-    try:
-        if choice:
-            candidate = geocode_location_text(
-                choice,
-                fetch_json=fetch_json,
-                language=(detect_system_locale(environ) or "en").split("_", 1)[0],
-                timezone=system.timezone,
-            )
-        else:
+    system = infer_system_location(environ)
+    candidate = system
+    if allow_network:
+        try:
             candidate = infer_network_location(
                 fetch_json=fetch_json,
                 language=(detect_system_locale(environ) or "en").split("_", 1)[0],
                 system_candidate=system,
             )
-    except Exception as exc:
-        output_fn(f"Location inference unavailable: {type(exc).__name__}")
-        candidate = system
+        except Exception:
+            candidate = system
 
-    name = candidate.display_name or candidate.timezone or "unknown location"
-    answer = input_fn(
-        f"Use {name} for local weather? [Y/n or type a corrected district/county]: "
-    ).strip()
-    if _is_skip(answer):
-        values.update(profile_values(candidate, confirmed=False, enabled=False))
-        return values
-    if answer and answer.casefold() not in {"y", "yes", "ok", "是", "可以"}:
+    values.update(profile_values(candidate, confirmed=False, enabled=False))
+    values["weather_onboarding_complete"] = False
+    return values
+
+
+def confirm_location_onboarding(
+    current_values: dict[str, Any],
+    *,
+    user_location: str = "",
+    fetch_json: FetchJson = default_fetch_json,
+    environ: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    """Apply the user's one chat answer and finish weather onboarding."""
+
+    values = dict(current_values)
+    system = infer_system_location(environ)
+    candidate = candidate_from_profile(values)
+    location_text = _text(user_location)
+
+    if location_text:
         try:
             candidate = geocode_location_text(
-                answer,
+                location_text,
                 fetch_json=fetch_json,
                 language=(detect_system_locale(environ) or "en").split("_", 1)[0],
                 timezone=candidate.timezone or system.timezone,
             )
         except Exception:
             candidate = LocationCandidate(
-                locality=answer,
+                locality=location_text,
                 timezone=candidate.timezone or system.timezone,
                 source="manual_correction_unresolved",
                 precision="user_text",
                 confidence=0.4,
             )
+    elif not candidate.has_coordinates and candidate.display_name:
+        try:
+            candidate = geocode_location_text(
+                candidate.display_name,
+                fetch_json=fetch_json,
+                language=(detect_system_locale(environ) or "en").split("_", 1)[0],
+                timezone=candidate.timezone or system.timezone,
+            )
+        except Exception:
+            pass
+
     values.update(profile_values(candidate, confirmed=True))
+    values["weather_onboarding_complete"] = True
     return values
 
+
+def disable_location_onboarding(
+    current_values: dict[str, Any],
+) -> dict[str, Any]:
+    """Finish onboarding without weather context."""
+
+    values = dict(current_values)
+    values["weather_enabled"] = False
+    values["weather_location_confirmed"] = False
+    values["weather_onboarding_complete"] = True
+    return values
+
+
+def location_confirmation_prompt(values: dict[str, Any]) -> str:
+    """Return one natural-language question for Hermes to ask in chat."""
+
+    candidate = candidate_from_profile(values)
+    name = candidate.display_name or candidate.timezone
+    if name:
+        if candidate.source.startswith("network"):
+            basis = "我根据系统时区和网络出口做了粗略判断"
+            privacy = "粗定位只会向定位服务发送网络出口 IP"
+        else:
+            basis = "我根据系统时区做了粗略判断"
+            privacy = "这一步没有读取聊天内容"
+        return (
+            f"{basis}，你可能在 {name}。以后天气先按这里查询，可以吗？"
+            "如果不对，直接告诉我所在的区、县或同等级别区域就行；"
+            f"{privacy}，天气查询只发送必要的地区或坐标。"
+        )
+    return (
+        "我没能可靠判断你所在的地区。为了让天气提醒更准确，"
+        "可以告诉我所在的区、县或同等级别区域吗？不想提供也没关系，"
+        "我会保持天气功能关闭。"
+    )
 
 def safe_location_summary(values: dict[str, Any]) -> dict[str, Any]:
     allowed = {

@@ -35,22 +35,28 @@ Runtime paths honor `HERMES_ALIVE_SHARED_DIR` when explicitly set.
 
 ## Location onboarding
 
-Location setup is a small part of normal personalization, not a separate panel.
-When no confirmed profile exists, the user may permit one network-assisted
-coarse lookup, type a district/county-equivalent place, or skip weather.
+Location setup is a small, optional part of normal installation. The terminal
+does not ask for timezone, quiet hours, coordinates, or a place name.
+
+Hermes Alive detects timezone locally and may perform one network-assisted coarse
+lookup when the installer requests it. The candidate is stored as unconfirmed and
+weather remains disabled. Hermes may then ask one natural-language question in
+the existing chat. The user can confirm, provide a corrected district/county-like
+area, or decline weather context.
 
 The target precision is the finest reliable district, county, borough, suburb,
 planning area, or equivalent. The system must not fabricate fine-grained
 precision when evidence supports only a city or region.
 
-Network-assisted lookup and geocoding receive only the minimum location input
-required by those services. Hermes chat content, user identity, session data,
-model credentials, and Provider secrets are not sent. Raw public IP and raw
-lookup responses are not persisted.
+Network-assisted lookup may send the network exit IP to the selected location
+service. Manual correction/geocoding sends only the typed place. Weather queries
+send only the minimum region or coordinate data required by the weather service.
+Hermes chat content, user identity, session data, model credentials, and Provider
+secrets are not sent. Raw public IP and raw lookup responses are not persisted.
 
 Only the confirmed profile is stored locally:
 
-- enabled/confirmed flags;
+- enabled/confirmed/onboarding-complete flags;
 - display name;
 - country and administrative levels;
 - latitude/longitude;

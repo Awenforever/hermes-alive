@@ -32,23 +32,48 @@ scripts/hermes-alive-lifecycle install
 The installer owns final source and hook placement. Test harnesses must not
 pre-copy files into `/opt/data/skills` or `/opt/data/hooks` before installation.
 
-## Provider and personalization
+## Zero-touch installation and personalization
 
-Provider credentials and model selection remain owned by Hermes. Hermes Alive
-stores only non-secret personalization.
+Provider credentials and model selection remain owned by Hermes. Installing this
+skill must not open a second terminal questionnaire or ask the user to understand
+timezone names, quiet-hour syntax, Provider CLI paths, or internal feature flags.
+
+After installation, Hermes runs:
 
 ```bash
 LIFECYCLE=/opt/data/skills/hermes/hermes-alive/scripts/hermes-alive-lifecycle
 
 "$LIFECYCLE" configure --provider-check-only
-/opt/hermes/.venv/bin/hermes setup model
-"$LIFECYCLE" configure
+"$LIFECYCLE" configure \
+  --non-interactive \
+  --enable \
+  --llm-enabled \
+  --discovery-enabled \
+  --dream-enabled \
+  --circadian-enabled \
+  --circadian-mode shadow \
+  --allow-network-location
 "$LIFECYCLE" verify
-"$LIFECYCLE" status
 ```
 
-Explicit process environment variables override managed values. Never place
-API keys, tokens, or private chat credentials in the repository.
+The lifecycle command automatically detects timezone, applies default quiet hours
+(`23:00`–`08:00`), and prepares an optional fine-grained weather suggestion.
+It prints one structured `onboarding_json` object for Hermes to interpret.
+
+When `location_confirmation_required=true`, Hermes may ask **one** natural chat
+question. The user can answer normally:
+
+- confirmation → run `configure --non-interactive --weather-location-confirmed`;
+- corrected district/county → run `configure --non-interactive --weather-location "<reply>"`;
+- decline → run `configure --non-interactive --skip-weather`.
+
+Installation does not wait for that answer. Weather remains disabled until the
+location is confirmed. Provider setup is not launched by this skill; if Hermes
+itself has no usable Provider, Hermes should explain that separate prerequisite
+instead of opening an unrelated skill questionnaire.
+
+Explicit process environment variables override managed values. Never place API
+keys, tokens, or private chat credentials in the repository.
 
 ## Runtime responsibilities
 
