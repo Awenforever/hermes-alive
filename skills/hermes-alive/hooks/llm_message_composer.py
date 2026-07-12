@@ -8,6 +8,7 @@ import logging
 import re
 from datetime import datetime, timezone, timedelta
 import os
+import urllib.parse
 try:
     import aiohttp
 except ImportError:
@@ -544,31 +545,70 @@ class LLMMessageComposer:
         return text
 
 async def _get_weather() -> str:
-    lat = os.getenv("HERMES_PROACTIVE_LAT", "31.85")
-    lon = os.getenv("HERMES_PROACTIVE_LON", "117.25")
-    if aiohttp is None:
+    # HERMES_ALIVE_LOCATION_WEATHER_ONBOARDING_V1
+    enabled = os.getenv("HERMES_PROACTIVE_WEATHER_ENABLED", "true").strip().lower()
+    if enabled in {"0", "false", "no", "off"}:
+        return ""
+    confirmed = os.getenv("HERMES_PROACTIVE_WEATHER_LOCATION_CONFIRMED", "").strip().lower()
+    if confirmed in {"0", "false", "no", "off"}:
+        return ""
+    lat = os.getenv("HERMES_PROACTIVE_LAT", "").strip()
+    lon = os.getenv("HERMES_PROACTIVE_LON", "").strip()
+    if not lat or not lon or aiohttp is None:
+        return ""
+    location_name = os.getenv("HERMES_PROACTIVE_WEATHER_LOCATION_NAME", "").strip()
+    weather_timezone = os.getenv("HERMES_PROACTIVE_WEATHER_TIMEZONE", "auto").strip() or "auto"
+    try:
+        float(lat); float(lon)
+    except ValueError:
         return ""
     try:
-        url = (
-            f"https://api.open-meteo.com/v1/forecast"
-            f"?latitude={lat}&longitude={lon}"
-            f"&current=weather_code,temperature_2m,relative_humidity_2m,apparent_temperature"
-            f"&timezone=Asia/Shanghai"
-        )
+        params = {
+            "latitude": lat,
+            "longitude": lon,
+            "current": "weather_code,temperature_2m,relative_humidity_2m,apparent_temperature",
+            "daily": "weather_code,precipitation_probability_max,temperature_2m_max,temperature_2m_min",
+            "forecast_days": "7",
+            "timezone": weather_timezone,
+        }
+        url = "https://api.open-meteo.com/v1/forecast"
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+            async with session.get(
+                url,
+                params=params,
+                timeout=aiohttp.ClientTimeout(total=5),
+            ) as resp:
                 if resp.status != 200:
                     return ""
                 data = await resp.json()
-                c = data.get("current", {})
-                if not c:
+                current = data.get("current", {})
+                if not isinstance(current, dict) or not current:
                     return ""
-                code = c.get("weather_code", 0)
-                temp = c.get("temperature_2m", "?")
-                feels = c.get("apparent_temperature", "?")
-                hum = c.get("relative_humidity_2m", "?")
-                desc = _wmo_desc(code)
-                return f"{desc} {temp}°C，体感{feels}°C，湿度{hum}%"
+                code = current.get("weather_code", 0)
+                temp = current.get("temperature_2m", "?")
+                feels = current.get("apparent_temperature", "?")
+                hum = current.get("relative_humidity_2m", "?")
+                parts = [f"当前{_wmo_desc(code)} {temp}°C，体感{feels}°C，湿度{hum}%"]
+
+                daily = data.get("daily", {})
+                if isinstance(daily, dict):
+                    codes = daily.get("weather_code") or []
+                    rain_probs = daily.get("precipitation_probability_max") or []
+                    rainy_codes = {51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99}
+                    rainy_days = sum(1 for value in codes if value in rainy_codes)
+                    numeric_probs = [
+                        float(value) for value in rain_probs
+                        if isinstance(value, (int, float))
+                    ]
+                    max_prob = int(max(numeric_probs)) if numeric_probs else None
+                    if rainy_days:
+                        rain_text = f"未来7天约{rainy_days}天有雨"
+                        if max_prob is not None:
+                            rain_text += f"，最高降雨概率{max_prob}%"
+                        parts.append(rain_text)
+
+                prefix = f"{location_name}：" if location_name else ""
+                return prefix + "；".join(parts)
     except Exception:
         pass
     return ""

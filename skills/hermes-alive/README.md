@@ -23,6 +23,11 @@ scripts/hermes-alive-lifecycle install
 Provider secrets remain managed by Hermes. Run `hermes setup model` when the
 lifecycle check reports that no model is configured.
 
+### Lightweight location and weather onboarding
+
+`configure` embeds one short location confirmation in the existing personalization flow. It can combine system timezone with an explicitly selected network-assisted lookup, then retain the finest reliable district/county-equivalent level available. The raw public IP and raw lookup responses are not persisted. Weather has no fallback coordinates and remains disabled until a confirmed profile has coordinates.
+
+
 ## 🧬 What It Is
 
 Hermes Alive is a zero-intrusion proactive companion skill for Hermes Agent.
@@ -260,3 +265,15 @@ python3 skills/hermes-alive/tests/run_stress.py
 ```
 
 Final acceptance must use the default full stress scale. Reduced scale is developer smoke only.
+
+## Circadian joint shadow replay
+
+`tests/run_joint_shadow_replay.py` validates the complete observe-only path from user sleep intent through Circadian state, dynamic Sleep / Quiet comparison, proactive quality governance and confirmed district-level weather context. It also verifies that shadow rejection never changes the current watcher send path. No runtime enforcement is enabled in this phase.
+
+## Isolated delivery enforcement v1
+
+After the combined shadow replay passes, the validated decisions can be
+enforced only in a dual-key isolated test runtime. Dynamic sleep protection,
+forced-awake quiet override, unanswered silence, candidate filtering and
+post-delivery affect commit are covered by deterministic tests. Production
+configuration does not expose the enforcement keys.

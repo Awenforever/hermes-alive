@@ -3,6 +3,11 @@
 本目录是 GitHub 仓库 `Awenforever/hermes-alive` 中的完整多文件技能，不是单独的
 `SKILL.md`。正式分发和验收对象是完整 GitHub 仓库。
 
+### 位置与天气（轻量引导）
+
+`configure` 会在现有个性化流程中附带一次简短的位置确认：可使用系统时区与网络出口做粗定位，再尽可能细化到区、县、规划区或同等级别；也可直接输入地区或跳过。网络定位仅在用户选择后执行，原始公网 IP 与原始响应不会保存，最终确认的位置只写入本地 managed config。天气上下文没有默认坐标，未确认位置时不会查询。
+
+
 ## Hermes 自安装
 
 ```bash
@@ -81,3 +86,14 @@ python3 /opt/data/skills/hermes/hermes-alive/tests/run_stress.py
 ```
 
 最终验收必须使用默认满负载压力规模；缩放模式仅用于开发烟测。
+
+## 作息联合 Shadow 回放
+
+`tests/run_joint_shadow_replay.py` 会把用户作息意图、Circadian 状态机、动态 Sleep / Quiet 比较、主动搭话质量治理和已确认的区／县级天气上下文放在同一条确定性回放链中验证。同时确认所有拒绝结论仍然只观察、不改变现有 watcher 发送路径。本阶段不启用 enforcement。
+
+## 隔离投递 Enforcement v1
+
+联合 Shadow Replay 通过后，已验证的作息、睡眠/静默和主动质量决策只会在
+“双重隔离开关”同时满足时真正控制投递。该阶段覆盖动态睡眠保护、被叫醒后
+对旧固定静默期的隔离覆盖、无回应沉默锁、候选消息过滤，以及情绪脉冲仅在
+成功发送后提交。生产托管配置不暴露这两个 enforcement 开关。

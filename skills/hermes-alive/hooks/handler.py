@@ -122,6 +122,17 @@ async def _on_agent_end(context: dict):
     except Exception:
         logger.exception("Failed to capture recent context on agent end")
 
+    # HERMES_ALIVE_CIRCADIAN_INTENT_BRIDGE_SHADOW_V1
+    # Context has just been refreshed. Apply only a de-duplicated shadow-state
+    # event; outbound behaviour remains unchanged.
+    circadian_intent = _process_circadian_intent_shadow()
+    logger.info(
+        "Circadian intent shadow: intent=%s applied=%s reason=%s",
+        circadian_intent.get("intent"),
+        circadian_intent.get("state_event_applied"),
+        circadian_intent.get("reason"),
+    )
+
     try:
         from safe_io import atomic_write_text
         from voice_engine import VoiceEngine
@@ -135,6 +146,29 @@ async def _on_agent_end(context: dict):
         logger.info("Voice evolved on agent end: stage=%s message_count=%s", engine.genome.relationship_stage, engine.message_count)
     except Exception:
         logger.exception("Failed to evolve voice on agent end")
+
+def _process_circadian_intent_shadow() -> dict:
+    """Process the latest user intent without affecting outbound behaviour."""
+    try:
+        from circadian_intent_bridge import process_latest_user_intent_shadow
+
+        result = process_latest_user_intent_shadow()
+        return result if isinstance(result, dict) else {
+            "processed": False,
+            "reason": "invalid_bridge_result",
+            "state_event_applied": False,
+        }
+    except Exception as exc:
+        logger.exception("Failed to process circadian intent shadow")
+        return {
+            "processed": False,
+            "reason": "bridge_error",
+            "error_type": type(exc).__name__,
+            "state_event_applied": False,
+            "delivery_enforced": False,
+            "watcher_behavior_changed": False,
+        }
+
 
 def _env_enabled() -> bool:
     return os.getenv("HERMES_PROACTIVE_PLATFORM_ENABLED", "").strip().lower() in {"1", "true", "yes", "on"}

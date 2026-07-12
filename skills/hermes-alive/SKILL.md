@@ -411,3 +411,19 @@ python3 tests/run_stress.py
 ```
 
 Markers: `HERMES_ALIVE_MATRIX_SUITE_V1`, `HERMES_ALIVE_STRESS_SUITE_V1`.
+
+## Location and weather onboarding
+
+During interactive `configure`, location/weather setup is a small part of the normal personalization flow rather than a separate configuration wizard. Pressing Enter explicitly selects network-assisted inference; typing a district/county performs manual place geocoding; `skip` leaves weather off. The candidate is confirmed before use. The profile stores only the confirmed administrative labels, coordinates, timezone, source class and precision; it never stores the raw public IP or raw provider response. Existing confirmed location is not silently replaced when the network exit changes.
+
+## Circadian joint shadow replay
+
+Before any enforcement work, run `python3 tests/run_joint_shadow_replay.py`. The suite validates the integrated Circadian, Sleep / Quiet, Proactive Quality and fine-grained weather-context path while requiring `watcher_enforced=false` and `behavior_changed=false`. Shadow rejection must not block the legacy watcher send path.
+
+## Isolated delivery enforcement
+
+The isolated development tree includes a dual-key enforcement harness for the
+validated Circadian, Sleep / Quiet and Proactive Quality decisions. It is
+disabled by default, unavailable through managed configuration, and must not be
+used as evidence of production readiness before the fresh-container lifecycle
+and real Weixin acceptance stages pass.

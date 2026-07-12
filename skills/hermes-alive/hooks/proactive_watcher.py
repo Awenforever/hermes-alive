@@ -3,6 +3,10 @@
 # Marker: RICH_CONTENT_DELIVERY_V1
 # Marker: RICH_CONTENT_METADATA_V1
 # Marker: RICH_CONTENT_REFERENCE_V1
+# Marker: HERMES_ALIVE_CIRCADIAN_WATCHER_SHADOW_V1
+# Marker: HERMES_ALIVE_CIRCADIAN_SLEEP_QUIET_POLICY_SHADOW_V1
+# Marker: HERMES_ALIVE_PROACTIVE_QUALITY_GOVERNOR_SHADOW_V1
+# Marker: HERMES_ALIVE_ISOLATED_DELIVERY_ENFORCEMENT_V1
 
 from __future__ import annotations
 
@@ -85,6 +89,8 @@ class ProactivePlatformWatcher:
         self._dream_engine: Any | None = None
         self._interruption_policy: Any | None = None
         self._content_delivery_engine: Any | None = None
+        self._circadian_engine: Any | None = None
+        self._proactive_quality_governor: Any | None = None
         self.watcher_id = f"{os.getpid()}-{uuid.uuid4().hex[:8]}"
         self.started_at = datetime.now().astimezone().isoformat()
 
@@ -134,10 +140,67 @@ class ProactivePlatformWatcher:
         if control_sent:
             return True
 
+        circadian_decision = self._circadian_shadow_decision(
+            message_class="proactive_social",
+        )
+        if circadian_decision is not None:
+            self._log(
+                "circadian_shadow",
+                tick_id=tick_id,
+                integration_mode="observe_only",
+                behavior_changed=False,
+                circadian=circadian_decision,
+            )
+
+        sleep_quiet_decision = self._sleep_quiet_policy_shadow_decision(
+            circadian_decision,
+            message_class="proactive_social",
+        )
+        if sleep_quiet_decision is not None:
+            self._log(
+                "sleep_quiet_policy_shadow",
+                tick_id=tick_id,
+                integration_mode="observe_only",
+                behavior_changed=False,
+                sleep_quiet_policy=sleep_quiet_decision,
+            )
+
         voice = self._voice_state()
 
         # ── Interruption policy: decide if/how Alive may speak ──
         user_active = self._user_active_recently()
+
+        quality_pre_decision = self._proactive_quality_shadow_decision(
+            user_active=user_active,
+        )
+        if quality_pre_decision is not None:
+            self._log(
+                "proactive_quality_shadow",
+                tick_id=tick_id,
+                integration_mode="observe_only",
+                behavior_changed=False,
+                quality_governor=quality_pre_decision,
+            )
+
+        enforcement_pre = self._isolated_precompose_enforcement(
+            sleep_quiet_decision,
+            quality_pre_decision,
+        )
+        if enforcement_pre is not None and bool(enforcement_pre.get("enabled")):
+            self._log(
+                "isolated_enforcement_precompose",
+                tick_id=tick_id,
+                enforcement=enforcement_pre,
+            )
+            if bool(enforcement_pre.get("block")):
+                self._log(
+                    "skip",
+                    tick_id=tick_id,
+                    reason=str((enforcement_pre.get("reasons") or ["isolated_enforcement_block"])[0]),
+                    isolated_enforcement=True,
+                )
+                return False
+
         policy_decision = self._evaluate_interruption_policy(
             user_active=user_active,
             discovery_available=False,
@@ -166,14 +229,24 @@ class ProactivePlatformWatcher:
             cooldown.set_mood_cooldown(social_urge)
             allowed, reason = cooldown.can_send("proactive")
             if not allowed:
-                cooldown_policy = self._evaluate_interruption_policy(
-                    user_active=user_active,
-                    discovery_available=False,
-                    cooldown_allowed=False,
-                    cooldown_reason=reason,
-                )
-                self._log("skip", tick_id=tick_id, reason=reason, quiet_hours=(reason == "quiet_hours"), interruption_policy=cooldown_policy)
-                return False
+                quiet_override = self._isolated_legacy_quiet_override(
+                    sleep_quiet_decision,
+                ) if reason == "quiet_hours" else None
+                if quiet_override is not None and bool(quiet_override.get("override")):
+                    self._log(
+                        "isolated_enforcement_legacy_quiet_override",
+                        tick_id=tick_id,
+                        enforcement=quiet_override,
+                    )
+                else:
+                    cooldown_policy = self._evaluate_interruption_policy(
+                        user_active=user_active,
+                        discovery_available=False,
+                        cooldown_allowed=False,
+                        cooldown_reason=reason,
+                    )
+                    self._log("skip", tick_id=tick_id, reason=reason, quiet_hours=(reason == "quiet_hours"), interruption_policy=cooldown_policy)
+                    return False
 
         import random
         if policy_decision is not None and not bool(policy_decision.get("allow_content_share", True)):
@@ -234,6 +307,31 @@ class ProactivePlatformWatcher:
                 delivery_plan = None
                 rich_payload = None
                 selected_delivery_item = None
+
+        quality_candidate_audits = self._quality_candidate_shadow_audits(
+            messages,
+            quality_pre_decision,
+        )
+        for audit_index, audit in enumerate(quality_candidate_audits, start=1):
+            self._log(
+                "proactive_quality_candidate_shadow",
+                tick_id=tick_id,
+                audit_index=audit_index,
+                integration_mode="observe_only",
+                behavior_changed=False,
+                quality_candidate=audit,
+            )
+
+        messages, quality_filter = self._apply_isolated_quality_enforcement(
+            messages,
+            quality_candidate_audits,
+        )
+        if quality_filter is not None and bool(quality_filter.get("enabled")):
+            self._log(
+                "isolated_enforcement_candidate_filter",
+                tick_id=tick_id,
+                enforcement=quality_filter,
+            )
 
         if not messages and rich_payload is None:
             self._log(
@@ -304,6 +402,10 @@ class ProactivePlatformWatcher:
                     continue
 
             sent_messages.append((msg_type, content, generated_by))
+            self._commit_isolated_quality_delivery(
+                content,
+                quality_candidate_audits,
+            )
 
             self._log(
                 "sent",
@@ -713,6 +815,233 @@ class ProactivePlatformWatcher:
         except Exception:
             logger.exception("Interruption policy failed")
             return None
+
+    def _circadian(self) -> Any | None:
+        # HERMES_ALIVE_CIRCADIAN_WATCHER_SHADOW_V1
+        if self._circadian_engine is None:
+            try:
+                from circadian_engine import CircadianEngine, load_circadian_config
+
+                self._circadian_engine = CircadianEngine(
+                    config=load_circadian_config(),
+                )
+            except Exception:
+                logger.exception("Failed to initialize circadian engine")
+                self._circadian_engine = False
+        return None if self._circadian_engine is False else self._circadian_engine
+
+    def _circadian_shadow_decision(
+        self,
+        *,
+        message_class: str,
+    ) -> dict[str, Any] | None:
+        engine = self._circadian()
+        if engine is None:
+            return None
+        try:
+            decision = engine.shadow_decision(
+                message_class=message_class,
+            )
+            if not isinstance(decision, dict):
+                return None
+            # This integration phase is observability-only even when a
+            # malformed external configuration says live. The decision is
+            # recorded, never enforced here.
+            decision = dict(decision)
+            decision["watcher_enforced"] = False
+            decision["integration_mode"] = "observe_only"
+            return decision
+        except Exception:
+            logger.exception("Circadian shadow decision failed")
+            return None
+
+    def _sleep_quiet_policy_shadow_decision(
+        self,
+        circadian_decision: dict[str, Any] | None,
+        *,
+        message_class: str,
+    ) -> dict[str, Any] | None:
+        # HERMES_ALIVE_CIRCADIAN_SLEEP_QUIET_POLICY_SHADOW_V1
+        if not isinstance(circadian_decision, dict):
+            return None
+        try:
+            from circadian_sleep_quiet_policy import evaluate_sleep_quiet_shadow
+
+            decision = evaluate_sleep_quiet_shadow(
+                circadian_decision,
+                message_class=message_class,
+            )
+            if not isinstance(decision, dict):
+                return None
+            # This phase is comparison-only. Existing CooldownManager quiet
+            # hours remain authoritative and this decision is never enforced.
+            decision = dict(decision)
+            decision["watcher_enforced"] = False
+            decision["integration_mode"] = "observe_only"
+            decision["behavior_changed"] = False
+            return decision
+        except Exception:
+            logger.exception("Circadian sleep/quiet shadow decision failed")
+            return None
+
+    def _quality_governor(self) -> Any | None:
+        # HERMES_ALIVE_PROACTIVE_QUALITY_GOVERNOR_SHADOW_V1
+        if self._proactive_quality_governor is None:
+            try:
+                from proactive_quality_governor import ProactiveQualityGovernor
+
+                self._proactive_quality_governor = ProactiveQualityGovernor()
+            except Exception:
+                logger.exception("Failed to initialize proactive quality governor")
+                self._proactive_quality_governor = False
+        return None if self._proactive_quality_governor is False else self._proactive_quality_governor
+
+    def _proactive_quality_shadow_decision(
+        self,
+        *,
+        user_active: bool,
+    ) -> dict[str, Any] | None:
+        governor = self._quality_governor()
+        if governor is None:
+            return None
+        try:
+            decision = governor.pre_decision(user_active=user_active)
+            if not isinstance(decision, dict):
+                return None
+            decision = dict(decision)
+            decision["watcher_enforced"] = False
+            decision["integration_mode"] = "observe_only"
+            decision["behavior_changed"] = False
+            return decision
+        except Exception:
+            logger.exception("Proactive quality governor pre-decision failed")
+            return None
+
+    def _quality_candidate_shadow_audits(
+        self,
+        messages: list[tuple[str, str, str]],
+        pre_decision: dict[str, Any] | None,
+    ) -> list[dict[str, Any]]:
+        governor = self._quality_governor()
+        if governor is None or not isinstance(pre_decision, dict):
+            return []
+        audits: list[dict[str, Any]] = []
+        for msg_type, content, generated_by in messages:
+            try:
+                enforcement_enabled = self._isolated_enforcement_enabled()
+                audit = governor.audit_candidate(
+                    content,
+                    pre_decision=pre_decision,
+                    structured_state=None,
+                    persist_shadow_state=not enforcement_enabled,
+                )
+                if not isinstance(audit, dict):
+                    continue
+                audit = dict(audit)
+                audit["msg_type"] = str(msg_type)
+                audit["generated_by"] = str(generated_by)
+                audit["watcher_enforced"] = False
+                audit["integration_mode"] = (
+                    "isolated_enforcement_candidate"
+                    if enforcement_enabled
+                    else "observe_only"
+                )
+                audit["behavior_changed"] = False
+                audits.append(audit)
+            except Exception:
+                logger.exception("Proactive quality candidate audit failed")
+        return audits
+
+    def _isolated_enforcement_gate(self) -> dict[str, Any] | None:
+        try:
+            from isolated_enforcement import enforcement_gate
+
+            gate = enforcement_gate()
+            return gate if isinstance(gate, dict) else None
+        except Exception:
+            logger.exception("Isolated enforcement gate failed")
+            return None
+
+    def _isolated_enforcement_enabled(self) -> bool:
+        gate = self._isolated_enforcement_gate()
+        return bool(gate and gate.get("enabled"))
+
+    def _isolated_precompose_enforcement(
+        self,
+        sleep_quiet_decision: dict[str, Any] | None,
+        quality_pre_decision: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        try:
+            from isolated_enforcement import precompose_enforcement
+
+            decision = precompose_enforcement(
+                sleep_quiet_decision,
+                quality_pre_decision,
+            )
+            return decision if isinstance(decision, dict) else None
+        except Exception:
+            logger.exception("Isolated precompose enforcement failed")
+            return None
+
+    def _isolated_legacy_quiet_override(
+        self,
+        sleep_quiet_decision: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        try:
+            from isolated_enforcement import should_override_legacy_quiet
+
+            decision = should_override_legacy_quiet(
+                sleep_quiet_decision,
+            )
+            return decision if isinstance(decision, dict) else None
+        except Exception:
+            logger.exception("Isolated legacy quiet override failed")
+            return None
+
+    def _apply_isolated_quality_enforcement(
+        self,
+        messages: list[tuple[str, str, str]],
+        audits: list[dict[str, Any]],
+    ) -> tuple[list[tuple[str, str, str]], dict[str, Any] | None]:
+        try:
+            from isolated_enforcement import filter_quality_candidates
+
+            filtered, decision = filter_quality_candidates(messages, audits)
+            return list(filtered), decision if isinstance(decision, dict) else None
+        except Exception:
+            logger.exception("Isolated candidate enforcement failed")
+            return messages, None
+
+    def _commit_isolated_quality_delivery(
+        self,
+        content: str,
+        audits: list[dict[str, Any]],
+    ) -> bool:
+        if not self._isolated_enforcement_enabled():
+            return False
+        message_hash = sha256_text(content)
+        audit = next(
+            (
+                item
+                for item in audits
+                if isinstance(item, dict)
+                and str(item.get("message_hash") or "") == message_hash
+                and bool(item.get("would_allow"))
+                and not bool(item.get("would_reject"))
+            ),
+            None,
+        )
+        if audit is None:
+            return False
+        governor = self._quality_governor()
+        if governor is None:
+            return False
+        try:
+            commit = getattr(governor, "commit_delivery", None)
+            return bool(commit and commit(audit))
+        except Exception:
+            logger.exception("Failed to commit isolated quality delivery")
+            return False
 
     def _extract_content_reference(
         self,

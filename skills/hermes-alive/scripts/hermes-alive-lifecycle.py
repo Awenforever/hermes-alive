@@ -9,12 +9,14 @@ Marker: HERMES_ALIVE_GITHUB_SELF_INSTALL_V1
 Marker: HERMES_ALIVE_LIFECYCLE_PERMISSION_HARDENING_V1
 Marker: HERMES_ALIVE_RUNTIME_PERMISSION_PRESERVATION_V1
 Marker: HERMES_ALIVE_INSTALL_TRANSACTION_ROLLBACK_V1
+Marker: HERMES_ALIVE_CIRCADIAN_MANAGED_CONFIG_V1
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import shutil
@@ -35,7 +37,7 @@ except Exception:  # pragma: no cover - Hermes normally ships PyYAML
 SKILL_NAME = "hermes-alive"
 HOOK_NAME = "hermes-alive"
 MANIFEST_VERSION = 1
-CONFIG_VERSION = 1
+CONFIG_VERSION = 3
 
 MANAGED_ENV_KEYS = {
     "enabled": "HERMES_PROACTIVE_PLATFORM_ENABLED",
@@ -52,9 +54,84 @@ MANAGED_ENV_KEYS = {
     "discovery_interval_seconds": "HERMES_PROACTIVE_DISCOVERY_INTERVAL_SECONDS",
     "dream_enabled": "HERMES_DREAM_ENABLED",
     "dream_interval_hours": "HERMES_DREAM_INTERVAL_HOURS",
+    "weather_enabled": "HERMES_PROACTIVE_WEATHER_ENABLED",
     "weather_lat": "HERMES_PROACTIVE_LAT",
     "weather_lon": "HERMES_PROACTIVE_LON",
+    "weather_location_name": "HERMES_PROACTIVE_WEATHER_LOCATION_NAME",
+    "weather_country_code": "HERMES_PROACTIVE_WEATHER_COUNTRY_CODE",
+    "weather_admin1": "HERMES_PROACTIVE_WEATHER_ADMIN1",
+    "weather_admin2": "HERMES_PROACTIVE_WEATHER_ADMIN2",
+    "weather_admin3": "HERMES_PROACTIVE_WEATHER_ADMIN3",
+    "weather_timezone": "HERMES_PROACTIVE_WEATHER_TIMEZONE",
+    "weather_location_confirmed": "HERMES_PROACTIVE_WEATHER_LOCATION_CONFIRMED",
+    "weather_location_source": "HERMES_PROACTIVE_WEATHER_LOCATION_SOURCE",
+    "weather_location_precision": "HERMES_PROACTIVE_WEATHER_LOCATION_PRECISION",
     "emoji_policy": "HERMES_ALIVE_EMOJI_POLICY",
+    "circadian_enabled": "HERMES_ALIVE_CIRCADIAN_ENABLED",
+    "circadian_mode": "HERMES_ALIVE_CIRCADIAN_MODE",
+    "chronotype": "HERMES_ALIVE_CIRCADIAN_CHRONOTYPE",
+    "circadian_timezone": "HERMES_ALIVE_CIRCADIAN_TIMEZONE",
+    "base_sleep_time": "HERMES_ALIVE_CIRCADIAN_BASE_SLEEP_TIME",
+    "base_wake_time": "HERMES_ALIVE_CIRCADIAN_BASE_WAKE_TIME",
+    "learned_sleep_offset_minutes": "HERMES_ALIVE_CIRCADIAN_LEARNED_SLEEP_OFFSET_MINUTES",
+    "learned_wake_offset_minutes": "HERMES_ALIVE_CIRCADIAN_LEARNED_WAKE_OFFSET_MINUTES",
+    "normal_sleep_earliest": "HERMES_ALIVE_CIRCADIAN_NORMAL_SLEEP_EARLIEST",
+    "normal_sleep_latest": "HERMES_ALIVE_CIRCADIAN_NORMAL_SLEEP_LATEST",
+    "exceptional_sleep_latest": "HERMES_ALIVE_CIRCADIAN_EXCEPTIONAL_SLEEP_LATEST",
+    "normal_wake_earliest": "HERMES_ALIVE_CIRCADIAN_NORMAL_WAKE_EARLIEST",
+    "normal_wake_latest": "HERMES_ALIVE_CIRCADIAN_NORMAL_WAKE_LATEST",
+    "ideal_sleep_minutes": "HERMES_ALIVE_CIRCADIAN_IDEAL_SLEEP_MINUTES",
+    "minimum_sleep_minutes": "HERMES_ALIVE_CIRCADIAN_MINIMUM_SLEEP_MINUTES",
+    "deep_sleep_core_minutes": "HERMES_ALIVE_CIRCADIAN_DEEP_SLEEP_CORE_MINUTES",
+    "daily_sleep_variance_minutes": "HERMES_ALIVE_CIRCADIAN_DAILY_SLEEP_VARIANCE_MINUTES",
+    "daily_wake_variance_minutes": "HERMES_ALIVE_CIRCADIAN_DAILY_WAKE_VARIANCE_MINUTES",
+    "max_learning_minutes_per_day": "HERMES_ALIVE_CIRCADIAN_MAX_LEARNING_MINUTES_PER_DAY",
+    "max_learning_minutes_per_week": "HERMES_ALIVE_CIRCADIAN_MAX_LEARNING_MINUTES_PER_WEEK",
+    "explicit_user_preference_weight": "HERMES_ALIVE_CIRCADIAN_EXPLICIT_USER_PREFERENCE_WEIGHT",
+    "repeated_interaction_weight": "HERMES_ALIVE_CIRCADIAN_REPEATED_INTERACTION_WEIGHT",
+    "single_late_interaction_weight": "HERMES_ALIVE_CIRCADIAN_SINGLE_LATE_INTERACTION_WEIGHT",
+    "learned_offset_decay_enabled": "HERMES_ALIVE_CIRCADIAN_LEARNED_OFFSET_DECAY_ENABLED",
+    "learned_offset_decay_minutes_per_week": "HERMES_ALIVE_CIRCADIAN_LEARNED_OFFSET_DECAY_MINUTES_PER_WEEK",
+    "user_can_delay_sleep": "HERMES_ALIVE_CIRCADIAN_USER_CAN_DELAY_SLEEP",
+    "max_user_delay_minutes": "HERMES_ALIVE_CIRCADIAN_MAX_USER_DELAY_MINUTES",
+    "user_can_wake_early": "HERMES_ALIVE_CIRCADIAN_USER_CAN_WAKE_EARLY",
+    "sleep_transition_message_probability": "HERMES_ALIVE_CIRCADIAN_SLEEP_TRANSITION_MESSAGE_PROBABILITY",
+    "wake_transition_message_probability": "HERMES_ALIVE_CIRCADIAN_WAKE_TRANSITION_MESSAGE_PROBABILITY",
+    "sleep_debt_recovery_enabled": "HERMES_ALIVE_CIRCADIAN_SLEEP_DEBT_RECOVERY_ENABLED",
+}
+
+CIRCADIAN_DEFAULT_VALUES: dict[str, Any] = {
+    "circadian_enabled": True,
+    "circadian_mode": "shadow",
+    "chronotype": "adaptive",
+    "circadian_timezone": "Asia/Singapore",
+    "base_sleep_time": "23:00",
+    "base_wake_time": "07:00",
+    "learned_sleep_offset_minutes": 0,
+    "learned_wake_offset_minutes": 0,
+    "normal_sleep_earliest": "22:00",
+    "normal_sleep_latest": "01:30",
+    "exceptional_sleep_latest": "03:00",
+    "normal_wake_earliest": "06:00",
+    "normal_wake_latest": "09:30",
+    "ideal_sleep_minutes": 480,
+    "minimum_sleep_minutes": 360,
+    "deep_sleep_core_minutes": 180,
+    "daily_sleep_variance_minutes": 30,
+    "daily_wake_variance_minutes": 35,
+    "max_learning_minutes_per_day": 10,
+    "max_learning_minutes_per_week": 40,
+    "explicit_user_preference_weight": 1.0,
+    "repeated_interaction_weight": 0.35,
+    "single_late_interaction_weight": 0.05,
+    "learned_offset_decay_enabled": True,
+    "learned_offset_decay_minutes_per_week": 5,
+    "user_can_delay_sleep": True,
+    "max_user_delay_minutes": 150,
+    "user_can_wake_early": True,
+    "sleep_transition_message_probability": 0.45,
+    "wake_transition_message_probability": 0.30,
+    "sleep_debt_recovery_enabled": True,
 }
 
 SECRET_NAME_TOKENS = (
@@ -600,6 +677,66 @@ def _bool_text(value: bool) -> str:
     return "true" if value else "false"
 
 
+def _location_weather_module(source_root: Path):
+    module_path = source_root / "hooks" / "location_weather_profile.py"
+    if not module_path.is_file():
+        raise LifecycleError(f"location onboarding module missing: {module_path}")
+    spec = importlib.util.spec_from_file_location(
+        "hermes_alive_location_weather_profile", module_path
+    )
+    if spec is None or spec.loader is None:
+        raise LifecycleError("cannot load location onboarding module")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _apply_noninteractive_location_args(
+    values: dict[str, Any], args: argparse.Namespace, paths: Paths
+) -> None:
+    module = _location_weather_module(paths.source_root)
+    if args.weather_location:
+        candidate = module.LocationCandidate(
+            country_code=str(args.weather_country_code or "").strip().upper(),
+            country_name="",
+            admin1=str(args.weather_admin1 or "").strip(),
+            admin2=str(args.weather_admin2 or "").strip(),
+            admin3=str(args.weather_admin3 or "").strip(),
+            locality=str(args.weather_location or "").strip(),
+            latitude=None if args.weather_lat is None else float(args.weather_lat),
+            longitude=None if args.weather_lon is None else float(args.weather_lon),
+            timezone=str(args.weather_timezone or args.timezone or "").strip(),
+            source="explicit_cli",
+            precision="district_or_county" if (args.weather_admin2 or args.weather_admin3) else "user_text",
+            confidence=1.0,
+        )
+        values.update(
+            module.profile_values(
+                candidate,
+                confirmed=(
+                    True
+                    if args.weather_location_confirmed is None
+                    else bool(args.weather_location_confirmed)
+                ),
+                enabled=args.weather_enabled,
+            )
+        )
+    elif args.allow_network_location:
+        candidate = module.infer_network_location()
+        values.update(
+            module.profile_values(
+                candidate,
+                confirmed=(
+                    False
+                    if args.weather_location_confirmed is None
+                    else bool(args.weather_location_confirmed)
+                ),
+                enabled=args.weather_enabled,
+            )
+        )
+
+
 def configure(args: argparse.Namespace) -> int:
     paths = _paths(args)
     provider = _provider_status(paths)
@@ -653,9 +790,59 @@ def configure(args: argparse.Namespace) -> int:
     if args.dream_enabled is not None:
         assign("dream_enabled", args.dream_enabled)
     assign("dream_interval_hours", args.dream_interval_hours)
+    if args.weather_enabled is not None:
+        assign("weather_enabled", args.weather_enabled)
     assign("weather_lat", args.weather_lat)
     assign("weather_lon", args.weather_lon)
+    assign("weather_location_name", args.weather_location)
+    assign("weather_country_code", args.weather_country_code)
+    assign("weather_admin1", args.weather_admin1)
+    assign("weather_admin2", args.weather_admin2)
+    assign("weather_admin3", args.weather_admin3)
+    assign("weather_timezone", args.weather_timezone)
+    if args.weather_location_confirmed is not None:
+        assign("weather_location_confirmed", args.weather_location_confirmed)
+    _apply_noninteractive_location_args(values, args, paths)
     assign("emoji_policy", args.emoji_policy)
+    if args.circadian_enabled is not None:
+        assign("circadian_enabled", args.circadian_enabled)
+    assign("circadian_mode", args.circadian_mode)
+    assign("chronotype", args.chronotype)
+    assign("circadian_timezone", args.circadian_timezone)
+    assign("base_sleep_time", args.base_sleep_time)
+    assign("base_wake_time", args.base_wake_time)
+    assign("learned_sleep_offset_minutes", args.learned_sleep_offset_minutes)
+    assign("learned_wake_offset_minutes", args.learned_wake_offset_minutes)
+    assign("normal_sleep_earliest", args.normal_sleep_earliest)
+    assign("normal_sleep_latest", args.normal_sleep_latest)
+    assign("exceptional_sleep_latest", args.exceptional_sleep_latest)
+    assign("normal_wake_earliest", args.normal_wake_earliest)
+    assign("normal_wake_latest", args.normal_wake_latest)
+    assign("ideal_sleep_minutes", args.ideal_sleep_minutes)
+    assign("minimum_sleep_minutes", args.minimum_sleep_minutes)
+    assign("deep_sleep_core_minutes", args.deep_sleep_core_minutes)
+    assign("daily_sleep_variance_minutes", args.daily_sleep_variance_minutes)
+    assign("daily_wake_variance_minutes", args.daily_wake_variance_minutes)
+    assign("max_learning_minutes_per_day", args.max_learning_minutes_per_day)
+    assign("max_learning_minutes_per_week", args.max_learning_minutes_per_week)
+    assign("explicit_user_preference_weight", args.explicit_user_preference_weight)
+    assign("repeated_interaction_weight", args.repeated_interaction_weight)
+    assign("single_late_interaction_weight", args.single_late_interaction_weight)
+    if args.learned_offset_decay_enabled is not None:
+        assign("learned_offset_decay_enabled", args.learned_offset_decay_enabled)
+    assign("learned_offset_decay_minutes_per_week", args.learned_offset_decay_minutes_per_week)
+    if args.user_can_delay_sleep is not None:
+        assign("user_can_delay_sleep", args.user_can_delay_sleep)
+    assign("max_user_delay_minutes", args.max_user_delay_minutes)
+    if args.user_can_wake_early is not None:
+        assign("user_can_wake_early", args.user_can_wake_early)
+    assign("sleep_transition_message_probability", args.sleep_transition_message_probability)
+    assign("wake_transition_message_probability", args.wake_transition_message_probability)
+    if args.sleep_debt_recovery_enabled is not None:
+        assign("sleep_debt_recovery_enabled", args.sleep_debt_recovery_enabled)
+
+    for name, default in CIRCADIAN_DEFAULT_VALUES.items():
+        values.setdefault(name, default)
 
     if not args.non_interactive and sys.stdin.isatty():
         if "enabled" not in values:
@@ -667,6 +854,9 @@ def configure(args: argparse.Namespace) -> int:
             entered = input("Timezone [system default]: ").strip()
             if entered:
                 values["timezone"] = entered
+        if not values.get("weather_location_confirmed"):
+            module = _location_weather_module(paths.source_root)
+            values = module.interactive_location_onboarding(values)
         if "quiet_start" not in values:
             entered = input("Quiet hours start [23:00]: ").strip()
             values["quiet_start"] = entered or "23:00"
@@ -694,6 +884,10 @@ def configure(args: argparse.Namespace) -> int:
     if not provider.get("ready"):
         print("HERMES_ALIVE_PROVIDER_SETUP_REQUIRED")
         print(f"provider_setup_command={provider['setup_command']}")
+    print(f"weather_enabled={str(bool(values.get('weather_enabled'))).lower()}")
+    print(f"weather_location_confirmed={str(bool(values.get('weather_location_confirmed'))).lower()}")
+    if values.get("weather_location_name"):
+        print(f"weather_location={values['weather_location_name']}")
     print("gateway_restart_required=true")
     return 0
 
@@ -931,11 +1125,82 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
     )
     configure_parser.add_argument("--dream-interval-hours", type=int)
+    configure_parser.add_argument(
+        "--weather-enabled",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+    )
     configure_parser.add_argument("--weather-lat")
     configure_parser.add_argument("--weather-lon")
+    configure_parser.add_argument("--weather-location")
+    configure_parser.add_argument("--weather-country-code")
+    configure_parser.add_argument("--weather-admin1")
+    configure_parser.add_argument("--weather-admin2")
+    configure_parser.add_argument("--weather-admin3")
+    configure_parser.add_argument("--weather-timezone")
+    configure_parser.add_argument(
+        "--weather-location-confirmed",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+    )
+    configure_parser.add_argument("--allow-network-location", action="store_true")
     configure_parser.add_argument(
         "--emoji-policy",
         choices=("contextual", "minimal", "off"),
+    )
+    configure_parser.add_argument(
+        "--circadian-enabled",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+    )
+    configure_parser.add_argument(
+        "--circadian-mode",
+        choices=("off", "shadow", "live"),
+    )
+    configure_parser.add_argument("--chronotype")
+    configure_parser.add_argument("--circadian-timezone")
+    configure_parser.add_argument("--base-sleep-time")
+    configure_parser.add_argument("--base-wake-time")
+    configure_parser.add_argument("--learned-sleep-offset-minutes", type=int)
+    configure_parser.add_argument("--learned-wake-offset-minutes", type=int)
+    configure_parser.add_argument("--normal-sleep-earliest")
+    configure_parser.add_argument("--normal-sleep-latest")
+    configure_parser.add_argument("--exceptional-sleep-latest")
+    configure_parser.add_argument("--normal-wake-earliest")
+    configure_parser.add_argument("--normal-wake-latest")
+    configure_parser.add_argument("--ideal-sleep-minutes", type=int)
+    configure_parser.add_argument("--minimum-sleep-minutes", type=int)
+    configure_parser.add_argument("--deep-sleep-core-minutes", type=int)
+    configure_parser.add_argument("--daily-sleep-variance-minutes", type=int)
+    configure_parser.add_argument("--daily-wake-variance-minutes", type=int)
+    configure_parser.add_argument("--max-learning-minutes-per-day", type=int)
+    configure_parser.add_argument("--max-learning-minutes-per-week", type=int)
+    configure_parser.add_argument("--explicit-user-preference-weight", type=float)
+    configure_parser.add_argument("--repeated-interaction-weight", type=float)
+    configure_parser.add_argument("--single-late-interaction-weight", type=float)
+    configure_parser.add_argument(
+        "--learned-offset-decay-enabled",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+    )
+    configure_parser.add_argument("--learned-offset-decay-minutes-per-week", type=int)
+    configure_parser.add_argument(
+        "--user-can-delay-sleep",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+    )
+    configure_parser.add_argument("--max-user-delay-minutes", type=int)
+    configure_parser.add_argument(
+        "--user-can-wake-early",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+    )
+    configure_parser.add_argument("--sleep-transition-message-probability", type=float)
+    configure_parser.add_argument("--wake-transition-message-probability", type=float)
+    configure_parser.add_argument(
+        "--sleep-debt-recovery-enabled",
+        action=argparse.BooleanOptionalAction,
+        default=None,
     )
     configure_parser.set_defaults(func=configure)
 
