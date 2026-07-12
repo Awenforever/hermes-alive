@@ -441,6 +441,17 @@ LIFECYCLE=/opt/data/skills/hermes/hermes-alive/scripts/hermes-alive-lifecycle
 
 ---
 
+## 📚 Documentation
+
+- [Architecture](skills/hermes-alive/docs/ARCHITECTURE.md)
+- [Runtime policies](skills/hermes-alive/docs/RUNTIME_POLICIES.md)
+- [Lifecycle and persistence](skills/hermes-alive/docs/LIFECYCLE_AND_PERSISTENCE.md)
+- [Data and privacy](skills/hermes-alive/docs/DATA_AND_PRIVACY.md)
+- [Testing and acceptance](skills/hermes-alive/docs/TESTING_AND_ACCEPTANCE.md)
+- [Discovery development](skills/hermes-alive/docs/DISCOVERY_DEVELOPMENT.md)
+
+---
+
 ## 🛡️ Design Principles
 
 1. **Model owns expression; code owns safety boundaries.**

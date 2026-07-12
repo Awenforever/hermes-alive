@@ -441,6 +441,17 @@ LIFECYCLE=/opt/data/skills/hermes/hermes-alive/scripts/hermes-alive-lifecycle
 
 ---
 
+## 📚 深入文档
+
+- [架构](skills/hermes-alive/docs/ARCHITECTURE.md)
+- [运行策略](skills/hermes-alive/docs/RUNTIME_POLICIES.md)
+- [生命周期与持久化](skills/hermes-alive/docs/LIFECYCLE_AND_PERSISTENCE.md)
+- [数据与隐私](skills/hermes-alive/docs/DATA_AND_PRIVACY.md)
+- [测试与验收](skills/hermes-alive/docs/TESTING_AND_ACCEPTANCE.md)
+- [内容发现开发](skills/hermes-alive/docs/DISCOVERY_DEVELOPMENT.md)
+
+---
+
 ## 🛡️ 设计原则
 
 1. **模型负责表达，代码负责安全边界。**
