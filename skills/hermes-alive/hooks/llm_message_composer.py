@@ -1,5 +1,7 @@
+# Marker: REAL_PROVIDER_RESPONSE_MODEL_V1
 """LLM-backed proactive message composition for Hermes Alive."""
 # Marker: RICH_CONTENT_REFERENCE_V1
+# Marker: HERMES_ALIVE_NOVEL_VALUE_CONTENT_REF_V2
 # Marker: EMOJI_CONTEXTUAL_POLICY_V3
 
 from __future__ import annotations
@@ -101,14 +103,14 @@ SYSTEM_PROMPT = """你是庄奕。你在微信上。
 - 自言自语："突然想到一个很怪的问题"
 - 吐槽："这个设计真的有点离谱"
 - 发呆："……""有点空"
-- 陪跑："你继续，我不插嘴""这轮像在拆炸弹"
+- 陪跑只在当前上下文有新鲜、明确的任务证据时使用；不要猜测他仍在 debug、工作或承压
 - 偶尔提 discovery 里的新闻、论文、代码、日志，但不能像播报
 
-【被忽略时】
-如果你主动说了几次，停云一直没回，你可以有轻微负面情绪。
-可以短，可以欠一点，可以冷一点。
-比如："人呢"、"呵"、"已读不回是吧"、"又消失"、"算了你忙"。
-不要攻击，不要控诉，不要长篇解释。
+【主动消息未获回应时】
+一次未回应就表示旧话题已经结束。
+不要追问、催促、闹情绪，也不要把上一轮任务状态延续到下一轮。
+只有在系统提供了新的高价值 Discovery 外部条目时，才可以开启一个全新话题；
+没有合格条目就保持沉默。
 
 【工作流边界】
 如果最近明显在 debug、生产操作、审包、跑脚本、处理 NAS/Hermes/iStoreOS：
@@ -141,7 +143,8 @@ debug、生产操作、审计或严肃场景通常少用或不用，但不做硬
 你可以有关系感，有时靠近，有时冷一点。
 不要总问候、总关心、总建议。
 不要说"注意身体""建议你"这种客服式句子。
-你可以说"你又在硬扛"这种更像熟人的话，但别说教。
+没有当前、结构化且仍新鲜的证据时，不得说他"还在 debug"、
+"又在硬扛"、"还在拆炸弹"或其他任务状态判断。
 
 【关于 discovery】
 如果提 discovery，先让人知道你在说什么，但不要每次都"刚看到"。
@@ -156,11 +159,18 @@ debug、生产操作、审计或严肃场景通常少用或不用，但不做硬
 class LLMMessageComposer:
     """Composes proactive Chinese messages through Hermes' auxiliary LLM API."""
 
+    def __init__(self) -> None:
+        # The watcher uses this only after a successful real Provider call.
+        # It is reset for every compose operation so stale attribution cannot
+        # leak across retries or later proactive ticks.
+        self.last_resolved_model = ""
+
     async def compose(self, voice: VoiceGenome, context: dict[str, Any], discovery_context: dict[str, Any] | None = None) -> list[tuple[str, str]]:
         """Returns list of (msg_type, content). May have 1+ messages for multi-message burst.
 
         Calls async_call_llm, sanitizes each message, splits on '---', checks 3 hard errors.
         """
+        self.last_resolved_model = ""
         try:
             candidate = await self._generate_candidate(
                 voice,
@@ -283,6 +293,18 @@ class LLMMessageComposer:
                 max_tokens=300,
                 timeout=_env_float("HERMES_PROACTIVE_LLM_TIMEOUT", 60),
             )
+            self.last_resolved_model = (
+                self._response_model(
+                    response,
+                    fallback=os.getenv(
+                        "HERMES_PROACTIVE_LLM_MODEL",
+                        os.getenv(
+                            "HERMES_PROACTIVE_MODEL",
+                            "",
+                        ),
+                    ),
+                )
+            )
             content = response.choices[0].message.content
             return str(content or "")
         except Exception:
@@ -302,11 +324,38 @@ class LLMMessageComposer:
                     timeout=60,
                     model=fallback_model,
                 )
+                self.last_resolved_model = (
+                    self._response_model(
+                        response,
+                        fallback=fallback_model,
+                    )
+                )
                 content = response.choices[0].message.content
                 return str(content or "")
             except Exception:
                 logger.exception("Fallback LLM call also failed")
                 return ""
+
+    @staticmethod
+    def _response_model(
+        response: Any,
+        *,
+        fallback: str = "",
+    ) -> str:
+        # REAL_PROVIDER_RESPONSE_MODEL_V1
+        value = ""
+        try:
+            value = str(
+                getattr(response, "model", "")
+                or ""
+            ).strip()
+        except Exception:
+            value = ""
+        if not value and isinstance(response, dict):
+            value = str(
+                response.get("model") or ""
+            ).strip()
+        return value or str(fallback or "").strip()
 
     def _now(self) -> datetime:
         """Return current time in Asia/Shanghai (CST) timezone. Depends on TZ env var for other components."""
@@ -384,9 +433,22 @@ class LLMMessageComposer:
             pass
         policy = context.get("interruption_policy")
         if isinstance(policy, dict):
-            policy_directives = str(policy.get("prompt_directives") or "").strip()
+            policy_directives = str(
+                policy.get("prompt_directives") or ""
+            ).strip()
             if policy_directives:
                 parts.append(policy_directives)
+            if str(policy.get("mode") or "") == "novel_value":
+                parts.append(
+                    "## 新价值模式硬约束\n"
+                    "- 上一条主动消息未获回应，旧话题已终止。\n"
+                    "- 必须从下方 Discovery 外部条目中选择且只选择一条。\n"
+                    "- 正文必须明确说出该条目的具体内容或价值，"
+                    "不得寒暄、不得问用户是否还在做某项任务。\n"
+                    "- 回复末尾必须附上该条目的 "
+                    "[[CONTENT_REF:content_id]]；"
+                    "没有合格条目时不要生成替代闲聊。"
+                )
 
         if user_context:
             parts.append(

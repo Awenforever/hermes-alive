@@ -243,7 +243,9 @@ def policy_matrix() -> None:
         ("debug", {**base, "current_context": {"flow": "debug_flow", "focus_lock": True}, "mood": {"energy": 50, "annoyance": 0, "pressure": 80}}, {}, {"level": 1, "allow_content_share": False, "max_bubbles": 1}),
         ("research", {**base, "current_context": {"flow": "research_flow", "focus_lock": False}}, {}, {"level": 2, "allow_content_share": True, "max_bubbles": 2}),
         ("user_active", base, {"user_active": True}, {"level": 0, "allow_send": False, "skip_reason": "user_active"}),
-        ("ignored", {**base, "ignored_proactive_count": 4}, {}, {"level": 3, "allow_content_share": False}),
+        ("ignored_exhausted", {**base, "ignored_proactive_count": 4}, {}, {"level": 0, "allow_send": False, "skip_reason": "unanswered_budget_exhausted"}),
+        ("ignored_one_no_value", {**base, "ignored_proactive_count": 1}, {}, {"level": 0, "allow_send": False, "skip_reason": "unanswered_no_novel_value"}),
+        ("ignored_one_with_discovery", {**base, "ignored_proactive_count": 1}, {"discovery_available": True}, {"level": 2, "mode": "novel_value", "allow_send": True, "allow_content_share": True}),
         ("night", {**base, "current_context": {"flow": "night_mode", "focus_lock": False}}, {}, {"level": 1, "max_bubbles": 1}),
         ("low_energy", {**base, "mood": {"energy": 20, "annoyance": 0, "pressure": 0}}, {}, {"level": 1, "allow_new_topic": False}),
         ("casual", {**base, "current_context": {"flow": "casual_flow", "focus_lock": False}}, {}, {"level": 2, "max_bubbles": 3}),
@@ -264,10 +266,51 @@ def delivery_plans() -> None:
         {"id": "bad", "title": "Bad URL", "url": "file:///etc/passwd", "source": "example"},
     ]}
     messages = [("research_ping", "Smoke paper", "fake-provider/fake-model")]
-    exact = engine.plan(messages, context, {"allow_content_share": True, "max_bubbles": 2}, content_ref="img")
+    exact = engine.plan(
+        messages,
+        context,
+        {
+            "allow_content_share": True,
+            "max_bubbles": 2,
+        },
+        content_ref="img",
+        content_generated_by="fake-provider/fake-model",
+    )
     assert exact.evidence_score == 1000
     assert exact.rich_payload and exact.rich_payload.kind == "image"
     assert exact.rich_payload.image_url.startswith("https://")
+    assert (
+        exact.rich_payload.generated_by
+        == "fake-provider/fake-model"
+    )
+
+    inherited = engine.plan(
+        messages,
+        context,
+        {
+            "allow_content_share": True,
+            "max_bubbles": 2,
+        },
+        content_ref="img",
+    )
+    assert inherited.rich_payload
+    assert (
+        inherited.rich_payload.generated_by
+        == "fake-provider/fake-model"
+    )
+
+    system_exact = engine.plan(
+        [],
+        context,
+        {
+            "allow_content_share": True,
+            "max_bubbles": 2,
+        },
+        content_ref="img",
+        content_generated_by="hermes",
+    )
+    assert system_exact.rich_payload
+    assert system_exact.rich_payload.generated_by == "hermes"
     unknown = engine.plan(messages, context, {"allow_content_share": True, "max_bubbles": 3}, content_ref="missing")
     assert unknown.rich_payload is None and unknown.evidence_score == 0
     blocked = engine.plan(messages, context, {"allow_content_share": False, "max_bubbles": 1}, content_ref="img")
@@ -359,11 +402,39 @@ def watcher_metadata_and_reference() -> None:
     assert model["is_system"] is False
     assert system["resolved_model"] == "hermes"
     assert system["is_system"] is True
-    visible, ref = watcher._extract_content_reference([
-        ("content_share", "hello", "fake-provider/fake-model"),
-        ("__content_ref__", "abc", "hermes"),
-    ])
+    candidate_messages = [
+        (
+            "content_share",
+            "hello",
+            "fake-provider/fake-model",
+        ),
+        (
+            "__content_ref__",
+            "abc",
+            "fake-provider/fake-model",
+        ),
+    ]
+    provenance = watcher._content_reference_generated_by(
+        candidate_messages,
+    )
+    visible, ref = watcher._extract_content_reference(
+        candidate_messages,
+    )
     assert ref == "abc" and len(visible) == 1
+    assert provenance == "fake-provider/fake-model"
+
+    system_provenance = (
+        watcher._content_reference_generated_by(
+            [
+                (
+                    "__content_ref__",
+                    "abc",
+                    "hermes",
+                )
+            ],
+        )
+    )
+    assert system_provenance == "hermes"
 
 
 class _TokenStore:
@@ -720,6 +791,50 @@ def lifecycle_matrix() -> None:
     assert second.returncode == 0, second.stdout
     verify = lifecycle_cmd(home, "verify")
     assert verify.returncode == 0, verify.stdout
+
+    configured = lifecycle_cmd(
+        home,
+        "configure",
+        "--non-interactive",
+    )
+    assert configured.returncode == 0, configured.stdout
+    managed_path = (
+        home
+        / "hermes_alive_shared"
+        / "config"
+        / "hermes-alive.json"
+    )
+    managed = json.loads(
+        managed_path.read_text(encoding="utf-8")
+    )
+    values = managed["values"]
+    assert values["quality_governor_mode"] == "enforce"
+    assert values["quality_topic_expiry_after_unanswered"] == 1
+    assert values["quality_silence_after_unanswered"] == 2
+    assert values["context_flow_max_age_seconds"] == 3600
+
+    overridden = lifecycle_cmd(
+        home,
+        "configure",
+        "--quality-governor-mode",
+        "shadow",
+        "--quality-topic-expiry-after-unanswered",
+        "2",
+        "--quality-silence-after-unanswered",
+        "3",
+        "--context-flow-max-age-seconds",
+        "7200",
+    )
+    assert overridden.returncode == 0, overridden.stdout
+    managed = json.loads(
+        managed_path.read_text(encoding="utf-8")
+    )
+    values = managed["values"]
+    assert values["quality_governor_mode"] == "shadow"
+    assert values["quality_topic_expiry_after_unanswered"] == 2
+    assert values["quality_silence_after_unanswered"] == 3
+    assert values["context_flow_max_age_seconds"] == 7200
+
     marker = home / "hermes_alive_shared" / "preferences" / "preserve.txt"
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.write_text("keep", encoding="utf-8")

@@ -2,6 +2,8 @@
 # Marker: INTERRUPTION_POLICY_V1
 # Marker: INTERRUPTION_POLICY_ENFORCEMENT_V1
 # Marker: EMOJI_SOFT_POLICY_V1
+# Marker: HERMES_ALIVE_UNANSWERED_DISCOVERY_PIVOT_V2
+# Marker: HERMES_ALIVE_CONTEXT_FRESHNESS_V2
 
 from __future__ import annotations
 
@@ -50,6 +52,14 @@ def _flow(state: dict[str, Any]) -> str:
 def _focus_lock(state: dict[str, Any]) -> bool:
     try:
         return bool((state.get("current_context") or {}).get("focus_lock"))
+    except Exception:
+        return False
+
+
+def _context_fresh(state: dict[str, Any]) -> bool:
+    try:
+        value = (state.get("current_context") or {}).get("context_fresh")
+        return True if value is None else bool(value)
     except Exception:
         return False
 
@@ -125,7 +135,17 @@ def _prompt_for(
     elif level == 1:
         lines.append("- 只允许 ambient 在场感：短、贴合当前场景、不转移话题。")
     elif level == 2:
-        lines.append("- 可以主动开题，但要有内容价值，不要模板化。")
+        if mode == "novel_value":
+            lines.append(
+                "- 上一条主动消息未获回应。旧话题已结束；"
+                "本轮只能分享一个新的、有明确价值的外部发现。"
+            )
+            lines.append(
+                "- 必须引用一个实际 Discovery 条目；"
+                "不得退回寒暄、陪伴式追问或用户任务状态猜测。"
+            )
+        else:
+            lines.append("- 可以主动开题，但要有内容价值，不要模板化。")
     elif level >= 3:
         lines.append("- 可以有关系性情绪：轻戳、冷淡、撒娇式不爽，但不要攻击。")
     if not allow_new_topic:
@@ -195,7 +215,62 @@ class InterruptionPolicy:
                 skip_reason=str(cooldown_reason or "cooldown"),
             )
 
-        if flow == "debug_flow" or focus_lock or pressure >= 78:
+        context_fresh = _context_fresh(state)
+
+        if ignored >= 2:
+            return _decision(
+                level=0,
+                mode="silent",
+                allow_send=False,
+                allow_when_user_active=False,
+                allow_new_topic=False,
+                allow_content_share=False,
+                allow_emoji=True,
+                max_bubbles=1,
+                preferred_speech_acts=["silent_marker"],
+                reason=["unanswered_budget_exhausted"],
+                skip_reason="unanswered_budget_exhausted",
+            )
+
+        if ignored >= 1:
+            if discovery_available:
+                return _decision(
+                    level=2,
+                    mode="novel_value",
+                    allow_send=True,
+                    allow_when_user_active=False,
+                    allow_new_topic=True,
+                    allow_content_share=True,
+                    allow_emoji=True,
+                    max_bubbles=2,
+                    preferred_speech_acts=[
+                        "content_share",
+                        "news_reaction",
+                        "research_ping",
+                    ],
+                    reason=[
+                        "unanswered_topic_expired",
+                        "fresh_discovery_available",
+                    ],
+                )
+            return _decision(
+                level=0,
+                mode="silent",
+                allow_send=False,
+                allow_when_user_active=False,
+                allow_new_topic=False,
+                allow_content_share=False,
+                allow_emoji=True,
+                max_bubbles=1,
+                preferred_speech_acts=["silent_marker"],
+                reason=["unanswered_topic_expired", "no_novel_value"],
+                skip_reason="unanswered_no_novel_value",
+            )
+
+        if (
+            context_fresh
+            and (flow == "debug_flow" or focus_lock or pressure >= 78)
+        ):
             return _decision(
                 level=1,
                 mode="ambient",

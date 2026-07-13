@@ -1,3 +1,6 @@
+# Marker: WATCHER_REAL_PROVIDER_MODEL_V1
+# Marker: RICH_CONTENT_LOGICAL_SENT_V1
+# Marker: RICH_CONTENT_MODEL_ATTRIBUTION_V2
 
 """Gateway-native proactive platform watcher for Hermes Alive."""
 # Marker: RICH_CONTENT_DELIVERY_V1
@@ -7,6 +10,13 @@
 # Marker: HERMES_ALIVE_CIRCADIAN_SLEEP_QUIET_POLICY_SHADOW_V1
 # Marker: HERMES_ALIVE_PROACTIVE_QUALITY_GOVERNOR_SHADOW_V1
 # Marker: HERMES_ALIVE_ISOLATED_DELIVERY_ENFORCEMENT_V1
+# Marker: HERMES_ALIVE_DISCOVERY_REFRESH_DECOUPLING_V2
+# Marker: HERMES_ALIVE_UNANSWERED_DISCOVERY_PIVOT_V2
+# Marker: HERMES_ALIVE_QUALITY_LIVE_ENFORCEMENT_V2
+# Marker: HERMES_ALIVE_CONTENT_REF_VALIDATION_V3
+# Marker: HERMES_ALIVE_QUALITY_OBSERVABILITY_V3
+# Marker: HERMES_ALIVE_QUALITY_FAIL_CLOSED_RUNTIME_V3
+# Marker: HERMES_ALIVE_QUALITY_AUDIT_ALIGNMENT_V3
 
 from __future__ import annotations
 
@@ -177,18 +187,29 @@ class ProactivePlatformWatcher:
             self._log(
                 "proactive_quality_shadow",
                 tick_id=tick_id,
-                integration_mode="observe_only",
-                behavior_changed=False,
+                integration_mode=str(
+                    quality_pre_decision.get("integration_mode")
+                    or "observe_only"
+                ),
+                watcher_enforced=bool(
+                    quality_pre_decision.get("watcher_enforced")
+                ),
+                behavior_changed=bool(
+                    quality_pre_decision.get("behavior_changed")
+                ),
                 quality_governor=quality_pre_decision,
             )
 
-        enforcement_pre = self._isolated_precompose_enforcement(
+        enforcement_pre = self._quality_precompose_enforcement(
             sleep_quiet_decision,
             quality_pre_decision,
         )
         if enforcement_pre is not None and bool(enforcement_pre.get("enabled")):
             self._log(
-                "isolated_enforcement_precompose",
+                str(
+                    enforcement_pre.get("log_event")
+                    or "quality_precompose_enforcement"
+                ),
                 tick_id=tick_id,
                 enforcement=enforcement_pre,
             )
@@ -196,8 +217,13 @@ class ProactivePlatformWatcher:
                 self._log(
                     "skip",
                     tick_id=tick_id,
-                    reason=str((enforcement_pre.get("reasons") or ["isolated_enforcement_block"])[0]),
-                    isolated_enforcement=True,
+                    reason=str(
+                        (
+                            enforcement_pre.get("reasons")
+                            or ["quality_enforcement_block"]
+                        )[0]
+                    ),
+                    quality_enforcement=True,
                 )
                 return False
 
@@ -207,16 +233,36 @@ class ProactivePlatformWatcher:
             cooldown_allowed=True,
             cooldown_reason=None,
         )
+        deferred_for_discovery = False
         if policy_decision is not None:
-            self._log("policy", tick_id=tick_id, interruption_policy=policy_decision)
+            self._log(
+                "policy",
+                tick_id=tick_id,
+                policy_stage="pre_discovery",
+                interruption_policy=policy_decision,
+            )
             if not bool(policy_decision.get("allow_send", True)):
+                skip_reason = str(
+                    policy_decision.get("skip_reason")
+                    or "interruption_policy_silent"
+                )
+                deferred_for_discovery = (
+                    skip_reason == "unanswered_no_novel_value"
+                )
+                if not deferred_for_discovery:
+                    self._log(
+                        "skip",
+                        tick_id=tick_id,
+                        reason=skip_reason,
+                        interruption_policy=policy_decision,
+                    )
+                    return False
                 self._log(
-                    "skip",
+                    "policy_deferred",
                     tick_id=tick_id,
-                    reason=str(policy_decision.get("skip_reason") or "interruption_policy_silent"),
+                    reason=skip_reason,
                     interruption_policy=policy_decision,
                 )
-                return False
 
         if user_active and not (policy_decision and bool(policy_decision.get("allow_when_user_active", False))):
             self._log("skip", tick_id=tick_id, reason="user_active", interruption_policy=policy_decision)
@@ -249,24 +295,100 @@ class ProactivePlatformWatcher:
                     return False
 
         import random
-        if policy_decision is not None and not bool(policy_decision.get("allow_content_share", True)):
-            discovery_context = None
-            self._log("policy", tick_id=tick_id, reason="content_share_disabled", interruption_policy=policy_decision)
-        else:
-            discovery_context = await self._check_discovery()
+
+        # Discovery refresh is independent from whether the current
+        # conversational policy allows immediate sharing. This prevents a
+        # stale debug/pressure flow from starving the background discovery
+        # cache forever.
+        discovery_context = await self._check_discovery()
+        discovery_available = self._external_discovery_available(
+            discovery_context
+        )
         if discovery_context is not None:
             self._log_discovery(tick_id, discovery_context)
+
+        final_policy = self._evaluate_interruption_policy(
+            user_active=user_active,
+            discovery_available=discovery_available,
+            cooldown_allowed=True,
+            cooldown_reason=None,
+        )
+        if final_policy is not None:
+            policy_decision = final_policy
+            self._log(
+                "policy",
+                tick_id=tick_id,
+                policy_stage="post_discovery",
+                interruption_policy=policy_decision,
+            )
+            if not bool(policy_decision.get("allow_send", True)):
+                self._log(
+                    "skip",
+                    tick_id=tick_id,
+                    reason=str(
+                        policy_decision.get("skip_reason")
+                        or "interruption_policy_silent"
+                    ),
+                    interruption_policy=policy_decision,
+                )
+                return False
+
+        compose_discovery_context = (
+            discovery_context
+            if policy_decision is None
+            or bool(policy_decision.get("allow_content_share", True))
+            else None
+        )
+        if (
+            discovery_context is not None
+            and compose_discovery_context is None
+        ):
+            self._log(
+                "policy",
+                tick_id=tick_id,
+                reason="content_share_deferred_but_discovery_refreshed",
+                interruption_policy=policy_decision,
+            )
+
         await self._check_dream()
         messages = await self._compose_message(
             voice,
-            discovery_context,
+            compose_discovery_context,
             policy_decision=policy_decision,
+        )
+        content_ref_generated_by = (
+            self._content_reference_generated_by(
+                messages,
+            )
         )
         messages, content_ref = (
             self._extract_content_reference(
                 messages,
             )
         )
+        if (
+            isinstance(policy_decision, dict)
+            and policy_decision.get("mode") == "novel_value"
+        ):
+            if not content_ref:
+                self._log(
+                    "skip",
+                    tick_id=tick_id,
+                    reason="novel_value_missing_content_ref",
+                    interruption_policy=policy_decision,
+                )
+                return False
+            if not self._content_reference_matches_discovery(
+                content_ref,
+                compose_discovery_context,
+            ):
+                self._log(
+                    "skip",
+                    tick_id=tick_id,
+                    reason="novel_value_invalid_content_ref",
+                    interruption_policy=policy_decision,
+                )
+                return False
         messages = self._enforce_policy_messages(
             messages,
             policy_decision,
@@ -280,9 +402,12 @@ class ProactivePlatformWatcher:
             try:
                 delivery_plan = delivery.plan(
                     messages,
-                    discovery_context,
+                    compose_discovery_context,
                     policy_decision,
                     content_ref=content_ref,
+                    content_generated_by=(
+                        content_ref_generated_by
+                    ),
                 )
                 messages = delivery_plan.text_messages
                 rich_payload = delivery_plan.rich_payload
@@ -299,6 +424,11 @@ class ProactivePlatformWatcher:
                     evidence_score=delivery_plan.evidence_score,
                     max_units=delivery_plan.max_units,
                     content_ref=content_ref,
+                    rich_generated_by=(
+                        rich_payload.generated_by
+                        if rich_payload is not None
+                        else None
+                    ),
                 )
             except Exception:
                 logger.exception(
@@ -312,23 +442,40 @@ class ProactivePlatformWatcher:
             messages,
             quality_pre_decision,
         )
-        for audit_index, audit in enumerate(quality_candidate_audits, start=1):
+        for audit_index, audit in enumerate(
+            quality_candidate_audits,
+            start=1,
+        ):
             self._log(
                 "proactive_quality_candidate_shadow",
                 tick_id=tick_id,
                 audit_index=audit_index,
-                integration_mode="observe_only",
-                behavior_changed=False,
+                integration_mode=str(
+                    audit.get("integration_mode")
+                    or "observe_only"
+                ),
+                watcher_enforced=bool(
+                    audit.get("watcher_enforced")
+                ),
+                behavior_changed=bool(
+                    audit.get("behavior_changed")
+                ),
                 quality_candidate=audit,
             )
 
-        messages, quality_filter = self._apply_isolated_quality_enforcement(
+        messages, quality_filter = self._apply_quality_enforcement(
             messages,
             quality_candidate_audits,
+            quality_pre_decision,
         )
-        if quality_filter is not None and bool(quality_filter.get("enabled")):
+        if quality_filter is not None and bool(
+            quality_filter.get("enabled")
+        ):
             self._log(
-                "isolated_enforcement_candidate_filter",
+                str(
+                    quality_filter.get("log_event")
+                    or "quality_candidate_enforcement"
+                ),
                 tick_id=tick_id,
                 enforcement=quality_filter,
             )
@@ -402,9 +549,10 @@ class ProactivePlatformWatcher:
                     continue
 
             sent_messages.append((msg_type, content, generated_by))
-            self._commit_isolated_quality_delivery(
+            self._commit_quality_delivery(
                 content,
                 quality_candidate_audits,
+                quality_pre_decision,
             )
 
             self._log(
@@ -457,6 +605,18 @@ class ProactivePlatformWatcher:
             rich_outcome is not None
             and rich_outcome.success
         )
+
+        if (
+            rich_success
+            and not sent_messages
+            and rich_payload is not None
+        ):
+            self._record_rich_delivery_sent(
+                tick_id,
+                rich_payload,
+                rich_outcome,
+            )
+
         sent_any = bool(sent_messages) or rich_success
 
         if sent_any and cooldown is not None:
@@ -884,6 +1044,20 @@ class ProactivePlatformWatcher:
             logger.exception("Circadian sleep/quiet shadow decision failed")
             return None
 
+    def _quality_enforcement_requested(self) -> bool:
+        return (
+            str(
+                os.getenv(
+                    "HERMES_ALIVE_QUALITY_GOVERNOR_MODE",
+                    "shadow",
+                )
+                or "shadow"
+            )
+            .strip()
+            .lower()
+            == "enforce"
+        )
+
     def _quality_governor(self) -> Any | None:
         # HERMES_ALIVE_PROACTIVE_QUALITY_GOVERNOR_SHADOW_V1
         if self._proactive_quality_governor is None:
@@ -892,9 +1066,15 @@ class ProactivePlatformWatcher:
 
                 self._proactive_quality_governor = ProactiveQualityGovernor()
             except Exception:
-                logger.exception("Failed to initialize proactive quality governor")
+                logger.exception(
+                    "Failed to initialize proactive quality governor"
+                )
                 self._proactive_quality_governor = False
-        return None if self._proactive_quality_governor is False else self._proactive_quality_governor
+        return (
+            None
+            if self._proactive_quality_governor is False
+            else self._proactive_quality_governor
+        )
 
     def _proactive_quality_shadow_decision(
         self,
@@ -909,26 +1089,90 @@ class ProactivePlatformWatcher:
             if not isinstance(decision, dict):
                 return None
             decision = dict(decision)
-            decision["watcher_enforced"] = False
-            decision["integration_mode"] = "observe_only"
+            live = (
+                str(decision.get("mode") or "").strip().lower()
+                == "enforce"
+            )
+            decision["watcher_enforced"] = live
+            decision["integration_mode"] = (
+                "enforce" if live else "observe_only"
+            )
             decision["behavior_changed"] = False
             return decision
         except Exception:
-            logger.exception("Proactive quality governor pre-decision failed")
+            logger.exception(
+                "Proactive quality governor pre-decision failed"
+            )
             return None
+
+    def _quality_rejection_placeholder(
+        self,
+        message: tuple[str, str, str],
+        *,
+        reason: str,
+        enforcement_enabled: bool,
+        live: bool,
+    ) -> dict[str, Any]:
+        msg_type, content, generated_by = message
+        return {
+            "engine": "proactive_quality_governor",
+            "version": 1,
+            "mode": "enforce" if live else "shadow",
+            "integration_mode": (
+                "enforce"
+                if live
+                else (
+                    "isolated_enforcement_candidate"
+                    if enforcement_enabled
+                    else "observe_only"
+                )
+            ),
+            "watcher_enforced": bool(enforcement_enabled),
+            "behavior_changed": bool(enforcement_enabled),
+            "would_allow": False,
+            "would_reject": True,
+            "reasons": [str(reason)],
+            "message_hash": sha256_text(content),
+            "msg_type": str(msg_type),
+            "generated_by": str(generated_by),
+            "audit_placeholder": True,
+        }
 
     def _quality_candidate_shadow_audits(
         self,
         messages: list[tuple[str, str, str]],
         pre_decision: dict[str, Any] | None,
     ) -> list[dict[str, Any]]:
+        live = self._quality_live_enforcement_enabled(
+            pre_decision
+        )
+        enforcement_enabled = (
+            live or self._isolated_enforcement_enabled()
+        )
         governor = self._quality_governor()
+
         if governor is None or not isinstance(pre_decision, dict):
-            return []
+            if not enforcement_enabled:
+                return []
+            reason = (
+                "quality_governor_unavailable"
+                if governor is None
+                else "quality_predecision_missing"
+            )
+            return [
+                self._quality_rejection_placeholder(
+                    message,
+                    reason=reason,
+                    enforcement_enabled=True,
+                    live=live,
+                )
+                for message in messages
+            ]
+
         audits: list[dict[str, Any]] = []
-        for msg_type, content, generated_by in messages:
+        for message in messages:
+            msg_type, content, generated_by = message
             try:
-                enforcement_enabled = self._isolated_enforcement_enabled()
                 audit = governor.audit_candidate(
                     content,
                     pre_decision=pre_decision,
@@ -936,21 +1180,67 @@ class ProactivePlatformWatcher:
                     persist_shadow_state=not enforcement_enabled,
                 )
                 if not isinstance(audit, dict):
-                    continue
+                    raise TypeError(
+                        "quality audit did not return a dictionary"
+                    )
                 audit = dict(audit)
                 audit["msg_type"] = str(msg_type)
                 audit["generated_by"] = str(generated_by)
-                audit["watcher_enforced"] = False
-                audit["integration_mode"] = (
-                    "isolated_enforcement_candidate"
-                    if enforcement_enabled
-                    else "observe_only"
+                audit["watcher_enforced"] = bool(
+                    enforcement_enabled
                 )
-                audit["behavior_changed"] = False
+                audit["integration_mode"] = (
+                    "enforce"
+                    if live
+                    else (
+                        "isolated_enforcement_candidate"
+                        if enforcement_enabled
+                        else "observe_only"
+                    )
+                )
+                audit["behavior_changed"] = bool(
+                    enforcement_enabled
+                    and (
+                        bool(audit.get("would_reject"))
+                        or not bool(audit.get("would_allow"))
+                    )
+                )
                 audits.append(audit)
             except Exception:
-                logger.exception("Proactive quality candidate audit failed")
+                logger.exception(
+                    "Proactive quality candidate audit failed"
+                )
+                if enforcement_enabled:
+                    audits.append(
+                        self._quality_rejection_placeholder(
+                            message,
+                            reason="quality_candidate_audit_failed",
+                            enforcement_enabled=True,
+                            live=live,
+                        )
+                    )
         return audits
+
+    def _quality_live_enforcement_enabled(
+        self,
+        pre_decision: dict[str, Any] | None = None,
+    ) -> bool:
+        # The explicit managed/env contract remains authoritative even when
+        # the governor cannot initialize or produce a pre-decision. Enforce
+        # mode must never silently degrade to observe-only.
+        if self._quality_enforcement_requested():
+            return True
+        if isinstance(pre_decision, dict):
+            return (
+                str(pre_decision.get("mode") or "").strip().lower()
+                == "enforce"
+            )
+        governor = self._quality_governor()
+        config = getattr(governor, "config", None)
+        return (
+            str(getattr(config, "mode", "") or "").strip().lower()
+            == "enforce"
+        )
 
     def _isolated_enforcement_gate(self) -> dict[str, Any] | None:
         try:
@@ -966,11 +1256,40 @@ class ProactivePlatformWatcher:
         gate = self._isolated_enforcement_gate()
         return bool(gate and gate.get("enabled"))
 
-    def _isolated_precompose_enforcement(
+    def _quality_precompose_enforcement(
         self,
         sleep_quiet_decision: dict[str, Any] | None,
         quality_pre_decision: dict[str, Any] | None,
     ) -> dict[str, Any] | None:
+        if self._quality_live_enforcement_enabled(
+            quality_pre_decision
+        ):
+            reasons: list[str] = []
+            if not isinstance(quality_pre_decision, dict):
+                reasons.append("quality_predecision_missing")
+            elif (
+                str(
+                    quality_pre_decision.get("mode") or ""
+                ).strip().lower()
+                != "enforce"
+            ):
+                reasons.append("quality_mode_mismatch")
+            elif bool(
+                quality_pre_decision.get("silence_lock")
+            ):
+                reasons.append("quality_silence_lock")
+            return {
+                "enabled": True,
+                "mode": "enforce",
+                "stage": "precompose",
+                "block": bool(reasons),
+                "allow": not bool(reasons),
+                "reasons": reasons,
+                "watcher_enforced": bool(reasons),
+                "behavior_changed": bool(reasons),
+                "log_event": "quality_precompose_enforcement",
+            }
+
         try:
             from isolated_enforcement import precompose_enforcement
 
@@ -978,9 +1297,15 @@ class ProactivePlatformWatcher:
                 sleep_quiet_decision,
                 quality_pre_decision,
             )
-            return decision if isinstance(decision, dict) else None
+            if not isinstance(decision, dict):
+                return None
+            result = dict(decision)
+            result["log_event"] = (
+                "isolated_enforcement_precompose"
+            )
+            return result
         except Exception:
-            logger.exception("Isolated precompose enforcement failed")
+            logger.exception("Quality precompose enforcement failed")
             return None
 
     def _isolated_legacy_quiet_override(
@@ -998,26 +1323,107 @@ class ProactivePlatformWatcher:
             logger.exception("Isolated legacy quiet override failed")
             return None
 
-    def _apply_isolated_quality_enforcement(
+    def _apply_quality_enforcement(
         self,
         messages: list[tuple[str, str, str]],
         audits: list[dict[str, Any]],
-    ) -> tuple[list[tuple[str, str, str]], dict[str, Any] | None]:
+        pre_decision: dict[str, Any] | None,
+    ) -> tuple[
+        list[tuple[str, str, str]],
+        dict[str, Any] | None,
+    ]:
+        original = list(messages)
+        if self._quality_live_enforcement_enabled(pre_decision):
+            kept: list[tuple[str, str, str]] = []
+            reason_counts: dict[str, int] = {}
+            missing = 0
+            rejected = 0
+            for index, message in enumerate(original):
+                if index >= len(audits):
+                    missing += 1
+                    rejected += 1
+                    reason_counts["quality_audit_missing"] = (
+                        reason_counts.get(
+                            "quality_audit_missing",
+                            0,
+                        )
+                        + 1
+                    )
+                    continue
+                audit = audits[index]
+                expected_hash = sha256_text(message[1])
+                audit_hash = str(
+                    audit.get("message_hash") or ""
+                )
+                if audit_hash != expected_hash:
+                    rejected += 1
+                    reason_counts["quality_audit_mismatch"] = (
+                        reason_counts.get(
+                            "quality_audit_mismatch",
+                            0,
+                        )
+                        + 1
+                    )
+                    continue
+                allowed = bool(audit.get("would_allow")) and not bool(
+                    audit.get("would_reject")
+                )
+                if allowed:
+                    kept.append(message)
+                    continue
+                rejected += 1
+                reasons = audit.get("reasons")
+                if not isinstance(reasons, list) or not reasons:
+                    reasons = ["quality_candidate_rejected"]
+                for reason in reasons:
+                    key = str(
+                        reason or "quality_candidate_rejected"
+                    )
+                    reason_counts[key] = (
+                        reason_counts.get(key, 0) + 1
+                    )
+            return kept, {
+                "enabled": True,
+                "mode": "enforce",
+                "stage": "candidate_filter",
+                "original_count": len(original),
+                "allowed_count": len(kept),
+                "rejected_count": rejected,
+                "missing_audit_count": missing,
+                "rejection_reasons": reason_counts,
+                "watcher_enforced": bool(rejected),
+                "behavior_changed": bool(rejected),
+                "log_event": "quality_candidate_enforcement",
+            }
+
         try:
             from isolated_enforcement import filter_quality_candidates
 
-            filtered, decision = filter_quality_candidates(messages, audits)
-            return list(filtered), decision if isinstance(decision, dict) else None
+            filtered, decision = filter_quality_candidates(
+                original,
+                audits,
+            )
+            if not isinstance(decision, dict):
+                return list(filtered), None
+            result = dict(decision)
+            result["log_event"] = (
+                "isolated_enforcement_candidate_filter"
+            )
+            return list(filtered), result
         except Exception:
-            logger.exception("Isolated candidate enforcement failed")
-            return messages, None
+            logger.exception("Quality candidate enforcement failed")
+            return original, None
 
-    def _commit_isolated_quality_delivery(
+    def _commit_quality_delivery(
         self,
         content: str,
         audits: list[dict[str, Any]],
+        pre_decision: dict[str, Any] | None,
     ) -> bool:
-        if not self._isolated_enforcement_enabled():
+        if not (
+            self._quality_live_enforcement_enabled(pre_decision)
+            or self._isolated_enforcement_enabled()
+        ):
             return False
         message_hash = sha256_text(content)
         audit = next(
@@ -1025,7 +1431,8 @@ class ProactivePlatformWatcher:
                 item
                 for item in audits
                 if isinstance(item, dict)
-                and str(item.get("message_hash") or "") == message_hash
+                and str(item.get("message_hash") or "")
+                == message_hash
                 and bool(item.get("would_allow"))
                 and not bool(item.get("would_reject"))
             ),
@@ -1040,8 +1447,110 @@ class ProactivePlatformWatcher:
             commit = getattr(governor, "commit_delivery", None)
             return bool(commit and commit(audit))
         except Exception:
-            logger.exception("Failed to commit isolated quality delivery")
+            logger.exception("Failed to commit quality delivery")
             return False
+
+    def _rich_delivery_logical_content(
+        self,
+        rich_payload: Any,
+    ) -> str:
+        # RICH_CONTENT_LOGICAL_SENT_V1
+        for attribute in (
+            "text",
+            "title",
+            "url",
+            "image_url",
+            "content_item_id",
+            "source",
+            "kind",
+        ):
+            value = str(
+                getattr(rich_payload, attribute, "")
+                or ""
+            ).strip()
+            if value:
+                return value
+        return "rich_content"
+
+    def _record_rich_delivery_sent(
+        self,
+        tick_id: str,
+        rich_payload: Any,
+        rich_outcome: Any,
+    ) -> None:
+        # One rich payload may become multiple transport bubbles.
+        # Record exactly one logical proactive send so unanswered
+        # budgeting and semantic cooldowns advance correctly.
+        logical_content = (
+            self._rich_delivery_logical_content(
+                rich_payload,
+            )
+        )
+        generated_by = str(
+            getattr(
+                rich_payload,
+                "generated_by",
+                "hermes",
+            )
+            or "hermes"
+        ).strip() or "hermes"
+        self._log(
+            "sent",
+            tick_id=tick_id,
+            reason="rich_proactive",
+            msg_type="content_share",
+            msg_index=1,
+            msg_count=1,
+            generated_by=generated_by,
+            message_hash=sha256_text(
+                logical_content,
+            ),
+            message_preview=redact_preview(
+                logical_content,
+            ),
+            adapter_result="ok",
+            logical_delivery=True,
+            rich_kind=str(
+                getattr(
+                    rich_payload,
+                    "kind",
+                    "rich",
+                )
+                or "rich"
+            ),
+            delivery_mode=str(
+                getattr(
+                    rich_outcome,
+                    "mode",
+                    "rich",
+                )
+                or "rich"
+            ),
+            content_item_id=str(
+                getattr(
+                    rich_payload,
+                    "content_item_id",
+                    "",
+                )
+                or ""
+            ),
+        )
+
+    def _content_reference_generated_by(
+        self,
+        messages: list[tuple[str, str, str]],
+    ) -> str | None:
+        # RICH_CONTENT_MODEL_ATTRIBUTION_V2
+        for msg_type, content, generated_by in messages:
+            if msg_type != "__content_ref__":
+                continue
+            if not str(content or "").strip():
+                continue
+            resolved = str(
+                generated_by or "hermes"
+            ).strip()
+            return resolved or "hermes"
+        return None
 
     def _extract_content_reference(
         self,
@@ -1271,7 +1780,28 @@ class ProactivePlatformWatcher:
                 # Check if LLM result is actually a fallback
                 msg_type, content = llm_result[0]
                 if not self._is_llm_fallback(msg_type, content):
-                    return [(m_type, m_content, self._llm_model_name()) for m_type, m_content in llm_result]
+                    resolved_model = self._llm_model_name()
+                    try:
+                        actual_model = str(
+                            getattr(
+                                self._llm_message_composer,
+                                "last_resolved_model",
+                                "",
+                            )
+                            or ""
+                        ).strip()
+                    except Exception:
+                        actual_model = ""
+                    if actual_model:
+                        resolved_model = actual_model
+                    return [
+                        (
+                            m_type,
+                            m_content,
+                            resolved_model,
+                        )
+                        for m_type, m_content in llm_result
+                    ]
                 logger.debug("LLM composer returned fallback; using heartbeat")
         fallback_content = self._policy_fallback_message(policy_decision)
         if not fallback_content:
@@ -1297,6 +1827,40 @@ class ProactivePlatformWatcher:
             logger.exception("LLM message composer failed")
             self._llm_message_composer = False
             return None
+
+    @staticmethod
+    def _external_discovery_available(
+        discovery_context: dict[str, Any] | None,
+    ) -> bool:
+        if not isinstance(discovery_context, dict):
+            return False
+        external = discovery_context.get("external")
+        return bool(
+            isinstance(external, list)
+            and any(isinstance(item, dict) for item in external)
+        )
+
+    @staticmethod
+    def _content_reference_matches_discovery(
+        content_ref: str | None,
+        discovery_context: dict[str, Any] | None,
+    ) -> bool:
+        """Verify a reference against the actual external Discovery set.
+
+        The LLM composer already validates its marker, but the watcher is the
+        final send boundary and must not trust alternate/future composers.
+        """
+        value = str(content_ref or "").strip()
+        if not value or not isinstance(discovery_context, dict):
+            return False
+        external = discovery_context.get("external")
+        if not isinstance(external, list):
+            return False
+        return any(
+            isinstance(item, dict)
+            and str(item.get("id") or "").strip() == value
+            for item in external
+        )
 
     async def _check_discovery(self) -> dict[str, Any] | None:
         if not self._feature_enabled(DISCOVERY_ENABLED_ENV):

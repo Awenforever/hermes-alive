@@ -1,5 +1,7 @@
 # Hermes Alive persistent state engine.
 # Marker: ALIVE_STATE_ENGINE_V1
+# Marker: HERMES_ALIVE_CONTEXT_FRESHNESS_V2
+# Marker: HERMES_ALIVE_SENT_EVENT_WINDOW_FIX_V2
 
 from __future__ import annotations
 
@@ -120,22 +122,33 @@ def _context_messages() -> list[dict[str, Any]]:
 
 
 def _read_proactive_records(limit: int = 80) -> list[dict[str, Any]]:
+    """Return the latest sent events rather than the latest raw log lines."""
     if not PROACTIVE_LOG.exists():
         return []
     records: list[dict[str, Any]] = []
     try:
-        lines = PROACTIVE_LOG.read_text(encoding="utf-8", errors="ignore").splitlines()
+        lines = PROACTIVE_LOG.read_text(
+            encoding="utf-8",
+            errors="ignore",
+        ).splitlines()
     except Exception:
         return []
-    for line in lines[-limit:]:
+
+    for line in reversed(lines):
         try:
             item = json.loads(line)
         except Exception:
             continue
         if not isinstance(item, dict):
             continue
-        if item.get("decision") == "sent" and str(item.get("msg_type") or "") != "test":
+        if (
+            item.get("decision") == "sent"
+            and str(item.get("msg_type") or "") != "test"
+        ):
             records.append(item)
+            if len(records) >= limit:
+                break
+    records.reverse()
     return records
 
 
@@ -174,29 +187,94 @@ def _message_texts(messages: list[dict[str, Any]], limit: int = 12) -> list[str]
     for msg in messages[-limit:]:
         if not isinstance(msg, dict):
             continue
-        text = str(msg.get("content_snippet") or msg.get("content") or msg.get("text") or "").strip()
+        text = str(
+            msg.get("content_snippet")
+            or msg.get("content")
+            or msg.get("text")
+            or ""
+        ).strip()
         if text:
             texts.append(text)
     return texts
 
 
-def _classify_flow(messages: list[dict[str, Any]]) -> tuple[str, bool, dict[str, int]]:
-    texts = _message_texts(messages, 12)
+def _latest_user_episode(
+    messages: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], float | None]:
+    latest_index: int | None = None
+    latest_ts: float | None = None
+    for index in range(len(messages) - 1, -1, -1):
+        message = messages[index]
+        if not isinstance(message, dict) or message.get("role") != "user":
+            continue
+        latest_index = index
+        latest_ts = _parse_ts(
+            message.get("timestamp")
+            or message.get("time")
+            or message.get("created_at")
+        )
+        break
+    if latest_index is None:
+        return [], None
+    return messages[latest_index:], latest_ts
+
+
+def _flow_max_age_seconds() -> int:
+    try:
+        value = int(
+            os.getenv(
+                "HERMES_ALIVE_CONTEXT_FLOW_MAX_AGE_SECONDS",
+                "3600",
+            )
+        )
+    except Exception:
+        value = 3600
+    return max(60, min(86400, value))
+
+
+def _classify_flow(
+    messages: list[dict[str, Any]],
+) -> tuple[str, bool, dict[str, Any]]:
+    episode, latest_user_ts = _latest_user_episode(messages)
+    now_ts = time.time()
+    age_seconds = (
+        None
+        if latest_user_ts is None
+        else max(0.0, now_ts - latest_user_ts)
+    )
+    context_fresh = bool(
+        latest_user_ts is not None
+        and age_seconds is not None
+        and age_seconds <= _flow_max_age_seconds()
+    )
+
+    texts = _message_texts(episode if context_fresh else [], 12)
     blob = "\n".join(texts)
     debug_count = len(DEBUG_RE.findall(blob))
     research_count = len(RESEARCH_RE.findall(blob))
     casual_count = len(CASUAL_RE.findall(blob))
 
+    signals: dict[str, Any] = {
+        "debug": debug_count,
+        "research": research_count,
+        "casual": casual_count,
+        "context_fresh": context_fresh,
+        "evidence_age_seconds": (
+            None if age_seconds is None else int(age_seconds)
+        ),
+        "evidence_observed_at": _iso_from_ts(latest_user_ts),
+    }
+
     hour = datetime.now(CST).hour
     if debug_count >= 3:
-        return "debug_flow", True, {"debug": debug_count, "research": research_count, "casual": casual_count}
+        return "debug_flow", True, signals
     if research_count >= 2:
-        return "research_flow", False, {"debug": debug_count, "research": research_count, "casual": casual_count}
+        return "research_flow", False, signals
     if hour in (0, 1, 2, 3, 4, 5):
-        return "night_mode", False, {"debug": debug_count, "research": research_count, "casual": casual_count}
+        return "night_mode", False, signals
     if casual_count >= 2:
-        return "casual_flow", False, {"debug": debug_count, "research": research_count, "casual": casual_count}
-    return "idle", False, {"debug": debug_count, "research": research_count, "casual": casual_count}
+        return "casual_flow", False, signals
+    return "idle", False, signals
 
 
 def _opener(text: str) -> str:
@@ -355,13 +433,21 @@ class AliveStateEngine:
             focus_lock=focus_lock,
             user_replied_after_ignored=recovered,
         )
-        state["current_context"] = {"flow": flow, "focus_lock": bool(focus_lock)}
+        state["current_context"] = {
+            "flow": flow,
+            "focus_lock": bool(focus_lock),
+            "context_fresh": bool(signals.get("context_fresh")),
+            "evidence_observed_at": signals.get("evidence_observed_at"),
+            "evidence_age_seconds": signals.get("evidence_age_seconds"),
+        }
         state["derived"] = {
             "debug_signal_count": signals["debug"],
             "research_signal_count": signals["research"],
             "casual_signal_count": signals["casual"],
+            "context_fresh": bool(signals.get("context_fresh")),
+            "evidence_age_seconds": signals.get("evidence_age_seconds"),
             "user_replied_after_ignored": recovered,
-            "source": "alive_state_engine_v1",
+            "source": "alive_state_engine_v2",
         }
 
         if update:
@@ -398,10 +484,19 @@ class AliveStateEngine:
         if acts:
             lines.append("- 最近 speech_act：" + " / ".join(str(x) for x in acts[-6:]))
 
-        if flow == "debug_flow":
-            lines.append("- 现在是 debug/运维流，只允许 ambient 陪跑，不要开无关新话题。")
-        elif ignored >= 3:
-            lines.append("- 用户已经连续忽略多条主动消息，本次优先 poke/sulk/短句，不要继续新闻播报。")
+        if ignored >= 2:
+            lines.append("- 用户已连续两次未回应主动消息：本轮必须沉默。")
+        elif ignored >= 1:
+            lines.append(
+                "- 上一次主动消息未获回应：旧话题已过期。"
+                "禁止继续猜测用户正在 debug、工作、硬扛或处理任务；"
+                "只有新的高价值外部内容才允许再次主动，否则沉默。"
+            )
+        elif flow == "debug_flow":
+            lines.append(
+                "- 当前 debug/运维证据仍新鲜，只允许一次简短陪跑；"
+                "不得把该状态延续到无人回应后的下一轮。"
+            )
         elif flow == "research_flow":
             lines.append("- 当前更适合 research_ping 或简短科研联想，不要泛泛闲聊。")
         elif flow == "night_mode":

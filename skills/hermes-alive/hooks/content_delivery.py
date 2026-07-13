@@ -3,6 +3,7 @@
 # Marker: RICH_CONTENT_CAPABILITY_FALLBACK_V1
 # Marker: RICH_CONTENT_METADATA_V1
 # Marker: RICH_CONTENT_REFERENCE_V1
+# Marker: RICH_CONTENT_MODEL_ATTRIBUTION_V2
 
 from __future__ import annotations
 
@@ -240,6 +241,7 @@ class ContentDeliveryEngine:
         policy_decision: dict[str, Any] | None,
         *,
         content_ref: str | None = None,
+        content_generated_by: str | None = None,
     ) -> DeliveryPlan:
         cleaned = [
             (
@@ -293,8 +295,26 @@ class ContentDeliveryEngine:
                 discovery_context,
                 cleaned,
             )
+        payload_generated_by = str(
+            content_generated_by or ""
+        ).strip()
+        if not payload_generated_by:
+            payload_generated_by = next(
+                (
+                    generated_by
+                    for _msg_type, _content, generated_by
+                    in cleaned
+                    if generated_by != "hermes"
+                ),
+                "hermes",
+            )
+
         rich_payload = (
-            self._build_payload(item, cleaned)
+            self._build_payload(
+                item,
+                cleaned,
+                generated_by=payload_generated_by,
+            )
             if item is not None and evidence_score >= 20
             else None
         )
@@ -375,6 +395,8 @@ class ContentDeliveryEngine:
         self,
         item: dict[str, Any],
         messages: list[tuple[str, str, str]],
+        *,
+        generated_by: str,
     ) -> DeliveryPayload | None:
         title = str(item.get("title") or "").strip()
         source = str(item.get("source") or "").strip()
@@ -412,7 +434,7 @@ class ContentDeliveryEngine:
                 title=title,
                 source=source,
                 content_item_id=item_id,
-                generated_by="hermes",
+                generated_by=generated_by,
             )
 
         if image_url:
@@ -424,7 +446,7 @@ class ContentDeliveryEngine:
                 title=title,
                 source=source,
                 content_item_id=item_id,
-                generated_by="hermes",
+                generated_by=generated_by,
             )
 
         if url and url not in _combined_message_text(messages):
@@ -435,7 +457,7 @@ class ContentDeliveryEngine:
                 title=title,
                 source=source,
                 content_item_id=item_id,
-                generated_by="hermes",
+                generated_by=generated_by,
             )
 
         return None

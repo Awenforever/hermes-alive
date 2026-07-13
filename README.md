@@ -6,7 +6,7 @@
 
 Personality, context, memory, circadian rhythm, and safe lifecycle management — built to make Hermes feel present without turning every silence into a notification.
 
-![version](https://img.shields.io/badge/version-v2.4.0-blue)
+![version](https://img.shields.io/badge/version-v2.4.1-blue)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB)
 ![Hermes](https://img.shields.io/badge/Hermes-gateway--native-6f42c1)
 ![status](https://img.shields.io/badge/status-acceptance%20candidate-orange)
@@ -53,7 +53,7 @@ Hermes Alive is not a replacement chatbot and does not own Provider credentials.
 | 🧰 Lifecycle management | Atomic install, rollback, verification, state-preserving uninstall, and destructive purge. | Active |
 
 > **Why “shadow by default”?**
-> The v2.4.0 candidate records Circadian and Quality decisions without changing production delivery. Real blocking is guarded by two isolated-test-only keys until fresh-container and real spare-WeChat acceptance are complete.
+> The v2.4.1 candidate records Circadian and Quality decisions without changing production delivery. Real blocking is guarded by two isolated-test-only keys until fresh-container and real spare-WeChat acceptance are complete.
 
 ---
 

@@ -6,7 +6,7 @@
 
 性格、上下文、记忆、拟人作息与安全生命周期管理——让 Hermes 有“在场感”，但不会把每一次沉默都变成通知。
 
-![version](https://img.shields.io/badge/version-v2.4.0-blue)
+![version](https://img.shields.io/badge/version-v2.4.1-blue)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB)
 ![Hermes](https://img.shields.io/badge/Hermes-gateway--native-6f42c1)
 ![status](https://img.shields.io/badge/status-acceptance%20candidate-orange)
@@ -53,7 +53,7 @@ Hermes Alive 不是一个替代式聊天机器人，也不接管 Provider 密钥
 | 🧰 生命周期管理 | 原子安装、失败回滚、验证、保留状态卸载和彻底清理。 | 已启用 |
 
 > **为什么默认使用 Shadow？**
-> v2.4.0 候选版会记录 Circadian 与 Quality 判断，但不会直接改变生产投递。真正拦截消息需要两个仅用于隔离测试的开关，必须在全新容器和备用微信真实验收通过后，才会考虑生产启用。
+> v2.4.1 候选版会记录 Circadian 与 Quality 判断，但不会直接改变生产投递。真正拦截消息需要两个仅用于隔离测试的开关，必须在全新容器和备用微信真实验收通过后，才会考虑生产启用。
 
 ---
 

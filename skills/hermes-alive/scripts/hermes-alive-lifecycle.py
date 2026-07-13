@@ -11,6 +11,7 @@ Marker: HERMES_ALIVE_RUNTIME_PERMISSION_PRESERVATION_V1
 Marker: HERMES_ALIVE_INSTALL_TRANSACTION_ROLLBACK_V1
 Marker: HERMES_ALIVE_CIRCADIAN_MANAGED_CONFIG_V1
 Marker: HERMES_ALIVE_ZERO_TOUCH_ONBOARDING_V1
+Marker: HERMES_ALIVE_QUALITY_MANAGED_CONFIG_V2
 """
 
 from __future__ import annotations
@@ -819,6 +820,19 @@ def configure(args: argparse.Namespace) -> int:
     if args.discovery_enabled is not None:
         assign("discovery_enabled", args.discovery_enabled)
     assign("discovery_interval_seconds", args.discovery_interval_seconds)
+    assign("quality_governor_mode", args.quality_governor_mode)
+    assign(
+        "quality_topic_expiry_after_unanswered",
+        args.quality_topic_expiry_after_unanswered,
+    )
+    assign(
+        "quality_silence_after_unanswered",
+        args.quality_silence_after_unanswered,
+    )
+    assign(
+        "context_flow_max_age_seconds",
+        args.context_flow_max_age_seconds,
+    )
     if args.dream_enabled is not None:
         assign("dream_enabled", args.dream_enabled)
     assign("dream_interval_hours", args.dream_interval_hours)
@@ -889,6 +903,64 @@ def configure(args: argparse.Namespace) -> int:
     values.setdefault("quiet_start", "23:00")
     values.setdefault("quiet_end", "08:00")
     values.setdefault("emoji_policy", "contextual")
+    values.setdefault("quality_governor_mode", "enforce")
+    values.setdefault(
+        "quality_topic_expiry_after_unanswered",
+        1,
+    )
+    values.setdefault(
+        "quality_silence_after_unanswered",
+        2,
+    )
+    values.setdefault("context_flow_max_age_seconds", 3600)
+
+    quality_mode = str(
+        values.get("quality_governor_mode") or ""
+    ).strip().lower()
+    if quality_mode not in {"off", "shadow", "enforce"}:
+        raise LifecycleError(
+            "quality_governor_mode must be off, shadow, or enforce"
+        )
+    values["quality_governor_mode"] = quality_mode
+
+    try:
+        topic_expiry = int(
+            values.get("quality_topic_expiry_after_unanswered")
+        )
+        silence_after = int(
+            values.get("quality_silence_after_unanswered")
+        )
+        context_max_age = int(
+            values.get("context_flow_max_age_seconds")
+        )
+    except (TypeError, ValueError) as exc:
+        raise LifecycleError(
+            "quality/context thresholds must be integers"
+        ) from exc
+
+    if not 1 <= topic_expiry <= 8:
+        raise LifecycleError(
+            "quality_topic_expiry_after_unanswered must be 1..8"
+        )
+    if not 1 <= silence_after <= 8:
+        raise LifecycleError(
+            "quality_silence_after_unanswered must be 1..8"
+        )
+    if silence_after < topic_expiry:
+        raise LifecycleError(
+            "quality_silence_after_unanswered must be >= "
+            "quality_topic_expiry_after_unanswered"
+        )
+    if not 60 <= context_max_age <= 86400:
+        raise LifecycleError(
+            "context_flow_max_age_seconds must be 60..86400"
+        )
+
+    values["quality_topic_expiry_after_unanswered"] = (
+        topic_expiry
+    )
+    values["quality_silence_after_unanswered"] = silence_after
+    values["context_flow_max_age_seconds"] = context_max_age
 
     for name, default in CIRCADIAN_DEFAULT_VALUES.items():
         values.setdefault(name, default)
@@ -1182,6 +1254,22 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
     )
     configure_parser.add_argument("--discovery-interval-seconds", type=int)
+    configure_parser.add_argument(
+        "--quality-governor-mode",
+        choices=("off", "shadow", "enforce"),
+    )
+    configure_parser.add_argument(
+        "--quality-topic-expiry-after-unanswered",
+        type=int,
+    )
+    configure_parser.add_argument(
+        "--quality-silence-after-unanswered",
+        type=int,
+    )
+    configure_parser.add_argument(
+        "--context-flow-max-age-seconds",
+        type=int,
+    )
     configure_parser.add_argument(
         "--dream-enabled",
         action=argparse.BooleanOptionalAction,

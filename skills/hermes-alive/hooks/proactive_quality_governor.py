@@ -1,14 +1,21 @@
-"""Observe-only quality governor for Hermes Alive proactive messages.
+"""Quality governor for Hermes Alive proactive messages.
+
+The governor supports both privacy-safe shadow observation and explicit
+fail-closed enforcement at the watcher send boundary.
 
 Markers:
 - HERMES_ALIVE_PROACTIVE_QUALITY_GOVERNOR_SHADOW_V1
 - HERMES_ALIVE_AFFECTIVE_PULSE_SHADOW_V1
 - HERMES_ALIVE_SEMANTIC_NOVELTY_SHADOW_V1
 - HERMES_ALIVE_QUALITY_COMMIT_AFTER_DELIVERY_V1
+- HERMES_ALIVE_UNANSWERED_TOPIC_EXPIRY_V2
+- HERMES_ALIVE_SENT_EVENT_WINDOW_FIX_V2
+- HERMES_ALIVE_QUALITY_ENFORCEMENT_MODE_V2
 
 This module never sends messages. Its decisions remain privacy-safe analyses;
-the watcher may consume them only behind the isolated dual-key enforcement
-guard. Affective state is committed after successful isolated delivery.
+the watcher may consume them in shadow mode, isolated dual-key testing, or the
+explicit production ``enforce`` mode. Affective state is committed only after
+successful delivery.
 """
 
 from __future__ import annotations
@@ -38,8 +45,9 @@ DEBUG_RE = re.compile(
     re.I,
 )
 TASK_STATUS_RE = re.compile(
-    r"(还在|还没|又在|是不是还在|怎么还在).{0,8}"
-    r"(搞|弄|跑|配置|调试|折腾|较劲|耗|处理|执行|审|测|修)",
+    r"(还在|还没|又在|是不是还在|怎么还在).{0,12}"
+    r"(搞|弄|跑|配置|调试|debug|折腾|较劲|耗|处理|执行|审|测|修|"
+    r"硬扛|死磕|拆炸弹|忙|工作)",
     re.I,
 )
 PRESENCE_RE = re.compile(
@@ -73,6 +81,7 @@ EMOJI_RE = re.compile(r"[\U0001F300-\U0001FAFF\U00002700-\U000027BF\U00002600-\U
 class QualityGovernorConfig:
     enabled: bool = True
     mode: str = "shadow"
+    topic_expiry_after_unanswered: int = 1
     silence_after_unanswered: int = 2
     casual_affect_probability: float = 0.22
     idle_affect_probability: float = 0.10
@@ -89,6 +98,12 @@ class QualityGovernorConfig:
         return cls(
             enabled=_env_bool(env.get("HERMES_ALIVE_QUALITY_GOVERNOR_ENABLED"), True),
             mode=str(env.get("HERMES_ALIVE_QUALITY_GOVERNOR_MODE", "shadow") or "shadow").strip().lower(),
+            topic_expiry_after_unanswered=_env_int(
+                env.get("HERMES_ALIVE_QUALITY_TOPIC_EXPIRY_AFTER_UNANSWERED"),
+                1,
+                1,
+                8,
+            ),
             silence_after_unanswered=_env_int(env.get("HERMES_ALIVE_QUALITY_SILENCE_AFTER_UNANSWERED"), 2, 1, 8),
             casual_affect_probability=_env_float(env.get("HERMES_ALIVE_QUALITY_AFFECT_PROBABILITY_CASUAL"), 0.22, 0.0, 1.0),
             idle_affect_probability=_env_float(env.get("HERMES_ALIVE_QUALITY_AFFECT_PROBABILITY_IDLE"), 0.10, 0.0, 1.0),
@@ -101,8 +116,12 @@ class QualityGovernorConfig:
         ).validated()
 
     def validated(self) -> "QualityGovernorConfig":
-        if self.mode not in {"off", "shadow"}:
+        if self.mode not in {"off", "shadow", "enforce"}:
             raise ValueError(f"unsupported quality governor mode: {self.mode}")
+        if self.silence_after_unanswered < self.topic_expiry_after_unanswered:
+            raise ValueError(
+                "silence_after_unanswered must be >= topic_expiry_after_unanswered"
+            )
         return self
 
 
@@ -117,6 +136,7 @@ class PreDecision:
     debug_or_workflow: bool
     user_active: bool
     unanswered_count: int
+    topic_expired: bool
     silence_episode_id: str | None
     affect_spent: bool
     affect_probability: float
@@ -132,7 +152,7 @@ class PreDecision:
 
 
 class ProactiveQualityGovernor:
-    """Privacy-safe, observe-only proactive-message quality analysis."""
+    """Privacy-safe proactive-message quality analysis and enforcement."""
 
     def __init__(
         self,
@@ -180,6 +200,12 @@ class ProactiveQualityGovernor:
         if affect_spent:
             reason.append("episode_affect_spent")
 
+        topic_expired = (
+            unanswered_count >= self.config.topic_expiry_after_unanswered
+        )
+        if topic_expired:
+            reason.append("unanswered_topic_expired")
+
         silence_lock = unanswered_count >= self.config.silence_after_unanswered
         if silence_lock:
             reason.append("unanswered_budget_exhausted")
@@ -187,11 +213,12 @@ class ProactiveQualityGovernor:
         probability = self._affect_probability(flow, unanswered_count, debug_or_workflow)
         eligible = bool(
             self.config.enabled
-            and self.config.mode == "shadow"
+            and self.config.mode in {"shadow", "enforce"}
             and not user_active
             and not debug_or_workflow
             and last_user_ts is not None
             and not affect_spent
+            and not topic_expired
             and not silence_lock
         )
         score = _stable_score(f"{episode_id}|affective-pulse-v1") if episode_id else None
@@ -199,23 +226,26 @@ class ProactiveQualityGovernor:
 
         if silence_lock:
             recommended_action = "silence"
+        elif topic_expired:
+            recommended_action = "novel_value_only"
         elif selected:
             recommended_action = "single_mild_affective_pulse"
-        elif unanswered_count > 0:
-            recommended_action = "novel_value_only"
         else:
             recommended_action = "normal_quality_check"
 
         decision = PreDecision(
             enabled=self.config.enabled,
             mode=self.config.mode,
-            integration_mode="observe_only",
-            watcher_enforced=False,
+            integration_mode=(
+                "enforce" if self.config.mode == "enforce" else "observe_only"
+            ),
+            watcher_enforced=self.config.mode == "enforce",
             behavior_changed=False,
             flow=flow,
             debug_or_workflow=debug_or_workflow,
             user_active=bool(user_active),
             unanswered_count=unanswered_count,
+            topic_expired=topic_expired,
             silence_episode_id=episode_id,
             affect_spent=affect_spent,
             affect_probability=round(probability, 6),
@@ -287,7 +317,26 @@ class ProactiveQualityGovernor:
         if FALSE_WEATHER_PERSPECTIVE_RE.search(content):
             reasons.append("false_weather_or_physical_perspective")
 
-        affective = bool(AFFECT_RE.search(content) or act in {"poke", "sulk"})
+        affective = bool(
+            AFFECT_RE.search(content)
+            or act in {"poke", "sulk"}
+        )
+        if bool(pre.get("topic_expired")):
+            if family in {
+                "task_status",
+                "presence_companion",
+                "disappearance_affect",
+            } or act in {
+                "poke",
+                "sulk",
+                "debug_companion",
+                "task_status",
+            }:
+                reasons.append(
+                    "old_topic_or_presence_after_unanswered"
+                )
+            if affective:
+                reasons.append("affect_after_topic_expiry")
         if affective:
             if bool(pre.get("silence_lock")):
                 reasons.append("affect_after_unanswered_budget_exhausted")
@@ -312,9 +361,14 @@ class ProactiveQualityGovernor:
             "engine": "proactive_quality_governor",
             "version": 1,
             "mode": self.config.mode,
-            "integration_mode": "observe_only",
-            "watcher_enforced": False,
-            "behavior_changed": False,
+            "integration_mode": (
+                "enforce" if self.config.mode == "enforce" else "observe_only"
+            ),
+            "watcher_enforced": self.config.mode == "enforce",
+            "behavior_changed": bool(
+                self.config.mode == "enforce"
+                and would_reject
+            ),
             "would_allow": not would_reject,
             "would_reject": would_reject,
             "reasons": unique_reasons,
@@ -469,20 +523,37 @@ def _read_context_queue() -> dict[str, Any]:
 
 
 def _read_proactive_records(limit: int = 120) -> list[dict[str, Any]]:
+    """Return the latest *sent events*, not merely the latest log lines.
+
+    A proactive tick emits many observability records. Slicing the last N raw
+    lines caused prior sent events to disappear after only one or two ticks,
+    which repeatedly reset unanswered_count to 1.
+    """
     if not PROACTIVE_LOG.exists():
         return []
     result: list[dict[str, Any]] = []
     try:
-        lines = PROACTIVE_LOG.read_text(encoding="utf-8", errors="ignore").splitlines()
+        lines = PROACTIVE_LOG.read_text(
+            encoding="utf-8",
+            errors="ignore",
+        ).splitlines()
     except Exception:
         return []
-    for line in lines[-limit:]:
+
+    for line in reversed(lines):
         try:
             item = json.loads(line)
         except Exception:
             continue
-        if isinstance(item, dict) and item.get("decision") == "sent" and str(item.get("msg_type") or "") != "test":
+        if (
+            isinstance(item, dict)
+            and item.get("decision") == "sent"
+            and str(item.get("msg_type") or "") != "test"
+        ):
             result.append(item)
+            if len(result) >= limit:
+                break
+    result.reverse()
     return result
 
 
@@ -531,7 +602,38 @@ def _sent_after(records: Iterable[dict[str, Any]], timestamp: float | None) -> l
 def _is_debug_or_workflow(flow: str, queue: dict[str, Any]) -> bool:
     if flow == "debug_flow":
         return True
-    text = "\n".join(str(item.get("content_snippet") or "") for item in _messages(queue)[-12:])
+
+    messages = _messages(queue)
+    latest_user_index: int | None = None
+    latest_user_ts: float | None = None
+    for index in range(len(messages) - 1, -1, -1):
+        item = messages[index]
+        if item.get("role") != "user":
+            continue
+        latest_user_index = index
+        latest_user_ts = _parse_timestamp(
+            item.get("timestamp")
+            or item.get("time")
+            or item.get("created_at")
+        )
+        break
+
+    if latest_user_index is None or latest_user_ts is None:
+        return False
+
+    max_age = _env_int(
+        os.environ.get("HERMES_ALIVE_CONTEXT_FLOW_MAX_AGE_SECONDS"),
+        3600,
+        60,
+        86400,
+    )
+    if _aware_now(None).timestamp() - latest_user_ts > max_age:
+        return False
+
+    text = "\n".join(
+        str(item.get("content_snippet") or "")
+        for item in messages[latest_user_index:]
+    )
     return len(DEBUG_RE.findall(text)) >= 3
 
 
