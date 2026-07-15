@@ -6,7 +6,7 @@
 
 性格、上下文、记忆、拟人作息与安全生命周期管理——让 Hermes 有“在场感”，但不会把每一次沉默都变成通知。
 
-![version](https://img.shields.io/badge/version-v2.4.1-blue)
+![version](https://img.shields.io/badge/version-v2.4.2-blue)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB)
 ![Hermes](https://img.shields.io/badge/Hermes-gateway--native-6f42c1)
 ![status](https://img.shields.io/badge/status-acceptance%20candidate-orange)

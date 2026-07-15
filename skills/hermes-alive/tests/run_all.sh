@@ -11,6 +11,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_joint_shadow_replay.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_isolated_enforcement.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_discovery_quality_pivot_v3.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_rich_content_model_attribution_v1.py"
+PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_runtime_disable_contract.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_matrix.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_stress.py"
 echo HERMES_ALIVE_PHASE_H_ALL_RESULT=PASS

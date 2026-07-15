@@ -113,7 +113,11 @@ def load_managed_env(*, overwrite: bool = False) -> dict[str, str]:
         if value is None:
             continue
         text = _text(value)
-        if overwrite or not os.getenv(env_name):
+        # Marker: HERMES_ALIVE_MANAGED_ENABLED_AUTHORITATIVE_V1
+        # The lifecycle-managed master switch must override a baked or inherited
+        # container environment. Other settings retain the existing env-first
+        # compatibility contract unless overwrite=True is explicitly requested.
+        if overwrite or key == "enabled" or not os.getenv(env_name):
             os.environ[env_name] = text
             loaded[env_name] = text
 

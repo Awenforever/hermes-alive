@@ -1,7 +1,7 @@
 ---
 name: hermes-alive
 description: "Hermes Alive — a gateway-native proactive companion for WeChat with managed lifecycle, contextual personality, circadian shadow decisions, quality safeguards, and clean uninstall."
-version: 2.4.0
+version: 2.4.2
 ---
 
 # Hermes Alive
@@ -72,8 +72,8 @@ location is confirmed. Provider setup is not launched by this skill; if Hermes
 itself has no usable Provider, Hermes should explain that separate prerequisite
 instead of opening an unrelated skill questionnaire.
 
-Explicit process environment variables override managed values. Never place API
-keys, tokens, or private chat credentials in the repository.
+Explicit process environment variables override managed values except the lifecycle-managed master `enabled` switch, which is authoritative so `--disable` cannot be bypassed by a baked container environment.
+Never place API keys, tokens, or private chat credentials in the repository.
 
 ## Runtime responsibilities
 

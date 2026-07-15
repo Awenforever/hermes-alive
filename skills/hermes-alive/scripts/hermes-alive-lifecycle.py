@@ -988,6 +988,28 @@ def configure(args: argparse.Namespace) -> int:
     }
     _atomic_write_json(paths.config_file, payload)
 
+    # Marker: HERMES_ALIVE_LIFECYCLE_RUNTIME_CONTROL_SYNC_V1
+    # Keep the live watcher control plane synchronized with lifecycle
+    # enable/disable operations. This makes --disable effective immediately for
+    # an already-running watcher, while managed_config remains authoritative on
+    # the next gateway import/start.
+    if args.enable or args.disable:
+        control_file = paths.shared_dir / "control.json"
+        control = _read_json(control_file, {})
+        if not isinstance(control, dict):
+            control = {}
+        control["enabled_override"] = bool(args.enable)
+        control["reason"] = (
+            "lifecycle configure --enable"
+            if args.enable
+            else "lifecycle configure --disable"
+        )
+        control["updated_at_utc"] = time.strftime(
+            "%Y-%m-%dT%H:%M:%SZ",
+            time.gmtime(),
+        )
+        _atomic_write_json(control_file, control)
+
     print("HERMES_ALIVE_MANAGED_CONFIG_OK")
     print(f"managed_config={paths.config_file}")
     print(f"provider_ready={str(bool(provider.get('ready'))).lower()}")

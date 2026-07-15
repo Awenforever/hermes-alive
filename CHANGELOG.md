@@ -4,6 +4,27 @@ All notable public repository changes are documented here.
 
 ## Unreleased
 
+## v2.4.2 — 2026-07-14
+
+### Fixed
+
+- The lifecycle-managed master `enabled` switch now overrides a baked or
+  inherited `HERMES_PROACTIVE_PLATFORM_ENABLED` value, so a disabled
+  installation cannot start proactive discovery, dreaming, composition, or
+  delivery cycles.
+- `configure --enable` and `configure --disable` now synchronize the runtime
+  `control.enabled_override` value, allowing an already-running watcher to
+  observe lifecycle state changes immediately.
+
+### Validation
+
+- Added focused regression coverage for managed master-switch authority,
+  lifecycle/runtime control synchronization, and the real handler startup gate.
+- Revalidated the complete offline matrix and stress suites.
+- Verified a contained native gateway startup with a baked `enabled=true`
+  conflict produced no proactive-state mutation, Provider attempt, or Weixin
+  send attempt.
+
 ## v2.4.1 — 2026-07-14
 
 ### Added
