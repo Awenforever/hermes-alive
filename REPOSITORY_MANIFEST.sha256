@@ -13,7 +13,7 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./ci/fakes/age
 7cd584e83d7ea9fba615e9d993e76bcc3c1f9ceb1d600ef6d52316c2637d7201  ./metadata/hermes-alive.json
 1abd5395e8cb5a88160ba7b6b97b5f41a2b9fcd13a8c5e6a18c8e7b5d5aba36b  ./scripts/bootstrap.sh
 232285943c2f963752f9cb15d8fef874f65364689420c65e65ec32966f5c2cef  ./scripts/portable-ci.sh
-1405e0171dff85a098c39ec0aaeaaf8636bccefc3c740e07f0c10f8dc7224abd  ./scripts/verify-repository.py
+56d45f7ecd8f31c11e325e0caafa63d73deb87bb74fcf4e4863f256ef7df441d  ./scripts/verify-repository.py
 57eb07543f9e2147613ab27e56d47f13e912e951d2c7fd4f27e731ee47c75b25  ./skills/hermes-alive/LICENSE
 75e5f0f597a2ebdcea17de7a78a1b6d23197e6f2580a3606697d0c78ceec6ed7  ./skills/hermes-alive/README.md
 d881fbac324156abde2a051629d0e95eb41db8c18139def3ea81c708a4d607f5  ./skills/hermes-alive/README_CN.md
