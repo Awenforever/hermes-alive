@@ -1,0 +1,95 @@
+# Hermes Alive discovery sources
+# Branch: feat/playwright-multi-platform (2026-07-05)
+# Sources by method:
+#   API (aiohttp): arxiv, github, hackernews, v2ex, bilibili
+#   RSS (aiohttp): sspai
+#   Playwright: hackernews (direct), zhihu, papers.cool, jandan
+#   Blocked: 小红书(需登录), 抖音(无内容), 微信公众号(robots全禁), Reddit(Cloudflare), Hermes Forum(GitHub登录)
+#   Pending research: 即刻(需用户协助找API endpoint)
+
+sources:
+  arxiv:
+    enabled: true
+    query: "(satellite AND smoke detection) OR (remote sensing AND computer vision) OR (wildfire AND deep learning) OR (flame AND microgravity)"
+    max_results: 3
+
+  github:
+    enabled: true
+    query: "stars:>50 pushed:>2026-04-01"
+    sort: stars
+    per_page: 3
+
+  hackernews:
+    enabled: true
+    max_stories: 15
+    target_count: 3
+
+  # New API-based sources (no Playwright needed)
+  v2ex:
+    enabled: true
+    max_results: 3
+
+  bilibili:
+    enabled: true
+    max_results: 3
+
+  sspai:
+    enabled: true
+    max_results: 3
+
+  rss:
+    enabled: false
+    feeds: []
+
+  playwright:
+    enabled: true
+    max_pages_per_run: 5
+    timeout_seconds: 30
+    delay_between_pages: 2.0
+    sites:
+      - name: "Hacker News"
+        url: "https://news.ycombinator.com/"
+        type: "forum"
+      - name: "Zhihu Hot"
+        url: "https://www.zhihu.com/hot"
+        type: "social"
+      - name: "papers.cool"
+        url: "https://papers.cool/"
+        type: "academic"
+      - name: "煎蛋"
+        url: "https://jandan.net/"
+        type: "social"
+      - name: "小红书"
+        url: "https://www.xiaohongshu.com/explore"
+        type: "social"
+
+dedup:
+  enabled: true
+  url_cache_size: 300
+
+budgets:
+  max_per_run: 18
+  max_per_source: 4
+
+share_threshold:
+  min_score: 0.60
+
+local_discovery:
+  enabled: false
+  allowed_roots: []
+  denied_patterns:
+    - "**/.env"
+    - "**/auth.json"
+    - "**/storage_state.json"
+    - "**/*cookie*"
+    - "**/*token*"
+    - "**/*secret*"
+    - "**/*credential*"
+    - "**/*api_key*"
+    - "**/*apikey*"
+    - "**/*.tar.gz"
+    - "**/*.zip"
+    - "**/private/**"
+    - "**/uploads/**"
+  max_files_per_tick: 0
+  max_file_size_bytes: 262144

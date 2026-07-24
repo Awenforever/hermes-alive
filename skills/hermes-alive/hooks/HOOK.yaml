@@ -1,0 +1,7 @@
+name: hermes-alive-proactive
+version: "1.0"
+events:
+  - gateway:startup
+  - session:start
+  - agent:end
+description: "Hermes Alive proactive platform watcher startup hook"

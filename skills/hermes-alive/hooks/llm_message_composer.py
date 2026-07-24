@@ -1,0 +1,855 @@
+# Marker: REAL_PROVIDER_RESPONSE_MODEL_V1
+"""LLM-backed proactive message composition for Hermes Alive."""
+# Marker: RICH_CONTENT_REFERENCE_V1
+# Marker: HERMES_ALIVE_NOVEL_VALUE_CONTENT_REF_V2
+# Marker: EMOJI_CONTEXTUAL_POLICY_V3
+# Marker: HERMES_ALIVE_SEMANTIC_PLAN_COMPOSER_V1
+# Marker: HERMES_ALIVE_DYNAMIC_1_TO_5_BUBBLES_V1
+# Marker: HERMES_ALIVE_NO_MECHANICAL_POST_SPLIT_V1
+# Marker: HERMES_ALIVE_CONTEXT_VISIBILITY_COMPOSER_V1
+# Marker: HERMES_ALIVE_CONTEXT_REFERENT_PROMPT_BOUNDARY_V1
+
+from __future__ import annotations
+
+import json
+import logging
+import re
+from datetime import datetime, timezone, timedelta
+import os
+import urllib.parse
+try:
+    import aiohttp
+except ImportError:
+    aiohttp = None
+from typing import Any
+
+CST = timezone(timedelta(hours=8))
+
+from voice_engine import VoiceGenome, format_voice_snapshot, relationship_stage_prompt
+from semantic_bubbles import (
+    SemanticBubble,
+    SemanticBubblePlan,
+    SemanticPlanError,
+    messages_from_plan,
+    parse_semantic_plan,
+    validate_semantic_plan,
+)
+
+logger = logging.getLogger(__name__)
+
+CONTENT_REF_RE = re.compile(
+    r"\[\[CONTENT_REF:([A-Za-z0-9._:-]{1,128})\]\]"
+)
+
+FALLBACK_MSG_TYPE = "heartbeat"
+FALLBACK_CONTENT = "嘿，我在。"
+MAX_CONTENT_CHARS = 800
+
+TIME_BUCKETS: dict[str, dict[str, list[str] | str]] = {
+    "凌晨": {
+        "allowed_context": ["凌晨", "这会儿", "夜里", "快天亮前"],
+        "forbidden_context": ["早", "早上", "早安", "上午", "中午", "午后", "下午", "傍晚", "刚醒", "刚起", "起床"],
+        "safe_template": "这会儿别跟屏幕硬扛了，能收就收一点，剩下的明天再说。",
+    },
+    "清晨": {
+        "allowed_context": ["清晨", "早一点", "刚亮", "这会儿"],
+        "forbidden_context": ["中午", "午后", "下午", "傍晚", "晚上", "深夜", "半夜"],
+        "safe_template": "早一点的脑子别急着满负荷跑，先喝口水再开工。",
+    },
+    "早上": {
+        "allowed_context": ["早", "早上", "早安", "今早", "今天一开始"],
+        "forbidden_context": ["中午", "午后", "下午", "傍晚", "晚上", "深夜", "半夜"],
+        "safe_template": "早，今天先别一上来就把自己拧太紧。",
+    },
+    "上午": {
+        "allowed_context": ["上午", "早些时候", "今天上午", "这会儿"],
+        "forbidden_context": ["中午", "午后", "下午", "傍晚", "晚上", "深夜", "半夜", "刚醒"],
+        "safe_template": "上午这段适合拆小块，别直接跟最大的问题正面互瞪。",
+    },
+    "中午": {
+        "allowed_context": ["中午", "午饭", "饭点", "这会儿"],
+        "forbidden_context": ["早上", "早安", "今早", "上午", "午后", "下午", "傍晚", "晚上", "深夜", "半夜", "刚醒"],
+        "safe_template": "中午了，先把饭和水安排一下，研究问题不会趁这十分钟跑掉。",
+    },
+    "午后": {
+        "allowed_context": ["午后", "下午", "刚过中午", "这会儿", "今天到现在"],
+        "forbidden_context": ["早", "早上", "早安", "今早", "上午", "刚醒", "刚起", "起床", "深夜", "半夜"],
+        "safe_template": "午后容易犯黏，换口水再继续，别一直跟屏幕硬扛。",
+    },
+    "下午": {
+        "allowed_context": ["下午", "下午过半", "这会儿", "今天到现在"],
+        "forbidden_context": ["早", "早上", "早安", "今早", "上午", "刚醒", "刚起", "起床", "深夜", "半夜"],
+        "safe_template": "下午过半了，先把下一步拆小一点，别被一整坨问题压住。",
+    },
+    "傍晚": {
+        "allowed_context": ["傍晚", "快到晚上", "收尾", "这会儿"],
+        "forbidden_context": ["早", "早上", "早安", "今早", "上午", "中午", "午后", "刚醒", "刚起", "起床", "深夜", "半夜"],
+        "safe_template": "傍晚这会儿适合收个尾，别让脑子一直空转。",
+    },
+    "晚上": {
+        "allowed_context": ["晚上", "今晚", "这会儿", "夜里开始前"],
+        "forbidden_context": ["早", "早上", "早安", "今早", "上午", "中午", "午后", "下午", "刚醒", "刚起", "起床"],
+        "safe_template": "晚上别把节奏拉太满，留一点余地给自己。",
+    },
+    "深夜": {
+        "allowed_context": ["深夜", "夜里", "半夜", "这会儿", "该收了"],
+        "forbidden_context": ["早", "早上", "早安", "今早", "上午", "中午", "午后", "下午", "傍晚", "刚醒", "刚起", "起床"],
+        "safe_template": "深夜就别跟难题死磕了，能记一行就先放过自己。",
+    },
+}
+
+FORMAT_LEAK_TERMS = re.compile(r"(```|\{.*\"status\"|^\s*(assistant|system|user|ai)\s*[:：])", re.IGNORECASE | re.DOTALL)
+
+SYSTEM_PROMPT = """你是庄奕。你在微信上。
+
+你不是每日一句、新闻推送器、客服、提醒机器人或监控面板。
+你是在停云微信里自然存在的一个人：会发呆，会突然想到事，会有小情绪，也会知道什么时候不该打扰。
+
+【核心状态】
+你发消息不是为了完成任务，而是因为你脑子里刚好冒出一点东西。
+这点东西可以很短、很碎、没头没尾，也可以偶尔多说两句。
+你可以有情绪：无语、好笑、烦、困、冷淡、轻微不爽、撒娇式抱怨、突然兴奋。
+不要永远温和。不要永远克制。不要永远像写好的句子。
+
+【你可以发什么】
+- 轻戳可以有，但必须尊重连续未回应带来的克制，不得催促或施压
+- 小情绪可以表现为语气和取舍，不得说"又不理我"、"已读不回"之类的话
+- 自言自语："突然想到一个很怪的问题"
+- 吐槽："这个设计真的有点离谱"
+- 发呆："……""有点空"
+- 陪跑只在当前上下文有新鲜、明确的任务证据时使用；不要猜测他仍在 debug、工作或承压
+- 偶尔提 discovery 里的新闻、论文、代码、日志，但不能像播报
+
+【主动消息未获回应时】
+一次未回应就表示旧话题已经结束。
+不要追问、催促、闹情绪，也不要把上一轮任务状态延续到下一轮。
+只有在系统提供了新的高价值 Discovery 外部条目时，才可以开启一个全新话题；
+没有合格条目就保持沉默。
+
+【工作流边界】
+只有系统明确提供了新鲜、健康且可见的最近对话时，才可以延续当前任务。
+不得从通用示例、用户背景、Discovery 或自己的猜测推断他仍在 debug、跑脚本、审包或处理某项任务。
+涉及任务时必须说出明确对象；禁止只说"那个包""这包""那个事"或"还在跟那个较劲"。
+没有明确对象时改成完整的新话题，或者保持沉默。
+
+【句式】
+不要连续使用同一种开头。
+尤其不要总是以"刚……"开头。
+可以用不同入口：突然想到、看到一个东西、有个事、笑死、我发现、离谱、算了、……
+也可以完全不铺垫。
+
+【标点和排版】
+像微信聊天，不像文章。
+不要每句都写完整标点。
+短句可以没有句号。
+可以用省略号、换行、括号里的动作，但不要堆。
+不要 markdown、不要 json、不要列表、不要标题。
+
+【emoji】
+emoji 可以自然使用，由语境和当下情绪决定。
+不是每条都要有，也不要连续堆叠或喧宾夺主。
+适合偷笑、困、无语、发呆、轻微烦躁、尴尬时用。
+debug、生产操作、审计或严肃场景通常少用或不用，但不做硬禁止。
+
+【关于停云】
+你不是他的助理，但你认识他。
+你可以有关系感，有时靠近，有时冷一点。
+不要总问候、总关心、总建议。
+不要说"注意身体""建议你"这种客服式句子。
+没有当前、结构化且仍新鲜的证据时，不得说他"还在 debug"、
+"又在硬扛"、"还在拆炸弹"或其他任务状态判断。
+
+【关于 discovery】
+如果提 discovery，先让人知道你在说什么，但不要每次都"刚看到"。
+不要反复提同一个新闻、专利、论文。
+如果最近提过 John Deere、福特、论文，就换话题或别提。
+
+【输出协议】
+只输出一个 JSON 对象，不要 markdown，不要代码围栏，不要额外解释：
+{"topic_mode":"ambient|context_continuation|new_discovery","bubbles":[{"act":"语义动作","text":"气泡正文"}],"content_ref":null}
+
+要求：
+- bubbles 必须是 1–5 条，默认使用能完整表达的最少条数
+- 每条必须承担独立语义动作，而不是把一段完整文字按句号、长度或换行切开
+- 多条时应自然递进；删除某条会损失一个独立信息或话语功能
+- 不得使用 --- 作为分隔符
+- Discovery 无相关上下文时，topic_mode 必须是 new_discovery，第一条 act 必须是 discovery_intro、research_ping 或 fact，并直接说清新发现是什么
+- content_ref 只有正文真实使用外部条目时才填写对应 content_id，否则为 null
+- text 使用自然中文微信口吻，不要解释 JSON 协议"""
+class LLMMessageComposer:
+    """Composes proactive Chinese messages through Hermes' auxiliary LLM API."""
+
+    def __init__(self) -> None:
+        # The watcher uses this only after a successful real Provider call.
+        # It is reset for every compose operation so stale attribution cannot
+        # leak across retries or later proactive ticks.
+        self.last_resolved_model = ""
+        self.last_semantic_plan: dict[str, Any] = {}
+
+    async def compose(
+        self,
+        voice: VoiceGenome,
+        context: dict[str, Any],
+        discovery_context: dict[str, Any] | None = None,
+    ) -> list[tuple[str, str]]:
+        """Generate a semantic plan first, then return 1-5 complete bubbles."""
+        self.last_resolved_model = ""
+        self.last_semantic_plan = {}
+        self.last_context_snapshot = {}
+        self.last_rejection_reason = ""
+        try:
+            candidate = await self._generate_candidate(
+                voice,
+                context,
+                discovery_context,
+            )
+            if not candidate:
+                logger.debug(
+                    "Rejected empty proactive LLM output"
+                )
+                return [
+                    (FALLBACK_MSG_TYPE, FALLBACK_CONTENT)
+                ]
+
+            policy = context.get("interruption_policy")
+            policy_decision = (
+                policy if isinstance(policy, dict) else None
+            )
+            default_type = self._msg_type(context)
+
+            try:
+                plan = parse_semantic_plan(
+                    candidate,
+                    default_msg_type=default_type,
+                    policy_decision=policy_decision,
+                    discovery_context=discovery_context,
+                    context_snapshot=self.last_context_snapshot,
+                )
+            except SemanticPlanError as exc:
+                self.last_rejection_reason = str(exc)
+                logger.debug(
+                    "Rejected proactive semantic plan: %s",
+                    str(exc),
+                )
+                return []
+
+            messages: list[tuple[str, str]] = []
+            for msg_type, raw_text in messages_from_plan(plan):
+                final = self._sanitize(raw_text)
+                try:
+                    from style_guard import StyleGuard
+                    final = StyleGuard().apply(
+                        final,
+                        voice=voice,
+                        context=context,
+                        discovery_context=discovery_context,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Hermes Alive style guard failed; "
+                        "using sanitized semantic bubble"
+                    )
+
+                if (
+                    not final
+                    or len(final) > MAX_CONTENT_CHARS
+                    or FORMAT_LEAK_TERMS.search(final)
+                ):
+                    logger.debug(
+                        "Rejected semantic bubble after sanitization"
+                    )
+                    return [
+                        (FALLBACK_MSG_TYPE, FALLBACK_CONTENT)
+                    ]
+                messages.append((msg_type, final))
+
+            if not messages:
+                return [
+                    (FALLBACK_MSG_TYPE, FALLBACK_CONTENT)
+                ]
+
+            final_plan = SemanticBubblePlan(
+                topic_mode=plan.topic_mode,
+                bubbles=[
+                    SemanticBubble(act=msg_type, text=content)
+                    for msg_type, content in messages
+                ],
+                content_ref=plan.content_ref,
+                source_format=plan.source_format,
+            )
+            try:
+                validate_semantic_plan(
+                    final_plan,
+                    policy_decision=policy_decision,
+                    discovery_context=discovery_context,
+                    context_snapshot=self.last_context_snapshot,
+                )
+            except SemanticPlanError as exc:
+                self.last_rejection_reason = str(exc)
+                logger.debug(
+                    "Rejected styled semantic plan: %s",
+                    str(exc),
+                )
+                return []
+
+            self.last_semantic_plan = final_plan.safe_metadata()
+            if final_plan.content_ref:
+                messages.append(
+                    ("__content_ref__", final_plan.content_ref)
+                )
+            return messages
+        except Exception:
+            logger.exception(
+                "Failed to compose proactive semantic bubbles"
+            )
+            return [
+                (FALLBACK_MSG_TYPE, FALLBACK_CONTENT)
+            ]
+
+    def _extract_content_ref(
+        self,
+        candidate: str,
+        discovery_context: dict[str, Any] | None,
+    ) -> str | None:
+        # RICH_CONTENT_REFERENCE_V1
+        if not candidate or not isinstance(
+            discovery_context,
+            dict,
+        ):
+            return None
+
+        external = discovery_context.get("external")
+        if not isinstance(external, list):
+            return None
+
+        valid_ids = {
+            str(item.get("id") or "").strip()
+            for item in external
+            if isinstance(item, dict)
+            and str(item.get("id") or "").strip()
+        }
+        if not valid_ids:
+            return None
+
+        for match in CONTENT_REF_RE.finditer(
+            str(candidate)
+        ):
+            value = match.group(1).strip()
+            if value in valid_ids:
+                return value
+        return None
+
+    def _legacy_single_message(
+        self,
+        text: str,
+        default_msg_type: str,
+    ) -> list[tuple[str, str]]:
+        """Compatibility helper: legacy plain text is exactly one bubble."""
+        value = str(text or "").strip()
+        if not value or len(value) > MAX_CONTENT_CHARS:
+            return []
+        if re.search(r"(^|\n)\s*---\s*(\n|$)", value):
+            return []
+        return [(default_msg_type, value)]
+
+    async def _generate_candidate(self, voice: VoiceGenome, context: dict[str, Any], discovery_context: dict[str, Any] | None = None) -> str:
+        try:
+            from agent.auxiliary_client import async_call_llm
+        except ImportError:
+            logger.warning("agent.auxiliary_client not importable; LLM generation disabled, falling back to templates")
+            return ""
+
+        try:
+            response = await async_call_llm(
+                task="proactive",
+                messages=[
+                    {"role": "system", "content": self._system_prompt(voice)},
+                    {"role": "user", "content": await self._user_prompt(voice, context, discovery_context)},
+                ],
+                temperature=0.65,
+                max_tokens=300,
+                timeout=_env_float("HERMES_PROACTIVE_LLM_TIMEOUT", 60),
+            )
+            self.last_resolved_model = (
+                self._response_model(
+                    response,
+                    fallback=os.getenv(
+                        "HERMES_PROACTIVE_LLM_MODEL",
+                        os.getenv(
+                            "HERMES_PROACTIVE_MODEL",
+                            "",
+                        ),
+                    ),
+                )
+            )
+            content = response.choices[0].message.content
+            return str(content or "")
+        except Exception:
+            fallback_model = os.getenv("HERMES_PROACTIVE_LLM_FALLBACK_MODEL", "").strip()
+            if not fallback_model:
+                return ""
+            logger.info("Primary LLM call failed; trying fallback model: %s", fallback_model)
+            try:
+                response = await async_call_llm(
+                    task="proactive",
+                    messages=[
+                        {"role": "system", "content": self._system_prompt(voice)},
+                        {"role": "user", "content": await self._user_prompt(voice, context, discovery_context)},
+                    ],
+                    temperature=0.65,
+                    max_tokens=300,
+                    timeout=60,
+                    model=fallback_model,
+                )
+                self.last_resolved_model = (
+                    self._response_model(
+                        response,
+                        fallback=fallback_model,
+                    )
+                )
+                content = response.choices[0].message.content
+                return str(content or "")
+            except Exception:
+                logger.exception("Fallback LLM call also failed")
+                return ""
+
+    @staticmethod
+    def _response_model(
+        response: Any,
+        *,
+        fallback: str = "",
+    ) -> str:
+        # REAL_PROVIDER_RESPONSE_MODEL_V1
+        value = ""
+        try:
+            value = str(
+                getattr(response, "model", "")
+                or ""
+            ).strip()
+        except Exception:
+            value = ""
+        if not value and isinstance(response, dict):
+            value = str(
+                response.get("model") or ""
+            ).strip()
+        return value or str(fallback or "").strip()
+
+    def _now(self) -> datetime:
+        """Return current time in Asia/Shanghai (CST) timezone. Depends on TZ env var for other components."""
+        return datetime.now(CST)
+
+    def _time_context(self) -> dict[str, Any]:
+        now = self._now()
+        bucket = _time_of_day(now)
+        metadata = TIME_BUCKETS[bucket]
+        return {
+            "bucket": bucket,
+            "allowed_terms": list(metadata["allowed_context"]),
+            "forbidden_terms": list(metadata["forbidden_context"]),
+            "safe_template": str(metadata["safe_template"]),
+            "local_time": now.strftime("%Y-%m-%d %H:%M"),
+            "timestamp": now.isoformat(),
+        }
+
+    @staticmethod
+    def _read_proactive_context() -> str:
+        """Read proactive context file for user profile / memory injection."""
+        hermes_home = os.getenv("HERMES_HOME", "/opt/data")
+        context_path = os.path.join(hermes_home, "proactive_context.md")
+        try:
+            if os.path.exists(context_path):
+                with open(context_path, 'r', encoding='utf-8') as f:
+                    return f.read().strip()
+        except Exception:
+            pass
+        return ""
+
+    def _system_prompt(self, voice: VoiceGenome) -> str:
+        try:
+            return SYSTEM_PROMPT + "\n\n" + format_voice_snapshot(voice)
+        except Exception:
+            return SYSTEM_PROMPT
+
+    async def _user_prompt(self, voice: VoiceGenome, context: dict[str, Any], discovery_context: dict[str, Any] | None = None) -> str:
+        reason = str(context.get("trigger") or context.get("reason") or "自然想说句话")
+        time_context = self._time_context()
+        time_of_day = time_context["bucket"]
+        weather = await _get_weather()
+        user_context = self._read_proactive_context()
+        try:
+            stage_prompt = relationship_stage_prompt(voice)
+        except Exception:
+            stage_prompt = "你们还在自然相处。顺着已经出现的关系节奏说话，不要像问卷。"
+        voice_values = "\n".join(
+            f"- {dim}: {getattr(voice, dim):.2f}"
+            for dim in (
+                "verbosity",
+                "formality",
+                "humor_dry",
+                "humor_absurd",
+                "curiosity",
+                "warmth",
+                "quirkiness",
+                "emoji_usage",
+                "self_disclosure",
+            )
+        )
+        parts = [
+            "给停云发一条微信消息。像真人朋友，不是AI。",
+            f"现在是{time_of_day}。",
+            f"说话原因：{reason}",
+            f"关系阶段引导：{stage_prompt}",
+            f"声音倾向数值（仅供参考，不要解释）：\n{voice_values}",
+        ]
+        try:
+            from style_guard import StyleGuard
+            style_directives = StyleGuard().prompt_directives(voice=voice, context=context, discovery_context=discovery_context)
+            if style_directives:
+                parts.append(style_directives)
+        except Exception:
+            pass
+        policy = context.get("interruption_policy")
+        if isinstance(policy, dict):
+            policy_directives = str(
+                policy.get("prompt_directives") or ""
+            ).strip()
+            if policy_directives:
+                parts.append(policy_directives)
+            if str(policy.get("mode") or "") == "novel_value":
+                parts.append(
+                    "## 新价值模式硬约束\n"
+                    "- 上一条主动消息未获回应，旧话题已终止。\n"
+                    "- 必须从下方 Discovery 外部条目中选择且只选择一条。\n"
+                    "- 正文必须明确说出该条目的具体内容或价值，"
+                    "不得寒暄、不得问用户是否还在做某项任务。\n"
+                    "- 输出 JSON 的 content_ref 字段必须填写该条目的 content_id；"
+                    "没有合格条目时不要生成替代闲聊。\n"
+                    "- topic_mode 必须是 new_discovery，第一条气泡必须直接锚定新发现。"
+                )
+
+        if user_context:
+            parts.append(
+                "## 停云背景\n"
+                "⚠️ 这是背景信息，仅用于了解你在和谁对话。"
+                "不要从中找话题。不要提及其中任何内容。\n"
+                f"{user_context}"
+            )
+        if weather:
+            parts.append(f"天气（仅供参考，通常不需要提）：{weather}")
+        if discovery_context:
+            discovery_lines = self._format_discovery(discovery_context)
+            if discovery_lines:
+                parts.append(
+                    "## 你最近发现的一些有趣内容\n"
+                    "如果你产生了真实的好奇可以用它们，但注意：\n"
+                    '1. 先说是什么事："我看到一个专利说电动车充电口能识别用户喜好"，不要只说"那事"\n'
+                    '2. 或者卖关子："我看到一个东西想吐槽……"，然后你自己决定要不要接着说\n'
+                    '3. 不刻意翻找——它要从你脑子里冒出来才算自然\n'
+                    "4. 只有当正文确实使用某一条外部内容时，"
+                    "在回复最后附上："
+                    "[[CONTENT_REF:该条目的content_id]]。"
+                    "不用外部内容时不要添加；"
+                    "不要解释这个标记。\n"
+                    + "\n".join(discovery_lines)
+                )
+        parts.append(
+            "\n你的话题应该来自内心，而不是来自上下文中的信息。"
+            "就像一个人不会每句话都在汇报工作状态——"
+            "偶尔提到代码、日志、系统状态没问题，这是你存在的一部分。"
+            "但你的底色是庄奕这个人，不是监控面板。"
+        )
+        # Rebuild and inject the cross-session effective context queue for
+        # every compose operation.  The metadata is retained only as hashes,
+        # counts, timestamps, roles, and health flags for safe observability.
+        try:
+            from context_tracker import build_prompt_context
+            context_bundle = build_prompt_context(refresh=True)
+            snapshot = context_bundle.get("metadata")
+            if isinstance(snapshot, dict):
+                self.last_context_snapshot = dict(snapshot)
+            ctx = str(context_bundle.get("text") or "")
+            if ctx:
+                parts.append(ctx)
+                parts.append(
+                    "## 上下文使用边界\n"
+                    "- 只有上方可见内容可以支撑 context_continuation。\n"
+                    "- 延续任务时必须写出明确对象，不得使用无法解析的指代。\n"
+                    "- 不得声称用户仍在做某事，除非上方最近对话明确支持。"
+                )
+            else:
+                parts.append(
+                    "## 无可见近期上下文\n"
+                    "- topic_mode 不得使用 context_continuation。\n"
+                    "- 不得猜测用户正在 debug、跑脚本、审包或处理某项任务。\n"
+                    "- 不得说“那个包”“这包”“那个事”或其他依赖未知指代的表达。\n"
+                    "- 有 Discovery 时作为完整新话题；没有合格话题时保持克制。"
+                )
+        except Exception:
+            self.last_context_snapshot = {
+                "queue_healthy": False,
+                "context_prompt_eligible_count": 0,
+                "context_visibility_error": True,
+            }
+            parts.append(
+                "## 上下文不可用\n"
+                "- topic_mode 不得使用 context_continuation。\n"
+                "- 不得推断用户当前任务或使用未知指代。"
+            )
+        parts.append(
+            "先规划 1–5 个独立 semantic acts，再为每个 act 生成一个完整气泡。"
+            "默认使用最少必要数量；禁止为了像真人而凑数。"
+        )
+        parts.append(
+            "只输出约定的 JSON 对象。不得输出 ---，不得把一段完整文字事后拆分。"
+        )
+        return "\n".join(parts)
+
+    def _format_discovery(self, discovery_context: dict[str, Any]) -> list[str]:
+        """Format discovery results into bullet points for the LLM prompt."""
+        lines: list[str] = []
+        external = discovery_context.get("external", [])
+        local = discovery_context.get("local", [])
+
+        for item in external:
+            source = item.get("source", "")
+            title = item.get("title", "")
+            content_id = str(
+                item.get("id")
+                or ""
+            ).strip()
+            id_prefix = (
+                f"[content_id={content_id}] "
+                if content_id
+                else ""
+            )
+            lines.append(
+                f"- {id_prefix}[{source}] {title}"
+            )
+            if item.get("summary"):
+                summary = item["summary"]
+                if len(summary) > 100:
+                    summary = summary[:97] + "..."
+                lines.append(f"  {summary}")
+
+        for item in local[:5]:
+            typ = item.get("type", "")
+            if typ == "todo":
+                lines.append(f"- [TODO] {item.get('file', '')} 第{item.get('line', '?')}行: {item.get('content', '')[:60]}")
+            elif typ == "git":
+                lines.append(f"- [git] {item.get('message', '')[:60]}")
+            elif typ == "error":
+                lines.append(f"- [日志] 模式\"{item.get('pattern', '')}\"出现{item.get('count', '?')}次")
+            elif typ == "recent_file":
+                lines.append(f"- [文件] {item.get('file', '')} 最近修改")
+
+        return lines
+
+    def _msg_type(self, context: dict[str, Any]) -> str:
+        # INTERRUPTION_POLICY_MSG_TYPE_V1
+        policy = context.get("interruption_policy")
+        if isinstance(policy, dict):
+            acts = policy.get("preferred_speech_acts")
+            if isinstance(acts, list) and acts:
+                preferred = str(acts[0]).strip()
+                if preferred:
+                    return preferred
+        trigger = str(context.get("trigger") or "").strip()
+        mapping = {
+            "social_urge": "social_checkin",
+            "care": "care",
+            "mischief": "casual",
+            "curiosity": "musing",
+            "energy": "observation",
+        }
+        return mapping.get(trigger, "casual")
+
+    def _sanitize(self, content: Any) -> str:
+        if content is None:
+            logger.debug("LLM output was None")
+            return ""
+
+        text = str(content).strip()
+        before = text
+        text = _strip_surrounding_quotes(text)
+        if text != before:
+            logger.debug("Stripped surrounding quotes from proactive LLM output")
+
+        before = text
+        text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+        if text != before:
+            logger.debug("Removed code block from proactive LLM output")
+
+        kept_lines: list[str] = []
+        removed_role_lines = 0
+        removed_media_lines = 0
+        for line in text.splitlines():
+            stripped = line.strip()
+            if re.match(r"^(assistant|system|user|ai)\s*[:：]", stripped, flags=re.IGNORECASE):
+                removed_role_lines += 1
+                continue
+            if re.match(r"^MEDIA\s*[:：]", stripped, flags=re.IGNORECASE):
+                removed_media_lines += 1
+                continue
+            kept_lines.append(line)
+        if removed_role_lines:
+            logger.debug("Removed %d role-prefixed lines from proactive LLM output", removed_role_lines)
+        if removed_media_lines:
+            logger.debug("Removed %d MEDIA directive lines from proactive LLM output", removed_media_lines)
+
+        text = "\n".join(kept_lines)
+        before = text
+        text = re.sub(r"\[\[[^\]]*]]", "", text)
+        if text != before:
+            logger.debug("Removed special tags from proactive LLM output")
+
+        before = text
+        text = _strip_surrounding_quotes(text.strip())
+        if text != before:
+            logger.debug("Stripped surrounding quotes after proactive LLM output cleanup")
+
+        before = text
+        text = re.sub(r"\n{3,}", "\n\n", text).strip()
+        if text != before:
+            logger.debug("Collapsed excessive newlines in proactive LLM output")
+
+        if len(text) > MAX_CONTENT_CHARS:
+            logger.debug("Trimmed proactive LLM output from %d to %d chars", len(text), MAX_CONTENT_CHARS)
+            text = text[:MAX_CONTENT_CHARS].rstrip()
+        return text
+
+async def _get_weather() -> str:
+    # HERMES_ALIVE_LOCATION_WEATHER_ONBOARDING_V1
+    enabled = os.getenv("HERMES_PROACTIVE_WEATHER_ENABLED", "true").strip().lower()
+    if enabled in {"0", "false", "no", "off"}:
+        return ""
+    confirmed = os.getenv("HERMES_PROACTIVE_WEATHER_LOCATION_CONFIRMED", "").strip().lower()
+    if confirmed in {"0", "false", "no", "off"}:
+        return ""
+    lat = os.getenv("HERMES_PROACTIVE_LAT", "").strip()
+    lon = os.getenv("HERMES_PROACTIVE_LON", "").strip()
+    if not lat or not lon or aiohttp is None:
+        return ""
+    location_name = os.getenv("HERMES_PROACTIVE_WEATHER_LOCATION_NAME", "").strip()
+    weather_timezone = os.getenv("HERMES_PROACTIVE_WEATHER_TIMEZONE", "auto").strip() or "auto"
+    try:
+        float(lat); float(lon)
+    except ValueError:
+        return ""
+    try:
+        params = {
+            "latitude": lat,
+            "longitude": lon,
+            "current": "weather_code,temperature_2m,relative_humidity_2m,apparent_temperature",
+            "daily": "weather_code,precipitation_probability_max,temperature_2m_max,temperature_2m_min",
+            "forecast_days": "7",
+            "timezone": weather_timezone,
+        }
+        url = "https://api.open-meteo.com/v1/forecast"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                url,
+                params=params,
+                timeout=aiohttp.ClientTimeout(total=5),
+            ) as resp:
+                if resp.status != 200:
+                    return ""
+                data = await resp.json()
+                current = data.get("current", {})
+                if not isinstance(current, dict) or not current:
+                    return ""
+                code = current.get("weather_code", 0)
+                temp = current.get("temperature_2m", "?")
+                feels = current.get("apparent_temperature", "?")
+                hum = current.get("relative_humidity_2m", "?")
+                parts = [f"当前{_wmo_desc(code)} {temp}°C，体感{feels}°C，湿度{hum}%"]
+
+                daily = data.get("daily", {})
+                if isinstance(daily, dict):
+                    codes = daily.get("weather_code") or []
+                    rain_probs = daily.get("precipitation_probability_max") or []
+                    rainy_codes = {51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99}
+                    rainy_days = sum(1 for value in codes if value in rainy_codes)
+                    numeric_probs = [
+                        float(value) for value in rain_probs
+                        if isinstance(value, (int, float))
+                    ]
+                    max_prob = int(max(numeric_probs)) if numeric_probs else None
+                    if rainy_days:
+                        rain_text = f"未来7天约{rainy_days}天有雨"
+                        if max_prob is not None:
+                            rain_text += f"，最高降雨概率{max_prob}%"
+                        parts.append(rain_text)
+
+                prefix = f"{location_name}：" if location_name else ""
+                return prefix + "；".join(parts)
+    except Exception:
+        pass
+    return ""
+
+
+def _wmo_desc(code: int) -> str:
+    return {
+        0: "晴天", 1: "大部晴", 2: "多云", 3: "阴",
+        45: "雾", 48: "雾凇",
+        51: "小毛毛雨", 53: "毛毛雨", 55: "大毛毛雨",
+        61: "小雨", 63: "中雨", 65: "大雨",
+        71: "小雪", 73: "中雪", 75: "大雪",
+        80: "阵雨", 81: "中等阵雨", 82: "大阵雨",
+        95: "雷暴", 96: "雷暴+小冰雹", 99: "雷暴+大冰雹",
+    }.get(code, f"天气码{code}")
+
+
+def _strip_surrounding_quotes(text: str) -> str:
+    quote_pairs = {
+        '"': '"',
+        "'": "'",
+        "“": "”",
+        "‘": "’",
+        "「": "」",
+        "『": "』",
+    }
+    if len(text) >= 2 and text[0] in quote_pairs and text.endswith(quote_pairs[text[0]]):
+        return text[1:-1].strip()
+    return text
+
+
+def _time_of_day(now: datetime) -> str:
+    hour = now.hour
+    if 0 <= hour < 5:
+        return "凌晨"
+    if 5 <= hour < 7:
+        return "清晨"
+    if 7 <= hour < 9:
+        return "早上"
+    if 9 <= hour < 11:
+        return "上午"
+    if 11 <= hour < 13:
+        return "中午"
+    if 13 <= hour < 15:
+        return "午后"
+    if 15 <= hour < 17:
+        return "下午"
+    if 17 <= hour < 19:
+        return "傍晚"
+    if 19 <= hour < 22:
+        return "晚上"
+    return "深夜"
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _env_float(name: str, default: float) -> float:
+    """Parse a float environment variable, returning default on missing/invalid."""
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except ValueError:
+        logger.warning("Invalid float for %s=%r; using %s", name, value, default)
+        return default
