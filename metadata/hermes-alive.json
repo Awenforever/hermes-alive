@@ -1,0 +1,23 @@
+{
+  "accepted_evidence": {
+    "documentation_result_sha256": "b167c9eef2bff25f4cbfc8e09ee8d25b2b704ecf0f05ff6fd73874f8e6f78b52",
+    "isolated_acceptance_v4_sha256": "ef66ae5370ff8dbe417c9738c8004967bc4f03cf34e35d237bbd398515c23868"
+  },
+  "bootstrap": "scripts/bootstrap.sh",
+  "default_branch": "main",
+  "name": "hermes-alive",
+  "portable_ci": "scripts/portable-ci.sh",
+  "production_deployed": false,
+  "production_feature_enforcement_readiness": "INCOMPLETE_SHADOW_COMPONENTS_REMAIN",
+  "real_wechat_e2e_completed": false,
+  "repository_stage": "candidate",
+  "runtime_modes": {
+    "circadian": "shadow",
+    "dynamic_sleep_quiet": "observe_only",
+    "isolated_delivery_enforcement": "test_only",
+    "quality_governor": "enforce"
+  },
+  "schema_version": 1,
+  "skill_path": "skills/hermes-alive",
+  "version": "2.4.2"
+}

@@ -1,4 +1,38 @@
+# Python
 __pycache__/
 *.py[cod]
-*.tar.gz
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Runtime and secrets
+.env
+.env.*
+!.env.template
+*.log
+*.jsonl
+*.pid
+*.sock
+cookies/
+sessions/
+browser-profile/
+playwright-report/
+test-results/
+
+# Hermes Alive state
+hermes_alive_shared/
+.hermes-home/
+acceptance-output/
+release-output/
+
+# Editors and OS
+.vscode/
+.idea/
 .DS_Store
+Thumbs.db
+
+# Build artifacts
+dist/
+build/
+*.tar.gz
+*.bundle

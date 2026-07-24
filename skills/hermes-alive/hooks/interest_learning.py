@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from safe_io import LOCK_DIR, atomic_write_text, file_lock, locked_read_json, locked_write_json
+from topic_dedup import TopicDedupStore, item_identity
 
 DEFAULT_BASE = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", "/opt/data/hermes_alive_shared"))
 
@@ -66,10 +67,8 @@ def _clamp(value: float, low: float = -1.0, high: float = 1.0) -> float:
 
 
 def _item_key(item: dict[str, Any]) -> str:
-    raw = str(item.get("url") or "").strip()
-    if not raw:
-        raw = f"{item.get('source', '')}|{item.get('title', '')}"
-    return hashlib.sha256(raw.encode("utf-8", errors="ignore")).hexdigest()[:20]
+    # HERMES_ALIVE_CANONICAL_ITEM_ID_V1
+    return item_identity(item)["content_identity"][:20]
 
 
 def _text(item: dict[str, Any]) -> str:
@@ -154,6 +153,7 @@ def normalize_item(item: dict[str, Any]) -> dict[str, Any]:
     ).strip()
     out["content_type"] = infer_content_type(out)
     out["tags"] = infer_tags(out)
+    out.update(item_identity(out))
     return out
 
 
@@ -246,6 +246,7 @@ class InterestLearningEngine:
         self.content_items_path = self.base / "content_items.jsonl"
         self.context_queue_path = self.base / "context_queue.json"
         self.alive_state_path = self.base / "state" / "alive_state.json"
+        self.topic_dedup = TopicDedupStore(self.base)
         self._ensure_files()
 
     def _ensure_files(self) -> None:
@@ -474,6 +475,8 @@ class InterestLearningEngine:
 
     def record_delivery(self, item: dict[str, Any], *, tick_id: str | None = None) -> dict[str, Any]:
         normalized = normalize_item(item)
+        # Idempotent safety net for delivery paths outside the watcher reservation.
+        self.topic_dedup.commit_delivery(normalized, tick_id=tick_id)
         normalized["delivered_at"] = _now()
         _append_bounded_jsonl(
             self.content_seen_path,
@@ -526,7 +529,13 @@ class InterestLearningEngine:
         return ids
 
     def was_seen(self, item: dict[str, Any]) -> bool:
-        return normalize_item(item)["id"] in self._seen_ids()
+        try:
+            return self.topic_dedup.check(
+                normalize_item(item),
+                include_reservations=True,
+            ).blocked
+        except Exception:
+            return normalize_item(item)["id"] in self._seen_ids()
 
     def _recent_tag_counts(self) -> dict[str, int]:
         counts: dict[str, int] = {}

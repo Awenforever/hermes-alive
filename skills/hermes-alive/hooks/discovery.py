@@ -27,6 +27,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from topic_dedup import TopicDedupStore, item_identity
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -1346,8 +1348,9 @@ class DiscoveryEngine:
         self._cached: dict[str, Any] | None = None
         self._last_fetch: float = 0.0
         self._in_progress: bool = False
-        # URL-based dedup cache (in-memory, resets on gateway restart)
+        # Content-identity cache complements the persistent delivery guard.
         self._url_cache: set[str] = set()
+        self._topic_dedup = TopicDedupStore()
         self._interest_engine: Any | None = None
 
     def _interest(self) -> Any | None:
@@ -1472,21 +1475,23 @@ class DiscoveryEngine:
         return ranked
 
     def _dedup(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Filter out items with URLs already seen."""
+        """Filter duplicate, reserved, and recently delivered topic units."""
+        guarded, rejected = self._topic_dedup.filter_candidates(items)
+        if rejected:
+            logger.info(
+                "Discovery topic dedup rejected %d item(s): %s",
+                len(rejected),
+                sorted({str(value.get("reason") or "unknown") for value in rejected}),
+            )
+
         new_items: list[dict[str, Any]] = []
-        for item in items:
-            url = item.get("url", "")
-            if url and url in self._url_cache:
+        for item in guarded:
+            identity = item_identity(item)
+            cache_key = identity["content_identity"]
+            if cache_key in self._url_cache:
                 continue
-            interest = self._interest()
-            if interest is not None:
-                try:
-                    if interest.was_seen(item):
-                        continue
-                except Exception:
-                    logger.exception("Persistent content dedup failed")
-            if url:
-                self._url_cache.add(url)
+            self._url_cache.add(cache_key)
+            item.update(identity)
             new_items.append(item)
         return new_items
 
@@ -1515,8 +1520,38 @@ class DiscoveryEngine:
         return [item for item in items if item.get("score", 0.0) >= threshold]
 
     def get_recent(self) -> dict[str, Any] | None:
-        """Return cached findings from the last run, or None."""
-        return self._cached
+        """Return the fresh cache with delivery-ineligible topics removed.
+
+        Discovery collection and proactive sharing intentionally run at different
+        cadences.  A cache may therefore be read by several watcher ticks.  Every
+        read must revalidate the external candidates against the persistent
+        delivery/reservation guard so a delivered item is consumed once while the
+        remaining unseen items stay available for later ticks.
+
+        The in-memory collection cache is never mutated here.  This preserves the
+        complete browsing batch for diagnostics and lets a verified material
+        update re-enter the eligible view when its fingerprint changes.
+        """
+        if self._cached is None:
+            return None
+
+        recent = dict(self._cached)
+        external = self._cached.get("external")
+        if not isinstance(external, list):
+            return recent
+
+        guarded, rejected = self._topic_dedup.filter_candidates(external)
+        recent["external"] = guarded
+        recent["external_cached_count"] = len(external)
+        recent["external_eligible_count"] = len(guarded)
+        recent["external_suppressed_count"] = len(rejected)
+        if rejected:
+            logger.info(
+                "Discovery cached-candidate rotation suppressed %d delivered, "
+                "reserved, or duplicate item(s)",
+                len(rejected),
+            )
+        return recent
 
     def has_fresh(self) -> bool:
         """Check if we have cached results that are still within the interval."""

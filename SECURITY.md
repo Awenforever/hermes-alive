@@ -1,17 +1,30 @@
 # Security Policy
 
-## Supported version
+## Supported branch
 
-Security fixes are applied to the current `main` branch and the latest
-published release.
+Security fixes are prepared against the `main` branch of this repository
+candidate. No production deployment is implied by a source change.
 
-## Reporting a vulnerability
+## Reporting
 
-Do not open a public issue for a suspected vulnerability or credential leak.
-Use GitHub's private vulnerability reporting feature for this repository.
-Include the affected version, reproduction steps, impact, and any proposed
-mitigation.
+Do not place credentials, private chat content, WeChat session material, Provider
+tokens, cookies, or production configuration in a public issue.
 
-Hermes Alive must never require users to place Provider credentials, platform
-tokens, or private chat identifiers in this repository. Those values belong
-in the local Hermes configuration and managed runtime state.
+A security report should include:
+
+- affected commit or tag;
+- reproducible steps using synthetic data;
+- expected and actual behavior;
+- whether the issue affects source, lifecycle, delivery, or persistence.
+
+## Boundaries
+
+Hermes Alive must not:
+
+- modify Hermes Core or `weixin.py`;
+- store Provider credentials;
+- expose raw private URLs/titles in topic history;
+- send a real message during CI or installation;
+- restart or modify production without explicit approval.
+
+The repository CI uses deterministic fakes and disabled Provider/WeChat delivery.

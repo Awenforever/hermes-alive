@@ -1,29 +1,23 @@
 # Contributing
 
-Contributions should preserve the repository's lifecycle, safety, and testing
-contracts.
+## Development rules
 
-Before submitting a change:
+1. Keep Hermes Alive changes inside `skills/hermes-alive`.
+2. Do not modify Hermes Core or the WeChat adapter.
+3. Add or update tests for behavioral changes.
+4. Preserve the documented `shadow`, `observe_only`, and `enforce` boundaries.
+5. Never add credentials, runtime state, browser profiles, caches, or private
+   conversation data.
+6. Run:
 
-1. Do not commit Provider credentials, platform tokens, real chat identifiers,
-   `.env` files, generated archives, or runtime state.
-2. Run the matrix suite:
+```bash
+bash scripts/portable-ci.sh
+```
 
-   ```bash
-   python3 skills/hermes-alive/tests/run_matrix.py
-   ```
+before submitting a change.
 
-3. Run shell and Python compile checks.
-4. For runtime, lifecycle, persistence, or delivery changes, run the full
-   stress suite:
+## Release changes
 
-   ```bash
-   python3 skills/hermes-alive/tests/run_stress.py
-   ```
-
-5. Keep installation centered on the complete GitHub repository, root
-   `bootstrap.sh`, and `hermes-alive-lifecycle`.
-6. Preserve default-uninstall state retention and purge zero-residue behavior.
-
-Pull requests should describe the user-visible behavior, validation performed,
-rollback considerations, and whether runtime files changed.
+A passing portable CI run is not full release acceptance. Runtime attribution,
+fresh-container lifecycle, repository transport, real GitHub URL installation,
+spare-WeChat E2E, and production verification are separate gates.

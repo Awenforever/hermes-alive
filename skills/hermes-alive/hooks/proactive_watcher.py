@@ -17,6 +17,12 @@
 # Marker: HERMES_ALIVE_QUALITY_OBSERVABILITY_V3
 # Marker: HERMES_ALIVE_QUALITY_FAIL_CLOSED_RUNTIME_V3
 # Marker: HERMES_ALIVE_QUALITY_AUDIT_ALIGNMENT_V3
+# Marker: HERMES_ALIVE_THREE_STAGE_ACTIVITY_GUARD_V1
+# Marker: HERMES_ALIVE_CONTEXT_VISIBILITY_OBSERVABILITY_V1
+# Marker: HERMES_ALIVE_CONTEXT_GUARD_FAIL_CLOSED_V1
+# Marker: HERMES_ALIVE_PER_OUTBOUND_ACTIVITY_GUARD_V1
+# Marker: HERMES_ALIVE_DISCOVERY_TOPIC_DEDUP_V1
+# Marker: HERMES_ALIVE_TOPIC_RESERVATION_SEND_GUARD_V1
 
 from __future__ import annotations
 
@@ -99,8 +105,10 @@ class ProactivePlatformWatcher:
         self._dream_engine: Any | None = None
         self._interruption_policy: Any | None = None
         self._content_delivery_engine: Any | None = None
+        self._topic_dedup_engine: Any | None = None
         self._circadian_engine: Any | None = None
         self._proactive_quality_governor: Any | None = None
+        self._last_activity_snapshot: dict[str, Any] = {}
         self.watcher_id = f"{os.getpid()}-{uuid.uuid4().hex[:8]}"
         self.started_at = datetime.now().astimezone().isoformat()
 
@@ -179,6 +187,11 @@ class ProactivePlatformWatcher:
 
         # ── Interruption policy: decide if/how Alive may speak ──
         user_active = self._user_active_recently()
+        self._log_activity_guard(
+            tick_id,
+            stage="pre_discovery",
+            user_active=user_active,
+        )
 
         quality_pre_decision = self._proactive_quality_shadow_decision(
             user_active=user_active,
@@ -228,6 +241,7 @@ class ProactivePlatformWatcher:
                 return False
 
         policy_decision = self._evaluate_interruption_policy(
+            voice=voice,
             user_active=user_active,
             discovery_available=False,
             cooldown_allowed=True,
@@ -264,8 +278,13 @@ class ProactivePlatformWatcher:
                     interruption_policy=policy_decision,
                 )
 
-        if user_active and not (policy_decision and bool(policy_decision.get("allow_when_user_active", False))):
-            self._log("skip", tick_id=tick_id, reason="user_active", interruption_policy=policy_decision)
+        if user_active:
+            self._log(
+                "skip",
+                tick_id=tick_id,
+                reason="user_active_pre_discovery",
+                interruption_policy=policy_decision,
+            )
             return False
 
         cooldown = self._cooldown()
@@ -286,6 +305,7 @@ class ProactivePlatformWatcher:
                     )
                 else:
                     cooldown_policy = self._evaluate_interruption_policy(
+                        voice=voice,
                         user_active=user_active,
                         discovery_available=False,
                         cooldown_allowed=False,
@@ -307,7 +327,22 @@ class ProactivePlatformWatcher:
         if discovery_context is not None:
             self._log_discovery(tick_id, discovery_context)
 
+        user_active_after_discovery = self._user_active_recently()
+        self._log_activity_guard(
+            tick_id,
+            stage="post_discovery_pre_compose",
+            user_active=user_active_after_discovery,
+        )
+        if user_active_after_discovery:
+            self._log(
+                "skip",
+                tick_id=tick_id,
+                reason="user_active_after_discovery",
+            )
+            return False
+
         final_policy = self._evaluate_interruption_policy(
+            voice=voice,
             user_active=user_active,
             discovery_available=discovery_available,
             cooldown_allowed=True,
@@ -356,6 +391,38 @@ class ProactivePlatformWatcher:
             compose_discovery_context,
             policy_decision=policy_decision,
         )
+
+        user_active_before_send = self._user_active_recently()
+        self._log_activity_guard(
+            tick_id,
+            stage="post_compose_pre_send",
+            user_active=user_active_before_send,
+        )
+        if user_active_before_send:
+            self._log(
+                "skip",
+                tick_id=tick_id,
+                reason="user_active_before_send",
+            )
+            return False
+
+        try:
+            semantic_plan = dict(
+                getattr(
+                    self._llm_message_composer,
+                    "last_semantic_plan",
+                    {},
+                )
+                or {}
+            )
+        except Exception:
+            semantic_plan = {}
+        if semantic_plan:
+            self._log(
+                "semantic_bubble_plan",
+                tick_id=tick_id,
+                semantic_plan=semantic_plan,
+            )
         content_ref_generated_by = (
             self._content_reference_generated_by(
                 messages,
@@ -398,6 +465,7 @@ class ProactivePlatformWatcher:
         delivery_plan: Any | None = None
         rich_payload: Any | None = None
         selected_delivery_item: dict[str, Any] | None = None
+        topic_reservation: dict[str, Any] | None = None
         if delivery is not None:
             try:
                 delivery_plan = delivery.plan(
@@ -488,9 +556,89 @@ class ProactivePlatformWatcher:
             )
             return False
 
+        if isinstance(selected_delivery_item, dict):
+            guard = self._topic_dedup()
+            should_guard = bool(
+                rich_payload is not None
+                or content_ref
+                or (
+                    delivery_plan is not None
+                    and int(getattr(delivery_plan, "evidence_score", 0)) >= 20
+                )
+            )
+            if guard is not None and should_guard:
+                decision = guard.reserve(
+                    selected_delivery_item,
+                    tick_id=tick_id,
+                )
+                topic_reservation = decision.to_dict()
+                self._log(
+                    "topic_dedup_reservation",
+                    tick_id=tick_id,
+                    allowed=decision.allowed,
+                    reason=decision.reason,
+                    canonical_url_hash=decision.identity.get("canonical_url_hash"),
+                    topic_signature=decision.identity.get("topic_signature"),
+                    topic_unit_id=decision.identity.get("topic_unit_id"),
+                    age_seconds=decision.age_seconds,
+                )
+                if decision.blocked:
+                    self._log(
+                        "skip",
+                        tick_id=tick_id,
+                        reason="discovery_topic_recently_delivered",
+                        topic_reason=decision.reason,
+                        canonical_url_hash=decision.identity.get("canonical_url_hash"),
+                        topic_signature=decision.identity.get("topic_signature"),
+                    )
+                    return False
+
         msg_count = len(messages)
         sent_messages: list[tuple[str, str, str]] = []
+        delivery_interrupted_by_activity = False
         for msg_index, (msg_type, content, generated_by) in enumerate(messages, start=1):
+            user_active_each_send = self._user_active_recently()
+            self._log_activity_guard(
+                tick_id,
+                stage="pre_text_send",
+                user_active=user_active_each_send,
+                msg_index=msg_index,
+                msg_count=msg_count,
+            )
+            if user_active_each_send:
+                delivery_interrupted_by_activity = True
+                self._log(
+                    "skip",
+                    tick_id=tick_id,
+                    reason="user_active_before_text_send",
+                    msg_type=msg_type,
+                    msg_index=msg_index,
+                    msg_count=msg_count,
+                )
+                break
+
+            if topic_reservation is not None and isinstance(selected_delivery_item, dict):
+                guard = self._topic_dedup()
+                validation = (
+                    guard.validate_reservation(
+                        selected_delivery_item,
+                        reservation_id=str(topic_reservation.get("reservation_id") or ""),
+                    )
+                    if guard is not None
+                    else None
+                )
+                if validation is None or validation.blocked:
+                    delivery_interrupted_by_activity = True
+                    self._log(
+                        "skip",
+                        tick_id=tick_id,
+                        reason="topic_reservation_invalid_before_text_send",
+                        topic_reason=(validation.reason if validation is not None else "guard_unavailable"),
+                        msg_index=msg_index,
+                        msg_count=msg_count,
+                    )
+                    break
+
             self._log_compose(tick_id, voice, discovery_context, msg_type, generated_by)
 
             metadata = self._metadata(generated_by)
@@ -577,29 +725,78 @@ class ProactivePlatformWatcher:
         if (
             delivery is not None
             and rich_payload is not None
+            and not delivery_interrupted_by_activity
         ):
-            rich_metadata = self._metadata(
-                rich_payload.generated_by
+            user_active_before_rich = self._user_active_recently()
+            self._log_activity_guard(
+                tick_id,
+                stage="pre_rich_send",
+                user_active=user_active_before_rich,
             )
-            rich_outcome = await delivery.send_rich(
-                adapter,
-                chat_id,
-                rich_payload,
-                metadata=rich_metadata,
-            )
-            self._log(
-                "rich_delivery"
-                if rich_outcome.success
-                else "rich_delivery_error",
-                tick_id=tick_id,
-                rich_kind=rich_outcome.kind,
-                delivery_mode=rich_outcome.mode,
-                content_delivered=rich_outcome.content_delivered,
-                fallback_used=rich_outcome.fallback_used,
-                error=rich_outcome.error,
-                content_item_id=rich_payload.content_item_id,
-                generated_by=rich_payload.generated_by,
-            )
+            rich_allowed = not user_active_before_rich
+            if user_active_before_rich:
+                delivery_interrupted_by_activity = True
+                self._log(
+                    "skip",
+                    tick_id=tick_id,
+                    reason="user_active_before_rich_send",
+                    rich_kind=getattr(rich_payload, "kind", None),
+                )
+
+            if (
+                rich_allowed
+                and topic_reservation is not None
+                and isinstance(selected_delivery_item, dict)
+            ):
+                guard = self._topic_dedup()
+                validation = (
+                    guard.validate_reservation(
+                        selected_delivery_item,
+                        reservation_id=str(
+                            topic_reservation.get("reservation_id") or ""
+                        ),
+                    )
+                    if guard is not None
+                    else None
+                )
+                if validation is None or validation.blocked:
+                    rich_allowed = False
+                    delivery_interrupted_by_activity = True
+                    self._log(
+                        "skip",
+                        tick_id=tick_id,
+                        reason="topic_reservation_invalid_before_rich_send",
+                        topic_reason=(
+                            validation.reason
+                            if validation is not None
+                            else "guard_unavailable"
+                        ),
+                        rich_kind=getattr(rich_payload, "kind", None),
+                    )
+
+            if rich_allowed:
+                rich_metadata = self._metadata(
+                    rich_payload.generated_by
+                )
+                rich_outcome = await delivery.send_rich(
+                    adapter,
+                    chat_id,
+                    rich_payload,
+                    metadata=rich_metadata,
+                )
+                self._log(
+                    "rich_delivery"
+                    if rich_outcome.success
+                    else "rich_delivery_error",
+                    tick_id=tick_id,
+                    rich_kind=rich_outcome.kind,
+                    delivery_mode=rich_outcome.mode,
+                    content_delivered=rich_outcome.content_delivered,
+                    fallback_used=rich_outcome.fallback_used,
+                    error=rich_outcome.error,
+                    content_item_id=rich_payload.content_item_id,
+                    generated_by=rich_payload.generated_by,
+                )
 
         rich_success = bool(
             rich_outcome is not None
@@ -618,6 +815,34 @@ class ProactivePlatformWatcher:
             )
 
         sent_any = bool(sent_messages) or rich_success
+
+        if topic_reservation is not None and isinstance(selected_delivery_item, dict):
+            guard = self._topic_dedup()
+            reservation_id = str(topic_reservation.get("reservation_id") or "")
+            if guard is not None:
+                if sent_any:
+                    committed = guard.commit_delivery(
+                        selected_delivery_item,
+                        tick_id=tick_id,
+                        reservation_id=reservation_id,
+                    )
+                    self._log(
+                        "topic_dedup_committed",
+                        tick_id=tick_id,
+                        reason=committed.reason,
+                        canonical_url_hash=committed.identity.get("canonical_url_hash"),
+                        topic_signature=committed.identity.get("topic_signature"),
+                        topic_unit_id=committed.identity.get("topic_unit_id"),
+                    )
+                else:
+                    guard.release(reservation_id=reservation_id)
+                    self._log(
+                        "topic_dedup_released",
+                        tick_id=tick_id,
+                        reason="no_delivery_succeeded",
+                        canonical_url_hash=topic_reservation.get("canonical_url_hash"),
+                        topic_signature=topic_reservation.get("topic_signature"),
+                    )
 
         if sent_any and cooldown is not None:
             cooldown_type = (
@@ -953,20 +1178,72 @@ class ProactivePlatformWatcher:
                 self._interruption_policy = False
         return None if self._interruption_policy is False else self._interruption_policy
 
+    def _log_activity_guard(
+        self,
+        tick_id: str,
+        *,
+        stage: str,
+        user_active: bool,
+        msg_index: int | None = None,
+        msg_count: int | None = None,
+    ) -> None:
+        snapshot = dict(self._last_activity_snapshot or {})
+        safe_fields = {
+            "stage": stage,
+            "user_active": bool(user_active),
+            "context_queue_sha256": snapshot.get("queue_sha256"),
+            "context_queue_updated_at": snapshot.get("updated_at"),
+            "context_queue_message_count": snapshot.get("message_count"),
+            "context_queue_distinct_session_count": snapshot.get(
+                "distinct_session_count"
+            ),
+            "context_queue_user_message_count": snapshot.get(
+                "user_message_count"
+            ),
+            "context_queue_assistant_message_count": snapshot.get(
+                "assistant_message_count"
+            ),
+            "context_queue_db_lag_seconds": snapshot.get(
+                "queue_db_lag_seconds"
+            ),
+            "context_queue_matches_db": snapshot.get("queue_matches_db"),
+            "context_queue_healthy": snapshot.get("queue_healthy"),
+            "latest_context_role": snapshot.get("last_message_role"),
+            "latest_context_age_seconds": snapshot.get(
+                "latest_context_age_seconds"
+            ),
+            "session_busy_boolean": snapshot.get("session_busy"),
+            "busy_lease_count": snapshot.get("busy_lease_count"),
+            "activity_guard_reason_code": snapshot.get(
+                "activity_guard_reason_code"
+            ),
+            "msg_index": msg_index,
+            "msg_count": msg_count,
+        }
+        self._log(
+            "activity_guard",
+            tick_id=tick_id,
+            activity_guard=safe_fields,
+        )
+
     def _evaluate_interruption_policy(
         self,
         *,
+        voice: Any | None,
         user_active: bool,
         discovery_available: bool,
         cooldown_allowed: bool,
         cooldown_reason: str | None,
     ) -> dict[str, Any] | None:
         # INTERRUPTION_POLICY_V1
+        # HERMES_ALIVE_PERSONALITY_DISPOSITION_INTEGRATION_V1
         policy = self._policy()
         if policy is None:
             return None
         try:
             return policy.evaluate(
+                voice=voice,
+                social_urge=self._extract_social_urge(voice),
                 user_active=user_active,
                 discovery_available=discovery_available,
                 cooldown_allowed=cooldown_allowed,
@@ -1689,6 +1966,20 @@ class ProactivePlatformWatcher:
             logger.exception("Failed to record interest-learning delivery")
             return False
 
+    def _topic_dedup(self) -> Any | None:
+        if self._topic_dedup_engine is None:
+            try:
+                from topic_dedup import TopicDedupStore
+                self._topic_dedup_engine = TopicDedupStore(BASE)
+            except Exception:
+                logger.exception("Failed to initialize topic dedup store")
+                self._topic_dedup_engine = False
+        return (
+            None
+            if self._topic_dedup_engine is False
+            else self._topic_dedup_engine
+        )
+
     def _content_delivery(self) -> Any | None:
         # RICH_CONTENT_DELIVERY_V1
         if self._content_delivery_engine is None:
@@ -1776,7 +2067,22 @@ class ProactivePlatformWatcher:
         default_voice = self._voice_state_or_default(voice)
         if self._feature_enabled(LLM_ENABLED_ENV):
             llm_result = await self._compose_llm_message(default_voice, discovery_context, policy_decision=policy_decision)
-            if llm_result is not None and len(llm_result) > 0:
+            if llm_result is not None:
+                if len(llm_result) == 0:
+                    rejection = str(
+                        getattr(
+                            self._llm_message_composer,
+                            "last_rejection_reason",
+                            "",
+                        )
+                        or ""
+                    ).strip()
+                    if rejection:
+                        self._log(
+                            "compose_rejected",
+                            reason=rejection,
+                        )
+                    return []
                 # Check if LLM result is actually a fallback
                 msg_type, content = llm_result[0]
                 if not self._is_llm_fallback(msg_type, content):
@@ -1919,43 +2225,86 @@ class ProactivePlatformWatcher:
             return False
 
     def _user_active_recently(self) -> bool:
-        """Return True when Alive should suppress proactive sending.
+        """Fail closed unless Hermes is idle and the effective queue is healthy.
 
-        Allow only when all three activity-guard conditions are true:
-        session is idle, the latest Weixin message is from Hermes, and that
-        Hermes message is at least 30 minutes old.
+        This combines the in-process flag, shared cross-process activity
+        leases, a rebuilt cross-session queue, and the latest effective role.
         """
         try:
             from context_tracker import activity_snapshot, is_session_busy
 
             if is_session_busy():
-                logger.debug("Activity guard: session busy, suppressing")
+                self._last_activity_snapshot = {
+                    "session_busy": True,
+                    "queue_healthy": False,
+                    "activity_guard_reason_code": "shared_or_local_session_busy",
+                }
+                logger.debug(
+                    "Activity guard: shared/local session busy, suppressing"
+                )
                 return True
 
             snapshot = activity_snapshot(refresh=True)
+            self._last_activity_snapshot = dict(snapshot)
+
+            if bool(snapshot.get("session_busy")):
+                self._last_activity_snapshot[
+                    "activity_guard_reason_code"
+                ] = "activity_snapshot_busy"
+                return True
+
+            if not bool(snapshot.get("queue_healthy", False)):
+                self._last_activity_snapshot[
+                    "activity_guard_reason_code"
+                ] = "context_queue_unhealthy"
+                logger.warning(
+                    "Activity guard: context queue unhealthy, suppressing"
+                )
+                return True
+
             if not snapshot.get("has_context"):
-                logger.debug("Activity guard: no conversation context, allowing")
+                self._last_activity_snapshot[
+                    "activity_guard_reason_code"
+                ] = "no_context_allow_new_topic"
                 return False
 
             last_role = snapshot.get("last_message_role")
             if last_role != "assistant":
-                logger.debug("Activity guard: last message role is %r, suppressing", last_role)
+                self._last_activity_snapshot[
+                    "activity_guard_reason_code"
+                ] = "latest_effective_role_not_assistant"
                 return True
 
             last_msg_ts = snapshot.get("last_message_timestamp")
             if last_msg_ts is None:
-                logger.debug("Activity guard: Hermes last-message timestamp missing, suppressing")
+                self._last_activity_snapshot[
+                    "activity_guard_reason_code"
+                ] = "latest_effective_timestamp_missing"
                 return True
 
             seconds_since_last = time.time() - float(last_msg_ts)
+            self._last_activity_snapshot[
+                "latest_context_age_seconds"
+            ] = max(0.0, seconds_since_last)
             if seconds_since_last < 1800:
-                logger.debug("Activity guard: Hermes last message %.0fs ago (< 1800s), suppressing", seconds_since_last)
+                self._last_activity_snapshot[
+                    "activity_guard_reason_code"
+                ] = "latest_assistant_under_activity_window"
                 return True
 
+            self._last_activity_snapshot[
+                "activity_guard_reason_code"
+            ] = "idle_and_queue_healthy"
             return False
         except Exception:
             logger.exception("_user_active_recently failed")
-            return True  # fail-safe: suppress on error
+            self._last_activity_snapshot = {
+                "session_busy": True,
+                "queue_healthy": False,
+                "activity_guard_reason_code": "activity_guard_exception",
+            }
+            return True
+
 
     def _extract_social_urge(self, voice: Any) -> float | None:
         """Extract social_urge value from the voice engine, return None if unavailable."""
@@ -2071,21 +2420,66 @@ class ProactivePlatformWatcher:
         msg_type: str,
         generated_by: str,
     ) -> None:
-        """Log compose context: voice snapshot, model, discovery availability, msg type."""
+        """Log compose context without raw conversation text."""
         voice_snapshot: dict[str, float] = {}
         if voice is not None:
             try:
                 from voice_engine import STYLE_DIMENSIONS
-                voice_snapshot = {dim: round(float(getattr(voice, dim, 0.0)), 2) for dim in STYLE_DIMENSIONS}
+                voice_snapshot = {
+                    dim: round(
+                        float(getattr(voice, dim, 0.0)),
+                        2,
+                    )
+                    for dim in STYLE_DIMENSIONS
+                }
                 engine = self._voice()
                 if engine is not None:
-                    voice_snapshot["social_urge"] = round(float(getattr(engine, "social_urge", 0.0)), 2)
+                    voice_snapshot["social_urge"] = round(
+                        float(
+                            getattr(
+                                engine,
+                                "social_urge",
+                                0.0,
+                            )
+                        ),
+                        2,
+                    )
             except Exception:
                 pass
 
         had_discovery = discovery_context is not None
-        external_n = len(discovery_context.get("external", []) or []) if had_discovery else 0
-        local_n = len(discovery_context.get("local", []) or []) if had_discovery else 0
+        external_n = (
+            len(discovery_context.get("external", []) or [])
+            if had_discovery
+            else 0
+        )
+        local_n = (
+            len(discovery_context.get("local", []) or [])
+            if had_discovery
+            else 0
+        )
+
+        context_snapshot: dict[str, Any] = {}
+        rejection_reason = ""
+        try:
+            context_snapshot = dict(
+                getattr(
+                    self._llm_message_composer,
+                    "last_context_snapshot",
+                    {},
+                )
+                or {}
+            )
+            rejection_reason = str(
+                getattr(
+                    self._llm_message_composer,
+                    "last_rejection_reason",
+                    "",
+                )
+                or ""
+            )
+        except Exception:
+            context_snapshot = {}
 
         self._log(
             "compose",
@@ -2095,7 +2489,42 @@ class ProactivePlatformWatcher:
             voice=voice_snapshot,
             had_discovery=had_discovery,
             discovery_items=external_n + local_n,
+            context_queue_sha256=context_snapshot.get(
+                "queue_sha256"
+            ),
+            context_queue_updated_at=context_snapshot.get(
+                "queue_updated_at"
+            ),
+            context_queue_message_count=context_snapshot.get(
+                "queue_message_count"
+            ),
+            context_queue_distinct_session_count=context_snapshot.get(
+                "queue_distinct_session_count"
+            ),
+            context_queue_db_lag_seconds=context_snapshot.get(
+                "queue_db_lag_seconds"
+            ),
+            context_prompt_eligible_count=context_snapshot.get(
+                "context_prompt_eligible_count"
+            ),
+            context_prompt_hash=context_snapshot.get(
+                "context_prompt_hash"
+            ),
+            latest_context_role=context_snapshot.get(
+                "latest_context_role"
+            ),
+            latest_context_age_seconds=context_snapshot.get(
+                "latest_context_age_seconds"
+            ),
+            session_busy_boolean=context_snapshot.get(
+                "session_busy_boolean"
+            ),
+            referent_anchor_count=context_snapshot.get(
+                "referent_anchor_count"
+            ),
+            rejection_reason=rejection_reason or None,
         )
+
 
 def _truthy(value: str | None) -> bool:
     return value is not None and value.strip().lower() in {"1", "true", "yes", "on"}

@@ -2,7 +2,7 @@
 
 ## Regression suites
 
-From the installed skill or repository checkout:
+From the skill root:
 
 ```bash
 bash tests/run_all.sh
@@ -19,56 +19,88 @@ python3 tests/run_proactive_quality_governor.py
 python3 tests/run_location_weather_onboarding.py
 python3 tests/run_joint_shadow_replay.py
 python3 tests/run_isolated_enforcement.py
+python3 tests/run_discovery_quality_pivot_v3.py
+python3 tests/run_rich_content_model_attribution_v1.py
+python3 tests/run_runtime_disable_contract.py
+python3 tests/run_topic_dedup_contracts.py
+python3 tests/run_context_visibility_contracts.py
 python3 tests/run_matrix.py
 python3 tests/run_stress.py
 ```
 
-The matrix suite covers Provider boundaries, managed configuration precedence,
-interruption policy, rich delivery, model metadata, interest learning,
-transaction rollback, and uninstall behavior. The stress suite uses full scale
-by default; reduced scale is only a developer smoke test.
+`run_stress.py` uses contractual full scale by default. Reduced scale is a
+developer smoke test and is not valid for release acceptance.
 
-## Joint shadow replay
+## Current mode inventory
 
-The joint replay validates one deterministic path through:
+```text
+quality_governor_lifecycle_default=enforce
+circadian_lifecycle_default=shadow
+sleep_quiet_policy_integration=observe_only
+isolated_delivery_enforcement=TEST_ONLY
+production_feature_enforcement_readiness=INCOMPLETE_SHADOW_COMPONENTS_REMAIN
+```
 
-1. Circadian intent recognition;
-2. Circadian state and bounded learning;
-3. dynamic Sleep/Quiet comparison;
-4. proactive quality governance;
-5. confirmed fine-grained weather context;
-6. the legacy watcher delivery path.
+A passing inventory means the documentation accurately describes these modes. It
+does not convert shadow components into production enforcement.
 
-Outside isolated acceptance, every rejection remains observe-only with
-`watcher_enforced=false` and `behavior_changed=false`.
+## Verified isolated acceptance
 
-## Isolated enforcement acceptance
+On July 24, 2026, the current source passed an isolated acceptance using the
+local Hermes production image with `--pull never`, `network none`, a read-only
+candidate mount, direct Hermes venv Python, and no executable dependency under
+`/tmp`.
 
-Delivery enforcement requires both acceptance-only environment values:
+Verified gates included:
+
+- exact source hashes and clean release candidate;
+- Python compilation;
+- URL/topic canonicalization, corruption recovery, concurrency, privacy, and
+  material-update hardening;
+- cached-candidate rotation, exhaustion without replay, restart persistence, and
+  material-update re-entry;
+- complete regression, model attribution, matrix, and default-scale stress;
+- fresh install, idempotent install, non-interactive configuration, and verify;
+- installed-source and active-hook hash alignment;
+- persistence across container recreation;
+- uninstall preserving shared state and removing code;
+- reinstall after uninstall;
+- installed topic, rotation, context, and mode contracts;
+- purge with zero residue;
+- reinstall after purge and final purge;
+- container/volume cleanup;
+- unchanged production snapshot and unchanged `weixin.py`.
+
+No Provider call or real WeChat message occurred.
+
+## Acceptance-only dual-key enforcement
+
+Combined dynamic enforcement tests require both:
 
 ```text
 HERMES_ALIVE_DELIVERY_ENFORCEMENT_MODE=isolated
 HERMES_ALIVE_RUNTIME_SCOPE=isolated_test
 ```
 
-Missing either value preserves observe-only behavior. Isolated enforcement is
-not production readiness by itself.
+Missing either value keeps that acceptance-only path disabled. This guard is not
+a production-readiness claim.
 
-## Fresh-container acceptance
+## Remaining release gates
 
-Before production consideration, complete all of the following from a fresh
-container and the real GitHub repository:
+Isolated source/lifecycle acceptance is a release gate, not final completion.
+The remaining sequence is:
 
-1. clone/install without pre-copying source into final directories;
-2. verify zero-touch configuration: automatic timezone, default quiet hours,
-   no terminal questionnaire, and at most one chat-based weather confirmation;
-3. verify source, active hook, managed config, and permissions;
-4. run the complete matrix and default-scale stress suites;
-5. recreate the container and confirm persistent state behavior;
-6. test default uninstall, reinstall, and purge with zero unexpected residue;
-7. with explicit approval, use a spare WeChat account for real end-to-end
-   delivery and footer verification;
-8. perform a final clean uninstall.
+1. build the complete repository candidate with root README files,
+   `skills/hermes-alive`, metadata, bootstrap, and Actions;
+2. verify bare/bundle transport from Git objects rather than a pre-copied tree;
+3. install from a real GitHub URL in a fresh container;
+4. with explicit approval, run spare-WeChat end-to-end delivery and footer tests;
+5. request explicit production deployment approval;
+6. deploy through a controlled, reversible production procedure;
+7. verify intended production mode activation;
+8. observe production stability across quiet-hour crossings, Discovery cycles,
+   Provider failure/recovery, container restart, and NAS restart.
 
-Production source/config changes and gateway restart are separate, explicit
-steps after acceptance.
+Final completion requires production behavior and persistence to match the
+documented design. Shadow or observe-only modules cannot be counted as enforced
+production features.

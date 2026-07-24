@@ -1,182 +1,173 @@
 ---
 name: hermes-alive
-description: "Hermes Alive — a gateway-native proactive companion for WeChat with managed lifecycle, contextual personality, circadian shadow decisions, quality safeguards, and clean uninstall."
+description: "Gateway-native proactive companion with contextual discovery, live quality enforcement, Circadian shadow observation, and reversible lifecycle management."
 version: 2.4.2
 ---
 
-# Hermes Alive
+# Hermes Alive — Hermes Installation Contract
 
-Hermes Alive is distributed as the complete GitHub repository
-`Awenforever/hermes-alive`. A standalone `SKILL.md` is not a complete release.
+## Distribution
 
-## Supported installation paths
+Treat the complete GitHub repository as the release unit. `SKILL.md` alone is
+not installable. Do not pre-copy source into the final skill or hook directory
+before lifecycle installation.
 
-### Repository bootstrap
+## Preconditions
 
-```bash
-git clone --depth 1 https://github.com/Awenforever/hermes-alive.git /tmp/hermes-alive
-bash /tmp/hermes-alive/bootstrap.sh --hermes-home /opt/data
+Before installation:
+
+1. confirm Hermes is installed and `HERMES_HOME` is writable;
+2. confirm Hermes has a usable Provider/model;
+3. do not request API keys, timezone syntax, quiet-hour syntax, coordinates, or
+   internal feature flags in a terminal questionnaire;
+4. do not modify Hermes Core, `weixin.py`, production configuration, or gateway
+   state as part of installation.
+
+Provider setup remains owned by Hermes. If readiness fails, report the missing
+prerequisite and stop; do not launch a second skill-specific Provider flow.
+
+## Paths
+
+Use lifecycle defaults unless the environment explicitly supplies safe paths:
+
+```text
+source: $HERMES_HOME/skills/hermes/hermes-alive
+hook:   $HERMES_HOME/hooks/hermes-alive
+state:  $HERMES_HOME/hermes_alive_shared
 ```
 
-### Hermes GitHub skill transport
+The shared directory must be a strict child of `HERMES_HOME`.
+
+## Install
+
+From the repository skill root:
 
 ```bash
-/opt/hermes/.venv/bin/hermes skills install \
-  Awenforever/hermes-alive/skills/hermes-alive \
-  --category hermes --yes
-
-cd /opt/data/skills/hermes/hermes-alive
-scripts/hermes-alive-lifecycle install
+bash scripts/install.sh
 ```
 
-The installer owns final source and hook placement. Test harnesses must not
-pre-copy files into `/opt/data/skills` or `/opt/data/hooks` before installation.
+Require:
 
-## Zero-touch installation and personalization
+```text
+HERMES_ALIVE_LIFECYCLE_INSTALL_OK
+```
 
-Provider credentials and model selection remain owned by Hermes. Installing this
-skill must not open a second terminal questionnaire or ask the user to understand
-timezone names, quiet-hour syntax, Provider CLI paths, or internal feature flags.
+Run the command a second time to verify idempotence. On failure, stop and surface
+the lifecycle error; never report success from partial output.
 
-After installation, Hermes runs:
+## Configure
+
+Default non-interactive configuration:
 
 ```bash
-LIFECYCLE=/opt/data/skills/hermes/hermes-alive/scripts/hermes-alive-lifecycle
-
-"$LIFECYCLE" configure --provider-check-only
-"$LIFECYCLE" configure \
+scripts/hermes-alive-lifecycle configure \
   --non-interactive \
   --enable \
-  --llm-enabled \
-  --discovery-enabled \
-  --dream-enabled \
-  --circadian-enabled \
-  --circadian-mode shadow \
-  --allow-network-location
-"$LIFECYCLE" verify
+  --skip-weather
 ```
 
-The lifecycle command automatically detects timezone, applies default quiet hours
-(`23:00`–`08:00`), and prepares an optional fine-grained weather suggestion.
-It prints one structured `onboarding_json` object for Hermes to interpret.
-
-When `location_confirmation_required=true`, Hermes may ask **one** natural chat
-question. The user can answer normally:
-
-- confirmation → run `configure --non-interactive --weather-location-confirmed`;
-- corrected district/county → run `configure --non-interactive --weather-location "<reply>"`;
-- decline → run `configure --non-interactive --skip-weather`.
-
-Installation does not wait for that answer. Weather remains disabled until the
-location is confirmed. Provider setup is not launched by this skill; if Hermes
-itself has no usable Provider, Hermes should explain that separate prerequisite
-instead of opening an unrelated skill questionnaire.
-
-Explicit process environment variables override managed values except the lifecycle-managed master `enabled` switch, which is authoritative so `--disable` cannot be bypassed by a baked container environment.
-Never place API keys, tokens, or private chat credentials in the repository.
-
-## Runtime responsibilities
-
-Hermes Alive installs a gateway hook that can:
-
-- maintain bounded conversation context and activity state;
-- evolve a per-user voice profile and interest profile;
-- discover external content through configured sources;
-- compose proactive messages through the routed Hermes model;
-- preserve truthful model footer metadata;
-- apply cooldown, interruption, and fixed quiet-hour safeguards;
-- record Circadian, Sleep/Quiet, and Proactive Quality decisions in shadow mode;
-- use confirmed fine-grained location only as optional weather context;
-- persist replaceable source separately from user/runtime state.
-
-Current Circadian and quality enforcement is available only behind the isolated
-acceptance guard:
+Require:
 
 ```text
-HERMES_ALIVE_DELIVERY_ENFORCEMENT_MODE=isolated
-HERMES_ALIVE_RUNTIME_SCOPE=isolated_test
+HERMES_ALIVE_MANAGED_CONFIG_OK
+HERMES_ALIVE_ZERO_TOUCH_CONFIG_OK
+provider_ready=true
 ```
 
-Both values are required. They are intentionally unavailable through managed
-production configuration.
+Default managed behavior:
 
-## Hard safety boundaries
+```text
+quality_governor_mode=enforce
+quality_topic_expiry_after_unanswered=1
+quality_silence_after_unanswered=2
+context_flow_max_age_seconds=3600
+circadian_mode=shadow
+fixed quiet hours=23:00–08:00
+```
 
-- Control and system-critical messages are evaluated before social sleep gates.
-- System errors, security/service alerts, explicit reminders, Email Watchdog,
-  control commands, and business-critical notices remain hard-exempt.
-- User silence may produce at most one mild probabilistic affective pulse per
-  silence episode; it must not become repetitive escalation.
-- Task-state wording requires fresh structured evidence.
-- Weather wording must not claim a robot location or bodily sensation.
-- Provider secrets stay with Hermes.
-- Production gateway restart, production source/config changes, and real
-  message delivery require explicit approval.
+Quality enforcement is live when the managed environment exports `enforce`.
+Circadian and dynamic sleep/quiet remain shadow/observe-only. The dual-key
+isolated delivery enforcement guard is test-only and must not be represented as
+production readiness.
 
-## Lifecycle
+Weather is optional. Without confirmed location, keep it disabled. When
+network-assisted discovery was explicitly requested, Hermes may ask one natural
+question in the existing chat to confirm, correct, or decline the suggested
+district/county-level area. Never block installation waiting for that reply.
+
+## Verify
 
 ```bash
-scripts/hermes-alive-lifecycle install
-scripts/hermes-alive-lifecycle configure
-scripts/hermes-alive-lifecycle verify
+bash scripts/verify.sh
+```
+
+Require:
+
+```text
+HERMES_ALIVE_LIFECYCLE_VERIFY_RESULT=PASS
+```
+
+Verification must check source and active-hook parity, compilation, manifest,
+managed configuration, Provider readiness, and safe permissions.
+
+## Runtime controls
+
+From the installed skill root:
+
+```bash
 scripts/hermes-alive-lifecycle status
-scripts/hermes-alive-lifecycle uninstall
-scripts/hermes-alive-lifecycle purge
+python3 hooks/alive_control.py status
+python3 hooks/alive_control.py disable
+python3 hooks/alive_control.py enable
+python3 scripts/logs.py --tail 20
 ```
 
-- `install` and upgrades are transactional and restore the previous source/hook
-  when validation fails.
-- `uninstall` removes source, active hook, and managed configuration while
-  preserving learning/runtime state.
-- `purge` removes all Hermes Alive-owned shared state and is destructive.
+`alive_control.py test` queues a real delivery request. Do not run it without
+explicit approval to send a real message.
 
-## Source layout
+Do not manually edit runtime JSON to reset unanswered state. The raw ignored
+count is evidence, not a fixed on/off switch.
 
-```text
-skills/hermes-alive/
-├── SKILL.md
-├── LICENSE
-├── hooks/
-├── scripts/
-├── templates/
-├── tests/
-└── docs/
-```
+## Uninstall
 
-The active hook is installed at `/opt/data/hooks/hermes-alive`. Persistent state
-lives under `/opt/data/hermes_alive_shared` by default and must not be stored in
-the source directory.
-
-## Validation
+Preserve learning/runtime state:
 
 ```bash
-cd /opt/data/skills/hermes/hermes-alive
-bash tests/run_all.sh
+bash scripts/uninstall.sh
 ```
 
-Final production consideration additionally requires a fresh-container install
-from the real GitHub repository, Provider/personalization onboarding, full
-matrix and default-scale stress tests, lifecycle and persistence checks, an
-approved spare-WeChat end-to-end test, and clean uninstall/purge verification.
+Require:
 
-## Documentation
+```text
+HERMES_ALIVE_LIFECYCLE_UNINSTALL_OK
+shared_state_preserved=true
+```
 
-- `docs/ARCHITECTURE.md`
-- `docs/RUNTIME_POLICIES.md`
-- `docs/LIFECYCLE_AND_PERSISTENCE.md`
-- `docs/DATA_AND_PRIVACY.md`
-- `docs/TESTING_AND_ACCEPTANCE.md`
-- `docs/DISCOVERY_DEVELOPMENT.md`
-- `tests/TESTING.md`
+Remove all Hermes Alive-owned shared state:
 
-## Implementation constraints
+```bash
+bash scripts/uninstall.sh --purge
+```
 
-- Hook modules are loaded flat; use absolute imports between hook files.
-- Required hook events are `gateway:startup`, `session:start`, and `agent:end`.
-- Runtime state paths must honor `HERMES_ALIVE_SHARED_DIR`.
-- Proactive model-authored messages use `is_system=false` and carry the resolved
-  model through all footer metadata fields.
-- Startup-ready notifications belong to `hermes-wechat-enhance`, not Hermes
-  Alive.
-- Optional Playwright discovery is outside the core lifecycle contract and must
-  use a persistent browser path when enabled in containers.
+Require:
+
+```text
+HERMES_ALIVE_LIFECYCLE_PURGE_OK
+shared_state_preserved=false
+```
+
+`purge` is destructive.
+
+## Safety and release gates
+
+- Never modify Hermes Core or `weixin.py`.
+- Never modify or restart production without explicit approval.
+- Never send real WeChat messages without explicit approval.
+- A failed `SendResult` is not a delivery.
+- Model-authored messages must retain the routed model in footer metadata.
+- Run complete regression, fresh-container lifecycle, persistence, uninstall,
+  reinstall, and purge gates before repository release.
+- Isolated acceptance is not final production completion.
+- Complete repository transport, real GitHub URL installation, spare-WeChat E2E,
+  controlled production deployment, restart persistence, and stability
+  observation remain separate gates.

@@ -2,6 +2,9 @@
 # Marker: ALIVE_STATE_ENGINE_V1
 # Marker: HERMES_ALIVE_CONTEXT_FRESHNESS_V2
 # Marker: HERMES_ALIVE_SENT_EVENT_WINDOW_FIX_V2
+# Marker: HERMES_ALIVE_INTERACTION_EVIDENCE_V1
+# Marker: HERMES_ALIVE_ORDINARY_INBOUND_NOT_DIRECT_RESET_V1
+# Marker: HERMES_ALIVE_CONTINUE_CONTEXT_EXCLUSION_V1
 
 from __future__ import annotations
 
@@ -50,11 +53,20 @@ def now_iso() -> str:
 def _empty_state() -> dict[str, Any]:
     ts = now_iso()
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "last_updated_at": ts,
         "last_user_reply_at": None,
         "last_proactive_at": None,
         "ignored_proactive_count": 0,
+        "interaction_evidence": {
+            "unanswered_pressure": 0.0,
+            "presence_signal": 0.0,
+            "engagement_signal": 0.5,
+            "last_inbound_kind": "none",
+            "last_inbound_at": None,
+            "last_reply_quality": 0.0,
+            "observed_proactive_count_since_inbound": 0,
+        },
         "recent_openers": [],
         "recent_speech_acts": [],
         "mood": {
@@ -152,15 +164,41 @@ def _read_proactive_records(limit: int = 80) -> list[dict[str, Any]]:
     return records
 
 
-def _last_user_ts(messages: list[dict[str, Any]]) -> float | None:
+def _message_content(message: dict[str, Any]) -> str:
+    return str(
+        message.get("content_snippet")
+        or message.get("content")
+        or message.get("text")
+        or ""
+    ).strip()
+
+
+def _is_control_message(text: str) -> bool:
+    return str(text or "").strip().startswith("/")
+
+
+def _latest_real_user_message(
+    messages: list[dict[str, Any]],
+) -> tuple[dict[str, Any] | None, float | None, str]:
     for msg in reversed(messages):
-        if not isinstance(msg, dict):
+        if not isinstance(msg, dict) or msg.get("role") != "user":
             continue
-        if msg.get("role") == "user":
-            ts = _parse_ts(msg.get("timestamp") or msg.get("time") or msg.get("created_at"))
-            if ts is not None:
-                return ts
-    return None
+        content = _message_content(msg)
+        if not content or _is_control_message(content):
+            continue
+        ts = _parse_ts(
+            msg.get("timestamp")
+            or msg.get("time")
+            or msg.get("created_at")
+        )
+        if ts is not None:
+            return msg, ts, content
+    return None, None, ""
+
+
+def _last_user_ts(messages: list[dict[str, Any]]) -> float | None:
+    _, timestamp, _ = _latest_real_user_message(messages)
+    return timestamp
 
 
 def _last_proactive_ts(records: list[dict[str, Any]]) -> float | None:
@@ -330,10 +368,157 @@ def _recent_speech_acts(records: list[dict[str, Any]]) -> list[str]:
     return vals[-MAX_RECENT:]
 
 
+
+def _reply_quality(text: str) -> float:
+    value = str(text or "").strip()
+    if not value:
+        return 0.0
+    length = len(value)
+    quality = 0.18
+    if length >= 4:
+        quality += 0.10
+    if length >= 12:
+        quality += 0.16
+    if length >= 40:
+        quality += 0.14
+    if re.search(r"[?？]|为什么|怎么|如何|你觉得|我觉得|可以|继续|帮我", value):
+        quality += 0.18
+    if re.search(r"^(嗯|哦|行|好|知道了|收到)[。.!！]?$", value):
+        quality = min(quality, 0.24)
+    return max(0.0, min(1.0, quality))
+
+
+def _elapsed_seconds(prev: dict[str, Any]) -> float:
+    previous = _parse_ts(prev.get("last_updated_at"))
+    if previous is None:
+        return 0.0
+    return max(0.0, time.time() - previous)
+
+
+def _derive_interaction_evidence(
+    *,
+    prev: dict[str, Any],
+    raw_ignored: int,
+    last_user_ts: float | None,
+    last_user_text: str,
+) -> dict[str, Any]:
+    previous = prev.get("interaction_evidence")
+    if not isinstance(previous, dict):
+        previous = {}
+
+    try:
+        fallback = min(
+            1.0,
+            int(prev.get("ignored_proactive_count") or 0) / 4.0,
+        )
+        pressure = max(
+            0.0,
+            min(
+                1.0,
+                float(previous.get("unanswered_pressure", fallback)),
+            ),
+        )
+    except Exception:
+        pressure = 0.0
+
+    elapsed = _elapsed_seconds(prev)
+    if elapsed > 0:
+        pressure *= 0.5 ** (elapsed / (18.0 * 3600.0))
+
+    try:
+        observed = max(
+            0,
+            int(
+                previous.get(
+                    "observed_proactive_count_since_inbound",
+                    0,
+                )
+            ),
+        )
+    except Exception:
+        observed = 0
+
+    previous_inbound_ts = _parse_ts(previous.get("last_inbound_at"))
+    new_inbound = bool(
+        last_user_ts is not None
+        and (
+            previous_inbound_ts is None
+            or last_user_ts > previous_inbound_ts
+        )
+    )
+
+    reply_quality = 0.0
+    if new_inbound:
+        reply_quality = _reply_quality(last_user_text)
+        pressure *= max(0.30, 0.92 - 0.55 * reply_quality)
+        observed = 0
+
+    new_unanswered_events = max(0, raw_ignored - observed)
+    if new_unanswered_events:
+        pressure = min(
+            1.0,
+            pressure
+            + 0.17 * new_unanswered_events
+            + 0.025 * max(0, new_unanswered_events - 1),
+        )
+
+    try:
+        old_presence = float(previous.get("presence_signal", 0.0))
+    except Exception:
+        old_presence = 0.0
+    try:
+        old_engagement = float(previous.get("engagement_signal", 0.5))
+    except Exception:
+        old_engagement = 0.5
+
+    presence = (
+        1.0
+        if new_inbound
+        else max(0.0, min(1.0, old_presence * 0.96))
+    )
+    engagement = (
+        reply_quality
+        if new_inbound
+        else max(0.0, min(1.0, old_engagement * 0.985))
+    )
+
+    return {
+        "unanswered_pressure": round(
+            max(0.0, min(1.0, pressure)),
+            4,
+        ),
+        "presence_signal": round(presence, 4),
+        "engagement_signal": round(engagement, 4),
+        "last_inbound_kind": (
+            "ordinary_user_message"
+            if new_inbound
+            else str(previous.get("last_inbound_kind") or "none")
+        ),
+        "last_inbound_at": (
+            _iso_from_ts(last_user_ts)
+            if new_inbound
+            else previous.get("last_inbound_at")
+        ),
+        "last_reply_quality": round(
+            reply_quality
+            if new_inbound
+            else float(
+                previous.get("last_reply_quality", 0.0)
+                or 0.0
+            ),
+            4,
+        ),
+        "observed_proactive_count_since_inbound": int(raw_ignored),
+        "new_inbound_evidence": bool(new_inbound),
+        "direct_reset_applied": False,
+    }
+
 def _derive_mood(
     *,
     prev: dict[str, Any],
     ignored: int,
+    unanswered_pressure: float,
+    reply_quality: float,
     flow: str,
     focus_lock: bool,
     user_replied_after_ignored: bool,
@@ -351,14 +536,28 @@ def _derive_mood(
     for key, base in baseline.items():
         mood[key] = _clamp(mood[key] * 0.75 + base * 0.25)
 
-    if ignored > 0:
-        mood["annoyance"] = _clamp(mood["annoyance"] + min(45, ignored * 12))
-        mood["boredom"] = _clamp(mood["boredom"] + min(35, ignored * 9))
-        mood["affection"] = _clamp(mood["affection"] - min(12, ignored * 2))
+    evidence = max(0.0, min(1.0, float(unanswered_pressure)))
+    if evidence > 0:
+        mood["annoyance"] = _clamp(
+            mood["annoyance"] + 32 * evidence
+        )
+        mood["boredom"] = _clamp(
+            mood["boredom"] + 25 * evidence
+        )
+        mood["affection"] = _clamp(
+            mood["affection"] - 8 * evidence
+        )
     if user_replied_after_ignored:
-        mood["annoyance"] = _clamp(mood["annoyance"] - 30)
-        mood["affection"] = _clamp(mood["affection"] + 12)
-        mood["boredom"] = _clamp(mood["boredom"] - 15)
+        quality = max(0.0, min(1.0, float(reply_quality)))
+        mood["annoyance"] = _clamp(
+            mood["annoyance"] - (6 + 18 * quality)
+        )
+        mood["affection"] = _clamp(
+            mood["affection"] + (3 + 9 * quality)
+        )
+        mood["boredom"] = _clamp(
+            mood["boredom"] - (4 + 10 * quality)
+        )
 
     if flow == "debug_flow":
         mood["pressure"] = _clamp(max(mood["pressure"], 76))
@@ -406,29 +605,51 @@ class AliveStateEngine:
             state["mood"] = _empty_state()["mood"]
         if not isinstance(state.get("current_context"), dict):
             state["current_context"] = _empty_state()["current_context"]
+        if not isinstance(state.get("interaction_evidence"), dict):
+            state["interaction_evidence"] = _empty_state()["interaction_evidence"]
         return state
 
     def snapshot(self, *, update: bool = True) -> dict[str, Any]:
         prev = self.read()
         messages = _context_messages()
         records = _read_proactive_records()
-        last_user_ts = _last_user_ts(messages)
+        _, last_user_ts, last_user_text = _latest_real_user_message(
+            messages
+        )
         last_proactive_ts = _last_proactive_ts(records)
         ignored_records = _sent_after(records, last_user_ts)
         ignored = len(ignored_records)
         flow, focus_lock, signals = _classify_flow(messages)
-        recovered = _user_replied_after_prev_ignored(prev, last_user_ts)
+        recovered = _user_replied_after_prev_ignored(
+            prev,
+            last_user_ts,
+        )
+        interaction_evidence = _derive_interaction_evidence(
+            prev=prev,
+            raw_ignored=ignored,
+            last_user_ts=last_user_ts,
+            last_user_text=last_user_text,
+        )
 
         state = _empty_state()
         state["last_updated_at"] = now_iso()
         state["last_user_reply_at"] = _iso_from_ts(last_user_ts)
         state["last_proactive_at"] = _iso_from_ts(last_proactive_ts)
         state["ignored_proactive_count"] = ignored
+        state["interaction_evidence"] = interaction_evidence
         state["recent_openers"] = _recent_openers(records)
         state["recent_speech_acts"] = _recent_speech_acts(records)
         state["mood"] = _derive_mood(
             prev=prev,
             ignored=ignored,
+            unanswered_pressure=float(
+                interaction_evidence.get("unanswered_pressure")
+                or 0.0
+            ),
+            reply_quality=float(
+                interaction_evidence.get("last_reply_quality")
+                or 0.0
+            ),
             flow=flow,
             focus_lock=focus_lock,
             user_replied_after_ignored=recovered,
@@ -447,7 +668,14 @@ class AliveStateEngine:
             "context_fresh": bool(signals.get("context_fresh")),
             "evidence_age_seconds": signals.get("evidence_age_seconds"),
             "user_replied_after_ignored": recovered,
-            "source": "alive_state_engine_v2",
+            "ordinary_inbound_direct_reset": False,
+            "unanswered_pressure": interaction_evidence.get(
+                "unanswered_pressure"
+            ),
+            "reply_quality": interaction_evidence.get(
+                "last_reply_quality"
+            ),
+            "source": "alive_state_engine_v3",
         }
 
         if update:
@@ -463,6 +691,17 @@ class AliveStateEngine:
         mood = state.get("mood", {})
         ctx = state.get("current_context", {})
         ignored = int(state.get("ignored_proactive_count") or 0)
+        evidence = (
+            state.get("interaction_evidence")
+            if isinstance(state.get("interaction_evidence"), dict)
+            else {}
+        )
+        unanswered_pressure = float(
+            evidence.get("unanswered_pressure") or 0.0
+        )
+        reply_quality = float(
+            evidence.get("last_reply_quality") or 0.0
+        )
         acts = state.get("recent_speech_acts") or []
         openers = state.get("recent_openers") or []
         flow = str(ctx.get("flow") or "idle")
@@ -472,7 +711,11 @@ class AliveStateEngine:
             "## Alive 状态 V1",
             f"- 当前场景：{flow}",
             f"- focus_lock：{'true' if focus_lock else 'false'}",
-            f"- ignored_proactive_count：{ignored}",
+            f"- ignored_proactive_count（原始观测）：{ignored}",
+            f"- unanswered_pressure（关系证据，不是开关）：{unanswered_pressure:.3f}",
+            f"- last_reply_quality：{reply_quality:.3f}",
+            "- 普通入站是新证据，不会机械清零关系状态。",
+            "- /continue 与其他控制命令不更新关系 context token。",
             "- mood："
             + f" energy={mood.get('energy', 50)}, boredom={mood.get('boredom', 20)}, "
             + f"annoyance={mood.get('annoyance', 0)}, affection={mood.get('affection', 65)}, "
@@ -484,13 +727,14 @@ class AliveStateEngine:
         if acts:
             lines.append("- 最近 speech_act：" + " / ".join(str(x) for x in acts[-6:]))
 
-        if ignored >= 2:
-            lines.append("- 用户已连续两次未回应主动消息：本轮必须沉默。")
-        elif ignored >= 1:
+        if unanswered_pressure > 0:
             lines.append(
-                "- 上一次主动消息未获回应：旧话题已过期。"
-                "禁止继续猜测用户正在 debug、工作、硬扛或处理任务；"
-                "只有新的高价值外部内容才允许再次主动，否则沉默。"
+                "- 存在未回应证据。是否说话由人格、情绪、关系温度、"
+                "时间与新话题价值共同决定，禁止使用固定次数开关。"
+            )
+        if ignored >= 1:
+            lines.append(
+                "- 旧主动话题不得追问或施压。若开启新话题，必须有独立价值。"
             )
         elif flow == "debug_flow":
             lines.append(

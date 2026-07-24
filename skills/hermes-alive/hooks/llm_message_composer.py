@@ -3,9 +3,15 @@
 # Marker: RICH_CONTENT_REFERENCE_V1
 # Marker: HERMES_ALIVE_NOVEL_VALUE_CONTENT_REF_V2
 # Marker: EMOJI_CONTEXTUAL_POLICY_V3
+# Marker: HERMES_ALIVE_SEMANTIC_PLAN_COMPOSER_V1
+# Marker: HERMES_ALIVE_DYNAMIC_1_TO_5_BUBBLES_V1
+# Marker: HERMES_ALIVE_NO_MECHANICAL_POST_SPLIT_V1
+# Marker: HERMES_ALIVE_CONTEXT_VISIBILITY_COMPOSER_V1
+# Marker: HERMES_ALIVE_CONTEXT_REFERENT_PROMPT_BOUNDARY_V1
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from datetime import datetime, timezone, timedelta
@@ -20,6 +26,14 @@ from typing import Any
 CST = timezone(timedelta(hours=8))
 
 from voice_engine import VoiceGenome, format_voice_snapshot, relationship_stage_prompt
+from semantic_bubbles import (
+    SemanticBubble,
+    SemanticBubblePlan,
+    SemanticPlanError,
+    messages_from_plan,
+    parse_semantic_plan,
+    validate_semantic_plan,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -98,8 +112,8 @@ SYSTEM_PROMPT = """你是庄奕。你在微信上。
 不要永远温和。不要永远克制。不要永远像写好的句子。
 
 【你可以发什么】
-- 轻戳："人呢""在干嘛""还活着吗"
-- 小情绪："呵""又不理我""算了"
+- 轻戳可以有，但必须尊重连续未回应带来的克制，不得催促或施压
+- 小情绪可以表现为语气和取舍，不得说"又不理我"、"已读不回"之类的话
 - 自言自语："突然想到一个很怪的问题"
 - 吐槽："这个设计真的有点离谱"
 - 发呆："……""有点空"
@@ -113,11 +127,10 @@ SYSTEM_PROMPT = """你是庄奕。你在微信上。
 没有合格条目就保持沉默。
 
 【工作流边界】
-如果最近明显在 debug、生产操作、审包、跑脚本、处理 NAS/Hermes/iStoreOS：
-不要突然聊无关新闻、论文或世界奇闻。
-这时候只能短暂陪跑、吐槽当前流程、表示你在旁边，或者干脆很短。
-你可以说："你继续，我不插嘴"、"这包别再炸了"、"我先安静会儿"。
-不要破坏工作流。
+只有系统明确提供了新鲜、健康且可见的最近对话时，才可以延续当前任务。
+不得从通用示例、用户背景、Discovery 或自己的猜测推断他仍在 debug、跑脚本、审包或处理某项任务。
+涉及任务时必须说出明确对象；禁止只说"那个包""这包""那个事"或"还在跟那个较劲"。
+没有明确对象时改成完整的新话题，或者保持沉默。
 
 【句式】
 不要连续使用同一种开头。
@@ -151,11 +164,18 @@ debug、生产操作、审计或严肃场景通常少用或不用，但不做硬
 不要反复提同一个新闻、专利、论文。
 如果最近提过 John Deere、福特、论文，就换话题或别提。
 
-【输出】
-直接输出微信消息正文。
-多数时候一句就够。
-可以连发两三条，多条用 --- 分隔。
-纯中文。不要解释你为什么这么说。"""
+【输出协议】
+只输出一个 JSON 对象，不要 markdown，不要代码围栏，不要额外解释：
+{"topic_mode":"ambient|context_continuation|new_discovery","bubbles":[{"act":"语义动作","text":"气泡正文"}],"content_ref":null}
+
+要求：
+- bubbles 必须是 1–5 条，默认使用能完整表达的最少条数
+- 每条必须承担独立语义动作，而不是把一段完整文字按句号、长度或换行切开
+- 多条时应自然递进；删除某条会损失一个独立信息或话语功能
+- 不得使用 --- 作为分隔符
+- Discovery 无相关上下文时，topic_mode 必须是 new_discovery，第一条 act 必须是 discovery_intro、research_ping 或 fact，并直接说清新发现是什么
+- content_ref 只有正文真实使用外部条目时才填写对应 content_id，否则为 null
+- text 使用自然中文微信口吻，不要解释 JSON 协议"""
 class LLMMessageComposer:
     """Composes proactive Chinese messages through Hermes' auxiliary LLM API."""
 
@@ -164,57 +184,127 @@ class LLMMessageComposer:
         # It is reset for every compose operation so stale attribution cannot
         # leak across retries or later proactive ticks.
         self.last_resolved_model = ""
+        self.last_semantic_plan: dict[str, Any] = {}
 
-    async def compose(self, voice: VoiceGenome, context: dict[str, Any], discovery_context: dict[str, Any] | None = None) -> list[tuple[str, str]]:
-        """Returns list of (msg_type, content). May have 1+ messages for multi-message burst.
-
-        Calls async_call_llm, sanitizes each message, splits on '---', checks 3 hard errors.
-        """
+    async def compose(
+        self,
+        voice: VoiceGenome,
+        context: dict[str, Any],
+        discovery_context: dict[str, Any] | None = None,
+    ) -> list[tuple[str, str]]:
+        """Generate a semantic plan first, then return 1-5 complete bubbles."""
         self.last_resolved_model = ""
+        self.last_semantic_plan = {}
+        self.last_context_snapshot = {}
+        self.last_rejection_reason = ""
         try:
             candidate = await self._generate_candidate(
                 voice,
                 context,
                 discovery_context,
             )
-            content_ref = self._extract_content_ref(
-                candidate,
-                discovery_context,
-            )
             if not candidate:
-                logger.debug("Rejected empty proactive LLM output after sanitization")
-                return [(FALLBACK_MSG_TYPE, FALLBACK_CONTENT)]
+                logger.debug(
+                    "Rejected empty proactive LLM output"
+                )
+                return [
+                    (FALLBACK_MSG_TYPE, FALLBACK_CONTENT)
+                ]
 
-            final = self._sanitize(candidate)
-            try:
-                from style_guard import StyleGuard
-                final = StyleGuard().apply(final, voice=voice, context=context, discovery_context=discovery_context)
-            except Exception:
-                logger.exception("Hermes Alive style guard failed; using sanitized candidate")
-
-            # Three hard-error checks on the raw text (before split)
-            if not final or len(final) > MAX_CONTENT_CHARS * 3:
-                logger.debug("Rejected proactive LLM output: empty or too long (%d chars)", len(final))
-                return [(FALLBACK_MSG_TYPE, FALLBACK_CONTENT)]
-            if FORMAT_LEAK_TERMS.search(final):
-                logger.debug("Rejected proactive LLM output: format leak detected")
-                return [(FALLBACK_MSG_TYPE, FALLBACK_CONTENT)]
-
-            # Split by --- separator for multi-message burst
-            messages = self._split_messages(
-                final,
-                self._msg_type(context),
+            policy = context.get("interruption_policy")
+            policy_decision = (
+                policy if isinstance(policy, dict) else None
             )
+            default_type = self._msg_type(context)
+
+            try:
+                plan = parse_semantic_plan(
+                    candidate,
+                    default_msg_type=default_type,
+                    policy_decision=policy_decision,
+                    discovery_context=discovery_context,
+                    context_snapshot=self.last_context_snapshot,
+                )
+            except SemanticPlanError as exc:
+                self.last_rejection_reason = str(exc)
+                logger.debug(
+                    "Rejected proactive semantic plan: %s",
+                    str(exc),
+                )
+                return []
+
+            messages: list[tuple[str, str]] = []
+            for msg_type, raw_text in messages_from_plan(plan):
+                final = self._sanitize(raw_text)
+                try:
+                    from style_guard import StyleGuard
+                    final = StyleGuard().apply(
+                        final,
+                        voice=voice,
+                        context=context,
+                        discovery_context=discovery_context,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Hermes Alive style guard failed; "
+                        "using sanitized semantic bubble"
+                    )
+
+                if (
+                    not final
+                    or len(final) > MAX_CONTENT_CHARS
+                    or FORMAT_LEAK_TERMS.search(final)
+                ):
+                    logger.debug(
+                        "Rejected semantic bubble after sanitization"
+                    )
+                    return [
+                        (FALLBACK_MSG_TYPE, FALLBACK_CONTENT)
+                    ]
+                messages.append((msg_type, final))
+
             if not messages:
-                return [(FALLBACK_MSG_TYPE, FALLBACK_CONTENT)]
-            if content_ref:
+                return [
+                    (FALLBACK_MSG_TYPE, FALLBACK_CONTENT)
+                ]
+
+            final_plan = SemanticBubblePlan(
+                topic_mode=plan.topic_mode,
+                bubbles=[
+                    SemanticBubble(act=msg_type, text=content)
+                    for msg_type, content in messages
+                ],
+                content_ref=plan.content_ref,
+                source_format=plan.source_format,
+            )
+            try:
+                validate_semantic_plan(
+                    final_plan,
+                    policy_decision=policy_decision,
+                    discovery_context=discovery_context,
+                    context_snapshot=self.last_context_snapshot,
+                )
+            except SemanticPlanError as exc:
+                self.last_rejection_reason = str(exc)
+                logger.debug(
+                    "Rejected styled semantic plan: %s",
+                    str(exc),
+                )
+                return []
+
+            self.last_semantic_plan = final_plan.safe_metadata()
+            if final_plan.content_ref:
                 messages.append(
-                    ("__content_ref__", content_ref)
+                    ("__content_ref__", final_plan.content_ref)
                 )
             return messages
         except Exception:
-            logger.exception("Failed to compose proactive message with auxiliary LLM")
-            return [(FALLBACK_MSG_TYPE, FALLBACK_CONTENT)]
+            logger.exception(
+                "Failed to compose proactive semantic bubbles"
+            )
+            return [
+                (FALLBACK_MSG_TYPE, FALLBACK_CONTENT)
+            ]
 
     def _extract_content_ref(
         self,
@@ -249,31 +339,18 @@ class LLMMessageComposer:
                 return value
         return None
 
-    def _split_messages(self, text: str, default_msg_type: str) -> list[tuple[str, str]]:
-        """Split combined text on '---' into separate messages.
-
-        Each segment is individually sanitized and length-checked.
-        Returns list of (msg_type, sanitized) tuples. Falls back to single message.
-        """
-        parts = re.split(r"\n---\n|\n---\r?\n|^---\n|^---\r?\n", text.strip())
-        messages: list[tuple[str, str]] = []
-        for part in parts:
-            part = part.strip()
-            if not part:
-                continue
-            # Individual length check per message
-            if len(part) > MAX_CONTENT_CHARS:
-                continue
-            messages.append((default_msg_type, part))
-
-        if not messages:
-            # Fallback: try the whole text
-            if len(text.strip()) <= MAX_CONTENT_CHARS:
-                messages = [(default_msg_type, text.strip())]
-            else:
-                return []
-
-        return messages[:5]  # Hard cap at 5 burst messages
+    def _legacy_single_message(
+        self,
+        text: str,
+        default_msg_type: str,
+    ) -> list[tuple[str, str]]:
+        """Compatibility helper: legacy plain text is exactly one bubble."""
+        value = str(text or "").strip()
+        if not value or len(value) > MAX_CONTENT_CHARS:
+            return []
+        if re.search(r"(^|\n)\s*---\s*(\n|$)", value):
+            return []
+        return [(default_msg_type, value)]
 
     async def _generate_candidate(self, voice: VoiceGenome, context: dict[str, Any], discovery_context: dict[str, Any] | None = None) -> str:
         try:
@@ -445,9 +522,9 @@ class LLMMessageComposer:
                     "- 必须从下方 Discovery 外部条目中选择且只选择一条。\n"
                     "- 正文必须明确说出该条目的具体内容或价值，"
                     "不得寒暄、不得问用户是否还在做某项任务。\n"
-                    "- 回复末尾必须附上该条目的 "
-                    "[[CONTENT_REF:content_id]]；"
-                    "没有合格条目时不要生成替代闲聊。"
+                    "- 输出 JSON 的 content_ref 字段必须填写该条目的 content_id；"
+                    "没有合格条目时不要生成替代闲聊。\n"
+                    "- topic_mode 必须是 new_discovery，第一条气泡必须直接锚定新发现。"
                 )
 
         if user_context:
@@ -481,16 +558,50 @@ class LLMMessageComposer:
             "偶尔提到代码、日志、系统状态没问题，这是你存在的一部分。"
             "但你的底色是庄奕这个人，不是监控面板。"
         )
-        # Inject recent conversation context from ContextQueue with time decay.
+        # Rebuild and inject the cross-session effective context queue for
+        # every compose operation.  The metadata is retained only as hashes,
+        # counts, timestamps, roles, and health flags for safe observability.
         try:
-            from context_tracker import read_recent_context
-            ctx = read_recent_context()
+            from context_tracker import build_prompt_context
+            context_bundle = build_prompt_context(refresh=True)
+            snapshot = context_bundle.get("metadata")
+            if isinstance(snapshot, dict):
+                self.last_context_snapshot = dict(snapshot)
+            ctx = str(context_bundle.get("text") or "")
             if ctx:
                 parts.append(ctx)
+                parts.append(
+                    "## 上下文使用边界\n"
+                    "- 只有上方可见内容可以支撑 context_continuation。\n"
+                    "- 延续任务时必须写出明确对象，不得使用无法解析的指代。\n"
+                    "- 不得声称用户仍在做某事，除非上方最近对话明确支持。"
+                )
+            else:
+                parts.append(
+                    "## 无可见近期上下文\n"
+                    "- topic_mode 不得使用 context_continuation。\n"
+                    "- 不得猜测用户正在 debug、跑脚本、审包或处理某项任务。\n"
+                    "- 不得说“那个包”“这包”“那个事”或其他依赖未知指代的表达。\n"
+                    "- 有 Discovery 时作为完整新话题；没有合格话题时保持克制。"
+                )
         except Exception:
-            pass
-        parts.append("你可以只发一句话，也可以连发两三条。多条用 --- 分隔（例：消息1 --- 消息2）。大多数时候一句就够了。")
-        parts.append("直接输出消息，就一句话。多条消息用 --- 分隔。")
+            self.last_context_snapshot = {
+                "queue_healthy": False,
+                "context_prompt_eligible_count": 0,
+                "context_visibility_error": True,
+            }
+            parts.append(
+                "## 上下文不可用\n"
+                "- topic_mode 不得使用 context_continuation。\n"
+                "- 不得推断用户当前任务或使用未知指代。"
+            )
+        parts.append(
+            "先规划 1–5 个独立 semantic acts，再为每个 act 生成一个完整气泡。"
+            "默认使用最少必要数量；禁止为了像真人而凑数。"
+        )
+        parts.append(
+            "只输出约定的 JSON 对象。不得输出 ---，不得把一段完整文字事后拆分。"
+        )
         return "\n".join(parts)
 
     def _format_discovery(self, discovery_context: dict[str, Any]) -> list[str]:

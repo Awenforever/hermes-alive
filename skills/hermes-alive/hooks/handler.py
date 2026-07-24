@@ -1,5 +1,6 @@
 
 """Hermes Alive hook event dispatcher."""
+# Marker: HERMES_ALIVE_CONTEXT_ACTIVITY_LEASE_BRIDGE_V1
 
 from __future__ import annotations
 
@@ -90,7 +91,7 @@ async def _startup(context: dict):
 async def _on_session_start(context: dict):
     try:
         from context_tracker import set_session_busy
-        set_session_busy()
+        set_session_busy(context if isinstance(context, dict) else {})
         logger.debug("Hermes Alive activity guard marked session busy")
     except Exception:
         logger.exception("Failed to mark session busy")
@@ -109,7 +110,7 @@ async def _on_session_start(context: dict):
 async def _on_agent_end(context: dict):
     try:
         from context_tracker import set_session_idle
-        set_session_idle()
+        set_session_idle(context if isinstance(context, dict) else {})
         logger.debug("Hermes Alive activity guard marked session idle")
     except Exception:
         logger.exception("Failed to mark session idle")
