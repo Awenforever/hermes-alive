@@ -223,7 +223,7 @@ def main() -> int:
     match = re.search(r"^version:\s*([^\s]+)\s*$", skill_text, re.MULTILINE)
     skill_version = match.group(1) if match else ""
 
-    if version != "2.4.2":
+    if version != "2.4.3":
         errors.append(f"unexpected_version:{version}")
     if metadata.get("version") != version:
         errors.append("metadata_version_mismatch")
@@ -237,6 +237,19 @@ def main() -> int:
         errors.append("production_deployed_claim")
     if metadata.get("real_wechat_e2e_completed") is not False:
         errors.append("real_wechat_claim")
+    if metadata.get("production_feature_enforcement_readiness") != (
+        "ISOLATED_ACCEPTANCE_COMPLETE_PRODUCTION_UPGRADE_PENDING"
+    ):
+        errors.append("production_enforcement_readiness")
+    runtime_modes = metadata.get("runtime_modes") or {}
+    if runtime_modes.get("quality_governor") != "enforce":
+        errors.append("runtime_quality_governor")
+    if runtime_modes.get("circadian") != "live":
+        errors.append("runtime_circadian")
+    if runtime_modes.get("dynamic_sleep_quiet") != "live_enforce":
+        errors.append("runtime_dynamic_sleep_quiet")
+    if runtime_modes.get("isolated_delivery_enforcement") != "test_only":
+        errors.append("runtime_isolated_enforcement")
 
     for rel in DOCS:
         path = root / rel

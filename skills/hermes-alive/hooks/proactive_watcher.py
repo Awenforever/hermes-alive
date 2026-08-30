@@ -8,6 +8,7 @@
 # Marker: RICH_CONTENT_REFERENCE_V1
 # Marker: HERMES_ALIVE_CIRCADIAN_WATCHER_SHADOW_V1
 # Marker: HERMES_ALIVE_CIRCADIAN_SLEEP_QUIET_POLICY_SHADOW_V1
+# Marker: HERMES_ALIVE_CIRCADIAN_SLEEP_QUIET_PRODUCTION_ENFORCEMENT_V1
 # Marker: HERMES_ALIVE_PROACTIVE_QUALITY_GOVERNOR_SHADOW_V1
 # Marker: HERMES_ALIVE_ISOLATED_DELIVERY_ENFORCEMENT_V1
 # Marker: HERMES_ALIVE_DISCOVERY_REFRESH_DECOUPLING_V2
@@ -162,11 +163,18 @@ class ProactivePlatformWatcher:
             message_class="proactive_social",
         )
         if circadian_decision is not None:
+            circadian_live = (
+                str(circadian_decision.get("integration_mode") or "")
+                == "enforce"
+            )
             self._log(
-                "circadian_shadow",
+                "circadian_enforcement" if circadian_live else "circadian_shadow",
                 tick_id=tick_id,
-                integration_mode="observe_only",
-                behavior_changed=False,
+                integration_mode=str(
+                    circadian_decision.get("integration_mode") or "observe_only"
+                ),
+                watcher_enforced=bool(circadian_decision.get("watcher_enforced")),
+                behavior_changed=bool(circadian_decision.get("behavior_changed")),
                 circadian=circadian_decision,
             )
 
@@ -175,13 +183,54 @@ class ProactivePlatformWatcher:
             message_class="proactive_social",
         )
         if sleep_quiet_decision is not None:
+            sleep_live = (
+                str(sleep_quiet_decision.get("integration_mode") or "")
+                == "enforce"
+            )
             self._log(
-                "sleep_quiet_policy_shadow",
+                (
+                    "sleep_quiet_policy_enforcement"
+                    if sleep_live
+                    else "sleep_quiet_policy_shadow"
+                ),
                 tick_id=tick_id,
-                integration_mode="observe_only",
-                behavior_changed=False,
+                integration_mode=str(
+                    sleep_quiet_decision.get("integration_mode")
+                    or "observe_only"
+                ),
+                watcher_enforced=bool(
+                    sleep_quiet_decision.get("watcher_enforced")
+                ),
+                behavior_changed=bool(
+                    sleep_quiet_decision.get("behavior_changed")
+                ),
                 sleep_quiet_policy=sleep_quiet_decision,
             )
+
+        circadian_sleep_enforcement = (
+            self._circadian_sleep_precompose_enforcement(
+                sleep_quiet_decision,
+            )
+        )
+        if circadian_sleep_enforcement is not None:
+            self._log(
+                "circadian_sleep_quiet_enforcement",
+                tick_id=tick_id,
+                enforcement=circadian_sleep_enforcement,
+            )
+            if bool(circadian_sleep_enforcement.get("block")):
+                self._log(
+                    "skip",
+                    tick_id=tick_id,
+                    reason=str(
+                        (
+                            circadian_sleep_enforcement.get("reasons")
+                            or ["circadian_live_sleep_block"]
+                        )[0]
+                    ),
+                    circadian_sleep_enforcement=True,
+                )
+                return False
 
         voice = self._voice_state()
 
@@ -294,12 +343,23 @@ class ProactivePlatformWatcher:
             cooldown.set_mood_cooldown(social_urge)
             allowed, reason = cooldown.can_send("proactive")
             if not allowed:
-                quiet_override = self._isolated_legacy_quiet_override(
-                    sleep_quiet_decision,
-                ) if reason == "quiet_hours" else None
+                quiet_override = None
+                quiet_event = None
+                if reason == "quiet_hours":
+                    quiet_override = self._production_legacy_quiet_override(
+                        sleep_quiet_decision,
+                    )
+                    if quiet_override is not None:
+                        quiet_event = "circadian_live_legacy_quiet_override"
+                    else:
+                        quiet_override = self._isolated_legacy_quiet_override(
+                            sleep_quiet_decision,
+                        )
+                        if quiet_override is not None:
+                            quiet_event = "isolated_enforcement_legacy_quiet_override"
                 if quiet_override is not None and bool(quiet_override.get("override")):
                     self._log(
-                        "isolated_enforcement_legacy_quiet_override",
+                        quiet_event or "legacy_quiet_override",
                         tick_id=tick_id,
                         enforcement=quiet_override,
                     )
@@ -1267,29 +1327,89 @@ class ProactivePlatformWatcher:
                 self._circadian_engine = False
         return None if self._circadian_engine is False else self._circadian_engine
 
+    def _circadian_live_requested(self) -> bool:
+        mode = str(
+            os.getenv("HERMES_ALIVE_CIRCADIAN_MODE", "shadow")
+            or "shadow"
+        ).strip().lower()
+        enabled = str(
+            os.getenv("HERMES_ALIVE_CIRCADIAN_ENABLED", "true")
+            or "true"
+        ).strip().lower() not in {"0", "false", "no", "off"}
+        return enabled and mode == "live"
+
+    def _circadian_fail_closed_decision(
+        self,
+        *,
+        message_class: str,
+        reason: str,
+        error_type: str | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "engine": "circadian",
+            "schema_version": 1,
+            "enabled": True,
+            "mode": "live",
+            "shadow_only": False,
+            "message_class": str(message_class),
+            "hard_exempt": False,
+            "phase": "unknown",
+            "would_allow_proactive": False,
+            "would_block_proactive": True,
+            "reason": str(reason),
+            "state_integrity_ok": False,
+            "state_integrity_reason": str(reason),
+            "fail_closed": True,
+            "watcher_enforced": True,
+            "integration_mode": "enforce",
+            "behavior_changed": True,
+            "error_type": error_type,
+        }
+
     def _circadian_shadow_decision(
         self,
         *,
         message_class: str,
     ) -> dict[str, Any] | None:
+        # Historical helper name retained for test/API compatibility.
         engine = self._circadian()
         if engine is None:
+            if self._circadian_live_requested():
+                return self._circadian_fail_closed_decision(
+                    message_class=message_class,
+                    reason="circadian_engine_unavailable_fail_closed",
+                )
             return None
         try:
             decision = engine.shadow_decision(
                 message_class=message_class,
             )
             if not isinstance(decision, dict):
+                if self._circadian_live_requested():
+                    return self._circadian_fail_closed_decision(
+                        message_class=message_class,
+                        reason="circadian_decision_missing_fail_closed",
+                    )
                 return None
-            # This integration phase is observability-only even when a
-            # malformed external configuration says live. The decision is
-            # recorded, never enforced here.
             decision = dict(decision)
-            decision["watcher_enforced"] = False
-            decision["integration_mode"] = "observe_only"
+            live = (
+                bool(decision.get("enabled", True))
+                and str(decision.get("mode") or "").strip().lower() == "live"
+            )
+            decision["watcher_enforced"] = live
+            decision["integration_mode"] = "enforce" if live else "observe_only"
+            decision["behavior_changed"] = bool(
+                live and decision.get("would_block_proactive")
+            )
             return decision
-        except Exception:
-            logger.exception("Circadian shadow decision failed")
+        except Exception as exc:
+            logger.exception("Circadian decision failed")
+            if self._circadian_live_requested():
+                return self._circadian_fail_closed_decision(
+                    message_class=message_class,
+                    reason="circadian_decision_error_fail_closed",
+                    error_type=type(exc).__name__,
+                )
             return None
 
     def _sleep_quiet_policy_shadow_decision(
@@ -1298,28 +1418,133 @@ class ProactivePlatformWatcher:
         *,
         message_class: str,
     ) -> dict[str, Any] | None:
-        # HERMES_ALIVE_CIRCADIAN_SLEEP_QUIET_POLICY_SHADOW_V1
+        # Historical helper name retained for compatibility.
         if not isinstance(circadian_decision, dict):
-            return None
+            if self._circadian_live_requested():
+                circadian_decision = self._circadian_fail_closed_decision(
+                    message_class=message_class,
+                    reason="circadian_decision_missing_fail_closed",
+                )
+            else:
+                return None
         try:
-            from circadian_sleep_quiet_policy import evaluate_sleep_quiet_shadow
+            from circadian_sleep_quiet_policy import evaluate_sleep_quiet_policy
 
-            decision = evaluate_sleep_quiet_shadow(
+            decision = evaluate_sleep_quiet_policy(
                 circadian_decision,
                 message_class=message_class,
             )
             if not isinstance(decision, dict):
-                return None
-            # This phase is comparison-only. Existing CooldownManager quiet
-            # hours remain authoritative and this decision is never enforced.
-            decision = dict(decision)
-            decision["watcher_enforced"] = False
-            decision["integration_mode"] = "observe_only"
-            decision["behavior_changed"] = False
-            return decision
-        except Exception:
-            logger.exception("Circadian sleep/quiet shadow decision failed")
+                raise TypeError("sleep quiet policy did not return a dictionary")
+            return dict(decision)
+        except Exception as exc:
+            logger.exception("Circadian sleep/quiet decision failed")
+            if self._circadian_live_requested():
+                return {
+                    "engine": "circadian_sleep_quiet_policy",
+                    "schema_version": 2,
+                    "mode": "live",
+                    "shadow_only": False,
+                    "integration_mode": "enforce",
+                    "watcher_enforced": True,
+                    "behavior_changed": True,
+                    "message_class": str(message_class),
+                    "phase": "unknown",
+                    "hard_exempt": False,
+                    "state_integrity_ok": False,
+                    "fail_closed": True,
+                    "would_allow_dynamic": False,
+                    "would_block_dynamic": True,
+                    "dynamic_reason": "sleep_quiet_policy_error_fail_closed",
+                    "legacy_override": False,
+                    "error_type": type(exc).__name__,
+                }
             return None
+
+    def _circadian_sleep_precompose_enforcement(
+        self,
+        sleep_quiet_decision: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        if not self._circadian_live_requested():
+            return None
+        reasons: list[str] = []
+        hard_exempt = False
+        if not isinstance(sleep_quiet_decision, dict):
+            reasons.append("sleep_quiet_decision_missing_fail_closed")
+        else:
+            hard_exempt = bool(sleep_quiet_decision.get("hard_exempt"))
+            if hard_exempt:
+                reasons = []
+            elif str(sleep_quiet_decision.get("integration_mode") or "") != "enforce":
+                reasons.append("sleep_quiet_not_live_fail_closed")
+            elif bool(sleep_quiet_decision.get("would_block_dynamic")):
+                reasons.append(
+                    str(
+                        sleep_quiet_decision.get("dynamic_reason")
+                        or "dynamic_sleep_window"
+                    )
+                )
+            elif not bool(sleep_quiet_decision.get("would_allow_dynamic")):
+                reasons.append("sleep_quiet_unknown_allow_state_fail_closed")
+        return {
+            "enabled": True,
+            "mode": "live",
+            "stage": "precompose",
+            "block": bool(reasons),
+            "allow": not bool(reasons),
+            "reasons": reasons,
+            "hard_exempt": hard_exempt,
+            "watcher_enforced": True,
+            "behavior_changed": bool(reasons),
+            "fail_closed": any("fail_closed" in r for r in reasons),
+        }
+
+    def _production_legacy_quiet_override(
+        self,
+        sleep_quiet_decision: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        if not self._circadian_live_requested():
+            return None
+        if not isinstance(sleep_quiet_decision, dict):
+            return {
+                "engine": "circadian_live_legacy_quiet_override",
+                "enabled": True,
+                "override": False,
+                "reason": "sleep_quiet_decision_missing_fail_closed",
+                "watcher_enforced": True,
+                "fail_closed": True,
+            }
+        if str(sleep_quiet_decision.get("integration_mode") or "") != "enforce":
+            return {
+                "engine": "circadian_live_legacy_quiet_override",
+                "enabled": True,
+                "override": False,
+                "reason": "sleep_quiet_not_live_fail_closed",
+                "watcher_enforced": True,
+                "fail_closed": True,
+            }
+        hard_exempt = bool(sleep_quiet_decision.get("hard_exempt"))
+        dynamic_allow = bool(sleep_quiet_decision.get("would_allow_dynamic"))
+        dynamic_block = bool(sleep_quiet_decision.get("would_block_dynamic"))
+        override = bool((hard_exempt or dynamic_allow) and not dynamic_block)
+        return {
+            "engine": "circadian_live_legacy_quiet_override",
+            "enabled": True,
+            "override": override,
+            "reason": (
+                "hard_exempt"
+                if hard_exempt
+                else "dynamic_awake_authoritative"
+                if override
+                else str(
+                    sleep_quiet_decision.get("dynamic_reason")
+                    or "dynamic_block_authoritative"
+                )
+            ),
+            "watcher_enforced": True,
+            "fail_closed": bool(dynamic_block),
+            "legacy_fixed_quiet_superseded": override,
+        }
 
     def _quality_enforcement_requested(self) -> bool:
         return (

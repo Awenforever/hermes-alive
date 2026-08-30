@@ -9,6 +9,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_proactive_quality_governor.py
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_location_weather_onboarding.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_joint_shadow_replay.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_isolated_enforcement.py"
+PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_production_enforcement.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_discovery_quality_pivot_v3.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_rich_content_model_attribution_v1.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_runtime_disable_contract.py"

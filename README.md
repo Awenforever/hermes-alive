@@ -35,8 +35,9 @@ message.
 The default configuration:
 
 - enables the live proactive quality governor;
-- keeps Circadian in `shadow`;
-- keeps dynamic Sleep/Quiet integration `observe_only`;
+- enables production Circadian `live` enforcement;
+- enables dynamic Sleep/Quiet live enforcement at the watcher pre-compose boundary;
+- keeps the isolated dual-key delivery-enforcement helper test-only;
 - leaves weather disabled until location is explicitly confirmed;
 - stores shared state under `$HERMES_HOME/hermes_alive_shared`.
 
@@ -53,18 +54,23 @@ isolated release gates.
 
 ## Release status
 
-This repository is a **candidate**, not a final production release. The current
-source and lifecycle have passed isolated acceptance, but the remaining path
-still includes:
+This repository is the **v2.4.3-rc.1 candidate**, not a final production
+deployment. The Circadian + Dynamic Sleep/Quiet production-enforcement patch
+has passed exact-base isolated acceptance in the current production image,
+including full regression, default-scale stress, persistence across container
+recreation, uninstall/reinstall, and purge/reinstall checks.
 
-1. bare-repository and Git bundle transport verification;
-2. installation from a real GitHub URL in a fresh container;
-3. spare-WeChat end-to-end testing with explicit approval;
-4. controlled production deployment and rollback;
-5. restart/persistence checks and stability observation.
+The remaining release path is deliberately separate:
 
-Circadian and dynamic Sleep/Quiet shadow components are not counted as
-production-enforced features.
+1. verify this repository candidate and Git bundle transport;
+2. publish the guarded `v2.4.3-rc.1` ref only after explicit approval;
+3. install from the real GitHub URL in a fresh isolated container;
+4. run spare-WeChat end-to-end acceptance with explicit approval;
+5. perform controlled production upgrade, rollback validation, and
+   post-restart persistence/real-path acceptance.
+
+The currently running production remains the previously accepted v2.4.2
+release until that upgrade path is completed.
 
 ## License
 

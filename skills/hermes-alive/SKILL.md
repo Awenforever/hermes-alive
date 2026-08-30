@@ -1,7 +1,7 @@
 ---
 name: hermes-alive
-description: "Gateway-native proactive companion with contextual discovery, live quality enforcement, Circadian shadow observation, and reversible lifecycle management."
-version: 2.4.2
+description: "Gateway-native proactive companion with contextual discovery, live quality enforcement, production Circadian sleep/quiet enforcement, and reversible lifecycle management."
+version: 2.4.3
 ---
 
 # Hermes Alive — Hermes Installation Contract
@@ -81,14 +81,17 @@ quality_governor_mode=enforce
 quality_topic_expiry_after_unanswered=1
 quality_silence_after_unanswered=2
 context_flow_max_age_seconds=3600
-circadian_mode=shadow
-fixed quiet hours=23:00–08:00
+circadian_mode=live
+legacy fixed quiet hours=23:00–08:00 (comparison/rollback fallback)
 ```
 
 Quality enforcement is live when the managed environment exports `enforce`.
-Circadian and dynamic sleep/quiet remain shadow/observe-only. The dual-key
-isolated delivery enforcement guard is test-only and must not be represented as
-production readiness.
+Circadian `live` makes dynamic sleep/quiet authoritative for proactive-social
+delivery: protected sleep phases block before composition, dynamic awake state
+may supersede the legacy fixed quiet window, and invalid live state fails
+closed. `shadow` remains an explicit observe-only rollback mode. The dual-key
+isolated delivery enforcement guard remains test-only and must not be represented
+as the production path.
 
 Weather is optional. Without confirmed location, keep it disabled. When
 network-assisted discovery was explicitly requested, Hermes may ask one natural

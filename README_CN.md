@@ -33,8 +33,9 @@ bootstrap 只调用技能生命周期，不修改 Hermes Core 或 `weixin.py`，
 默认配置会：
 
 - 启用实时主动质量治理；
-- 将 Circadian 保持为 `shadow`；
-- 将动态 Sleep/Quiet 保持为 `observe_only`；
+- 启用生产 Circadian `live` enforcement；
+- 在 watcher pre-compose 边界启用动态 Sleep/Quiet live enforcement；
+- 保持 isolated 双 key delivery-enforcement helper 仅用于测试；
 - 在位置未明确确认前关闭天气；
 - 将共享状态保存到 `$HERMES_HOME/hermes_alive_shared`。
 
@@ -49,15 +50,20 @@ bash scripts/portable-ci.sh
 
 ## 当前边界
 
-这是**仓库候选**，不是最终生产发布。后续仍需完成：
+这是 **v2.4.3-rc.1 仓库候选**，不是已经部署到生产的最终版本。
+Circadian + Dynamic Sleep/Quiet production-enforcement 补丁已经在当前生产
+镜像的全新隔离容器中通过精确基线验收，包括完整回归、默认规模 stress、
+容器重建持久化、卸载/重装以及 purge/重装。
 
-1. bare repository 与 Git bundle transport 验证；
-2. 从真实 GitHub URL 在全新容器安装；
-3. 经明确批准后使用备用微信做端到端验证；
-4. 受控生产部署与回滚；
-5. 重启、持久化和稳定运行观察。
+后续发布路径仍严格分离：
 
-Circadian 与动态 Sleep/Quiet 的 shadow 组件不能计为生产强制功能。
+1. 验证本仓库候选与 Git bundle transport；
+2. 只有在明确批准后才受控发布 `v2.4.3-rc.1`；
+3. 从真实 GitHub URL 在全新隔离容器安装；
+4. 经明确批准后使用备用微信做端到端验收；
+5. 受控生产升级、回滚验证以及 restart/persistence/real-path 验收。
+
+当前线上生产仍保持此前已经验收通过的 v2.4.2，直到上述升级链全部完成。
 
 ## License
 

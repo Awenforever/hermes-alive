@@ -23,8 +23,9 @@ Hermes Alive 为 Hermes 增加主动交互层。安装后，Hermes 可以：
 - 在消息 footer 中保留真实路由模型；
 - 将可替换源码与用户学习、运行状态分开保存。
 
-Circadian 当前用于学习和观测，保持 `shadow`。固定静默时间仍然具有实际约束力，
-动态睡眠/静默策略尚不宣称为生产强制模式。
+Circadian 支持生产 `live` 强制模式，也保留 `shadow` 与 `off`。在 `live` 下，学习得到的
+动态睡眠/清醒状态负责主动社交消息的静默判断：睡眠保护阶段在生成前阻断，动态清醒状态
+可以覆盖旧固定静默时间；损坏或未知的 live 状态按 fail-closed 处理。
 
 ## 快速开始
 
@@ -61,7 +62,7 @@ Provider 问卷，也不会保存 API Key。
 1. 自动识别本地时区；
 2. 使用默认静默时间 `23:00`–`08:00`；
 3. 启用实时主动质量治理；
-4. 将 Circadian 保持为 `shadow`；
+4. 启用 Circadian `live` 动态睡眠/静默强制策略；
 5. 使用 `--skip-weather` 时保持天气关闭；
 6. 将非敏感托管配置写入共享状态目录。
 
@@ -122,7 +123,7 @@ $HERMES_HOME/hermes_alive_shared
 共享目录必须位于 `HERMES_HOME` 内部。
 
 持久化内容可能包括托管配置、有限上下文、兴趣与表达档案、Discovery 证据、
-话题投递哈希、主动日志和 Circadian 观测状态。Provider 凭据仍保存在 Hermes 配置中。
+话题投递哈希、主动日志以及 Circadian 睡眠/清醒与 enforcement 状态。Provider 凭据仍保存在 Hermes 配置中。
 
 详见[数据与隐私](docs/DATA_AND_PRIVACY.md)。
 

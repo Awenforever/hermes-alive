@@ -11,7 +11,7 @@ Hermes Alive may persist:
 - Discovery cache and content evidence;
 - topic reservation and delivery history;
 - dream diffs and memory-processing state;
-- Circadian state and shadow observability;
+- Circadian sleep/wake state plus shadow/live enforcement observability;
 - an optional confirmed location profile.
 
 The lifecycle default shared root is:

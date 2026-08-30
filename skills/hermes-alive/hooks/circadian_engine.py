@@ -13,6 +13,7 @@ Markers:
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, time, timedelta, timezone
@@ -224,6 +225,8 @@ class CircadianEngine:
         self.now_fn = now_fn or (lambda: datetime.now(self.tz))
         shared = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", DEFAULT_SHARED_DIR))
         self.state_path = state_path or shared / "circadian_state.json"
+        self.state_integrity_ok = True
+        self.state_integrity_reason = "missing_state"
         self.state = self._load_state()
 
     def snapshot(self, *, update: bool = True, now: datetime | None = None) -> dict[str, Any]:
@@ -386,13 +389,56 @@ class CircadianEngine:
         message_class: str = "proactive_social",
         now: datetime | None = None,
     ) -> dict[str, Any]:
+        """Return the current delivery decision without sending anything.
+
+        The historical method name is preserved for compatibility.  In
+        ``shadow`` mode the result is observational.  In ``live`` mode the
+        watcher may enforce the returned decision, so unreadable/invalid
+        persisted state is fail-closed for non-exempt proactive traffic.
+        """
+
         current = self._local(now or self.now_fn())
-        state = self.snapshot(update=True, now=current)
         category = str(message_class or "proactive_social").strip().lower()
         hard_exempt = category in HARD_EXEMPT_CLASSES
+        configured_active = bool(self.config.enabled) and self.config.mode != "off"
+
+        if not self.state_integrity_ok:
+            live_block = (
+                configured_active
+                and self.config.mode == "live"
+                and not hard_exempt
+            )
+            return {
+                "engine": "circadian",
+                "schema_version": SCHEMA_VERSION,
+                "enabled": bool(self.config.enabled),
+                "mode": self.config.mode,
+                "shadow_only": self.config.mode == "shadow",
+                "message_class": category,
+                "hard_exempt": hard_exempt,
+                "phase": "unknown",
+                "dynamic_sleep_window": False,
+                "deep_sleep_core": False,
+                "would_allow_proactive": not live_block,
+                "would_block_proactive": live_block,
+                "reason": (
+                    "hard_exempt"
+                    if hard_exempt
+                    else "state_invalid_fail_closed"
+                    if live_block
+                    else "state_invalid_observe_only"
+                ),
+                "state_integrity_ok": False,
+                "state_integrity_reason": self.state_integrity_reason,
+                "fail_closed": live_block,
+                "planned_sleep_at": None,
+                "planned_wake_at": None,
+                "sleep_debt_minutes": 0,
+            }
+
+        state = self.snapshot(update=True, now=current)
         asleep = state.get("phase") in {"asleep", "light_sleep"}
         in_deep_core = self._in_deep_sleep_core(current)
-        configured_active = bool(self.config.enabled) and self.config.mode != "off"
         would_allow = (not configured_active) or hard_exempt or not asleep
         reason = (
             "disabled"
@@ -421,6 +467,9 @@ class CircadianEngine:
             "would_allow_proactive": would_allow,
             "would_block_proactive": not would_allow,
             "reason": reason,
+            "state_integrity_ok": True,
+            "state_integrity_reason": self.state_integrity_reason,
+            "fail_closed": False,
             "planned_sleep_at": state.get("planned_sleep_at"),
             "planned_wake_at": state.get("planned_wake_at"),
             "sleep_debt_minutes": int(state.get("sleep_debt_minutes") or 0),
@@ -446,23 +495,48 @@ class CircadianEngine:
 
     def _load_state(self) -> dict[str, Any]:
         default = self._empty_state()
-        if locked_read_json is not None:
-            loaded = locked_read_json(self.state_path, default, STATE_LOCK_NAME)
-        else:  # pragma: no cover
-            try:
-                import json
+        loaded: Any = default
 
-                loaded = json.loads(self.state_path.read_text(encoding="utf-8"))
+        if not self.state_path.exists():
+            self.state_integrity_ok = True
+            self.state_integrity_reason = "missing_state"
+        else:
+            try:
+                raw = json.loads(self.state_path.read_text(encoding="utf-8"))
             except Exception:
-                loaded = default
+                self.state_integrity_ok = False
+                self.state_integrity_reason = "corrupt_json"
+                return default
+            if not isinstance(raw, dict):
+                self.state_integrity_ok = False
+                self.state_integrity_reason = "invalid_state_type"
+                return default
+            raw_phase = str(raw.get("phase") or "awake")
+            if raw_phase not in VALID_PHASES:
+                self.state_integrity_ok = False
+                self.state_integrity_reason = "invalid_phase"
+                return default
+            loaded = raw
+            self.state_integrity_ok = True
+            self.state_integrity_reason = "valid_state"
+
+        if locked_read_json is not None and self.state_path.exists():
+            loaded = locked_read_json(self.state_path, loaded, STATE_LOCK_NAME)
         if not isinstance(loaded, dict):
-            loaded = default
+            self.state_integrity_ok = False
+            self.state_integrity_reason = "invalid_state_type_after_lock"
+            return default
+
         state = default
         state.update(loaded)
         if int(state.get("schema_version") or 0) != SCHEMA_VERSION:
             state = self._migrate_state(state)
         phase = str(state.get("phase") or "awake")
-        state["phase"] = phase if phase in VALID_PHASES else "awake"
+        if phase not in VALID_PHASES:
+            self.state_integrity_ok = False
+            self.state_integrity_reason = "invalid_phase_after_migration"
+            return default
+        state["phase"] = phase
         return state
 
     def _empty_state(self) -> dict[str, Any]:
