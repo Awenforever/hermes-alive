@@ -17,6 +17,7 @@ python3 tests/run_proactive_quality_governor.py
 python3 tests/run_location_weather_onboarding.py
 python3 tests/run_joint_shadow_replay.py
 python3 tests/run_isolated_enforcement.py
+python3 tests/run_production_enforcement.py
 python3 tests/run_discovery_quality_pivot_v3.py
 python3 tests/run_rich_content_model_attribution_v1.py
 python3 tests/run_runtime_disable_contract.py

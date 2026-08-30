@@ -77,6 +77,17 @@ MANAGED_ENV_KEYS = {
 }
 
 
+# These lifecycle-owned switches define whether Hermes Alive is active and
+# whether production enforcement is live. They must not be silently shadowed
+# by stale/baked container environment values after a managed reconfigure.
+MANAGED_AUTHORITATIVE_KEYS = {
+    "enabled",
+    "quality_governor_mode",
+    "circadian_enabled",
+    "circadian_mode",
+}
+
+
 def _text(value: Any) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
@@ -114,10 +125,15 @@ def load_managed_env(*, overwrite: bool = False) -> dict[str, str]:
             continue
         text = _text(value)
         # Marker: HERMES_ALIVE_MANAGED_ENABLED_AUTHORITATIVE_V1
-        # The lifecycle-managed master switch must override a baked or inherited
-        # container environment. Other settings retain the existing env-first
-        # compatibility contract unless overwrite=True is explicitly requested.
-        if overwrite or key == "enabled" or not os.getenv(env_name):
+        # Marker: HERMES_ALIVE_MANAGED_ENFORCEMENT_MODE_AUTHORITATIVE_V1
+        # Lifecycle-owned enable/enforcement switches override stale or baked
+        # container values. Other settings retain env-first compatibility unless
+        # overwrite=True is explicitly requested.
+        if (
+            overwrite
+            or key in MANAGED_AUTHORITATIVE_KEYS
+            or not os.getenv(env_name)
+        ):
             os.environ[env_name] = text
             loaded[env_name] = text
 

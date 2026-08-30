@@ -1,12 +1,14 @@
-"""Observe-only sleep and quiet policy for Hermes Alive.
+"""Dynamic sleep and quiet policy for Hermes Alive.
 
-This module compares the deterministic Circadian Engine decision with the
-legacy fixed quiet-hours gate. It never blocks, sends, or mutates delivery.
+Shadow mode compares Circadian with the legacy fixed quiet-hours gate without
+changing delivery. Live mode makes the dynamic Circadian decision authoritative
+for proactive social delivery while preserving hard exemptions.
 
 Markers:
 - HERMES_ALIVE_CIRCADIAN_SLEEP_QUIET_POLICY_SHADOW_V1
 - HERMES_ALIVE_CIRCADIAN_DYNAMIC_QUIET_COMPARE_V1
 - HERMES_ALIVE_CIRCADIAN_HARD_EXEMPT_BOUNDARY_V1
+- HERMES_ALIVE_CIRCADIAN_SLEEP_QUIET_PRODUCTION_ENFORCEMENT_V1
 """
 
 from __future__ import annotations
@@ -135,6 +137,149 @@ def evaluate_sleep_quiet_shadow(
         "sleep_debt_minutes": _safe_nonnegative_int(circadian.get("sleep_debt_minutes")),
         "raw_message_stored": False,
     }
+
+
+def evaluate_sleep_quiet_live(
+    circadian_decision: Mapping[str, Any] | None,
+    *,
+    message_class: str = "proactive_social",
+    now: datetime | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """Return the production-enforce dynamic sleep/quiet decision.
+
+    In live mode the dynamic Circadian state owns the social quiet decision.
+    Legacy fixed quiet hours are retained as comparison/rollback evidence only:
+    an awake dynamic state may override them, while a protected dynamic state
+    blocks even outside the fixed window. Invalid/unknown live state fails
+    closed for non-exempt proactive social traffic.
+    """
+
+    env = os.environ if environ is None else environ
+    category = str(message_class or "proactive_social").strip().lower()
+    circadian = dict(circadian_decision) if isinstance(circadian_decision, Mapping) else {}
+    timezone_name = str(
+        circadian.get("timezone")
+        or env.get("HERMES_ALIVE_CIRCADIAN_TIMEZONE")
+        or env.get("TZ")
+        or DEFAULT_TIMEZONE
+    ).strip() or DEFAULT_TIMEZONE
+    current = _local_now(now, timezone_name)
+    legacy = fixed_quiet_hours_snapshot(now=current, environ=env, timezone_name=timezone_name)
+
+    enabled = bool(circadian.get("enabled", True))
+    mode = str(circadian.get("mode") or "shadow").strip().lower()
+    phase = str(circadian.get("phase") or "unknown").strip().lower()
+    hard_exempt = bool(circadian.get("hard_exempt")) or category in HARD_EXEMPT_CLASSES
+    state_integrity_ok = bool(circadian.get("state_integrity_ok", True))
+
+    if not enabled:
+        dynamic_allow = True
+        reason = "circadian_disabled"
+        fail_closed = False
+    elif mode == "off":
+        dynamic_allow = True
+        reason = "circadian_mode_off"
+        fail_closed = False
+    elif hard_exempt:
+        dynamic_allow = True
+        reason = "hard_exempt"
+        fail_closed = False
+    elif mode != "live":
+        dynamic_allow = True
+        reason = "live_mode_required"
+        fail_closed = False
+    elif not state_integrity_ok:
+        dynamic_allow = False
+        reason = "state_invalid_fail_closed"
+        fail_closed = True
+    elif phase in SLEEP_PROTECTED_PHASES:
+        dynamic_allow = False
+        reason = (
+            "deep_sleep_core"
+            if bool(circadian.get("deep_sleep_core"))
+            else "sleep_protection_transition"
+            if phase in {"winding_down", "drowsy"}
+            else "dynamic_sleep_window"
+        )
+        fail_closed = False
+    elif phase == "forced_awake":
+        dynamic_allow = True
+        reason = "user_forced_awake"
+        fail_closed = False
+    elif phase in KNOWN_AWAKE_PHASES:
+        dynamic_allow = True
+        reason = "awake"
+        fail_closed = False
+    else:
+        dynamic_allow = False
+        reason = "unknown_phase_fail_closed"
+        fail_closed = True
+
+    legacy_in_quiet = bool(legacy["in_quiet_hours"])
+    legacy_allow = hard_exempt or not legacy_in_quiet
+    comparison = _comparison(
+        dynamic_allow=dynamic_allow,
+        legacy_allow=legacy_allow,
+        hard_exempt=hard_exempt,
+    )
+    active_live = enabled and mode == "live"
+
+    return {
+        "engine": "circadian_sleep_quiet_policy",
+        "schema_version": 2,
+        "mode": "live" if active_live else mode,
+        "shadow_only": False,
+        "integration_mode": "enforce" if active_live else "observe_only",
+        "watcher_enforced": bool(active_live),
+        "behavior_changed": bool(active_live and dynamic_allow != legacy_allow),
+        "message_class": category,
+        "phase": phase,
+        "hard_exempt": hard_exempt,
+        "sleep_protected_phase": phase in SLEEP_PROTECTED_PHASES,
+        "deep_sleep_core": bool(circadian.get("deep_sleep_core")),
+        "state_integrity_ok": state_integrity_ok,
+        "fail_closed": fail_closed,
+        "would_allow_dynamic": dynamic_allow,
+        "would_block_dynamic": not dynamic_allow,
+        "dynamic_reason": reason,
+        "legacy_fixed_quiet": legacy,
+        "legacy_would_allow": legacy_allow,
+        "legacy_would_block": not legacy_allow,
+        "legacy_override": bool(active_live and dynamic_allow and not legacy_allow),
+        "comparison": comparison,
+        "authoritative_source": "circadian_dynamic" if active_live else "legacy_fixed_quiet",
+        "planned_sleep_at": circadian.get("planned_sleep_at"),
+        "planned_wake_at": circadian.get("planned_wake_at"),
+        "sleep_debt_minutes": _safe_nonnegative_int(circadian.get("sleep_debt_minutes")),
+        "raw_message_stored": False,
+    }
+
+
+def evaluate_sleep_quiet_policy(
+    circadian_decision: Mapping[str, Any] | None,
+    *,
+    message_class: str = "proactive_social",
+    now: datetime | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """Dispatch to shadow comparison or production live enforcement policy."""
+
+    circadian = dict(circadian_decision) if isinstance(circadian_decision, Mapping) else {}
+    mode = str(circadian.get("mode") or "shadow").strip().lower()
+    if mode == "live":
+        return evaluate_sleep_quiet_live(
+            circadian,
+            message_class=message_class,
+            now=now,
+            environ=environ,
+        )
+    return evaluate_sleep_quiet_shadow(
+        circadian,
+        message_class=message_class,
+        now=now,
+        environ=environ,
+    )
 
 
 def fixed_quiet_hours_snapshot(

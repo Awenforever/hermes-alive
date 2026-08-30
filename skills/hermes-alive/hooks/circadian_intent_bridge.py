@@ -221,7 +221,7 @@ class CircadianIntentBridge:
         base: dict[str, Any] = {
             "bridge": "circadian_intent",
             "schema_version": SCHEMA_VERSION,
-            "integration_mode": "shadow_state_only",
+            "integration_mode": "state_only",
             "delivery_enforced": False,
             "watcher_behavior_changed": False,
             "message_sent": False,
@@ -274,11 +274,12 @@ class CircadianIntentBridge:
             cfg = engine.config
             if not cfg.enabled:
                 result["reason"] = "circadian_disabled"
-            elif cfg.mode != "shadow":
-                # This phase must never become a live enforcement path merely
-                # because an external config accidentally says "live".
-                result["reason"] = "shadow_mode_required"
+            elif cfg.mode not in {"shadow", "live"}:
+                result["reason"] = "circadian_mode_not_stateful"
             else:
+                # Intent handling remains state-only in both shadow and live
+                # modes.  It may move the bounded Circadian state machine but
+                # it never sends and never directly changes watcher control.
                 at = datetime.fromtimestamp(message_ts, tz=engine.tz)
                 state = engine.apply_event(
                     match.engine_event,
@@ -287,7 +288,7 @@ class CircadianIntentBridge:
                 )
                 result.update(
                     state_event_applied=True,
-                    reason="shadow_state_event_applied",
+                    reason=f"{cfg.mode}_state_event_applied",
                     resulting_phase=state.get("phase"),
                     planned_sleep_at=state.get("planned_sleep_at"),
                     planned_wake_at=state.get("planned_wake_at"),
@@ -322,7 +323,7 @@ def process_latest_user_intent_shadow() -> dict[str, Any]:
         return {
             "bridge": "circadian_intent",
             "schema_version": SCHEMA_VERSION,
-            "integration_mode": "shadow_state_only",
+            "integration_mode": "state_only",
             "delivery_enforced": False,
             "watcher_behavior_changed": False,
             "message_sent": False,

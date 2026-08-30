@@ -104,7 +104,7 @@ MANAGED_ENV_KEYS = {
 
 CIRCADIAN_DEFAULT_VALUES: dict[str, Any] = {
     "circadian_enabled": True,
-    "circadian_mode": "shadow",
+    "circadian_mode": "live",
     "chronotype": "adaptive",
     "base_sleep_time": "23:00",
     "base_wake_time": "07:00",

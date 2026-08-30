@@ -18,15 +18,18 @@ The Circadian engine tracks planned and observed sleep/wake behavior, winding
 down, sleep phases, forced awake state, sleep debt, oversleep, and recovery.
 Learning is slow and bounded.
 
-Current live behavior:
+Managed behavior:
 
-- fixed quiet hours remain authoritative;
-- Circadian is `shadow`;
-- dynamic Sleep/Quiet integration is `observe_only`;
-- hard-exempt system, security, control, reminder, Email Watchdog, and
-  business-critical classes remain outside social sleep gates.
+- Circadian supports `off`, `shadow`, and `live`; fresh lifecycle configuration defaults to `live`;
+- in `shadow`, dynamic Sleep/Quiet is observe-only and legacy fixed quiet hours remain authoritative;
+- in `live`, dynamic Circadian sleep state is authoritative for proactive-social quiet decisions before composition;
+- protected phases (`winding_down`, `drowsy`, `asleep`, `light_sleep`) block proactive-social delivery;
+- dynamic awake / forced-awake state may supersede the legacy fixed quiet window, which remains comparison and rollback evidence rather than a second authority;
+- invalid or corrupt live Circadian state fails closed for non-exempt proactive-social traffic;
+- hard-exempt system, security, control, reminder, Email Watchdog, and business-critical classes remain outside social sleep gates.
 
-The dual-key isolated guard is for acceptance testing, not production status.
+The dual-key isolated guard remains acceptance-only and is never a production shortcut.
+Explicit sleep/wake/delay intents update bounded Circadian state in both shadow and live modes, but the intent bridge never sends directly.
 
 ## Unanswered interaction evidence
 

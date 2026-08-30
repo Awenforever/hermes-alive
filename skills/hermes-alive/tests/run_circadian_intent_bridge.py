@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tempfile
 import time
@@ -163,13 +164,16 @@ def test_queries_and_user_observations_do_not_mutate_engine() -> None:
         check(not (root / "circadian_state.json").exists(), f"engine state created for {text}")
 
 
-def test_non_shadow_mode_never_activates_bridge() -> None:
+def test_live_mode_updates_state_but_remains_delivery_neutral() -> None:
     now = datetime(2026, 7, 12, 22, 50, tzinfo=TZ)
     bridge, root = bridge_at(now, mode="live")
     result = bridge.process_queue({"messages": [message("晚安", now.timestamp(), 30)]})
-    check(result["reason"] == "shadow_mode_required", f"live mode was not rejected: {result}")
-    check(result["state_event_applied"] is False, "live mode applied shadow bridge")
-    check(not (root / "circadian_state.json").exists(), "live mode created engine state")
+    check(result["reason"] == "live_state_event_applied", f"live state event was not applied: {result}")
+    check(result["state_event_applied"] is True, "live mode did not update circadian state")
+    check(result["delivery_enforced"] is False, "intent bridge directly enforced delivery")
+    check(result["watcher_behavior_changed"] is False, "intent bridge directly changed watcher")
+    state = json.loads((root / "circadian_state.json").read_text(encoding="utf-8"))
+    check(state["phase"] == "winding_down", f"live intent phase wrong: {state}")
 
 
 def test_privacy_records_store_no_raw_message() -> None:
@@ -212,6 +216,9 @@ def test_handler_calls_shadow_bridge_and_preserves_boundary() -> None:
 def test_public_entry_reads_local_context_queue() -> None:
     now = time.time()
     original = sys.modules.get("context_tracker")
+    old_shared = os.environ.get("HERMES_ALIVE_SHARED_DIR")
+    temp_shared = Path(tempfile.mkdtemp(prefix="circadian-public-entry-"))
+    os.environ["HERMES_ALIVE_SHARED_DIR"] = str(temp_shared)
     fake = ModuleType("context_tracker")
     fake.read_context_queue = lambda refresh=False: {"messages": [message("你睡了吗", now, 41)]}
     sys.modules["context_tracker"] = fake
@@ -220,6 +227,10 @@ def test_public_entry_reads_local_context_queue() -> None:
         check(result["intent"] == "sleep_status_query", f"public entry failed: {result}")
         check(result["state_event_applied"] is False, "query mutated state")
     finally:
+        if old_shared is None:
+            os.environ.pop("HERMES_ALIVE_SHARED_DIR", None)
+        else:
+            os.environ["HERMES_ALIVE_SHARED_DIR"] = old_shared
         if original is None:
             sys.modules.pop("context_tracker", None)
         else:
@@ -235,7 +246,7 @@ def main() -> int:
         test_duplicate_message_applies_once,
         test_stale_message_is_recorded_but_not_applied,
         test_queries_and_user_observations_do_not_mutate_engine,
-        test_non_shadow_mode_never_activates_bridge,
+        test_live_mode_updates_state_but_remains_delivery_neutral,
         test_privacy_records_store_no_raw_message,
         test_handler_calls_shadow_bridge_and_preserves_boundary,
         test_public_entry_reads_local_context_queue,

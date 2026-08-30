@@ -8,9 +8,11 @@ gateway:startup
   -> ProactivePlatformWatcher
       -> control and hard-exempt system work
       -> activity/context snapshot and lease
-      -> Circadian shadow decision
-      -> dynamic Sleep/Quiet observe-only comparison
-      -> fixed quiet hours, cooldown, and interruption policy
+      -> Circadian decision (shadow or live)
+      -> dynamic Sleep/Quiet comparison/enforcement
+      -> live Circadian pre-compose gate
+      -> cooldown and interruption policy
+      -> legacy fixed quiet override only when live dynamic-awake is authoritative
       -> discovery and dream cycles
       -> LLM composition
       -> live proactive quality audit/enforcement
@@ -18,10 +20,11 @@ gateway:startup
       -> WeChat delivery and delivery commit/release
 ```
 
-The managed lifecycle defaults the proactive quality governor to `enforce`.
-Circadian remains `shadow`, and dynamic Sleep/Quiet remains `observe_only`.
-Fixed quiet hours remain authoritative outside acceptance-only isolated
-enforcement.
+The managed lifecycle defaults the proactive quality governor to `enforce` and
+Circadian to `live`. In live mode, dynamic sleep state is authoritative for
+proactive-social quiet behavior. Legacy fixed quiet hours remain available as
+comparison/rollback evidence and as the active safeguard when Circadian is
+`shadow` or `off`.
 
 ## Main components
 
@@ -38,7 +41,7 @@ enforcement.
 | `topic_dedup.py` | Persistent URL/topic reservation, delivery history, material-update fingerprints, and privacy-safe hashes. |
 | `circadian_engine.py` | Sleep/wake facts, phases, sleep debt, bounded learning, and persistence. |
 | `circadian_intent_bridge.py` | Deterministic recognition of fresh Hermes-directed sleep/wake instructions. |
-| `circadian_sleep_quiet_policy.py` | Observe-only comparison between dynamic sleep state and fixed quiet hours. |
+| `circadian_sleep_quiet_policy.py` | Shadow comparison plus production live dynamic Sleep/Quiet enforcement and legacy-quiet supersession evidence. |
 | `interruption_policy.py` | Social interruption level, semantic bubble budget, and content constraints. |
 | `proactive_quality_governor.py` | Repeat, affect, task-evidence, topic, and weather-perspective audits. |
 | `isolated_enforcement.py` | Dual-key acceptance-only enforcement for dynamic sleep/quality integration tests. |
@@ -95,8 +98,11 @@ for that candidate rather than silently degrading to observe-only.
 
 ### Circadian and dynamic Sleep/Quiet
 
-Circadian default is `shadow`. Dynamic Sleep/Quiet integration is
-`observe_only`. Fixed quiet hours remain the live production safeguard.
+Circadian lifecycle default is `live`. In live mode, protected sleep phases
+block proactive-social delivery before composition; dynamic awake state may
+supersede fixed quiet hours. Unknown/corrupt live state fails closed. In
+`shadow`, the same decisions are logged without changing delivery and fixed
+quiet hours remain authoritative.
 
 ### Isolated dual-key guard
 

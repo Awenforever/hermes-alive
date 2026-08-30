@@ -26,9 +26,11 @@ the WeChat adapter. After installation, Hermes can:
 - preserve the real routed model in footer metadata;
 - keep replaceable source separate from persistent user/runtime state.
 
-Circadian state is currently learned and observed in shadow mode. Fixed quiet
-hours remain authoritative. Dynamic sleep/quiet enforcement is not presented as
-production-ready.
+Circadian supports production `live` enforcement as well as `shadow` and `off`.
+In live mode, learned dynamic sleep/wake state governs proactive-social quiet
+behavior; protected sleep phases block before composition and dynamic awake
+state may supersede the legacy fixed quiet window. Invalid live state fails
+closed.
 
 ## Quick start
 
@@ -65,7 +67,7 @@ The non-interactive configuration flow:
 1. detects the local timezone;
 2. applies default quiet hours `23:00`–`08:00`;
 3. enables the live proactive quality governor;
-4. keeps Circadian in `shadow`;
+4. enables Circadian `live` dynamic Sleep/Quiet enforcement;
 5. leaves weather disabled when `--skip-weather` is used;
 6. writes managed, non-secret configuration under the shared state directory.
 
@@ -133,7 +135,7 @@ The shared directory must be a child of `HERMES_HOME`.
 
 Persistent data may include managed configuration, bounded context, interest and
 voice profiles, discovery evidence, topic-delivery hashes, proactive logs, and
-Circadian observability. Provider credentials remain in Hermes configuration.
+Circadian sleep/wake state and enforcement observability. Provider credentials remain in Hermes configuration.
 
 See [Data and Privacy](docs/DATA_AND_PRIVACY.md).
 

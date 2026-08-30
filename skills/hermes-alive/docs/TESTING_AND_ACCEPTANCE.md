@@ -19,6 +19,7 @@ python3 tests/run_proactive_quality_governor.py
 python3 tests/run_location_weather_onboarding.py
 python3 tests/run_joint_shadow_replay.py
 python3 tests/run_isolated_enforcement.py
+python3 tests/run_production_enforcement.py
 python3 tests/run_discovery_quality_pivot_v3.py
 python3 tests/run_rich_content_model_attribution_v1.py
 python3 tests/run_runtime_disable_contract.py
@@ -35,14 +36,16 @@ developer smoke test and is not valid for release acceptance.
 
 ```text
 quality_governor_lifecycle_default=enforce
-circadian_lifecycle_default=shadow
-sleep_quiet_policy_integration=observe_only
+circadian_lifecycle_default=live
+sleep_quiet_policy_live_integration=enforce
+legacy_fixed_quiet_role=shadow/off_authority_and_live_comparison_fallback
 isolated_delivery_enforcement=TEST_ONLY
-production_feature_enforcement_readiness=INCOMPLETE_SHADOW_COMPONENTS_REMAIN
+production_feature_enforcement_readiness=SOURCE_IMPLEMENTED_PENDING_RELEASE_ACCEPTANCE
 ```
 
-A passing inventory means the documentation accurately describes these modes. It
-does not convert shadow components into production enforcement.
+The inventory is a source contract only. Production completion still requires
+fresh-container acceptance, release transport, controlled upgrade, restart, and
+real production enforcement evidence.
 
 ## Verified isolated acceptance
 
