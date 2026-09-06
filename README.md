@@ -1,76 +1,135 @@
+<div align="center">
+
 # Hermes Alive
 
-Hermes Alive is a gateway-native proactive companion for Hermes and WeChat. The
-repository contains the complete skill source, lifecycle tooling, tests,
-documentation, repository metadata, and portable CI.
+**A gateway-native proactive companion for Hermes Agent.**
 
-- English skill documentation: [`skills/hermes-alive/README.md`](skills/hermes-alive/README.md)
-- 中文说明：[`skills/hermes-alive/README_CN.md`](skills/hermes-alive/README_CN.md)
-- Architecture: [`skills/hermes-alive/docs/ARCHITECTURE.md`](skills/hermes-alive/docs/ARCHITECTURE.md)
-- Testing and acceptance: [`skills/hermes-alive/docs/TESTING_AND_ACCEPTANCE.md`](skills/hermes-alive/docs/TESTING_AND_ACCEPTANCE.md)
+Presence, personality, memory, and circadian rhythm—without turning every silence into a notification.
 
-## Repository layout
+![version](https://img.shields.io/badge/version-2.4.3-blue)
+![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB)
+![Hermes](https://img.shields.io/badge/Hermes-gateway--native-6f42c1)
+![license](https://img.shields.io/badge/license-MIT-green)
+
+[中文](README_CN.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)
+
+</div>
+
+---
+
+## What it is
+
+[Hermes Alive](https://github.com/Awenforever/hermes-alive) adds a proactive interaction layer to [Hermes Agent](https://github.com/NousResearch/hermes-agent). It runs with the Hermes gateway, follows recent WeChat context, and occasionally starts a conversation when the timing and content are appropriate.
+
+> **Presence without obligation.** Hermes may notice, remember, react, go quiet, sleep, wake, and speak first—but it should never demand attention.
+
+Hermes Alive uses the Provider, model configuration, gateway, and WeChat adapter already managed by Hermes. It does not replace Hermes or maintain a separate credential system.
+
+## Core capabilities
+
+| Capability | What it does |
+|---|---|
+| Context-aware initiative | Avoids interrupting active work, pending replies, or fresh conversations. |
+| Personality and relationship state | Adapts tone and initiative through bounded, reversible learning. |
+| Circadian rhythm | Models sleep, wakefulness, delayed sleep, sleep debt, and recovery. |
+| Interruption and quality policy | Blocks repetition, pressure, unsupported task claims, and unsafe proactive drafts. |
+| Discovery | Finds and rotates potentially useful external content without repeatedly sharing the same topic. |
+| Dream consolidation | Optionally turns high-confidence conversation evidence into bounded memory updates. |
+| Traceable delivery | Preserves the actual routed model and links decisions through a shared `tick_id`. |
+| Safe lifecycle | Supports atomic installation, verification, rollback, state-preserving uninstall, and purge. |
+
+## How it works
 
 ```text
-skills/hermes-alive/       complete installable skill
-scripts/bootstrap.sh       repository-level install/configure/verify entrypoint
-scripts/portable-ci.sh     public CI and repository integrity checks
-scripts/verify-repository.py
-metadata/                  version, source manifest, and release-stage facts
-.github/workflows/ci.yml   portable GitHub Actions workflow
+Hermes gateway
+  → recent context and activity checks
+  → circadian and interruption policy
+  → personality, memory, and optional discovery
+  → model composition
+  → quality and duplicate checks
+  → WeChat delivery
 ```
 
-## Safe installation
+System and safety messages keep their own priority and are not treated as ordinary social interruptions.
 
-Clone the complete repository, then run:
+## Quick start
+
+Requirements:
+
+- a working Hermes installation;
+- Python 3.11 or later;
+- a Provider/model configured in Hermes;
+- a writable `HERMES_HOME` (normally `/opt/data`).
+
+Install from the complete repository:
 
 ```bash
-bash scripts/bootstrap.sh
+git clone --depth 1 \
+  https://github.com/Awenforever/hermes-alive.git \
+  /tmp/hermes-alive
+
+cd /tmp/hermes-alive
+HERMES_HOME=/opt/data bash scripts/bootstrap.sh
 ```
 
-The bootstrap delegates to the skill lifecycle. It does not modify Hermes Core
-or `weixin.py`, does not restart production, and does not send a real WeChat
-message.
+The bootstrap installs the source skill and active gateway hook, writes non-secret defaults, and runs verification. It does not restart the gateway. Restart Hermes with the normal procedure for your deployment after reviewing the result.
 
-The default configuration:
-
-- enables the live proactive quality governor;
-- enables production Circadian `live` enforcement;
-- enables dynamic Sleep/Quiet live enforcement at the watcher pre-compose boundary;
-- keeps the isolated dual-key delivery-enforcement helper test-only;
-- leaves weather disabled until location is explicitly confirmed;
-- stores shared state under `$HERMES_HOME/hermes_alive_shared`.
-
-## Verification
+## Configure and operate
 
 ```bash
-bash scripts/portable-ci.sh
+export HERMES_HOME=/opt/data
+LIFECYCLE="$HERMES_HOME/skills/hermes/hermes-alive/scripts/hermes-alive-lifecycle"
+
+"$LIFECYCLE" configure
+"$LIFECYCLE" verify
+"$LIFECYCLE" status
 ```
 
-Portable CI verifies repository structure, manifests, documentation links,
-compilation, and the suites that can run with a deterministic test double. Full
-Hermes-runtime attribution and complete lifecycle acceptance remain separate
-isolated release gates.
+Provider credentials remain in Hermes. If Hermes has no usable model, configure it with:
 
-## Release status
+```bash
+/opt/hermes/.venv/bin/hermes setup model
+```
 
-This repository is the **v2.4.3-rc.1 candidate**, not a final production
-deployment. The Circadian + Dynamic Sleep/Quiet production-enforcement patch
-has passed exact-base isolated acceptance in the current production image,
-including full regression, default-scale stress, persistence across container
-recreation, uninstall/reinstall, and purge/reinstall checks.
+Pause or resume proactive delivery without uninstalling:
 
-The remaining release path is deliberately separate:
+```bash
+python3 "$HERMES_HOME/hooks/hermes-alive/alive_control.py" disable
+python3 "$HERMES_HOME/hooks/hermes-alive/alive_control.py" enable
+python3 "$HERMES_HOME/hooks/hermes-alive/alive_control.py" status
+```
 
-1. verify this repository candidate and Git bundle transport;
-2. publish the guarded `v2.4.3-rc.1` ref only after explicit approval;
-3. install from the real GitHub URL in a fresh isolated container;
-4. run spare-WeChat end-to-end acceptance with explicit approval;
-5. perform controlled production upgrade, rollback validation, and
-   post-restart persistence/real-path acceptance.
+## Data and removal
 
-The currently running production remains the previously accepted v2.4.2
-release until that upgrade path is completed.
+```text
+$HERMES_HOME/skills/hermes/hermes-alive  installed source
+$HERMES_HOME/hooks/hermes-alive          active gateway hook
+$HERMES_HOME/hermes_alive_shared         configuration and persistent state
+```
+
+Provider secrets stay in Hermes configuration. Hermes Alive does not modify Hermes Core or `weixin.py`.
+
+Default uninstall removes the installed source, hook, and managed configuration while preserving learned and runtime state:
+
+```bash
+bash "$HERMES_HOME/skills/hermes/hermes-alive/scripts/uninstall.sh"
+```
+
+To remove all Hermes Alive state as well:
+
+```bash
+bash "$HERMES_HOME/skills/hermes/hermes-alive/scripts/uninstall.sh" --purge
+```
+
+`--purge` is destructive. Production restarts and real-message tests should always be explicit operational decisions.
+
+## Documentation
+
+- [Architecture](skills/hermes-alive/docs/ARCHITECTURE.md)
+- [Runtime policies](skills/hermes-alive/docs/RUNTIME_POLICIES.md)
+- [Lifecycle and persistence](skills/hermes-alive/docs/LIFECYCLE_AND_PERSISTENCE.md)
+- [Data and privacy](skills/hermes-alive/docs/DATA_AND_PRIVACY.md)
+- [Testing](skills/hermes-alive/tests/TESTING.md)
 
 ## License
 

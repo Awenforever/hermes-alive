@@ -1,70 +1,136 @@
+<div align="center">
+
 # Hermes Alive
 
-Hermes Alive 是面向 Hermes 与微信网关的主动陪伴能力。本仓库包含完整技能源码、
-生命周期工具、测试、文档、仓库元数据和便携 CI，不是单独的 `SKILL.md`。
+**Hermes Agent 的 gateway-native 主动陪伴能力。**
 
-- 英文技能说明：[`skills/hermes-alive/README.md`](skills/hermes-alive/README.md)
-- 中文技能说明：[`skills/hermes-alive/README_CN.md`](skills/hermes-alive/README_CN.md)
-- 架构：[`skills/hermes-alive/docs/ARCHITECTURE.md`](skills/hermes-alive/docs/ARCHITECTURE.md)
-- 测试与验收：[`skills/hermes-alive/docs/TESTING_AND_ACCEPTANCE.md`](skills/hermes-alive/docs/TESTING_AND_ACCEPTANCE.md)
+让 Hermes 拥有在场感、性格、记忆与作息，但不把每一次沉默都变成通知。
 
-## 仓库结构
+![version](https://img.shields.io/badge/version-2.4.3-blue)
+![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB)
+![Hermes](https://img.shields.io/badge/Hermes-gateway--native-6f42c1)
+![license](https://img.shields.io/badge/license-MIT-green)
+
+[English](README.md) · [安全说明](SECURITY.md) · [参与贡献](CONTRIBUTING.md)
+
+</div>
+
+---
+
+## 这是什么
+
+[Hermes Alive](https://github.com/Awenforever/hermes-alive) 是 [Hermes Agent](https://github.com/NousResearch/hermes-agent) 的主动交互层。它随 Hermes Gateway 运行，理解近期微信上下文，并在时机和内容都合适时偶尔主动开口。
+
+> **有在场感，但不制造回应义务。** Hermes 可以注意、记住、反应、沉默、入睡、醒来和主动搭话，但不应索取注意力。
+
+Hermes Alive 复用 Hermes 已有的 Provider、模型配置、Gateway 和微信适配器，不替代 Hermes，也不维护第二套凭据系统。
+
+## 核心能力
+
+| 能力 | 作用 |
+|---|---|
+| 上下文感知 | Hermes 正在工作、仍需回复或对话仍新鲜时避免插话。 |
+| 性格与关系状态 | 通过有边界、可逆的学习调整表达和主动倾向。 |
+| 拟人作息 | 建模入睡、清醒、延迟入睡、睡眠债与恢复。 |
+| 打断与质量策略 | 拦截重复、施压、无依据的任务判断和不安全草稿。 |
+| Discovery | 发现并轮换可能有价值的外部内容，避免反复分享同一话题。 |
+| Dream 记忆整合 | 可选地把高置信度对话证据转化为有边界的记忆更新。 |
+| 可追踪投递 | 保留真实路由模型，并用统一 `tick_id` 串联决策。 |
+| 安全生命周期 | 支持原子安装、验证、回滚、保留状态卸载和彻底清理。 |
+
+## 工作方式
 
 ```text
-skills/hermes-alive/       完整可安装技能
-scripts/bootstrap.sh       仓库级安装、配置和验证入口
-scripts/portable-ci.sh     公共 CI 与仓库完整性检查
-scripts/verify-repository.py
-metadata/                  版本、源码清单和发布阶段事实
-.github/workflows/ci.yml   GitHub Actions 便携检查
+Hermes Gateway
+  → 近期上下文与活动检查
+  → 作息与打断策略
+  → 性格、记忆与可选 Discovery
+  → 模型生成
+  → 质量与重复检查
+  → 微信投递
 ```
 
-## 安全安装
+系统和安全消息保持独立优先级，不按普通社交打扰处理。
 
-克隆完整仓库后执行：
+## 快速开始
+
+运行要求：
+
+- 已安装且可用的 Hermes；
+- Python 3.11 或更高版本；
+- 已在 Hermes 中配置可用的 Provider 与模型；
+- 可写的 `HERMES_HOME`，通常为 `/opt/data`。
+
+从完整仓库安装：
 
 ```bash
-bash scripts/bootstrap.sh
+git clone --depth 1 \
+  https://github.com/Awenforever/hermes-alive.git \
+  /tmp/hermes-alive
+
+cd /tmp/hermes-alive
+HERMES_HOME=/opt/data bash scripts/bootstrap.sh
 ```
 
-bootstrap 只调用技能生命周期，不修改 Hermes Core 或 `weixin.py`，不重启生产，
-也不会发送真实微信消息。
+bootstrap 会安装技能源码和 Gateway Hook、写入非敏感默认配置并执行验证，但不会重启 Gateway。确认结果后，请按当前部署方式正常重启 Hermes。
 
-默认配置会：
-
-- 启用实时主动质量治理；
-- 启用生产 Circadian `live` enforcement；
-- 在 watcher pre-compose 边界启用动态 Sleep/Quiet live enforcement；
-- 保持 isolated 双 key delivery-enforcement helper 仅用于测试；
-- 在位置未明确确认前关闭天气；
-- 将共享状态保存到 `$HERMES_HOME/hermes_alive_shared`。
-
-## 验证
+## 配置与运行
 
 ```bash
-bash scripts/portable-ci.sh
+export HERMES_HOME=/opt/data
+LIFECYCLE="$HERMES_HOME/skills/hermes/hermes-alive/scripts/hermes-alive-lifecycle"
+
+"$LIFECYCLE" configure
+"$LIFECYCLE" verify
+"$LIFECYCLE" status
 ```
 
-便携 CI 检查仓库结构、清单、文档链接、Python 编译和可使用确定性测试替身运行的
-测试。完整 Hermes 运行时归属与生命周期验收仍是独立发布门禁。
+Provider 凭据始终由 Hermes 管理。如果 Hermes 尚无可用模型，请运行：
 
-## 当前边界
+```bash
+/opt/hermes/.venv/bin/hermes setup model
+```
 
-这是 **v2.4.3-rc.1 仓库候选**，不是已经部署到生产的最终版本。
-Circadian + Dynamic Sleep/Quiet production-enforcement 补丁已经在当前生产
-镜像的全新隔离容器中通过精确基线验收，包括完整回归、默认规模 stress、
-容器重建持久化、卸载/重装以及 purge/重装。
+无需卸载即可暂停或恢复主动投递：
 
-后续发布路径仍严格分离：
+```bash
+python3 "$HERMES_HOME/hooks/hermes-alive/alive_control.py" disable
+python3 "$HERMES_HOME/hooks/hermes-alive/alive_control.py" enable
+python3 "$HERMES_HOME/hooks/hermes-alive/alive_control.py" status
+```
 
-1. 验证本仓库候选与 Git bundle transport；
-2. 只有在明确批准后才受控发布 `v2.4.3-rc.1`；
-3. 从真实 GitHub URL 在全新隔离容器安装；
-4. 经明确批准后使用备用微信做端到端验收；
-5. 受控生产升级、回滚验证以及 restart/persistence/real-path 验收。
+## 数据与卸载
 
-当前线上生产仍保持此前已经验收通过的 v2.4.2，直到上述升级链全部完成。
+```text
+$HERMES_HOME/skills/hermes/hermes-alive  已安装源码
+$HERMES_HOME/hooks/hermes-alive          生效中的 Gateway Hook
+$HERMES_HOME/hermes_alive_shared         配置与持久化状态
+```
 
-## License
+Provider 密钥仍保存在 Hermes 配置中。Hermes Alive 不修改 Hermes Core 或 `weixin.py`。
+
+默认卸载会删除已安装源码、Hook 和托管配置，同时保留学习与运行状态：
+
+```bash
+bash "$HERMES_HOME/skills/hermes/hermes-alive/scripts/uninstall.sh"
+```
+
+同时删除全部 Hermes Alive 状态：
+
+```bash
+bash "$HERMES_HOME/skills/hermes/hermes-alive/scripts/uninstall.sh" --purge
+```
+
+`--purge` 具有破坏性。生产重启和真实消息测试始终应当是明确的运维决定。
+
+## 文档
+
+- [架构](skills/hermes-alive/docs/ARCHITECTURE.md)
+- [运行策略](skills/hermes-alive/docs/RUNTIME_POLICIES.md)
+- [生命周期与持久化](skills/hermes-alive/docs/LIFECYCLE_AND_PERSISTENCE.md)
+- [数据与隐私](skills/hermes-alive/docs/DATA_AND_PRIVACY.md)
+- [测试指南](skills/hermes-alive/tests/TESTING.md)
+
+## 许可证
 
 [MIT](LICENSE)

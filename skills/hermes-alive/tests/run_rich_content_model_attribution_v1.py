@@ -326,6 +326,49 @@ def test_composer_captures_primary_response_model() -> None:
         auxiliary_client.async_call_llm = original
 
 
+def test_composer_routes_configured_model_to_provider() -> None:
+    import agent.auxiliary_client as auxiliary_client
+
+    original = auxiliary_client.async_call_llm
+    old_model = os.environ.get(
+        "HERMES_PROACTIVE_LLM_MODEL"
+    )
+    captured: dict = {}
+
+    async def fake_call(**kwargs):
+        captured.update(kwargs)
+        return _fake_response(
+            "主动模型路由测试",
+            "deepseek-v4-flash-ascend",
+        )
+
+    auxiliary_client.async_call_llm = fake_call
+    os.environ[
+        "HERMES_PROACTIVE_LLM_MODEL"
+    ] = "deepseek-v4-flash-ascend"
+    try:
+        composer = LLMMessageComposer()
+        _isolate_composer_prompt(composer)
+        value = asyncio.run(
+            composer._generate_candidate(
+                SimpleNamespace(),
+                {},
+                None,
+            )
+        )
+        assert value == "主动模型路由测试"
+        assert captured["task"] == "proactive"
+        assert captured["model"] == (
+            "deepseek-v4-flash-ascend"
+        )
+    finally:
+        auxiliary_client.async_call_llm = original
+        if old_model is None:
+            os.environ.pop("HERMES_PROACTIVE_LLM_MODEL", None)
+        else:
+            os.environ["HERMES_PROACTIVE_LLM_MODEL"] = old_model
+
+
 def test_composer_captures_fallback_response_model() -> None:
     import agent.auxiliary_client as auxiliary_client
 
@@ -533,6 +576,7 @@ TESTS = [
     test_rich_logical_content_prefers_payload_text,
     test_rich_only_records_one_logical_sent_event,
     test_composer_captures_primary_response_model,
+    test_composer_routes_configured_model_to_provider,
     test_composer_captures_fallback_response_model,
     test_watcher_prefers_actual_provider_model,
     test_watcher_falls_back_when_response_model_empty,

@@ -359,6 +359,12 @@ class LLMMessageComposer:
             logger.warning("agent.auxiliary_client not importable; LLM generation disabled, falling back to templates")
             return ""
 
+        preferred_model = os.getenv(
+            "HERMES_PROACTIVE_LLM_MODEL",
+            os.getenv("HERMES_PROACTIVE_MODEL", ""),
+        ).strip()
+        model_override = preferred_model or None
+
         try:
             response = await async_call_llm(
                 task="proactive",
@@ -369,17 +375,12 @@ class LLMMessageComposer:
                 temperature=0.65,
                 max_tokens=300,
                 timeout=_env_float("HERMES_PROACTIVE_LLM_TIMEOUT", 60),
+                model=model_override,
             )
             self.last_resolved_model = (
                 self._response_model(
                     response,
-                    fallback=os.getenv(
-                        "HERMES_PROACTIVE_LLM_MODEL",
-                        os.getenv(
-                            "HERMES_PROACTIVE_MODEL",
-                            "",
-                        ),
-                    ),
+                    fallback=preferred_model,
                 )
             )
             content = response.choices[0].message.content
