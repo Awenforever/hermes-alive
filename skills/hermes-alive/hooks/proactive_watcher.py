@@ -110,6 +110,8 @@ class ProactivePlatformWatcher:
         self._circadian_engine: Any | None = None
         self._proactive_quality_governor: Any | None = None
         self._last_activity_snapshot: dict[str, Any] = {}
+        self._last_delivery_gate_reason = ""
+        self._last_log_rotation_check = 0.0
         self.watcher_id = f"{os.getpid()}-{uuid.uuid4().hex[:8]}"
         self.started_at = datetime.now().astimezone().isoformat()
 
@@ -154,6 +156,31 @@ class ProactivePlatformWatcher:
         if adapter is None or not chat_id:
             self._log("skip", tick_id=tick_id, reason="adapter_or_chat_id_unavailable")
             return False
+
+        delivery_ready, delivery_reason, delivery_pending = self._delivery_preflight(
+            adapter, chat_id
+        )
+        if not delivery_ready:
+            # Log only state transitions.  A blocked channel can remain blocked
+            # for days; repeating the same record every tick caused log growth
+            # without adding operational information.
+            if delivery_reason != self._last_delivery_gate_reason:
+                self._log(
+                    "delivery_circuit_open",
+                    tick_id=tick_id,
+                    reason=delivery_reason,
+                    pending=delivery_pending,
+                )
+                self._last_delivery_gate_reason = delivery_reason
+            return False
+        if self._last_delivery_gate_reason:
+            self._log(
+                "delivery_circuit_closed",
+                tick_id=tick_id,
+                reason="delivery_ready",
+                pending=delivery_pending,
+            )
+            self._last_delivery_gate_reason = ""
 
         control_sent = await self._process_control_queue(adapter, chat_id, tick_id)
         if control_sent:
@@ -702,6 +729,11 @@ class ProactivePlatformWatcher:
             self._log_compose(tick_id, voice, discovery_context, msg_type, generated_by)
 
             metadata = self._metadata(generated_by)
+            metadata.update({
+                "_delivery_source": "hermes-alive",
+                "_delivery_id": "hermes-alive-" + sha256_text(content)[:32],
+                "_delivery_ttl_seconds": 6 * 3600,
+            })
             if delivery is not None:
                 outcome = await delivery.send_text(
                     adapter,
@@ -2604,7 +2636,58 @@ class ProactivePlatformWatcher:
         metadata["is_system"] = False
         return metadata
 
+    def _delivery_preflight(
+        self,
+        adapter: Any,
+        chat_id: str,
+    ) -> tuple[bool, str, int]:
+        """Fail closed before discovery/LLM work when Weixin cannot send now."""
+        if not all(
+            hasattr(adapter, name)
+            for name in ("_send_queue", "_budget_store", "_token_store", "_account_id")
+        ):
+            # Non-Weixin adapters and lightweight test adapters do not expose
+            # the context-token transport contract.
+            return True, "preflight_not_applicable", 0
+        if not getattr(adapter, "_send_session", None) or not getattr(adapter, "_token", None):
+            return False, "adapter_not_connected", 0
+        account_id = str(getattr(adapter, "_account_id", "") or "")
+        queue = getattr(adapter, "_send_queue", None)
+        pending = 0
+        try:
+            if queue is not None and hasattr(queue, "pending_count"):
+                pending = int(queue.pending_count(account_id, chat_id) or 0)
+        except Exception:
+            return False, "queue_health_unknown", 0
+        # Alive is a low-priority producer.  With strict FIFO it must not add
+        # more work behind any existing user, email or report delivery.
+        if pending > 0:
+            return False, "downstream_queue_not_empty", pending
+        budget = getattr(adapter, "_budget_store", None)
+        tokens = getattr(adapter, "_token_store", None)
+        try:
+            exhausted = bool(budget.is_exhausted(account_id, chat_id))
+            valid_token = (
+                budget.get_valid_token(account_id, chat_id)
+                or tokens.get(account_id, chat_id)
+            )
+        except Exception:
+            return False, "context_budget_unknown", pending
+        if exhausted:
+            return False, "context_token_budget_exhausted", pending
+        if not valid_token:
+            return False, "context_token_unavailable", pending
+        return True, "delivery_ready", pending
+
     def _log(self, decision: str, **extra: Any) -> None:
+        now = time.time()
+        if now - self._last_log_rotation_check >= 300:
+            try:
+                from log_rotate import rotate_proactive_log
+                rotate_proactive_log(BASE)
+            except Exception:
+                logger.exception("Failed to rotate proactive log")
+            self._last_log_rotation_check = now
         record = {
             "decision": decision,
             "watcher_id": self.watcher_id,

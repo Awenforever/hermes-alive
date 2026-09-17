@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_RETENTION_DAYS = 7
 RETENTION_ENV = "HERMES_ALIVE_LOG_RETENTION_DAYS"
+DEFAULT_MAX_BYTES = 10 * 1024 * 1024
+MAX_BYTES_ENV = "HERMES_ALIVE_LOG_MAX_BYTES"
 
 
 def rotate_proactive_log(base_dir: Path, log_name: str = "proactive_log.jsonl") -> None:
@@ -26,15 +28,18 @@ def rotate_proactive_log(base_dir: Path, log_name: str = "proactive_log.jsonl") 
         return
 
     retention = int(os.getenv(RETENTION_ENV, str(DEFAULT_RETENTION_DAYS)))
+    max_bytes = max(1024 * 1024, int(os.getenv(MAX_BYTES_ENV, str(DEFAULT_MAX_BYTES))))
 
     # Check if the log is from a previous day
     mtime = log_path.stat().st_mtime
     log_date = datetime.fromtimestamp(mtime).date()
     today = datetime.now().date()
 
-    if log_date < today:
+    oversized = log_path.stat().st_size >= max_bytes
+    if log_date < today or oversized:
         # Rotate: rename to dated archive
-        archive_name = f"{log_path.stem}.{log_date.isoformat()}{log_path.suffix}"
+        suffix = datetime.now().strftime("-%H%M%S") if oversized else ""
+        archive_name = f"{log_path.stem}.{log_date.isoformat()}{suffix}{log_path.suffix}"
         archive_path = base_dir / archive_name
         try:
             log_path.rename(archive_path)
@@ -49,7 +54,7 @@ def rotate_proactive_log(base_dir: Path, log_name: str = "proactive_log.jsonl") 
         # Extract date from filename: proactive_log.2026-07-01.jsonl → 2026-07-01
         stem = old_log.name.replace(Path(log_name).stem + ".", "").replace(Path(log_name).suffix, "")
         try:
-            file_date = datetime.strptime(stem, "%Y-%m-%d").date()
+            file_date = datetime.strptime(stem[:10], "%Y-%m-%d").date()
             if file_date < cutoff:
                 old_log.unlink()
                 logger.info("Purged old log: %s (date=%s < cutoff=%s)", old_log.name, file_date, cutoff)
