@@ -263,7 +263,7 @@ def delivery_plans() -> None:
     engine = ContentDeliveryEngine(allowed_file_roots=[SHARED], max_file_bytes=1024)
     context = {"external": [
         {"id": "img", "title": "Smoke paper", "url": "https://example.invalid/paper", "image_url": "//img.example.invalid/a.jpg", "source": "example"},
-        {"id": "bad", "title": "Bad URL", "url": "file:///etc/passwd", "source": "example"},
+        {"id": "bad", "title": "Bad URL", "url": "file:///outside/not-allowed", "source": "example"},
     ]}
     messages = [("research_ping", "Smoke paper", "fake-provider/fake-model")]
     exact = engine.plan(
@@ -343,7 +343,8 @@ async def delivery_send_matrix() -> None:
 
     allowed = await engine.send_rich(adapter, "chat", DeliveryPayload(kind="file", file_path=str(small), title="small"), metadata={"resolved_model": "hermes"})
     assert allowed.success and allowed.mode == "native_file"
-    outside = await engine.send_rich(adapter, "chat", DeliveryPayload(kind="file", file_path="/etc/passwd", title="bad"), metadata={"resolved_model": "hermes"})
+    outside_path = SHARED.parent / "outside-not-allowed.txt"
+    outside = await engine.send_rich(adapter, "chat", DeliveryPayload(kind="file", file_path=str(outside_path), title="bad"), metadata={"resolved_model": "hermes"})
     assert not outside.success
     oversized = await engine.send_rich(adapter, "chat", DeliveryPayload(kind="file", file_path=str(large), title="large"), metadata={"resolved_model": "hermes"})
     assert not oversized.success

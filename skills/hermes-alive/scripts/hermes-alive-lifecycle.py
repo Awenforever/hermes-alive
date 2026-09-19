@@ -188,7 +188,7 @@ def _paths(args: argparse.Namespace) -> Paths:
     hermes_home = _safe_resolve(
         Path(
             getattr(args, "hermes_home", None)
-            or os.getenv("HERMES_HOME", "/opt/data")
+            or os.getenv("HERMES_HOME", str(Path.home() / ".hermes"))
         )
     )
     source_target = _safe_resolve(
@@ -208,7 +208,7 @@ def _paths(args: argparse.Namespace) -> Paths:
             getattr(args, "shared_dir", None)
             or os.getenv(
                 "HERMES_ALIVE_SHARED_DIR",
-                str(hermes_home / "hermes_alive_shared"),
+                str(hermes_home / "plugin-data" / "hermes-alive" / "runtime"),
             )
         )
     )

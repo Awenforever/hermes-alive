@@ -9,7 +9,7 @@ from pathlib import Path
 MARKER = "HERMES_ENV_AWARE_PERSISTENCE_VERIFY_V1"
 
 def hermes_home() -> Path:
-    return Path(os.environ.get("HERMES_HOME", "/opt/data")).resolve()
+    return Path(os.environ.get("HERMES_HOME", str(Path.home() / ".hermes"))).resolve()
 
 def in_container() -> bool:
     if Path("/.dockerenv").exists():

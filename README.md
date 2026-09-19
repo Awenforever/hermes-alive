@@ -1,135 +1,60 @@
-<div align="center">
-
 # Hermes Alive
 
-**A gateway-native proactive companion for Hermes Agent.**
+Hermes 的克制型主动陪伴插件。它根据最近对话、安静时段、发送积压和互动频率，决定是否主动发起一条消息。
 
-Presence, personality, memory, and circadian rhythm—without turning every silence into a notification.
+## 功能
 
-![version](https://img.shields.io/badge/version-2.4.3-blue)
-![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB)
-![Hermes](https://img.shields.io/badge/Hermes-gateway--native-6f42c1)
-![license](https://img.shields.io/badge/license-MIT-green)
+- 活跃对话或待发送队列存在时不打扰。
+- 支持安静时段和最小主动消息间隔。
+- 对重复、施压、无依据的任务声明和低质量草稿做拦截。
+- 人格、关系和记忆更新有界、可追踪、可关闭。
+- 使用 Hermes 已配置的模型与消息通道，不维护第二套密钥。
+- 默认关闭；必须由使用者明确启用。
 
-[中文](README_CN.md) · [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md)
+Hermes Alive 不负责普通入站回复、微信队列、邮件监控或学术周报。
 
-</div>
+## 要求
 
----
+- Hermes `>=0.21.3,<0.22`
+- Python 3.11+
+- Hermes 中已有可用模型和目标消息通道
 
-## What it is
-
-[Hermes Alive](https://github.com/Awenforever/hermes-alive) adds a proactive interaction layer to [Hermes Agent](https://github.com/NousResearch/hermes-agent). It runs with the Hermes gateway, follows recent WeChat context, and occasionally starts a conversation when the timing and content are appropriate.
-
-> **Presence without obligation.** Hermes may notice, remember, react, go quiet, sleep, wake, and speak first—but it should never demand attention.
-
-Hermes Alive uses the Provider, model configuration, gateway, and WeChat adapter already managed by Hermes. It does not replace Hermes or maintain a separate credential system.
-
-## Core capabilities
-
-| Capability | What it does |
-|---|---|
-| Context-aware initiative | Avoids interrupting active work, pending replies, or fresh conversations. |
-| Personality and relationship state | Adapts tone and initiative through bounded, reversible learning. |
-| Circadian rhythm | Models sleep, wakefulness, delayed sleep, sleep debt, and recovery. |
-| Interruption and quality policy | Blocks repetition, pressure, unsupported task claims, and unsafe proactive drafts. |
-| Discovery | Finds and rotates potentially useful external content without repeatedly sharing the same topic. |
-| Dream consolidation | Optionally turns high-confidence conversation evidence into bounded memory updates. |
-| Traceable delivery | Preserves the actual routed model and links decisions through a shared `tick_id`. |
-| Safe lifecycle | Supports atomic installation, verification, rollback, state-preserving uninstall, and purge. |
-
-## How it works
-
-```text
-Hermes gateway
-  → recent context and activity checks
-  → circadian and interruption policy
-  → personality, memory, and optional discovery
-  → model composition
-  → quality and duplicate checks
-  → WeChat delivery
-```
-
-System and safety messages keep their own priority and are not treated as ordinary social interruptions.
-
-## Quick start
-
-Requirements:
-
-- a working Hermes installation;
-- Python 3.11 or later;
-- a Provider/model configured in Hermes;
-- a writable `HERMES_HOME` (normally `/opt/data`).
-
-Install from the complete repository:
+## 安装
 
 ```bash
-git clone --depth 1 \
-  https://github.com/Awenforever/hermes-alive.git \
-  /tmp/hermes-alive
-
-cd /tmp/hermes-alive
-HERMES_HOME=/opt/data bash scripts/bootstrap.sh
+hermes plugins install Awenforever/hermes-alive
+hermes plugins enable hermes-alive
+hermes alive install-runtime
 ```
 
-The bootstrap installs the source skill and active gateway hook, writes non-secret defaults, and runs verification. It does not restart the gateway. Restart Hermes with the normal procedure for your deployment after reviewing the result.
-
-## Configure and operate
+确认状态后再启用主动消息：
 
 ```bash
-export HERMES_HOME=/opt/data
-LIFECYCLE="$HERMES_HOME/skills/hermes/hermes-alive/scripts/hermes-alive-lifecycle"
-
-"$LIFECYCLE" configure
-"$LIFECYCLE" verify
-"$LIFECYCLE" status
+hermes alive status
+hermes alive enable
 ```
 
-Provider credentials remain in Hermes. If Hermes has no usable model, configure it with:
+暂停时无需卸载：
 
 ```bash
-/opt/hermes/.venv/bin/hermes setup model
+hermes alive disable
 ```
 
-Pause or resume proactive delivery without uninstalling:
+## 默认策略
 
-```bash
-python3 "$HERMES_HOME/hooks/hermes-alive/alive_control.py" disable
-python3 "$HERMES_HOME/hooks/hermes-alive/alive_control.py" enable
-python3 "$HERMES_HOME/hooks/hermes-alive/alive_control.py" status
-```
+| 选项 | 默认值 | 作用 |
+|---|---:|---|
+| `enabled` | `false` | 是否允许主动发送 |
+| `delivery_platform` | `weixin` | 主动消息通道 |
+| `min_interval_seconds` | `21600` | 两次主动消息的最短间隔 |
+| `quiet_hours_start` | `23:00` | 安静时段开始 |
+| `quiet_hours_end` | `08:00` | 安静时段结束 |
 
-## Data and removal
+运行状态保存在当前 Hermes profile 的 `plugin-data/hermes-alive/`，Gateway hook 位于 `hooks/hermes-alive/`。插件不修改 Hermes Core。
 
-```text
-$HERMES_HOME/skills/hermes/hermes-alive  installed source
-$HERMES_HOME/hooks/hermes-alive          active gateway hook
-$HERMES_HOME/hermes_alive_shared         configuration and persistent state
-```
+## 安全与隐私
 
-Provider secrets stay in Hermes configuration. Hermes Alive does not modify Hermes Core or `weixin.py`.
-
-Default uninstall removes the installed source, hook, and managed configuration while preserving learned and runtime state:
-
-```bash
-bash "$HERMES_HOME/skills/hermes/hermes-alive/scripts/uninstall.sh"
-```
-
-To remove all Hermes Alive state as well:
-
-```bash
-bash "$HERMES_HOME/skills/hermes/hermes-alive/scripts/uninstall.sh" --purge
-```
-
-`--purge` is destructive. Production restarts and real-message tests should always be explicit operational decisions.
-
-## Documentation
-
-- [Architecture](skills/hermes-alive/docs/ARCHITECTURE.md)
-- [Runtime policies](skills/hermes-alive/docs/RUNTIME_POLICIES.md)
-- [Lifecycle and persistence](skills/hermes-alive/docs/LIFECYCLE_AND_PERSISTENCE.md)
-- [Data and privacy](skills/hermes-alive/docs/DATA_AND_PRIVACY.md)
-- [Testing](skills/hermes-alive/tests/TESTING.md)
+插件只应使用当前会话和本地状态中确有依据的信息。发现、记忆或主动发送功能均不得绕过 Hermes 的通道权限与队列规则。建议先在备用账号观察数天，再逐步缩短主动间隔。
 
 ## License
 

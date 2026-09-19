@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import json
 import os
@@ -16,11 +15,11 @@ import tempfile
 import time
 import unicodedata
 import uuid
-from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
+from safe_io import file_lock
 
 DEFAULT_BASE = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", "/opt/data/hermes_alive_shared"))
 DEFAULT_COOLDOWN_HOURS = float(os.getenv("HERMES_ALIVE_TOPIC_COOLDOWN_HOURS", "24"))
@@ -236,15 +235,8 @@ class TopicDedupStore:
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
 
-    @contextmanager
     def _lock(self) -> Iterator[None]:
-        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
-        with self.lock_path.open("a+", encoding="utf-8") as handle:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        return file_lock(self.lock_path)
 
     def _default_state(self) -> dict[str, Any]:
         return {"schema_version": 1, "delivered": [], "reservations": []}

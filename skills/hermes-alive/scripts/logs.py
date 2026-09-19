@@ -29,7 +29,11 @@ import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-DEFAULT_LOG_DIR = os.environ.get("HERMES_ALIVE_SHARED_DIR", "/opt/data/hermes_alive_shared")
+_HERMES_HOME = Path(os.environ.get("HERMES_HOME", str(Path.home() / ".hermes"))).expanduser()
+DEFAULT_LOG_DIR = os.environ.get(
+    "HERMES_ALIVE_SHARED_DIR",
+    str(_HERMES_HOME / "plugin-data" / "hermes-alive" / "runtime"),
+)
 DEFAULT_LOG_NAME = "proactive_log.jsonl"
 
 

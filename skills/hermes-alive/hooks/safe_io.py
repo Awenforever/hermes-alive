@@ -1,8 +1,8 @@
 
 """Safe file IO helpers for Hermes Alive runtime state.
 
-Linux/container oriented:
-- fcntl.flock for inter-process locks
+Cross-platform:
+- fcntl.flock on POSIX and msvcrt.locking on Windows
 - temp file + fsync + os.replace for atomic writes
 - JSONL append with lock
 """
@@ -10,7 +10,6 @@ Linux/container oriented:
 from __future__ import annotations
 
 import contextlib
-import fcntl
 import hashlib
 import json
 import os
@@ -25,23 +24,52 @@ BASE = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", "/opt/data/hermes_alive_shared"
 LOCK_DIR = BASE / "locks"
 LOCK_DIR.mkdir(parents=True, exist_ok=True)
 
+
+if os.name == "nt":
+    import msvcrt
+
+    def _try_lock(fh: Any) -> bool:
+        if os.fstat(fh.fileno()).st_size == 0:
+            fh.write("\0")
+            fh.flush()
+        fh.seek(0)
+        try:
+            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+            return True
+        except OSError:
+            return False
+
+    def _unlock(fh: Any) -> None:
+        fh.seek(0)
+        msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+else:
+    import fcntl
+
+    def _try_lock(fh: Any) -> bool:
+        try:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return True
+        except BlockingIOError:
+            return False
+
+    def _unlock(fh: Any) -> None:
+        fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+
 @contextlib.contextmanager
 def file_lock(path: Path, timeout: float = 5.0) -> Iterator[None]:
     path.parent.mkdir(parents=True, exist_ok=True)
     start = time.monotonic()
     with open(path, "a+", encoding="utf-8") as fh:
         while True:
-            try:
-                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            if _try_lock(fh):
                 break
-            except BlockingIOError:
-                if time.monotonic() - start >= timeout:
-                    raise TimeoutError(f"lock timeout: {path}")
-                time.sleep(0.05)
+            if time.monotonic() - start >= timeout:
+                raise TimeoutError(f"lock timeout: {path}")
+            time.sleep(0.05)
         try:
             yield
         finally:
-            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+            _unlock(fh)
 
 @contextlib.contextmanager
 def try_file_lock(path: Path) -> Iterator[bool]:
@@ -50,14 +78,13 @@ def try_file_lock(path: Path) -> Iterator[bool]:
     acquired = False
     try:
         try:
-            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            acquired = True
-        except BlockingIOError:
+            acquired = _try_lock(fh)
+        except OSError:
             acquired = False
         yield acquired
     finally:
         if acquired:
-            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+            _unlock(fh)
         fh.close()
 
 def atomic_write_text(path: Path, text: str) -> None:
