@@ -863,7 +863,7 @@ def lifecycle_compile_failure_preserves_previous() -> None:
     (new / "hooks" / "broken.py").write_text("def broken(:\n", encoding="utf-8")
     failed = lifecycle_cmd(home, "install", "--source-root", str(new), source=new)
     assert failed.returncode != 0
-    target = home / "skills" / "hermes" / "hermes-alive"
+    target = home / "skills" / "hermes-alive"
     assert (target / "TEST_VERSION").read_text(encoding="utf-8") == "old"
     assert lifecycle_cmd(home, "verify").returncode == 0
 
@@ -934,7 +934,7 @@ def manifest_failure_transaction_rollback() -> None:
             raise AssertionError("manifest failure not raised")
     finally:
         module._write_manifest = real
-    target = home / "skills" / "hermes" / "hermes-alive"
+    target = home / "skills" / "hermes-alive"
     assert (target / "TEST_VERSION").read_text(encoding="utf-8") == "old"
     assert lifecycle_cmd(home, "verify").returncode == 0
 

@@ -11,13 +11,13 @@ import sys
 from pathlib import Path
 # Hermes Alive import path bootstrap
 _HERMES_HOME = Path(os.getenv("HERMES_HOME", str(Path.home() / ".hermes"))).expanduser()
-_HOOK_DIR = os.getenv("HERMES_HOOK_DIR", str(_HERMES_HOME / "hooks" / "hermes-alive"))
+_HOOK_DIR = str(Path(__file__).resolve().parent)
 _SHARED_DIR = os.getenv(
     "HERMES_ALIVE_SHARED_DIR",
     str(_HERMES_HOME / "plugin-data" / "hermes-alive" / "runtime"),
 )
 os.environ.setdefault("HERMES_HOME", str(_HERMES_HOME))
-os.environ.setdefault("HERMES_HOOK_DIR", _HOOK_DIR)
+os.environ["HERMES_HOOK_DIR"] = _HOOK_DIR
 os.environ.setdefault("HERMES_ALIVE_SHARED_DIR", _SHARED_DIR)
 for _p in (_HOOK_DIR, _SHARED_DIR):
     if _p not in sys.path:
@@ -27,9 +27,11 @@ for _p in (_HOOK_DIR, _SHARED_DIR):
 try:
     from managed_config import load_managed_env
     load_managed_env(overwrite=False)
-except Exception:
+except Exception as exc:
     # Configuration loading must never prevent hook import.
-    pass
+    logging.getLogger(__name__).warning(
+        "Hermes Alive: managed config bootstrap failed: %s", exc
+    )
 
 logger = logging.getLogger(__name__)
 _watcher_task: asyncio.Task | None = None
@@ -177,7 +179,15 @@ def _process_circadian_intent_shadow() -> dict:
 
 
 def _env_enabled() -> bool:
+    marker = Path(_SHARED_DIR) / "enabled"
+    if marker.is_file():
+        try:
+            return marker.read_text(encoding="utf-8").strip().lower() in {
+                "1", "true", "yes", "on", "enabled",
+            }
+        except OSError:
+            return False
     explicit = os.getenv("HERMES_PROACTIVE_PLATFORM_ENABLED", "").strip().lower()
     if explicit:
         return explicit in {"1", "true", "yes", "on"}
-    return (Path(_SHARED_DIR) / "enabled").is_file()
+    return False

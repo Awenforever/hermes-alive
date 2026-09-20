@@ -32,7 +32,7 @@ from typing import Any, Iterable
 
 from safe_io import locked_read_json, locked_write_json, sha256_text
 
-BASE = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", "/opt/data/hermes_alive_shared"))
+BASE = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", str(Path(os.getenv("HERMES_HOME", "/opt/data")) / "plugin-data" / "hermes-alive" / "runtime")))
 CONTEXT_QUEUE = BASE / "context_queue.json"
 PROACTIVE_LOG = BASE / "proactive_log.jsonl"
 STATE_PATH = BASE / "state" / "proactive_quality_governor_shadow.json"

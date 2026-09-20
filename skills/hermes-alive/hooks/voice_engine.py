@@ -31,9 +31,10 @@ STYLE_DIMENSIONS = (
 )
 
 RELATIONSHIP_STAGES = ("new", "exploring", "familiar", "close")
-SHARED_STATE_PATH = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", "/opt/data/hermes_alive_shared")) / "voice_state.json"
-OLD_MOOD_STATE_PATH = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", "/opt/data/hermes_alive_shared")) / "mood_state.json"
-PROACTIVE_LOG = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", "/opt/data/hermes_alive_shared")) / "proactive_log.jsonl"
+_SHARED_DIR = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", str(Path(os.getenv("HERMES_HOME", "/opt/data")) / "plugin-data" / "hermes-alive" / "runtime")))
+SHARED_STATE_PATH = _SHARED_DIR / "voice_state.json"
+OLD_MOOD_STATE_PATH = _SHARED_DIR / "mood_state.json"
+PROACTIVE_LOG = _SHARED_DIR / "proactive_log.jsonl"
 VOICE_LOCK_NAME = "voice_state.lock"
 MAX_EVOLUTION_LOG = 80
 

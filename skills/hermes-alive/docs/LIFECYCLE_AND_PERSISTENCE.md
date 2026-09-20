@@ -10,9 +10,9 @@ hook directories.
 ## Safe default paths
 
 ```text
-source: $HERMES_HOME/skills/hermes/hermes-alive
+source: $HERMES_HOME/skills/hermes-alive
 hook:   $HERMES_HOME/hooks/hermes-alive
-state:  $HERMES_HOME/hermes_alive_shared
+state:  $HERMES_HOME/plugin-data/hermes-alive/runtime
 ```
 
 The shared directory must be a strict child of `HERMES_HOME`. Lifecycle commands

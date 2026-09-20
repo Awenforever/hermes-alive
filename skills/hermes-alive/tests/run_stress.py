@@ -274,7 +274,7 @@ def lifecycle_stress() -> dict[str, Any]:
         for action in ("install", "install", "uninstall", "install", "purge"):
             result = lifecycle_cmd(home, SKILL, action)
             assert result.returncode == 0, (action, result.stdout)
-        assert not (home / "skills" / "hermes" / "hermes-alive").exists()
+        assert not (home / "skills" / "hermes-alive").exists()
         assert not (home / "hooks" / "hermes-alive").exists()
         assert not (home / "hermes_alive_shared").exists()
         passed += 1

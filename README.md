@@ -52,6 +52,8 @@ hermes alive disable
 
 运行状态保存在当前 Hermes profile 的 `plugin-data/hermes-alive/`，Gateway hook 位于 `hooks/hermes-alive/`。插件不修改 Hermes Core。
 
+启用和禁用会同时原子更新 profile 内的托管配置与运行标记；它们优先于镜像中可能残留的旧环境变量，因此容器重建后不会意外反转状态。
+
 ## 安全与隐私
 
 插件只应使用当前会话和本地状态中确有依据的信息。发现、记忆或主动发送功能均不得绕过 Hermes 的通道权限与队列规则。建议先在备用账号观察数天，再逐步缩短主动间隔。

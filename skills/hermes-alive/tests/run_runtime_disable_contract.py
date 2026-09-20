@@ -213,6 +213,36 @@ print("HANDLER_RUNTIME_DISABLE_GATE=PASS")
         assert result.returncode == 0, result.stdout
         assert "HANDLER_RUNTIME_DISABLE_GATE=PASS" in result.stdout
 
+        # A profile-owned marker is the final operator switch and must win
+        # over stale image environment values in both directions.
+        (shared / "enabled").write_text("true\n", encoding="utf-8")
+        env["HERMES_PROACTIVE_PLATFORM_ENABLED"] = "false"
+        code = """
+import os
+import sys
+sys.path.insert(0, os.environ["HERMES_TEST_HOOKS"])
+import handler
+assert handler._env_enabled() is True
+print("HANDLER_MARKER_ENABLE_AUTHORITY=PASS")
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", code], env=env, text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
+        )
+        assert result.returncode == 0, result.stdout
+
+        (shared / "enabled").write_text("false\n", encoding="utf-8")
+        env["HERMES_PROACTIVE_PLATFORM_ENABLED"] = "true"
+        code = code.replace(
+            "is True\nprint(\"HANDLER_MARKER_ENABLE_AUTHORITY=PASS\")",
+            "is False\nprint(\"HANDLER_MARKER_DISABLE_AUTHORITY=PASS\")",
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", code], env=env, text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
+        )
+        assert result.returncode == 0, result.stdout
+
 
 def main() -> int:
     test_managed_master_switch_authority()

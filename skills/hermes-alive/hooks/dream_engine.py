@@ -76,7 +76,7 @@ class DreamEngine:
 
     def __init__(self, diff_path: str | None = None) -> None:
         self._diff_path = diff_path or os.getenv(
-                    "DREAM_DIFF_PATH", os.path.join(os.getenv("HERMES_HOME", "/opt/data"), "hermes_alive_shared", "dream_diff.json")
+                    "DREAM_DIFF_PATH", os.path.join(os.getenv("HERMES_HOME", "/opt/data"), "plugin-data", "hermes-alive", "runtime", "dream_diff.json")
                 )
 
     def should_run(self) -> bool:

@@ -115,9 +115,9 @@ Docker 不是必需条件。容器环境应持久化挂载 `HERMES_HOME`；普�
 生命周期默认使用：
 
 ```text
-$HERMES_HOME/skills/hermes/hermes-alive
+$HERMES_HOME/skills/hermes-alive
 $HERMES_HOME/hooks/hermes-alive
-$HERMES_HOME/hermes_alive_shared
+$HERMES_HOME/plugin-data/hermes-alive/runtime
 ```
 
 共享目录必须位于 `HERMES_HOME` 内部。

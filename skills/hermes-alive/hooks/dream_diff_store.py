@@ -58,7 +58,7 @@ class DreamDiff:
 
 def save_diff(diff: DreamDiff, path: str | None = None) -> str:
     """Save a dream diff to a JSON file. Returns the file path."""
-    target = path or os.getenv("DREAM_DIFF_PATH", os.path.join(os.getenv("HERMES_HOME", "/opt/data"), "hermes_alive_shared", "dream_diff.json"))
+    target = path or os.getenv("DREAM_DIFF_PATH", os.path.join(os.getenv("HERMES_HOME", "/opt/data"), "plugin-data", "hermes-alive", "runtime", "dream_diff.json"))
     os.makedirs(os.path.dirname(target), exist_ok=True)
     with open(target, "w", encoding="utf-8") as f:
         json.dump(diff.to_dict(), f, indent=2, ensure_ascii=False)
@@ -67,7 +67,7 @@ def save_diff(diff: DreamDiff, path: str | None = None) -> str:
 
 def load_latest_diff(path: str | None = None) -> DreamDiff | None:
     """Load the most recent dream diff from disk. Returns None if no diff exists."""
-    target = path or os.getenv("DREAM_DIFF_PATH", os.path.join(os.getenv("HERMES_HOME", "/opt/data"), "hermes_alive_shared", "dream_diff.json"))
+    target = path or os.getenv("DREAM_DIFF_PATH", os.path.join(os.getenv("HERMES_HOME", "/opt/data"), "plugin-data", "hermes-alive", "runtime", "dream_diff.json"))
     if not os.path.exists(target):
         return None
     try:
@@ -80,7 +80,7 @@ def load_latest_diff(path: str | None = None) -> DreamDiff | None:
 
 def mark_applied(path: str | None = None) -> bool:
     """Mark a dream diff as applied. Returns True on success."""
-    target = path or os.getenv("DREAM_DIFF_PATH", os.path.join(os.getenv("HERMES_HOME", "/opt/data"), "hermes_alive_shared", "dream_diff.json"))
+    target = path or os.getenv("DREAM_DIFF_PATH", os.path.join(os.getenv("HERMES_HOME", "/opt/data"), "plugin-data", "hermes-alive", "runtime", "dream_diff.json"))
     diff = load_latest_diff(target)
     if diff is None:
         return False

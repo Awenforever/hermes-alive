@@ -7,7 +7,7 @@ Commands:
   alive_control.py disable
   alive_control.py test
 
-This script controls the gateway watcher through $HERMES_HOME/hermes_alive_shared/control.json.
+This script controls the gateway watcher through $HERMES_HOME/plugin-data/hermes-alive/runtime/control.json.
 It also reads $HERMES_HOME/.env for accurate status display.
 """
 

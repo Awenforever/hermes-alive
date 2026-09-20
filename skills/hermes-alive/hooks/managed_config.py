@@ -98,7 +98,7 @@ def managed_config_path() -> Path:
     shared = Path(
         os.getenv(
             "HERMES_ALIVE_SHARED_DIR",
-            "/opt/data/hermes_alive_shared",
+            str(Path(os.getenv("HERMES_HOME", "/opt/data")) / "plugin-data" / "hermes-alive" / "runtime"),
         )
     )
     return shared / "config" / "hermes-alive.json"

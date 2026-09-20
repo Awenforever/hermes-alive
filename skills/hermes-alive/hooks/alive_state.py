@@ -19,7 +19,7 @@ from typing import Any
 from safe_io import locked_read_json, locked_write_json
 
 CST = timezone(timedelta(hours=8))
-BASE = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", "/opt/data/hermes_alive_shared"))
+BASE = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", str(Path(os.getenv("HERMES_HOME", "/opt/data")) / "plugin-data" / "hermes-alive" / "runtime")))
 STATE_DIR = BASE / "state"
 STATE_PATH = STATE_DIR / "alive_state.json"
 CONTEXT_QUEUE = BASE / "context_queue.json"

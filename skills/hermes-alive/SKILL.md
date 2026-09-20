@@ -1,7 +1,7 @@
 ---
 name: hermes-alive
 description: "Gateway-native proactive companion with contextual discovery, live quality enforcement, production Circadian sleep/quiet enforcement, and reversible lifecycle management."
-version: 2.4.3
+version: 2.5.0
 ---
 
 # Hermes Alive — Hermes Installation Contract
@@ -31,9 +31,9 @@ prerequisite and stop; do not launch a second skill-specific Provider flow.
 Use lifecycle defaults unless the environment explicitly supplies safe paths:
 
 ```text
-source: $HERMES_HOME/skills/hermes/hermes-alive
+source: $HERMES_HOME/skills/hermes-alive
 hook:   $HERMES_HOME/hooks/hermes-alive
-state:  $HERMES_HOME/hermes_alive_shared
+state:  $HERMES_HOME/plugin-data/hermes-alive/runtime
 ```
 
 The shared directory must be a strict child of `HERMES_HOME`.

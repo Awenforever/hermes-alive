@@ -33,9 +33,10 @@ import logging
 import os
 import re
 import sys
+from pathlib import Path
 # Hermes Alive import path bootstrap
 _HOOK_DIR = os.getenv("HERMES_HOOK_DIR", "/opt/data/hooks/hermes-alive")
-_SHARED_DIR = os.getenv("HERMES_ALIVE_SHARED_DIR", "/opt/data/hermes_alive_shared")
+_SHARED_DIR = os.getenv("HERMES_ALIVE_SHARED_DIR", str(Path(os.getenv("HERMES_HOME", "/opt/data")) / "plugin-data" / "hermes-alive" / "runtime"))
 for _p in (_HOOK_DIR, _SHARED_DIR):
     if _p not in sys.path:
         sys.path.insert(0, _p)
@@ -44,7 +45,6 @@ import time
 import uuid
 from collections.abc import Mapping
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 
@@ -75,7 +75,7 @@ LLM_ENABLED_ENV = "HERMES_PROACTIVE_LLM_ENABLED"
 LLM_MODEL_ENV = "HERMES_PROACTIVE_LLM_MODEL"
 DISCOVERY_ENABLED_ENV = "HERMES_PROACTIVE_DISCOVERY_ENABLED"
 
-BASE = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", "/opt/data/hermes_alive_shared"))
+BASE = Path(_SHARED_DIR)
 WATCHER_LOCK = BASE / "locks" / "proactive_watcher.lock"
 PROACTIVE_LOG = BASE / "proactive_log.jsonl"
 CONTROL = BASE / "control.json"

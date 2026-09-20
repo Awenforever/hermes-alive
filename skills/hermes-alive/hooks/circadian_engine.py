@@ -30,7 +30,7 @@ except Exception:  # pragma: no cover - standalone import fallback
 SCHEMA_VERSION = 1
 STATE_LOCK_NAME = "circadian_state.lock"
 DEFAULT_TIMEZONE = "Asia/Singapore"
-DEFAULT_SHARED_DIR = "/opt/data/hermes_alive_shared"
+DEFAULT_SHARED_DIR = str(Path(os.getenv("HERMES_HOME", "/opt/data")) / "plugin-data" / "hermes-alive" / "runtime")
 VALID_PHASES = {
     "awake",
     "winding_down",

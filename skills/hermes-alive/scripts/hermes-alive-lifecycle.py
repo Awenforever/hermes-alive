@@ -194,7 +194,7 @@ def _paths(args: argparse.Namespace) -> Paths:
     source_target = _safe_resolve(
         Path(
             getattr(args, "source_target", None)
-            or hermes_home / "skills" / "hermes" / SKILL_NAME
+            or hermes_home / "skills" / SKILL_NAME
         )
     )
     hook_target = _safe_resolve(

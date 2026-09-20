@@ -20,7 +20,7 @@ from typing import Any
 from safe_io import LOCK_DIR, atomic_write_text, file_lock, locked_read_json, locked_write_json
 from topic_dedup import TopicDedupStore, item_identity
 
-DEFAULT_BASE = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", "/opt/data/hermes_alive_shared"))
+DEFAULT_BASE = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", str(Path(os.getenv("HERMES_HOME", "/opt/data")) / "plugin-data" / "hermes-alive" / "runtime")))
 
 TOPIC_PATTERNS: dict[str, tuple[str, ...]] = {
     "ai": ("ai", "llm", "agent", "模型", "人工智能", "机器学习", "深度学习", "transformer"),

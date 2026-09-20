@@ -21,7 +21,7 @@ from typing import Any, Iterator
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 from safe_io import file_lock
 
-DEFAULT_BASE = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", "/opt/data/hermes_alive_shared"))
+DEFAULT_BASE = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", str(Path(os.getenv("HERMES_HOME", "/opt/data")) / "plugin-data" / "hermes-alive" / "runtime")))
 DEFAULT_COOLDOWN_HOURS = float(os.getenv("HERMES_ALIVE_TOPIC_COOLDOWN_HOURS", "24"))
 DEFAULT_RESERVATION_TTL_SECONDS = float(
     os.getenv("HERMES_ALIVE_TOPIC_RESERVATION_TTL_SECONDS", "900")

@@ -214,7 +214,7 @@ class ContentDeliveryEngine:
         if allowed_file_roots is None:
             raw_roots = os.getenv(
                 "HERMES_ALIVE_DELIVERY_FILE_ROOTS",
-                "/opt/data/hermes_alive_shared",
+                str(Path(os.getenv("HERMES_HOME", "/opt/data")) / "plugin-data" / "hermes-alive" / "runtime"),
             )
             allowed_file_roots = [
                 value.strip()

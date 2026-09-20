@@ -17,7 +17,7 @@ Hermes Alive may persist:
 The lifecycle default shared root is:
 
 ```text
-$HERMES_HOME/hermes_alive_shared
+$HERMES_HOME/plugin-data/hermes-alive/runtime
 ```
 
 Runtime components honor `HERMES_ALIVE_SHARED_DIR` when a lifecycle-safe path is

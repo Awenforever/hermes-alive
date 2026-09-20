@@ -6,7 +6,7 @@
 
 让 Hermes 拥有在场感、性格、记忆与作息，但不把每一次沉默都变成通知。
 
-![version](https://img.shields.io/badge/version-2.4.3-blue)
+![version](https://img.shields.io/badge/version-2.5.0-blue)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB)
 ![Hermes](https://img.shields.io/badge/Hermes-gateway--native-6f42c1)
 ![license](https://img.shields.io/badge/license-MIT-green)
@@ -78,7 +78,7 @@ bootstrap 会安装技能源码和 Gateway Hook、写入非敏感默认配置并
 
 ```bash
 export HERMES_HOME=/opt/data
-LIFECYCLE="$HERMES_HOME/skills/hermes/hermes-alive/scripts/hermes-alive-lifecycle"
+LIFECYCLE="$HERMES_HOME/skills/hermes-alive/scripts/hermes-alive-lifecycle"
 
 "$LIFECYCLE" configure
 "$LIFECYCLE" verify
@@ -102,9 +102,9 @@ python3 "$HERMES_HOME/hooks/hermes-alive/alive_control.py" status
 ## 数据与卸载
 
 ```text
-$HERMES_HOME/skills/hermes/hermes-alive  已安装源码
+$HERMES_HOME/skills/hermes-alive         已安装源码
 $HERMES_HOME/hooks/hermes-alive          生效中的 Gateway Hook
-$HERMES_HOME/hermes_alive_shared         配置与持久化状态
+$HERMES_HOME/plugin-data/hermes-alive/runtime  配置与持久化状态
 ```
 
 Provider 密钥仍保存在 Hermes 配置中。Hermes Alive 不修改 Hermes Core 或 `weixin.py`。
@@ -112,13 +112,13 @@ Provider 密钥仍保存在 Hermes 配置中。Hermes Alive 不修改 Hermes Cor
 默认卸载会删除已安装源码、Hook 和托管配置，同时保留学习与运行状态：
 
 ```bash
-bash "$HERMES_HOME/skills/hermes/hermes-alive/scripts/uninstall.sh"
+bash "$HERMES_HOME/skills/hermes-alive/scripts/uninstall.sh"
 ```
 
 同时删除全部 Hermes Alive 状态：
 
 ```bash
-bash "$HERMES_HOME/skills/hermes/hermes-alive/scripts/uninstall.sh" --purge
+bash "$HERMES_HOME/skills/hermes-alive/scripts/uninstall.sh" --purge
 ```
 
 `--purge` 具有破坏性。生产重启和真实消息测试始终应当是明确的运维决定。

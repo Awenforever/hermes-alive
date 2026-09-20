@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -84,17 +86,68 @@ def _enabled_file() -> Path:
     return _shared_target() / "enabled"
 
 
+def _config_file() -> Path:
+    return _shared_target() / "config" / "hermes-alive.json"
+
+
+def _atomic_write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, raw = tempfile.mkstemp(prefix=f".{path.name}.", dir=str(path.parent))
+    tmp = Path(raw)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def _read_config() -> dict:
+    try:
+        value = json.loads(_config_file().read_text(encoding="utf-8"))
+        return value if isinstance(value, dict) else {}
+    except Exception:
+        return {}
+
+
+def _set_enabled(enabled: bool) -> None:
+    config = _read_config()
+    values = config.get("values") if isinstance(config.get("values"), dict) else {}
+    values["enabled"] = enabled
+    config["values"] = values
+    config.setdefault("schema_version", 1)
+    _atomic_write(
+        _config_file(),
+        json.dumps(config, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+    )
+    _atomic_write(_enabled_file(), "true\n" if enabled else "false\n")
+
+
+def _effective_enabled() -> bool:
+    marker = _enabled_file()
+    if marker.is_file():
+        try:
+            return marker.read_text(encoding="utf-8").strip().lower() in {
+                "1", "true", "yes", "on", "enabled",
+            }
+        except OSError:
+            return False
+    values = _read_config().get("values")
+    return bool(values.get("enabled", False)) if isinstance(values, dict) else False
+
+
 def alive_command(args: argparse.Namespace) -> int:
     action = getattr(args, "alive_action", None)
     if action == "install-runtime":
         return _install_runtime()
     if action == "enable":
-        _enabled_file().parent.mkdir(parents=True, exist_ok=True)
-        _enabled_file().write_text("enabled\n", encoding="utf-8")
+        _set_enabled(True)
         print(json.dumps({"ok": True, "enabled": True, "restart_required": True}))
         return 0
     if action == "disable":
-        _enabled_file().unlink(missing_ok=True)
+        _set_enabled(False)
         print(json.dumps({"ok": True, "enabled": False, "restart_required": True}))
         return 0
     if action in {None, "status"}:
@@ -104,7 +157,7 @@ def alive_command(args: argparse.Namespace) -> int:
                     "ok": True,
                     "hermes_home": str(_home()),
                     "hook_installed": (_hook_target() / "HOOK.yaml").is_file(),
-                    "enabled": _enabled_file().is_file(),
+                    "enabled": _effective_enabled(),
                     "state_root": str(_shared_target()),
                 },
                 indent=2,

@@ -92,7 +92,7 @@ def lifecycle_command(home: Path, shared: Path, *extra: str) -> list[str]:
         "--hermes-home",
         str(home),
         "--source-target",
-        str(home / "skills" / "hermes" / "hermes-alive"),
+        str(home / "skills" / "hermes-alive"),
         "--hook-target",
         str(home / "hooks" / "hermes-alive"),
         "--shared-dir",

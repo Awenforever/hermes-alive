@@ -126,9 +126,9 @@ or WSL uses normal filesystem persistence.
 Default lifecycle paths are:
 
 ```text
-$HERMES_HOME/skills/hermes/hermes-alive
+$HERMES_HOME/skills/hermes-alive
 $HERMES_HOME/hooks/hermes-alive
-$HERMES_HOME/hermes_alive_shared
+$HERMES_HOME/plugin-data/hermes-alive/runtime
 ```
 
 The shared directory must be a child of `HERMES_HOME`.

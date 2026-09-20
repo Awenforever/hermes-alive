@@ -45,7 +45,7 @@ ACTIVITY_LEASE_TTL_SECONDS = float(
 SHARED_DIR = Path(
     os.getenv(
         "HERMES_ALIVE_SHARED_DIR",
-        "/opt/data/hermes_alive_shared",
+        str(Path(os.getenv("HERMES_HOME", "/opt/data")) / "plugin-data" / "hermes-alive" / "runtime"),
     )
 )
 QUEUE_FILE = SHARED_DIR / "context_queue.json"
