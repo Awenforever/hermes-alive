@@ -90,6 +90,10 @@ def _config_file() -> Path:
     return _shared_target() / "config" / "hermes-alive.json"
 
 
+def _control_file() -> Path:
+    return _shared_target() / "control.json"
+
+
 def _atomic_write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, raw = tempfile.mkstemp(prefix=f".{path.name}.", dir=str(path.parent))
@@ -123,6 +127,19 @@ def _set_enabled(enabled: bool) -> None:
         json.dumps(config, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
     )
     _atomic_write(_enabled_file(), "true\n" if enabled else "false\n")
+    try:
+        control = json.loads(_control_file().read_text(encoding="utf-8"))
+        if not isinstance(control, dict):
+            control = {}
+    except Exception:
+        control = {}
+    control["enabled_override"] = enabled
+    control["reason"] = "plugin CLI enable" if enabled else "plugin CLI disable"
+    control["updated_at_utc"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    _atomic_write(
+        _control_file(),
+        json.dumps(control, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+    )
 
 
 def _effective_enabled() -> bool:

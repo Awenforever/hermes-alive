@@ -54,8 +54,8 @@ def test_managed_master_switch_authority() -> None:
 
             assert os.environ["HERMES_PROACTIVE_PLATFORM_ENABLED"] == "false"
             assert loaded["HERMES_PROACTIVE_PLATFORM_ENABLED"] == "false"
-            assert os.environ["HERMES_PROACTIVE_LLM_ENABLED"] == "true"
-            assert "HERMES_PROACTIVE_LLM_ENABLED" not in loaded
+            assert os.environ["HERMES_PROACTIVE_LLM_ENABLED"] == "false"
+            assert loaded["HERMES_PROACTIVE_LLM_ENABLED"] == "false"
 
             payload = json.loads(config.read_text(encoding="utf-8"))
             payload["values"]["enabled"] = True

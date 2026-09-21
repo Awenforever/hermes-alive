@@ -34,6 +34,7 @@ class CooldownManager:
         self.state_path = state_path or DEFAULT_STATE_PATH
         self.now_fn = now_fn or datetime.now
         self.last_sent: datetime | None = None
+        self.last_attempt: datetime | None = None
         self.daily_count = 0
         self.day = self.now_fn().date().isoformat()
         self.type_counts: dict[str, int] = defaultdict(int)
@@ -59,18 +60,31 @@ class CooldownManager:
         self._reset_if_new_day()
         if self.is_quiet_hours():
             return False, "quiet_hours"
-        if self.last_sent is not None:
+        reference = max(
+            (value for value in (self.last_sent, self.last_attempt) if value is not None),
+            default=None,
+        )
+        if reference is not None:
             effective = self._mood_cooldown or _env_int("HERMES_PROACTIVE_COOLDOWN_MINUTES", 90)
-            elapsed = (self.now_fn() - self.last_sent).total_seconds() / 60
+            elapsed = (self.now_fn() - reference).total_seconds() / 60
             if elapsed < effective:
-                return False, "cooldown"
+                reason = "cooldown_after_failure" if self.last_attempt == reference else "cooldown"
+                return False, reason
         return True, "ok"
 
     def record_send(self, msg_type: str) -> None:
         self._reset_if_new_day()
         self.last_sent = self.now_fn()
+        self.last_attempt = None
         self.daily_count += 1
         self.type_counts[msg_type] += 1
+        self._save()
+
+    def record_attempt(self, msg_type: str) -> None:
+        """Persist a failed-attempt backoff without counting it as delivered."""
+        _ = msg_type
+        self._reset_if_new_day()
+        self.last_attempt = self.now_fn()
         self._save()
 
     def status(self) -> dict:
@@ -78,6 +92,7 @@ class CooldownManager:
         return {
             "state_path": str(self.state_path),
             "last_sent": self.last_sent.isoformat() if self.last_sent else None,
+            "last_attempt": self.last_attempt.isoformat() if self.last_attempt else None,
             "daily_count": self.daily_count,
             "day": self.day,
             "type_counts": dict(self.type_counts),
@@ -123,10 +138,17 @@ class CooldownManager:
                 self.last_sent = datetime.fromisoformat(raw_last_sent)
             except ValueError:
                 self.last_sent = None
+        raw_last_attempt = data.get("last_attempt")
+        if raw_last_attempt:
+            try:
+                self.last_attempt = datetime.fromisoformat(raw_last_attempt)
+            except ValueError:
+                self.last_attempt = None
 
     def _save(self) -> None:
         data = {
             "last_sent": self.last_sent.isoformat() if self.last_sent else None,
+            "last_attempt": self.last_attempt.isoformat() if self.last_attempt else None,
             "daily_count": self.daily_count,
             "day": self.day,
             "type_counts": dict(self.type_counts),

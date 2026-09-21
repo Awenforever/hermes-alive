@@ -82,6 +82,9 @@ MANAGED_ENV_KEYS = {
 # by stale/baked container environment values after a managed reconfigure.
 MANAGED_AUTHORITATIVE_KEYS = {
     "enabled",
+    "llm_enabled",
+    "llm_model",
+    "llm_fallback_model",
     "quality_governor_mode",
     "circadian_enabled",
     "circadian_mode",

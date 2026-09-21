@@ -39,12 +39,16 @@ def main() -> int:
         assert (state / "enabled").read_text(encoding="utf-8") == "true\n"
         config = json.loads((state / "config/hermes-alive.json").read_text(encoding="utf-8"))
         assert config["values"]["enabled"] is True
+        control = json.loads((state / "control.json").read_text(encoding="utf-8"))
+        assert control["enabled_override"] is True
         assert command(module, "status")["enabled"] is True
 
         assert command(module, "disable")["enabled"] is False
         assert (state / "enabled").read_text(encoding="utf-8") == "false\n"
         config = json.loads((state / "config/hermes-alive.json").read_text(encoding="utf-8"))
         assert config["values"]["enabled"] is False
+        control = json.loads((state / "control.json").read_text(encoding="utf-8"))
+        assert control["enabled_override"] is False
         assert command(module, "status")["enabled"] is False
 
         installed = command(module, "install-runtime")

@@ -103,12 +103,16 @@ class FakeCircadian:
 
 
 class DummyAdapter:
-    def __init__(self) -> None:
+    def __init__(self, *, success: bool = True) -> None:
         self.contents: list[str] = []
+        self.success = success
 
     async def send(self, chat_id: str, content: str, metadata: dict[str, Any] | None = None):
         self.contents.append(content)
-        return SimpleNamespace(success=True, error=None)
+        return SimpleNamespace(
+            success=self.success,
+            error=None if self.success else "synthetic delivery failure",
+        )
 
 
 class FakeCooldown:
@@ -116,6 +120,7 @@ class FakeCooldown:
         self.allowed = allowed
         self.reason = reason
         self.records: list[str] = []
+        self.attempts: list[str] = []
 
     def set_mood_cooldown(self, social_urge: float | None) -> None:
         pass
@@ -125,6 +130,9 @@ class FakeCooldown:
 
     def record_send(self, msg_type: str) -> None:
         self.records.append(msg_type)
+
+    def record_attempt(self, msg_type: str) -> None:
+        self.attempts.append(msg_type)
 
 
 async def install_tick_stubs(
@@ -323,6 +331,30 @@ def test_watcher_shadow_never_uses_production_enforcement() -> None:
         restore_env(previous)
 
 
+def test_failed_delivery_records_backoff_without_counting_send() -> None:
+    previous = live_env()
+    try:
+        adapter = DummyAdapter(success=False)
+        cooldown = FakeCooldown()
+        watcher = ProactivePlatformWatcher({}, SimpleNamespace())
+        watcher._log = lambda name, **extra: None
+        asyncio.run(
+            install_tick_stubs(
+                watcher,
+                adapter,
+                circadian=decision(phase="forced_awake"),
+                cooldown=cooldown,
+            )
+        )
+        result = asyncio.run(watcher._tick_impl("failed-delivery-backoff"))
+        check(result is False, "failed delivery was reported as sent")
+        check(cooldown.records == [], "failed delivery incremented successful-send cooldown")
+        check(cooldown.attempts == ["casual"], "failed delivery did not persist attempt backoff")
+        check(adapter.contents == ["production-enforcement-test"], "delivery retried inside one tick")
+    finally:
+        restore_env(previous)
+
+
 def test_engine_unavailable_live_is_watcher_fail_closed() -> None:
     previous = live_env()
     try:
@@ -393,6 +425,7 @@ def main() -> int:
         test_corrupt_persistent_state_is_live_fail_closed_and_not_overwritten,
         test_watcher_live_sleep_blocks_before_compose,
         test_watcher_live_awake_overrides_legacy_quiet_and_sends,
+        test_failed_delivery_records_backoff_without_counting_send,
         test_watcher_shadow_never_uses_production_enforcement,
         test_engine_unavailable_live_is_watcher_fail_closed,
         test_isolated_test_guard_remains_test_only,

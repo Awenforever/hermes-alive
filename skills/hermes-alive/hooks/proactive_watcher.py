@@ -751,7 +751,10 @@ class ProactivePlatformWatcher:
                         msg_index=msg_index,
                         msg_count=msg_count,
                     )
-                    continue
+                    record_attempt = getattr(cooldown, "record_attempt", None)
+                    if callable(record_attempt):
+                        record_attempt(msg_type)
+                    break
             else:
                 try:
                     result = await adapter.send(
@@ -772,7 +775,10 @@ class ProactivePlatformWatcher:
                             msg_index=msg_index,
                             msg_count=msg_count,
                         )
-                        continue
+                        record_attempt = getattr(cooldown, "record_attempt", None)
+                        if callable(record_attempt):
+                            record_attempt(msg_type)
+                        break
                 except Exception as exc:
                     self._log(
                         "error",
@@ -786,7 +792,10 @@ class ProactivePlatformWatcher:
                     logger.exception(
                         "Failed to send proactive platform message"
                     )
-                    continue
+                    record_attempt = getattr(cooldown, "record_attempt", None)
+                    if callable(record_attempt):
+                        record_attempt(msg_type)
+                    break
 
             sent_messages.append((msg_type, content, generated_by))
             self._commit_quality_delivery(

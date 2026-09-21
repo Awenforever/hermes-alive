@@ -154,6 +154,7 @@ def managed_valid_and_override() -> None:
             {
                 "values": {
                     "enabled": True,
+                    "llm_model": "qwen3.6-chat",
                     "timezone": "Asia/Singapore",
                     "emoji_policy": "contextual",
                 }
@@ -166,6 +167,7 @@ def managed_valid_and_override() -> None:
         "HERMES_PROACTIVE_PLATFORM_ENABLED",
         "TZ",
         "HERMES_ALIVE_EMOJI_POLICY",
+        "HERMES_PROACTIVE_LLM_MODEL",
     )
     previous = {
         name: os.environ.get(name)
@@ -185,6 +187,7 @@ def managed_valid_and_override() -> None:
 
         # An explicit environment value wins when overwrite=False.
         os.environ["TZ"] = "Existing/Zone"
+        os.environ["HERMES_PROACTIVE_LLM_MODEL"] = "stale-model"
 
         loaded = load_managed_env(
             overwrite=False
@@ -197,6 +200,7 @@ def managed_valid_and_override() -> None:
             == "true"
         )
         assert os.environ["TZ"] == "Existing/Zone"
+        assert os.environ["HERMES_PROACTIVE_LLM_MODEL"] == "qwen3.6-chat"
         assert (
             os.environ[
                 "HERMES_ALIVE_EMOJI_POLICY"
