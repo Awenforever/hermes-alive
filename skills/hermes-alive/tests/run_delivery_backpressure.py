@@ -42,10 +42,32 @@ class Tokens:
         return self.token
 
 
+class RuntimeV2:
+    def __init__(self, pending: int, count: int = 0) -> None:
+        self.pending = pending
+        self.count = count
+
+    def pending_count(self, account_id: str, chat_id: str) -> int:
+        return self.pending
+
+    def snapshot(self, account_id: str, chat_id: str, token: str):
+        return self.count, "fingerprint"
+
+
 def adapter(*, pending: int = 0, exhausted: bool = False, token: str = "token"):
     return SimpleNamespace(
         _send_queue=Queue(pending),
         _budget_store=Budget(exhausted, token),
+        _token_store=Tokens(token),
+        _account_id="acct",
+        _send_session=object(),
+        _token="transport",
+    )
+
+
+def adapter_v2(*, pending: int = 0, count: int = 0, token: str = "token"):
+    return SimpleNamespace(
+        _hermes_wechat_runtime_v2=RuntimeV2(pending, count),
         _token_store=Tokens(token),
         _account_id="acct",
         _send_session=object(),
@@ -69,6 +91,24 @@ def main() -> int:
         "context_token_unavailable",
     )
     assert watcher._delivery_preflight(adapter(), "peer") == (
+        True,
+        "delivery_ready",
+        0,
+    )
+    assert watcher._delivery_preflight(adapter_v2(pending=3), "peer") == (
+        False,
+        "downstream_queue_not_empty",
+        3,
+    )
+    assert watcher._delivery_preflight(adapter_v2(count=10), "peer")[:2] == (
+        False,
+        "context_token_budget_exhausted",
+    )
+    assert watcher._delivery_preflight(adapter_v2(token=""), "peer")[:2] == (
+        False,
+        "context_token_unavailable",
+    )
+    assert watcher._delivery_preflight(adapter_v2(), "peer") == (
         True,
         "delivery_ready",
         0,

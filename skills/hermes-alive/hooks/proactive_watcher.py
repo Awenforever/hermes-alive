@@ -2651,6 +2651,28 @@ class ProactivePlatformWatcher:
         chat_id: str,
     ) -> tuple[bool, str, int]:
         """Fail closed before discovery/LLM work when Weixin cannot send now."""
+        runtime_v2 = getattr(adapter, "_hermes_wechat_runtime_v2", None)
+        if runtime_v2 is not None:
+            if not getattr(adapter, "_send_session", None) or not getattr(adapter, "_token", None):
+                return False, "adapter_not_connected", 0
+            account_id = str(getattr(adapter, "_account_id", "") or "")
+            try:
+                pending = int(runtime_v2.pending_count(account_id, chat_id) or 0)
+            except Exception:
+                return False, "queue_health_unknown", 0
+            if pending > 0:
+                return False, "downstream_queue_not_empty", pending
+            try:
+                context_token = adapter._token_store.get(account_id, chat_id)
+                count, _fingerprint = runtime_v2.snapshot(account_id, chat_id, context_token)
+            except Exception:
+                return False, "context_budget_unknown", pending
+            if int(count) >= 10:
+                return False, "context_token_budget_exhausted", pending
+            if not context_token:
+                return False, "context_token_unavailable", pending
+            return True, "delivery_ready", pending
+
         if not all(
             hasattr(adapter, name)
             for name in ("_send_queue", "_budget_store", "_token_store", "_account_id")
