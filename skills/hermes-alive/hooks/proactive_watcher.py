@@ -2590,7 +2590,7 @@ class ProactivePlatformWatcher:
         return _truthy(raw)
 
     def _llm_model_name(self) -> str:
-        return os.getenv(LLM_MODEL_ENV, os.getenv("HERMES_PROACTIVE_MODEL", "deepseek-v4-flash-ascend")).strip() or "deepseek-v4-flash-ascend"
+        return os.getenv(LLM_MODEL_ENV, os.getenv("HERMES_PROACTIVE_MODEL", "deepseek-flash")).strip() or "deepseek-flash"
 
     async def _check_dream(self) -> None:
         """Run dream memory consolidation if interval has elapsed."""

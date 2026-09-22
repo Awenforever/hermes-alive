@@ -339,13 +339,13 @@ def test_composer_routes_configured_model_to_provider() -> None:
         captured.update(kwargs)
         return _fake_response(
             "主动模型路由测试",
-            "deepseek-v4-flash-ascend",
+            "deepseek-flash",
         )
 
     auxiliary_client.async_call_llm = fake_call
     os.environ[
         "HERMES_PROACTIVE_LLM_MODEL"
-    ] = "deepseek-v4-flash-ascend"
+    ] = "deepseek-flash"
     try:
         composer = LLMMessageComposer()
         _isolate_composer_prompt(composer)
@@ -359,7 +359,7 @@ def test_composer_routes_configured_model_to_provider() -> None:
         assert value == "主动模型路由测试"
         assert captured["task"] == "proactive"
         assert captured["model"] == (
-            "deepseek-v4-flash-ascend"
+            "deepseek-flash"
         )
     finally:
         auxiliary_client.async_call_llm = original

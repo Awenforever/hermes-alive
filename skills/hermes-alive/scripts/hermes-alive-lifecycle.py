@@ -798,6 +798,10 @@ def configure(args: argparse.Namespace) -> int:
     values = current.get("values", {}) if isinstance(current, dict) else {}
     if not isinstance(values, dict):
         values = {}
+    # New installations get a production-ready default route while upgrades
+    # preserve any explicit user choice already stored in managed config.
+    values.setdefault("llm_model", "deepseek-flash")
+    values.setdefault("llm_fallback_model", "qwen3.6-chat")
 
     def assign(name: str, value: Any) -> None:
         if value is not None:
