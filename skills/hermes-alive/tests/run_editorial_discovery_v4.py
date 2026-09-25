@@ -81,12 +81,28 @@ def test_proxy_is_opt_in_and_applied() -> None:
     check(kwargs.get("proxy") == "http://proxy.invalid:7890", f"proxy missing: {kwargs}")
 
 
+def test_news_aggregator_caps_real_publishers() -> None:
+    engine = DiscoveryEngine.__new__(DiscoveryEngine)
+    engine._sources_config = {
+        "budgets": {"max_per_run": 5, "max_per_source": 1, "max_per_lane": 5},
+        "editorial": {"lane_order": ["culture_people"]},
+    }
+    items = []
+    for index, publisher in enumerate(("媒体甲", "媒体乙", "媒体甲")):
+        item = candidate("culture_people", index)
+        item.update({"source": "news_search", "publisher": publisher})
+        items.append(item)
+    result = engine._enforce_budget(items)
+    check([item["publisher"] for item in result] == ["媒体甲", "媒体乙"], result)
+
+
 def main() -> int:
     tests = [
         test_no_academic_source_bonus,
         test_stale_current_affairs_is_rejected,
         test_lanes_are_interleaved_and_capped,
         test_proxy_is_opt_in_and_applied,
+        test_news_aggregator_caps_real_publishers,
     ]
     for test in tests:
         test()

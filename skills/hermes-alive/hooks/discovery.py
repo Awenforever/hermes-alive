@@ -1673,13 +1673,21 @@ class DiscoveryEngine:
         capped: list[dict[str, Any]] = []
         for item in items:
             source = item.get("source", "unknown")
+            # A news-search endpoint is an aggregator, not the editorial
+            # publisher. Count its publisher so one transport cannot crowd out
+            # whole lanes made up of independent outlets.
+            source_key = (
+                str(item.get("publisher") or source)
+                if source == "news_search"
+                else str(source)
+            )
             lane = _lane(item)
-            if source_counts.get(source, 0) >= max_per_source:
+            if source_counts.get(source_key, 0) >= max_per_source:
                 continue
             lane_cap = int(lane_caps.get(lane, max_per_lane))
             if lane_counts.get(lane, 0) >= lane_cap:
                 continue
-            source_counts[source] = source_counts.get(source, 0) + 1
+            source_counts[source_key] = source_counts.get(source_key, 0) + 1
             lane_counts[lane] = lane_counts.get(lane, 0) + 1
             capped.append(item)
 

@@ -56,7 +56,7 @@ sources:
         source_trust: 0.78
       - name: "合肥本地"
         lane: "local_hefei"
-        query: "合肥 政策 发布 OR 公示 OR 新规 when:7d"
+        query: "\"合肥\" (政策 OR 公示 OR 新规 OR 发布) when:7d"
         max_results: 4
         source_trust: 0.80
       - name: "人物与文化"
