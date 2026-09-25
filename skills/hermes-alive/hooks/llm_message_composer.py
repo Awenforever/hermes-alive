@@ -169,6 +169,7 @@ debug、生产操作、审计或严肃场景通常少用或不用，但不做硬
 {"topic_mode":"ambient|context_continuation|new_discovery","bubbles":[{"act":"语义动作","text":"气泡正文"}],"content_ref":null}
 
 要求：
+- act 只能从以下枚举中选择，不得创造近义标签或英文变体：self_talk、observation、question、care、dry_observation、debug_companion、research_ping、discovery_intro、fact、reaction、turn、source_link、closing、poke、casual
 - bubbles 必须是 1–5 条，默认使用能完整表达的最少条数
 - 每条必须承担独立语义动作，而不是把一段完整文字按句号、长度或换行切开
 - 多条时应自然递进；删除某条会损失一个独立信息或话语功能
@@ -656,10 +657,10 @@ class LLMMessageComposer:
                     return preferred
         trigger = str(context.get("trigger") or "").strip()
         mapping = {
-            "social_urge": "social_checkin",
+            "social_urge": "poke",
             "care": "care",
             "mischief": "casual",
-            "curiosity": "musing",
+            "curiosity": "self_talk",
             "energy": "observation",
         }
         return mapping.get(trigger, "casual")

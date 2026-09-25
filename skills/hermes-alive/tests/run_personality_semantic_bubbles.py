@@ -32,6 +32,7 @@ import alive_state
 from interruption_policy import InterruptionPolicy
 from proactive_disposition import evaluate_proactive_disposition
 from semantic_bubbles import (
+    ALLOWED_ACTS,
     SemanticPlanError,
     parse_semantic_plan,
 )
@@ -421,6 +422,16 @@ def test_composer_contract_has_no_separator_instruction() -> None:
     check("semantic" in prompt.lower() or "语义" in prompt, "semantic contract missing")
 
 
+def test_composer_contract_enumerates_only_runtime_supported_acts() -> None:
+    prompt = llm_message_composer.SYSTEM_PROMPT
+    for act in sorted(ALLOWED_ACTS):
+        check(act in prompt, f"supported act missing from prompt: {act}")
+    composer = llm_message_composer.LLMMessageComposer()
+    for trigger in ("social_urge", "care", "mischief", "curiosity", "energy", "unknown"):
+        act = composer._msg_type({"trigger": trigger})
+        check(act in ALLOWED_ACTS, f"trigger maps to unsupported act: {trigger} -> {act}")
+
+
 TESTS = [
     test_same_ignored_count_can_produce_different_behavior,
     test_ignored_count_is_evidence_not_direct_switch,
@@ -433,6 +444,7 @@ TESTS = [
     test_cross_bubble_duplicate_is_rejected,
     test_policy_limit_is_respected,
     test_composer_contract_has_no_separator_instruction,
+    test_composer_contract_enumerates_only_runtime_supported_acts,
 ]
 
 
