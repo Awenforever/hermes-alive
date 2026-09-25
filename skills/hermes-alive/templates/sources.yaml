@@ -2,10 +2,16 @@
 # Branch: feat/playwright-multi-platform (2026-07-05)
 # Sources by method:
 #   API (aiohttp): arxiv, github, hackernews, v2ex, bilibili
+#   News search (RSS): configurable current affairs, local, culture and light-interest lanes
 #   RSS (aiohttp): sspai
 #   Playwright: hackernews (direct), zhihu, papers.cool, jandan
-#   Blocked: 小红书(需登录), 抖音(无内容), 微信公众号(robots全禁), Reddit(Cloudflare), Hermes Forum(GitHub登录)
+#   Auth-required: 小红书（匿名抓取不作为可靠生产来源）
 #   Pending research: 即刻(需用户协助找API endpoint)
+
+network:
+  # Leave blank unless this device needs an HTTP(S) proxy for discovery.
+  # Example: http://192.168.1.10:7890
+  proxy_url: ""
 
 sources:
   arxiv:
@@ -37,6 +43,33 @@ sources:
     enabled: true
     max_results: 3
 
+  # Editorial lanes are intentionally data-driven. Add or change queries here;
+  # no Python patch is required to personalize region or interests.
+  news_search:
+    enabled: true
+    max_results_per_query: 4
+    queries:
+      - name: "重要时事"
+        lane: "current_affairs"
+        query: "中国 国际 重大进展 when:3d"
+        max_results: 4
+        source_trust: 0.78
+      - name: "合肥本地"
+        lane: "local_hefei"
+        query: "合肥 政策 发布 OR 公示 OR 新规 when:7d"
+        max_results: 4
+        source_trust: 0.80
+      - name: "人物与文化"
+        lane: "culture_people"
+        query: "作家 OR 艺术家 OR 文化 新作 OR 逝世 when:7d"
+        max_results: 4
+        source_trust: 0.72
+      - name: "轻松趣闻"
+        lane: "social_fun"
+        query: "猫 OR 宠物 OR 趣闻 OR 网络热议 when:3d"
+        max_results: 4
+        source_trust: 0.62
+
   rss:
     enabled: false
     feeds: []
@@ -62,6 +95,7 @@ sources:
       - name: "小红书"
         url: "https://www.xiaohongshu.com/explore"
         type: "social"
+        enabled: false
 
 dedup:
   enabled: true
@@ -69,7 +103,32 @@ dedup:
 
 budgets:
   max_per_run: 18
-  max_per_source: 4
+  max_per_source: 12
+  max_per_lane: 4
+  lane_caps:
+    academic: 2
+    technology: 3
+    current_affairs: 4
+    local_hefei: 4
+    culture_people: 3
+    social_fun: 4
+
+freshness:
+  current_affairs: 168
+  local_hefei: 336
+  culture_people: 336
+  social_fun: 168
+  technology: 336
+  academic: 720
+
+editorial:
+  lane_order:
+    - current_affairs
+    - local_hefei
+    - social_fun
+    - culture_people
+    - technology
+    - academic
 
 share_threshold:
   min_score: 0.60

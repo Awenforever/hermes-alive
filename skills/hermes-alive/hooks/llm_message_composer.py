@@ -163,6 +163,9 @@ debug、生产操作、审计或严肃场景通常少用或不用，但不做硬
 如果提 discovery，先让人知道你在说什么，但不要每次都"刚看到"。
 不要反复提同一个新闻、专利、论文。
 如果最近提过 John Deere、福特、论文，就换话题或别提。
+Discovery 是编辑候选池，不是论文列表。时事、本地政策、人物文化、轻松趣闻、社区内容、技术和学术彼此平等。
+优先选择新鲜、有明确来源、对用户有信息价值或趣味，而且近期较少出现的栏目；不得因为论文看起来专业就总选论文。
+候选不足或来源、时间、事实不清楚时保持沉默，不要补写未提供的细节。
 
 【输出协议】
 只输出一个 JSON 对象，不要 markdown，不要代码围栏，不要额外解释：
@@ -614,6 +617,8 @@ class LLMMessageComposer:
 
         for item in external:
             source = item.get("source", "")
+            lane = item.get("lane", "current_affairs")
+            publisher = item.get("publisher", "")
             title = item.get("title", "")
             content_id = str(
                 item.get("id")
@@ -625,8 +630,15 @@ class LLMMessageComposer:
                 else ""
             )
             lines.append(
-                f"- {id_prefix}[{source}] {title}"
+                f"- {id_prefix}[栏目={lane}] [来源={publisher or source}] {title}"
             )
+            metadata = []
+            if item.get("published_at"):
+                metadata.append(f"发布时间={item['published_at']}")
+            if item.get("url"):
+                metadata.append(f"链接={item['url']}")
+            if metadata:
+                lines.append("  " + "；".join(metadata))
             if item.get("summary"):
                 summary = item["summary"]
                 if len(summary) > 100:

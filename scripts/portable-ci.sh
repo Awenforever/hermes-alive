@@ -72,6 +72,7 @@ run_and_require run_joint_shadow_replay.py '^HERMES_ALIVE_JOINT_SHADOW_REPLAY_RE
 run_and_require run_isolated_enforcement.py '^HERMES_ALIVE_ISOLATED_ENFORCEMENT_RESULT=PASS$'
 run_and_require run_production_enforcement.py '^HERMES_ALIVE_PRODUCTION_ENFORCEMENT_RESULT=PASS$'
 run_and_require run_discovery_quality_pivot_v3.py '^HERMES_ALIVE_DISCOVERY_PIVOT_V3_RESULT=PASS$'
+run_and_require run_editorial_discovery_v4.py '^HERMES_ALIVE_EDITORIAL_DISCOVERY_V4_RESULT=PASS$'
 run_and_require run_rich_content_model_attribution_v1.py '^HERMES_ALIVE_RICH_CONTENT_MODEL_ATTRIBUTION_RESULT=PASS([[:space:]]|$)'
 run_and_require run_runtime_disable_contract.py '^HERMES_ALIVE_RUNTIME_DISABLE_CONTRACT_RESULT=PASS$'
 run_and_require run_plugin_cli_portable.py '^HERMES_ALIVE_PLUGIN_CLI_PORTABLE_RESULT=PASS$'

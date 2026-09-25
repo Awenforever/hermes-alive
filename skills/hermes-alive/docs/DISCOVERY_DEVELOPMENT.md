@@ -58,6 +58,17 @@ collectors. Current integrations include papers, repositories, technology news,
 Chinese community feeds, video trends, and selected lifestyle/discussion
 sources.
 
+Candidates are normalized into editorial lanes (`current_affairs`,
+`local_hefei`, `culture_people`, `social_fun`, `technology`, and `academic`).
+Freshness is enforced per lane and the final batch is round-robin interleaved;
+source type alone never awards a paper or repository a higher score. Configured
+news-search queries are editorial inputs, so regions and interests can be
+personalized without changing Python code.
+
+Authenticated social platforms are not treated as reliable anonymous sources.
+They require an explicitly authorized, private browser state; when unavailable,
+the source is reported as unavailable and other lanes continue normally.
+
 Browser-backed discovery is optional and outside the core lifecycle contract.
 When enabled in a container, browser assets need a persistent path such as:
 

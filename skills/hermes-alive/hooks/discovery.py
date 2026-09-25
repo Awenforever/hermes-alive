@@ -20,12 +20,15 @@ from __future__ import annotations
 # Marker: RICH_CONTENT_IMAGE_SOURCE_V1
 
 import asyncio
+import html
 import logging
 import os
 import time
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote_plus
 
 from topic_dedup import TopicDedupStore, item_identity
 
@@ -101,10 +104,11 @@ DEFAULT_SOURCES_CONFIG: dict[str, Any] = {
         "arxiv": {"enabled": True, "query": "(satellite AND smoke detection) OR (remote sensing AND computer vision) OR (wildfire AND deep learning)", "max_results": 3},
         "github": {"enabled": True, "query": "stars:>50 pushed:>2026-04-01", "sort": "stars", "per_page": 3},
         "hackernews": {"enabled": True, "max_stories": 15, "target_count": 3},
+        "news_search": {"enabled": False, "queries": []},
         "rss": {"enabled": False, "feeds": []},
     },
     "dedup": {"enabled": True, "url_cache_size": 200},
-    "budgets": {"max_per_run": 15, "max_per_source": 5},
+    "budgets": {"max_per_run": 15, "max_per_source": 5, "max_per_lane": 4},
     "share_threshold": {"min_score": 0.6},
 }
 
@@ -118,6 +122,15 @@ class ExternalDiscovery:
     def __init__(self, sources_config: dict[str, Any] | None = None) -> None:
         self._session: aiohttp.ClientSession | None = None
         self.sources_config = sources_config or {}
+        self.last_health: dict[str, dict[str, Any]] = {}
+
+    def _request(self, session: aiohttp.ClientSession, url: str, **kwargs: Any) -> Any:
+        """Create a GET request with the optional user-configured network proxy."""
+        network = self.sources_config.get("network", {})
+        proxy = str(network.get("proxy_url") or os.getenv("HERMES_DISCOVERY_PROXY_URL", "")).strip()
+        if proxy and "proxy" not in kwargs:
+            kwargs["proxy"] = proxy
+        return session.get(url, **kwargs)
 
     async def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
@@ -131,13 +144,17 @@ class ExternalDiscovery:
             logger.debug("aiohttp not available; skipping external discovery")
             return results
 
-        tasks: dict[str, Any] = {
-            "arxiv": self._collect_arxiv(),
-            "github": self._collect_github_trending(),
-            "hn": self._collect_hacker_news(),
-        }
+        tasks: dict[str, Any] = {}
         # Add RSS if enabled in sources config
         sources = self.sources_config.get("sources", {})
+        if sources.get("arxiv", {}).get("enabled", False):
+            tasks["arxiv"] = self._collect_arxiv()
+        if sources.get("github", {}).get("enabled", False):
+            tasks["github"] = self._collect_github_trending()
+        if sources.get("hackernews", {}).get("enabled", False):
+            tasks["hn"] = self._collect_hacker_news()
+        if sources.get("news_search", {}).get("enabled", False):
+            tasks["news_search"] = self._collect_news_search()
         if sources.get("rss", {}).get("enabled", False):
             tasks["rss"] = self._collect_rss()
         # Add Playwright if enabled in sources config
@@ -161,9 +178,11 @@ class ExternalDiscovery:
         for source_name, result in zip(names, gathered):
             if isinstance(result, Exception):
                 logger.exception("ExternalDiscovery[%s] failed: %s", source_name, result)
+                self.last_health[source_name] = {"ok": False, "fetched": 0, "error": type(result).__name__}
             else:
                 items = result or []
                 results.extend(items)
+                self.last_health[source_name] = {"ok": True, "fetched": len(items)}
                 logger.debug("ExternalDiscovery[%s]: %d items", source_name, len(items))
 
         if self._session and not self._session.closed:
@@ -185,7 +204,7 @@ class ExternalDiscovery:
         url = f"https://export.arxiv.org/api/query?{query}"
         headers = {"User-Agent": "HermesAlive/1.0 (discovery)"}
 
-        async with session.get(url, headers=headers) as resp:
+        async with self._request(session, url, headers=headers) as resp:
             if resp.status != 200:
                 logger.warning("arXiv API returned status %d", resp.status)
                 return []
@@ -222,9 +241,12 @@ class ExternalDiscovery:
 
             results.append({
                 "source": "arxiv",
+                "lane": "academic",
                 "title": title,
                 "summary": summary,
                 "url": url,
+                "published_at": entry.findtext("atom:published", "", ns).strip(),
+                "source_trust": 0.85,
                 "interesting_reason": "最近的相关研究论文",
             })
 
@@ -236,7 +258,7 @@ class ExternalDiscovery:
         url = "https://www.v2ex.com/api/topics/hot.json"
         headers = {"User-Agent": "HermesAlive/1.0 (discovery)"}
         try:
-            async with session.get(url, headers=headers) as resp:
+            async with self._request(session, url, headers=headers) as resp:
                 if resp.status != 200:
                     logger.warning("V2EX API returned status %d", resp.status)
                     return []
@@ -253,6 +275,7 @@ class ExternalDiscovery:
             if title:
                 results.append({
                     "source": "v2ex",
+                    "lane": "social_fun",
                     "title": title,
                     "summary": f"节点:{topic.get('node', {}).get('title', '')} 回复:{topic.get('replies', 0)}",
                     "url": topic_url,
@@ -271,7 +294,7 @@ class ExternalDiscovery:
             "Accept-Language": "zh-CN,zh;q=0.9",
         }
         try:
-            async with session.get(url, headers=headers) as resp:
+            async with self._request(session, url, headers=headers) as resp:
                 if resp.status != 200:
                     logger.warning("Bilibili API returned status %d", resp.status)
                     return []
@@ -291,6 +314,7 @@ class ExternalDiscovery:
             if title:
                 results.append({
                     "source": "bilibili",
+                    "lane": "social_fun",
                     "title": title,
                     "summary": summary,
                     "url": video_url,
@@ -311,7 +335,7 @@ class ExternalDiscovery:
             "Accept": "application/rss+xml, application/xml",
         }
         try:
-            async with session.get(url, headers=headers) as resp:
+            async with self._request(session, url, headers=headers) as resp:
                 if resp.status != 200:
                     logger.warning("少数派 RSS returned status %d", resp.status)
                     return []
@@ -338,10 +362,80 @@ class ExternalDiscovery:
             if title:
                 results.append({
                     "source": "sspai",
+                    "lane": "technology",
                     "title": title,
                     "summary": summary,
                     "url": link,
+                    "published_at": (item.findtext("pubDate", "") or "").strip(),
                 })
+        return results
+
+    async def _collect_news_search(self) -> list[dict[str, Any]]:
+        """Collect configurable editorial lanes from Google News RSS.
+
+        Queries are data, not code: users can add regions and interests without
+        another release. Each result preserves lane, publisher and publication
+        time so the pipeline can enforce freshness and diversity.
+        """
+        import xml.etree.ElementTree as ET
+
+        cfg = self.sources_config.get("sources", {}).get("news_search", {})
+        queries = cfg.get("queries", [])
+        if not isinstance(queries, list):
+            return []
+        session = await self._get_session()
+        results: list[dict[str, Any]] = []
+        default_limit = int(cfg.get("max_results_per_query", 4))
+        for spec in queries:
+            if not isinstance(spec, dict) or not spec.get("enabled", True):
+                continue
+            query = str(spec.get("query") or "").strip()
+            lane = str(spec.get("lane") or "current_affairs").strip()
+            if not query:
+                continue
+            language = str(spec.get("language") or "zh-CN")
+            country = str(spec.get("country") or "CN")
+            ceid = str(spec.get("ceid") or f"{country}:zh-Hans")
+            url = (
+                "https://news.google.com/rss/search?q=" + quote_plus(query)
+                + f"&hl={quote_plus(language)}&gl={quote_plus(country)}&ceid={quote_plus(ceid)}"
+            )
+            try:
+                async with self._request(
+                    session,
+                    url,
+                    headers={"User-Agent": "HermesAlive/2.6 (editorial-discovery)"},
+                ) as resp:
+                    if resp.status != 200:
+                        logger.warning("News search lane %s returned status %d", lane, resp.status)
+                        continue
+                    payload = await resp.text()
+            except Exception:
+                logger.exception("News search lane %s failed", lane)
+                continue
+            try:
+                root = ET.fromstring(payload)
+            except ET.ParseError:
+                logger.warning("News search lane %s returned invalid RSS", lane)
+                continue
+            limit = int(spec.get("max_results", default_limit))
+            for node in root.findall(".//item")[:limit]:
+                title = html.unescape((node.findtext("title", "") or "").strip())
+                link = (node.findtext("link", "") or "").strip()
+                published = (node.findtext("pubDate", "") or "").strip()
+                source_node = node.find("source")
+                publisher = (source_node.text or "").strip() if source_node is not None else ""
+                if title and link:
+                    results.append({
+                        "source": "news_search",
+                        "publisher": publisher,
+                        "lane": lane,
+                        "title": title,
+                        "url": link,
+                        "published_at": published,
+                        "source_trust": float(spec.get("source_trust", 0.72)),
+                        "content_type": "news",
+                    })
         return results
 
     async def _collect_github_trending(self) -> list[dict[str, Any]]:
@@ -357,7 +451,7 @@ class ExternalDiscovery:
             "Accept": "application/vnd.github.v3+json",
         }
 
-        async with session.get(url, headers=headers) as resp:
+        async with self._request(session, url, headers=headers) as resp:
             if resp.status != 200:
                 logger.warning("GitHub API returned status %d; trying trending page", resp.status)
                 return await self._collect_github_trending_scrape()
@@ -368,6 +462,7 @@ class ExternalDiscovery:
             for repo in items[:3]:
                 results.append({
                     "source": "github",
+                    "lane": "technology",
                     "title": repo.get("full_name", ""),
                     "description": repo.get("description") or "",
                     "url": repo.get("html_url", ""),
@@ -383,7 +478,7 @@ class ExternalDiscovery:
         headers = {"User-Agent": "HermesAlive/1.0 (discovery)"}
 
         try:
-            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            async with self._request(session, url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 if resp.status != 200:
                     logger.warning("GitHub trending page returned status %d", resp.status)
                     return []
@@ -433,6 +528,7 @@ class ExternalDiscovery:
 
             results.append({
                 "source": "github",
+                "lane": "technology",
                 "title": full_name,
                 "description": description,
                 "url": f"https://github.com/{full_name}",
@@ -446,29 +542,27 @@ class ExternalDiscovery:
         session = await self._get_session()
 
         # Get top stories
-        async with session.get(
-            "https://hacker-news.firebaseio.com/v0/topstories.json"
+        async with self._request(
+            session, "https://hacker-news.firebaseio.com/v0/topstories.json"
         ) as resp:
             if resp.status != 200:
                 logger.warning("HN topstories returned status %d", resp.status)
                 return []
             story_ids = await resp.json()
 
-        # Fetch individual stories (top 10 to filter interesting ones)
+        # Popularity already supplies a useful signal. Do not pre-filter by
+        # technology keywords here: doing so silently turns a general feed into
+        # another AI/paper feed.
         results: list[dict[str, Any]] = []
-        interesting_keywords = [
-            "ai", "machine learning", "deep learning", "llm", "gpt",
-            "programming", "software", "python", "rust", "go",
-            "computer vision", "remote sensing", "satellite",
-            "startup", "open source", "research", "paper",
-        ]
-
-        for sid in story_ids[:15]:
-            if len(results) >= 3:
+        cfg = self.sources_config.get("sources", {}).get("hackernews", {})
+        target_count = int(cfg.get("target_count", 3))
+        max_stories = int(cfg.get("max_stories", 15))
+        for sid in story_ids[:max_stories]:
+            if len(results) >= target_count:
                 break
             try:
-                async with session.get(
-                    f"https://hacker-news.firebaseio.com/v0/item/{sid}.json"
+                async with self._request(
+                    session, f"https://hacker-news.firebaseio.com/v0/item/{sid}.json"
                 ) as resp:
                     if resp.status != 200:
                         continue
@@ -481,50 +575,19 @@ class ExternalDiscovery:
 
                     url = item.get("url") or f"https://news.ycombinator.com/item?id={sid}"
 
-                    # Check if title is interesting
-                    title_lower = title.lower()
-                    is_interesting = any(kw in title_lower for kw in interesting_keywords)
-
-                    if is_interesting:
-                        results.append({
-                            "source": "hn",
-                            "title": title,
-                            "url": url,
-                        })
+                    results.append({
+                        "source": "hn",
+                        "lane": "technology",
+                        "title": title,
+                        "url": url,
+                        "published_at": datetime.fromtimestamp(
+                            int(item.get("time") or 0), tz=timezone.utc
+                        ).isoformat() if item.get("time") else "",
+                        "engagement": int(item.get("score") or 0),
+                    })
             except Exception:
                 logger.debug("Failed to fetch HN item %d", sid, exc_info=True)
                 continue
-
-        # If we didn't find enough interesting ones, just add top ones
-        if len(results) < 3:
-            for sid in story_ids[:10]:
-                if len(results) >= 3:
-                    break
-                try:
-                    async with session.get(
-                        f"https://hacker-news.firebaseio.com/v0/item/{sid}.json"
-                    ) as resp:
-                        if resp.status != 200:
-                            continue
-                        item = await resp.json()
-                        if not item or not isinstance(item, dict):
-                            continue
-                        title = (item.get("title") or "").strip()
-                        if not title:
-                            continue
-
-                        already = any(r["url"].endswith(str(sid)) for r in results)
-                        if already:
-                            continue
-
-                        url = item.get("url") or f"https://news.ycombinator.com/item?id={sid}"
-                        results.append({
-                            "source": "hn",
-                            "title": title,
-                            "url": url,
-                        })
-                except Exception:
-                    continue
 
         return results
 
@@ -544,10 +607,11 @@ class ExternalDiscovery:
         for feed in feeds:
             feed_url = feed.get("url", "")
             feed_name = feed.get("name", feed_url)
+            feed_lane = feed.get("lane", "current_affairs")
             if not feed_url:
                 continue
             try:
-                async with session.get(feed_url, headers={"User-Agent": "HermesAlive/1.0 (discovery)"}) as resp:
+                async with self._request(session, feed_url, headers={"User-Agent": "HermesAlive/1.0 (discovery)"}) as resp:
                     if resp.status != 200:
                         logger.warning("RSS feed %s returned status %d", feed_name, resp.status)
                         continue
@@ -574,10 +638,12 @@ class ExternalDiscovery:
                     link = item.findtext("link", "").strip()
                     items.append({
                         "source": "rss",
+                        "lane": feed_lane,
                         "title": title,
                         "summary": desc,
                         "url": link,
                         "feed_name": feed_name,
+                        "published_at": (item.findtext("pubDate", "") or "").strip(),
                     })
             else:
                 # Atom
@@ -588,10 +654,12 @@ class ExternalDiscovery:
                     url = link_el.get("href", "") if link_el is not None else ""
                     items.append({
                         "source": "rss",
+                        "lane": feed_lane,
                         "title": title,
                         "summary": summary,
                         "url": url,
                         "feed_name": feed_name,
+                        "published_at": entry.findtext("atom:updated", "", ns).strip(),
                     })
 
             results.extend(items)
@@ -623,7 +691,7 @@ class ExternalDiscovery:
             logger.debug("Playwright not available; skipping playwright discovery")
             return []
 
-        sites: list[dict[str, str]] = play_config.get("sites", [])
+        sites: list[dict[str, Any]] = play_config.get("sites", [])
         if not sites:
             return []
 
@@ -633,15 +701,22 @@ class ExternalDiscovery:
 
         results: list[dict[str, Any]] = []
         async with async_playwright() as pw:
-            browser = await pw.chromium.launch(
-                headless=True,
-                args=[
+            network = self.sources_config.get("network", {})
+            proxy_url = str(network.get("proxy_url") or os.getenv("HERMES_DISCOVERY_PROXY_URL", "")).strip()
+            launch_options: dict[str, Any] = {
+                "headless": True,
+                "args": [
                     '--disable-blink-features=AutomationControlled',
                     '--no-sandbox',
-                ]
-            )
+                ],
+            }
+            if proxy_url:
+                launch_options["proxy"] = {"server": proxy_url}
+            browser = await pw.chromium.launch(**launch_options)
             try:
                 for i, site in enumerate(sites[:max_pages]):
+                    if not site.get("enabled", True):
+                        continue
                     url = site.get("url", "")
                     name = site.get("name", url)
                     site_type = site.get("type", "")
@@ -706,6 +781,13 @@ class ExternalDiscovery:
                                     "site_name": name,
                                 })
 
+                        lane = {
+                            "academic": "academic",
+                            "social": "social_fun",
+                            "forum": "technology",
+                        }.get(site_type, "current_affairs")
+                        for item in items:
+                            item.setdefault("lane", lane)
                         results.extend(items)
                         logger.debug(
                             "Playwright[%s]: %d items from %s", name, len(items), url
@@ -1304,27 +1386,73 @@ class LocalDiscovery:
 # ── Scoring ─────────────────────────────────────────────────────────────────────
 
 
-def _score_item(item: dict[str, Any]) -> float:
-    """Score 0.0-1.0 based on basic heuristics."""
-    score = 0.5  # neutral baseline
-    title = (item.get("title", "") + " " + item.get("description", "")).lower()
+DEFAULT_SOURCE_LANES = {
+    "arxiv": "academic",
+    "github": "technology",
+    "hn": "technology",
+    "hackernews": "technology",
+    "sspai": "technology",
+    "v2ex": "social_fun",
+    "bilibili": "social_fun",
+}
 
-    # Boost for relevant keywords
-    keywords = [
-        "ai", "llm", "agent", "smoke", "satellite", "fire", "detection",
-        "python", "rust", "open source", "research", "paper", "architecture",
-    ]
-    for kw in keywords:
-        if kw in title:
-            score += 0.05
 
-    # Boost for source authority
-    if item.get("source") == "arxiv":
-        score += 0.1
-    elif item.get("source") in ("hn", "hackernews"):
-        score += 0.05
+def _lane(item: dict[str, Any]) -> str:
+    value = str(item.get("lane") or "").strip()
+    if value:
+        return value
+    return DEFAULT_SOURCE_LANES.get(str(item.get("source") or ""), "current_affairs")
 
-    return min(score, 1.0)
+
+def _published_datetime(value: Any) -> datetime | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        parsed = parsedate_to_datetime(raw)
+    except (TypeError, ValueError):
+        try:
+            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _age_hours(item: dict[str, Any], *, now: datetime | None = None) -> float | None:
+    published = _published_datetime(item.get("published_at"))
+    if published is None:
+        return None
+    current = now or datetime.now(timezone.utc)
+    return max(0.0, (current - published).total_seconds() / 3600.0)
+
+
+def _score_item(item: dict[str, Any], *, now: datetime | None = None) -> float:
+    """Score evidence quality and freshness without privileging a topic lane."""
+    title = str(item.get("title") or "").strip()
+    url = str(item.get("url") or "").strip()
+    if not title or not url:
+        return 0.0
+    score = 0.61
+    trust = float(item.get("source_trust") or 0.6)
+    score += max(-0.06, min(0.08, (trust - 0.5) * 0.2))
+    age = _age_hours(item, now=now)
+    if age is not None:
+        if age <= 24:
+            score += 0.10
+        elif age <= 72:
+            score += 0.07
+        elif age <= 168:
+            score += 0.03
+        elif age > 720:
+            score -= 0.18
+    engagement = float(item.get("engagement") or item.get("stars") or 0)
+    if engagement >= 1000:
+        score += 0.06
+    elif engagement >= 100:
+        score += 0.03
+    return max(0.0, min(score, 1.0))
 
 
 # ── Discovery Engine ────────────────────────────────────────────────────────────
@@ -1432,6 +1560,9 @@ class DiscoveryEngine:
                 "external": external,
                 "local": local,
                 "fetched_at": datetime.now(timezone.utc).isoformat(),
+                "source_health": dict(self._external.last_health),
+                "lane_counts": self._count_by(external, "lane"),
+                "source_counts": self._count_by(external, "source"),
             }
 
             self._cached = results
@@ -1445,6 +1576,14 @@ class DiscoveryEngine:
         finally:
             self._in_progress = False
 
+    @staticmethod
+    def _count_by(items: list[dict[str, Any]], key: str) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for item in items:
+            value = str(item.get(key) or "unknown")
+            counts[value] = counts.get(value, 0) + 1
+        return counts
+
     def _apply_pipeline(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Apply persistent dedup and interest-aware ranking."""
         interest = self._interest()
@@ -1457,6 +1596,9 @@ class DiscoveryEngine:
         items = self._dedup(items)
         ranked: list[dict[str, Any]] = []
         for item in items:
+            item["lane"] = _lane(item)
+            if not self._fresh_enough(item):
+                continue
             base_score = _score_item(item)
             if interest is not None:
                 try:
@@ -1473,6 +1615,28 @@ class DiscoveryEngine:
         ranked = self._filter_by_threshold(ranked)
         ranked = self._enforce_budget(ranked)
         return ranked
+
+    def _fresh_enough(self, item: dict[str, Any]) -> bool:
+        age = _age_hours(item)
+        if age is None:
+            return True
+        freshness = self._sources_config.get("freshness", {})
+        defaults = {
+            "current_affairs": 168,
+            "local_hefei": 336,
+            "culture_people": 336,
+            "social_fun": 168,
+            "technology": 336,
+            "academic": 720,
+        }
+        maximum = float(freshness.get(_lane(item), defaults.get(_lane(item), 336)))
+        if age > maximum:
+            logger.info(
+                "Discovery freshness rejected lane=%s age_hours=%.1f title=%s",
+                _lane(item), age, str(item.get("title") or "")[:80],
+            )
+            return False
+        return True
 
     def _dedup(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Filter duplicate, reserved, and recently delivered topic units."""
@@ -1496,23 +1660,51 @@ class DiscoveryEngine:
         return new_items
 
     def _enforce_budget(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Enforce max_per_source and max_per_run budgets."""
+        """Enforce source/lane caps, then interleave lanes for editorial diversity."""
         budgets = self._sources_config.get("budgets", {})
         max_per_run = budgets.get("max_per_run", BUDGET_MAX_PER_RUN)
         max_per_source = budgets.get("max_per_source", BUDGET_MAX_PER_SOURCE)
+        max_per_lane = budgets.get("max_per_lane", 4)
+        lane_caps = budgets.get("lane_caps", {})
 
         # Enforce per-source cap
         source_counts: dict[str, int] = {}
+        lane_counts: dict[str, int] = {}
         capped: list[dict[str, Any]] = []
         for item in items:
             source = item.get("source", "unknown")
+            lane = _lane(item)
             if source_counts.get(source, 0) >= max_per_source:
                 continue
+            lane_cap = int(lane_caps.get(lane, max_per_lane))
+            if lane_counts.get(lane, 0) >= lane_cap:
+                continue
             source_counts[source] = source_counts.get(source, 0) + 1
+            lane_counts[lane] = lane_counts.get(lane, 0) + 1
             capped.append(item)
 
-        # Enforce total cap
-        return capped[:max_per_run]
+        # Round-robin lanes. Pure score sorting repeatedly starved all but the
+        # historically strongest category even after those items passed quality.
+        queues: dict[str, list[dict[str, Any]]] = {}
+        for item in capped:
+            queues.setdefault(_lane(item), []).append(item)
+        lane_order = list(self._sources_config.get("editorial", {}).get("lane_order", []))
+        lane_order.extend(lane for lane in queues if lane not in lane_order)
+        interleaved: list[dict[str, Any]] = []
+        while queues and len(interleaved) < max_per_run:
+            progressed = False
+            for lane in lane_order:
+                queue = queues.get(lane)
+                if queue:
+                    interleaved.append(queue.pop(0))
+                    progressed = True
+                    if len(interleaved) >= max_per_run:
+                        break
+                if queue == []:
+                    queues.pop(lane, None)
+            if not progressed:
+                break
+        return interleaved
 
     def _filter_by_threshold(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Remove items below the share threshold score."""
