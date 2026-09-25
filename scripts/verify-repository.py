@@ -61,6 +61,12 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def sha256_index_blob(root: Path, rel: str) -> str:
+    """Hash canonical staged content, independent of checkout line endings."""
+    payload = subprocess.check_output(git_command(root, "show", f":{rel}"))
+    return hashlib.sha256(payload).hexdigest()
+
+
 def parse_manifest(path: Path) -> dict[str, str]:
     values: dict[str, str] = {}
     for raw in path.read_text(encoding="utf-8").splitlines():
@@ -206,6 +212,7 @@ def main() -> int:
     args = parser.parse_args()
 
     root = Path(args.root).resolve()
+    index_available = git_worktree(root)
     errors: list[str] = []
     warnings: list[str] = []
 
@@ -276,7 +283,11 @@ def main() -> int:
         path = skill_root / rel
         if not path.is_file():
             errors.append(f"source_manifest_missing:{rel}")
-        elif sha256(path) != digest:
+        elif (
+            sha256_index_blob(root, f"skills/hermes-alive/{rel}")
+            if index_available
+            else sha256(path)
+        ) != digest:
             errors.append(f"source_manifest_mismatch:{rel}")
 
     repository_manifest = parse_manifest(root / "REPOSITORY_MANIFEST.sha256")
@@ -284,7 +295,11 @@ def main() -> int:
         path = root / rel
         if not path.is_file():
             errors.append(f"repository_manifest_missing:{rel}")
-        elif sha256(path) != digest:
+        elif (
+            sha256_index_blob(root, rel)
+            if index_available
+            else sha256(path)
+        ) != digest:
             errors.append(f"repository_manifest_mismatch:{rel}")
 
     actual_manifest_files = {
