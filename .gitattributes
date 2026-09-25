@@ -5,3 +5,4 @@
 *.yml text eol=lf
 *.json text eol=lf
 *.md text eol=lf
+skills/hermes-alive/scripts/hermes-alive-lifecycle text eol=lf
