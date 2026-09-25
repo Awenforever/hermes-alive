@@ -6,6 +6,7 @@ Commands:
   alive_control.py enable
   alive_control.py disable
   alive_control.py test
+  alive_control.py discover
 
 This script controls the gateway watcher through $HERMES_HOME/plugin-data/hermes-alive/runtime/control.json.
 It also reads $HERMES_HOME/.env for accurate status display.
@@ -118,6 +119,17 @@ def test() -> int:
     print("Queued one /alive test request. Enable Hermes Alive only when you intentionally want it sent.")
     return 0
 
+
+def discover() -> int:
+    """Request one real Discovery→model→quality→delivery watcher run."""
+    data = load_control()
+    data["discovery_once"] = True
+    data["discovery_once_requested_at"] = datetime.now().astimezone().isoformat()
+    data["reason"] = "manual full-chain discovery via alive_control.py"
+    save_control(data)
+    print("Queued one full-chain Alive discovery run; no static message was supplied.")
+    return 0
+
 def clear_test_queue() -> int:
     atomic_write_text(QUEUE, "")
     print("Cleared Hermes Alive control queue.")
@@ -125,13 +137,14 @@ def clear_test_queue() -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["status", "enable", "disable", "test", "clear-test-queue"])
+    parser.add_argument("command", choices=["status", "enable", "disable", "test", "discover", "clear-test-queue"])
     args = parser.parse_args()
     return {
         "status": status,
         "enable": enable,
         "disable": disable,
         "test": test,
+        "discover": discover,
         "clear-test-queue": clear_test_queue,
     }[args.command]()
 

@@ -185,6 +185,13 @@ class ProactivePlatformWatcher:
         control_sent = await self._process_control_queue(adapter, chat_id, tick_id)
         if control_sent:
             return True
+        manual_discovery = self._consume_discovery_once()
+        if manual_discovery:
+            self._log(
+                "manual_discovery",
+                tick_id=tick_id,
+                reason="operator_requested_full_chain",
+            )
 
         circadian_decision = self._circadian_shadow_decision(
             message_class="proactive_social",
@@ -245,7 +252,7 @@ class ProactivePlatformWatcher:
                 tick_id=tick_id,
                 enforcement=circadian_sleep_enforcement,
             )
-            if bool(circadian_sleep_enforcement.get("block")):
+            if bool(circadian_sleep_enforcement.get("block")) and not manual_discovery:
                 self._log(
                     "skip",
                     tick_id=tick_id,
@@ -258,6 +265,12 @@ class ProactivePlatformWatcher:
                     circadian_sleep_enforcement=True,
                 )
                 return False
+            if bool(circadian_sleep_enforcement.get("block")) and manual_discovery:
+                self._log(
+                    "manual_discovery_override",
+                    tick_id=tick_id,
+                    reason="schedule_only_circadian_override",
+                )
 
         voice = self._voice_state()
 
@@ -302,7 +315,7 @@ class ProactivePlatformWatcher:
                 tick_id=tick_id,
                 enforcement=enforcement_pre,
             )
-            if bool(enforcement_pre.get("block")):
+            if bool(enforcement_pre.get("block")) and not manual_discovery:
                 self._log(
                     "skip",
                     tick_id=tick_id,
@@ -315,13 +328,23 @@ class ProactivePlatformWatcher:
                     quality_enforcement=True,
                 )
                 return False
+            if bool(enforcement_pre.get("block")) and manual_discovery:
+                self._log(
+                    "manual_discovery_override",
+                    tick_id=tick_id,
+                    reason="operator_one_shot_precompose_silence_override",
+                )
 
-        policy_decision = self._evaluate_interruption_policy(
-            voice=voice,
-            user_active=user_active,
-            discovery_available=False,
-            cooldown_allowed=True,
-            cooldown_reason=None,
+        policy_decision = (
+            self._manual_discovery_policy()
+            if manual_discovery
+            else self._evaluate_interruption_policy(
+                voice=voice,
+                user_active=user_active,
+                discovery_available=False,
+                cooldown_allowed=True,
+                cooldown_reason=None,
+            )
         )
         deferred_for_discovery = False
         if policy_decision is not None:
@@ -364,7 +387,7 @@ class ProactivePlatformWatcher:
             return False
 
         cooldown = self._cooldown()
-        if cooldown is not None:
+        if cooldown is not None and not manual_discovery:
             # Set voice-linked cooldown before checking
             social_urge = self._extract_social_urge(voice)
             cooldown.set_mood_cooldown(social_urge)
@@ -428,12 +451,16 @@ class ProactivePlatformWatcher:
             )
             return False
 
-        final_policy = self._evaluate_interruption_policy(
-            voice=voice,
-            user_active=user_active,
-            discovery_available=discovery_available,
-            cooldown_allowed=True,
-            cooldown_reason=None,
+        final_policy = (
+            self._manual_discovery_policy()
+            if manual_discovery and discovery_available
+            else self._evaluate_interruption_policy(
+                voice=voice,
+                user_active=user_active,
+                discovery_available=discovery_available,
+                cooldown_allowed=True,
+                cooldown_reason=None,
+            )
         )
         if final_policy is not None:
             policy_decision = final_policy
@@ -1021,6 +1048,36 @@ class ProactivePlatformWatcher:
     def _control(self) -> dict[str, Any]:
         data = locked_read_json(CONTROL, {}, "control.lock")
         return data if isinstance(data, dict) else {}
+
+    def _consume_discovery_once(self) -> bool:
+        """Atomically consume the explicit one-shot full-chain request."""
+        control = self._control()
+        if not bool(control.get("discovery_once")):
+            return False
+        control["discovery_once"] = False
+        control["discovery_once_consumed_at"] = datetime.now().astimezone().isoformat()
+        locked_write_json(CONTROL, control, "control.lock")
+        return True
+
+    @staticmethod
+    def _manual_discovery_policy() -> dict[str, Any]:
+        return {
+            "level": 2,
+            "mode": "novel_value",
+            "allow_send": True,
+            "allow_when_user_active": False,
+            "allow_new_topic": True,
+            "allow_content_share": True,
+            "allow_emoji": True,
+            "max_bubbles": 3,
+            "preferred_speech_acts": ["content_share"],
+            "reason": ["operator_requested_full_chain"],
+            "skip_reason": None,
+            "prompt_directives": (
+                "从真实 Discovery 候选中自主选择一个新鲜、有趣且近期较少出现的条目；"
+                "必须返回有效 content_ref，不得生成无来源闲聊。"
+            ),
+        }
 
     def _resolve_adapter_and_chat_id(self) -> tuple[Any | None, str | None]:
         """Resolve the first adapter and a canonical platform chat target.

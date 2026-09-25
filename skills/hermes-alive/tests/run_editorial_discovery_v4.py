@@ -11,6 +11,7 @@ HOOKS = Path(__file__).resolve().parents[1] / "hooks"
 sys.path.insert(0, str(HOOKS))
 
 from discovery import DiscoveryEngine, ExternalDiscovery, _score_item  # noqa: E402
+from proactive_watcher import ProactivePlatformWatcher  # noqa: E402
 
 
 def check(condition: bool, message: str) -> None:
@@ -96,6 +97,16 @@ def test_news_aggregator_caps_real_publishers() -> None:
     check([item["publisher"] for item in result] == ["媒体甲", "媒体乙"], result)
 
 
+def test_manual_discovery_is_real_content_only() -> None:
+    policy = ProactivePlatformWatcher._manual_discovery_policy()
+    check(policy["mode"] == "novel_value", policy)
+    check(policy["allow_content_share"] is True, policy)
+    check("content_ref" in policy["prompt_directives"], policy)
+    control_source = (HOOKS / "alive_control.py").read_text(encoding="utf-8")
+    check('data["discovery_once"] = True' in control_source, "discover command missing")
+    check("Hermes Alive 主动推送测试" not in policy["prompt_directives"], "static test leaked")
+
+
 def main() -> int:
     tests = [
         test_no_academic_source_bonus,
@@ -103,6 +114,7 @@ def main() -> int:
         test_lanes_are_interleaved_and_capped,
         test_proxy_is_opt_in_and_applied,
         test_news_aggregator_caps_real_publishers,
+        test_manual_discovery_is_real_content_only,
     ]
     for test in tests:
         test()
