@@ -128,10 +128,21 @@ class ProactivePlatformWatcher:
             try:
                 while True:
                     await self.tick()
-                    await asyncio.sleep(self.interval_seconds)
+                    await self._wait_for_next_tick()
             except asyncio.CancelledError:
                 self._log("stop", reason="watcher_cancelled")
                 raise
+
+    async def _wait_for_next_tick(self) -> None:
+        """Sleep normally, but wake promptly for an explicit one-shot request."""
+        deadline = time.monotonic() + self.interval_seconds
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return
+            await asyncio.sleep(min(1.0, remaining))
+            if bool(self._control().get("discovery_once")):
+                return
             except Exception as exc:
                 self._log("error", reason="watcher_crashed", error=type(exc).__name__)
                 logger.exception("Proactive platform watcher crashed")

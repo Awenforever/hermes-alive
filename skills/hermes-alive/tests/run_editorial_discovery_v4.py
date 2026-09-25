@@ -105,6 +105,8 @@ def test_manual_discovery_is_real_content_only() -> None:
     control_source = (HOOKS / "alive_control.py").read_text(encoding="utf-8")
     check('data["discovery_once"] = True' in control_source, "discover command missing")
     check("Hermes Alive 主动推送测试" not in policy["prompt_directives"], "static test leaked")
+    watcher_source = (HOOKS / "proactive_watcher.py").read_text(encoding="utf-8")
+    check("await self._wait_for_next_tick()" in watcher_source, "one-shot request is not prompt")
 
 
 def main() -> int:
