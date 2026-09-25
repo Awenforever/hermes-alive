@@ -11,7 +11,7 @@ c672d8f3e4eb8a67a20d48078e26ece5b3eb208a59f35bb825f83318a119a4e0  ./.gitignore
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./ci/fakes/agent/__init__.py
 9ad885f59b90418d1d95092668742c0607ca1352274c3b1310eba9fc084f84a0  ./ci/fakes/agent/auxiliary_client.py
 0969da99a0bc2a1b71ed50584560f4588a37567ac63af3ddbaf3c4617ca5621a  ./ci/requirements.txt
-3316e392c48940249b23fc5f3bd7be6856ff582118af549147c09f958880a80c  ./metadata/hermes-alive-source.sha256
+7ea5bf503ffaa2686495ad50fed86801b04c80be16cfd478ff2a70a82e54a26d  ./metadata/hermes-alive-source.sha256
 6cf7d4c9aca521e3628b10357656c46676b5759beccf8c1e4e77d1a7e6dd2a16  ./metadata/hermes-alive.json
 d9092e35eca7d0985eb7f2b9a00aecc26040e3c428a1ac12cd7431cd29ac4e33  ./plugin.yaml
 f32f602daad2078d8b00b5410ff59e7fd136c1b7ef7836cbfcc1d9c2454bd171  ./plugin_cli.py
@@ -53,7 +53,7 @@ a280bca8671edc095b596b4dc2e79b70a692fa3998968277aaee9a78aa39aaaa  ./skills/herme
 0a3f3b87571e2b803993449d76d6fb9ec699d6ee2ff53a8d12274d8571ac4bd3  ./skills/hermes-alive/hooks/managed_config.py
 9509a3bccab1d7104db73123e1a7c65222501acd25ba9aa379c762ec689074cf  ./skills/hermes-alive/hooks/proactive_disposition.py
 60ca0f88f51637286c112f73c2fdcbb5529b7dca312bc2caeed562057980a826  ./skills/hermes-alive/hooks/proactive_quality_governor.py
-4c517d6737350e57d7473bfcee71524e45f9c50e72e35139b01cc32bec3478de  ./skills/hermes-alive/hooks/proactive_watcher.py
+7d0e6d0857baa895ee6ed241e1421a9b6dd57338f76d9d3ceb0ae91a4cb40d4e  ./skills/hermes-alive/hooks/proactive_watcher.py
 009c23b7f1431e1d7a2c18cc4bf11e2de90337c013a489b90dab779186aa3d91  ./skills/hermes-alive/hooks/safe_io.py
 72278520b7e406c2b3a0cef5f70ed92c1b70ebe6e9cff718280977dd9c031ed3  ./skills/hermes-alive/hooks/semantic_bubbles.py
 742a6bd39e96b6d75f3be75e581ff41bdfdf04e8e0b9e8427c91b91edb51f6ce  ./skills/hermes-alive/hooks/style_guard.py
