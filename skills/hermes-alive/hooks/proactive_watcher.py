@@ -1065,7 +1065,6 @@ class ProactivePlatformWatcher:
             "level": 2,
             "mode": "novel_value",
             "allow_send": True,
-            "allow_when_user_active": False,
             "allow_new_topic": True,
             "allow_content_share": True,
             "allow_emoji": True,
