@@ -607,8 +607,7 @@ class LLMMessageComposer:
         parsed = cls._json_object(candidate)
         if not isinstance(parsed, dict) or not locked_ref:
             return candidate
-        if not str(parsed.get("content_ref") or "").strip():
-            parsed["content_ref"] = locked_ref
+        parsed["content_ref"] = locked_ref
         return json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
 
     def _repair_unambiguous_content_ref(

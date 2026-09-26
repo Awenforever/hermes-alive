@@ -377,6 +377,9 @@ def test_recovery_generation_is_locked_to_one_ranked_source() -> None:
     draft = json.dumps({"bubbles": [], "content_ref": None})
     bound = LLMMessageComposer._bind_locked_content_ref(draft, locked_ref)
     assert json.loads(bound)["content_ref"] == "story-2"
+    stale = json.dumps({"bubbles": [], "content_ref": "story-1"})
+    rebound = LLMMessageComposer._bind_locked_content_ref(stale, locked_ref)
+    assert json.loads(rebound)["content_ref"] == "story-2"
 
 
 def test_structured_plan_is_extracted_from_model_wrapping() -> None:
