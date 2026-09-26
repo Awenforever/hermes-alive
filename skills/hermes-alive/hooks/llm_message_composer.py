@@ -14,6 +14,8 @@ from __future__ import annotations
 import json
 import logging
 import re
+import asyncio
+import html as html_lib
 from datetime import datetime, timezone, timedelta
 import os
 import urllib.parse
@@ -44,6 +46,8 @@ CONTENT_REF_RE = re.compile(
 FALLBACK_MSG_TYPE = "heartbeat"
 FALLBACK_CONTENT = "嘿，我在。"
 MAX_CONTENT_CHARS = 800
+MAX_EDITORIAL_CANDIDATES = 8
+MAX_EVIDENCE_CHARS = 6000
 
 TIME_BUCKETS: dict[str, dict[str, list[str] | str]] = {
     "凌晨": {
@@ -174,8 +178,11 @@ Discovery 是编辑候选池，不是论文列表。时事、本地政策、人�
 要求：
 - act 只能从以下枚举中选择，不得创造近义标签或英文变体：self_talk、observation、question、care、dry_observation、debug_companion、research_ping、discovery_intro、fact、reaction、turn、source_link、closing、poke、casual
 - bubbles 必须是 1–5 条，默认使用能完整表达的最少条数
+- max_bubbles 只是上限，不是目标；简单分享通常一条即可，事实和简短反应可以在同一条中自然完成
 - 每条必须承担独立语义动作，而不是把一段完整文字按句号、长度或换行切开
 - 多条时应自然递进；删除某条会损失一个独立信息或话语功能
+- “看到个东西”“想跟你说”等纯开场不算独立语义动作；第一条本身就要包含信息核心
+- 主观反应必须增加一个有依据的观察角度；不得伪造“第一次见”“一直觉得”等个人经历来凑人格
 - 不得使用 --- 作为分隔符
 - Discovery 无相关上下文时，topic_mode 必须是 new_discovery，第一条 act 必须是 discovery_intro、research_ping 或 fact，并直接说清新发现是什么
 - content_ref 只有正文真实使用外部条目时才填写对应 content_id，否则为 null
@@ -190,6 +197,7 @@ class LLMMessageComposer:
         self.last_resolved_model = ""
         self.last_semantic_plan: dict[str, Any] = {}
         self.last_repair_reason = ""
+        self.last_editorial_review: dict[str, Any] = {}
 
     async def compose(
         self,
@@ -201,15 +209,22 @@ class LLMMessageComposer:
         self.last_resolved_model = ""
         self.last_semantic_plan = {}
         self.last_repair_reason = ""
+        self.last_editorial_review = {}
         self.last_context_snapshot = {}
         self.last_rejection_reason = ""
         try:
+            discovery_context = await self._enrich_discovery_context(
+                discovery_context,
+                context=context,
+            )
             candidate = await self._generate_candidate(
                 voice,
                 context,
                 discovery_context,
             )
             if not candidate:
+                if self.last_rejection_reason:
+                    return []
                 logger.debug(
                     "Rejected empty proactive LLM output"
                 )
@@ -418,54 +433,418 @@ class LLMMessageComposer:
         ).strip()
         model_override = preferred_model or None
 
-        try:
-            response = await async_call_llm(
+        generation_prompt = await self._user_prompt(
+            voice,
+            context,
+            discovery_context,
+        )
+        messages = [
+            {"role": "system", "content": self._system_prompt(voice)},
+            {"role": "user", "content": generation_prompt},
+        ]
+        content, resolved_model = await self._call_routed_llm(
+            async_call_llm,
+            task="proactive",
+            messages=messages,
+            temperature=0.65,
+            max_tokens=500,
+            preferred_model=model_override,
+        )
+        if not content:
+            return ""
+        self.last_resolved_model = resolved_model
+
+        if not self._requires_editorial_review(context, discovery_context):
+            return content
+
+        review = await self._review_editorial_candidate(
+            async_call_llm,
+            content,
+            discovery_context,
+            preferred_model=model_override,
+        )
+        self.last_editorial_review = review
+        if review.get("pass") is True:
+            return content
+
+        # Reviewer feedback is expressed as violated dimensions, not lexical
+        # substitutions.  A bounded whole-draft loop lets the model reconsider
+        # selection and structure without growing a phrase-specific patch set.
+        current = content
+        current_model = resolved_model
+        max_revisions = max(
+            1,
+            min(
+                3,
+                int(os.getenv("HERMES_ALIVE_EDITORIAL_MAX_REVISIONS", "2")),
+            ),
+        )
+        for _attempt in range(max_revisions):
+            issues = review.get("issues")
+            if not isinstance(issues, list):
+                issues = ["the draft did not satisfy the editorial contract"]
+            revision_prompt = (
+                generation_prompt
+                + "\n\n## 独立编辑审查未通过\n"
+                + "上一版：\n"
+                + current
+                + "\n审查意见：\n- "
+                + "\n- ".join(str(value) for value in issues[:8])
+                + "\n请从证据和信息核心重新设计整组消息，可以换选题、删减或合并气泡；"
+                + "不要逐字修补旧稿。仍只输出约定 JSON。"
+            )
+            revised, revised_model = await self._call_routed_llm(
+                async_call_llm,
                 task="proactive",
                 messages=[
                     {"role": "system", "content": self._system_prompt(voice)},
-                    {"role": "user", "content": await self._user_prompt(voice, context, discovery_context)},
+                    {"role": "user", "content": revision_prompt},
                 ],
-                temperature=0.65,
-                max_tokens=300,
-                timeout=_env_float("HERMES_PROACTIVE_LLM_TIMEOUT", 60),
-                model=model_override,
+                temperature=0.25,
+                max_tokens=500,
+                preferred_model=model_override,
             )
-            self.last_resolved_model = (
-                self._response_model(
-                    response,
-                    fallback=preferred_model,
-                )
-            )
-            content = response.choices[0].message.content
-            return str(content or "")
-        except Exception:
-            fallback_model = os.getenv("HERMES_PROACTIVE_LLM_FALLBACK_MODEL", "").strip()
-            if not fallback_model:
+            if not revised:
+                self.last_rejection_reason = "editorial_revision_unavailable"
                 return ""
-            logger.info("Primary LLM call failed; trying fallback model: %s", fallback_model)
+            current = revised
+            current_model = revised_model or current_model
+            review = await self._review_editorial_candidate(
+                async_call_llm,
+                current,
+                discovery_context,
+                preferred_model=model_override,
+            )
+            self.last_editorial_review = review
+            if review.get("pass") is True:
+                self.last_resolved_model = current_model
+                return current
+
+        failed = review.get("issues")
+        reason = ",".join(str(value) for value in (failed or [])[:4])
+        self.last_rejection_reason = (
+            "editorial_quality_rejected"
+            + (f":{reason}" if reason else "")
+        )
+        return ""
+
+    async def _call_routed_llm(
+        self,
+        call: Any,
+        *,
+        task: str,
+        messages: list[dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+        preferred_model: str | None,
+    ) -> tuple[str, str]:
+        """Call the configured primary, then only the explicit fallback."""
+        models = [str(preferred_model or "").strip()]
+        fallback = os.getenv(
+            "HERMES_PROACTIVE_LLM_FALLBACK_MODEL",
+            "",
+        ).strip()
+        if fallback and fallback not in models:
+            models.append(fallback)
+        if not models[0]:
+            models[0] = ""
+
+        for index, model in enumerate(models):
             try:
-                response = await async_call_llm(
-                    task="proactive",
-                    messages=[
-                        {"role": "system", "content": self._system_prompt(voice)},
-                        {"role": "user", "content": await self._user_prompt(voice, context, discovery_context)},
-                    ],
-                    temperature=0.65,
-                    max_tokens=300,
-                    timeout=60,
-                    model=fallback_model,
+                response = await call(
+                    task=task,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    timeout=_env_float(
+                        "HERMES_PROACTIVE_LLM_TIMEOUT",
+                        60,
+                    ),
+                    model=model or None,
                 )
-                self.last_resolved_model = (
-                    self._response_model(
+                content = str(
+                    response.choices[0].message.content or ""
+                ).strip()
+                if content:
+                    return content, self._response_model(
                         response,
-                        fallback=fallback_model,
+                        fallback=model,
                     )
-                )
-                content = response.choices[0].message.content
-                return str(content or "")
             except Exception:
-                logger.exception("Fallback LLM call also failed")
-                return ""
+                if index + 1 < len(models):
+                    logger.info(
+                        "LLM call failed; trying configured fallback model: %s",
+                        models[index + 1],
+                    )
+                else:
+                    logger.exception("Configured LLM route failed")
+        return "", ""
+
+    @staticmethod
+    def _requires_editorial_review(
+        context: dict[str, Any],
+        discovery_context: dict[str, Any] | None,
+    ) -> bool:
+        if not isinstance(discovery_context, dict):
+            return False
+        external = discovery_context.get("external")
+        if not isinstance(external, list) or not external:
+            return False
+        policy = context.get("interruption_policy")
+        return bool(
+            isinstance(policy, dict)
+            and str(policy.get("mode") or "") == "novel_value"
+        )
+
+    async def _review_editorial_candidate(
+        self,
+        call: Any,
+        candidate: str,
+        discovery_context: dict[str, Any] | None,
+        *,
+        preferred_model: str | None,
+    ) -> dict[str, Any]:
+        """Fail-closed, evidence-aware review of a complete message plan."""
+        selected = self._selected_evidence(candidate, discovery_context)
+        if selected is None:
+            return {
+                "pass": False,
+                "issues": ["missing or invalid content_ref"],
+                "dimensions": {},
+            }
+        evidence = self._evidence_document(selected)
+        review_prompt = f"""你是独立的微信内容编辑，不负责讨好作者。
+
+请审查候选消息是否值得主动打扰用户。只根据给出的证据判断，不使用外部常识补洞。
+
+通用质量契约：
+1. factual_grounding：每个可核验事实都能由证据直接推出；翻译和忠实概括可以，猜测必须明确是猜测且有交流价值。
+2. informational_value：用户读完能得到具体的新信息，而不是空泛开场、标题复述或无依据感想。
+3. source_and_time：不夸大来源权威性，不把旧内容说成刚发生，不隐瞒材料不足。系统会自动附加来源链接，正文不必机械念出来源名或发布时间。
+4. natural_voice：像朋友分享，但不伪造亲历、情绪或用户处境，不使用播报模板。
+5. minimal_bubbles：气泡数是表达所需的最少数量；纯铺垫、同义重复、可无损合并都判失败。
+6. coherent_whole：整组消息脱离后台上下文仍能独立理解，问题或观点必须建立在已给事实之上。
+
+只有六项全部通过，pass 才能为 true。输出一个 JSON 对象：
+{{"pass":true|false,"dimensions":{{"factual_grounding":true|false,"informational_value":true|false,"source_and_time":true|false,"natural_voice":true|false,"minimal_bubbles":true|false,"coherent_whole":true|false}},"issues":["简明、可执行的原则性问题"]}}
+
+证据：
+{evidence}
+
+候选消息计划：
+{candidate}
+"""
+        raw, _model = await self._call_routed_llm(
+            call,
+            task="proactive_editorial_review",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "严格执行证据审查；宁可拒绝，不得替候选补充事实。",
+                },
+                {"role": "user", "content": review_prompt},
+            ],
+            temperature=0.0,
+            max_tokens=500,
+            preferred_model=preferred_model,
+        )
+        parsed = self._json_object(raw)
+        if not isinstance(parsed, dict):
+            return {
+                "pass": False,
+                "issues": ["editorial reviewer returned invalid JSON"],
+                "dimensions": {},
+            }
+        dimensions = parsed.get("dimensions")
+        required = {
+            "factual_grounding",
+            "informational_value",
+            "source_and_time",
+            "natural_voice",
+            "minimal_bubbles",
+            "coherent_whole",
+        }
+        dimension_pass = bool(
+            isinstance(dimensions, dict)
+            and required.issubset(dimensions)
+            and all(dimensions.get(name) is True for name in required)
+        )
+        issues = parsed.get("issues")
+        issue_list = issues if isinstance(issues, list) else []
+        return {
+            "pass": (
+                parsed.get("pass") is True
+                and dimension_pass
+                and not issue_list
+            ),
+            "dimensions": dimensions if isinstance(dimensions, dict) else {},
+            "issues": issue_list,
+            "content_ref": str(selected.get("id") or ""),
+        }
+
+    @staticmethod
+    def _json_object(value: str) -> dict[str, Any] | None:
+        raw = str(value or "").strip()
+        if raw.startswith("```"):
+            raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.I)
+            raw = re.sub(r"\s*```$", "", raw)
+        try:
+            parsed = json.loads(raw)
+        except Exception:
+            return None
+        return parsed if isinstance(parsed, dict) else None
+
+    def _selected_evidence(
+        self,
+        candidate: str,
+        discovery_context: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        parsed = self._json_object(candidate)
+        if not isinstance(parsed, dict) or not isinstance(discovery_context, dict):
+            return None
+        content_ref = str(parsed.get("content_ref") or "").strip()
+        external = discovery_context.get("external")
+        if not content_ref or not isinstance(external, list):
+            return None
+        return next(
+            (
+                item for item in external
+                if isinstance(item, dict)
+                and str(item.get("id") or "").strip() == content_ref
+            ),
+            None,
+        )
+
+    @staticmethod
+    def _evidence_document(item: dict[str, Any]) -> str:
+        fields = [
+            ("content_id", item.get("id")),
+            ("title", item.get("title")),
+            ("publisher", item.get("publisher") or item.get("source")),
+            ("published_at", item.get("published_at")),
+            ("summary", item.get("summary")),
+            ("retrieved_text", item.get("evidence_text")),
+            ("url", item.get("url")),
+        ]
+        return "\n".join(
+            f"{name}: {str(value).strip()[:MAX_EVIDENCE_CHARS]}"
+            for name, value in fields
+            if str(value or "").strip()
+        )
+
+    async def _enrich_discovery_context(
+        self,
+        discovery_context: dict[str, Any] | None,
+        *,
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """Retrieve readable evidence before asking a model to select a story."""
+        if not isinstance(discovery_context, dict):
+            return discovery_context
+        if not self._requires_editorial_review(
+            context or {},
+            discovery_context,
+        ):
+            return discovery_context
+        external = discovery_context.get("external")
+        if not isinstance(external, list) or not external or aiohttp is None:
+            return discovery_context
+
+        enriched = dict(discovery_context)
+        items = [dict(item) for item in external if isinstance(item, dict)]
+        limit = max(
+            1,
+            min(
+                12,
+                int(os.getenv(
+                    "HERMES_ALIVE_EDITORIAL_FETCH_CANDIDATES",
+                    str(MAX_EDITORIAL_CANDIDATES),
+                )),
+            ),
+        )
+        timeout = aiohttp.ClientTimeout(total=10, connect=4)
+        connector = aiohttp.TCPConnector(limit=4)
+        async with aiohttp.ClientSession(
+            timeout=timeout,
+            connector=connector,
+            headers={"User-Agent": "HermesAlive/2.8 editorial evidence"},
+        ) as session:
+            tasks = [
+                self._fetch_readable_evidence(session, item)
+                for item in items[:limit]
+            ]
+            evidence_values = await asyncio.gather(
+                *tasks,
+                return_exceptions=True,
+            )
+        for item, evidence in zip(items[:limit], evidence_values):
+            if isinstance(evidence, str) and evidence:
+                item["evidence_text"] = evidence
+                item["evidence_status"] = "retrieved"
+            else:
+                item["evidence_status"] = "metadata_only"
+        enriched["external"] = items
+        return enriched
+
+    async def _fetch_readable_evidence(
+        self,
+        session: Any,
+        item: dict[str, Any],
+    ) -> str:
+        url = str(item.get("url") or "").strip()
+        parsed = urllib.parse.urlparse(url)
+        host = str(parsed.hostname or "").lower()
+        if parsed.scheme not in {"http", "https"} or not host:
+            return ""
+        if host in {"localhost", "localhost.localdomain"} or host.endswith(".local"):
+            return ""
+        try:
+            async with session.get(
+                url,
+                allow_redirects=True,
+                max_redirects=5,
+            ) as response:
+                if response.status >= 400:
+                    return ""
+                content_type = str(response.headers.get("Content-Type") or "").lower()
+                if not any(value in content_type for value in ("text", "html", "xml", "json")):
+                    return ""
+                body = await response.content.read(750_000)
+                charset = response.charset or "utf-8"
+                raw = body.decode(charset, errors="replace")
+        except Exception:
+            return ""
+        return self._readable_text(raw)[:MAX_EVIDENCE_CHARS]
+
+    @staticmethod
+    def _readable_text(raw: str) -> str:
+        text = str(raw or "")
+        # Prefer explicit page metadata and article paragraphs, while remaining
+        # dependency-free for portable NAS/WSL/Windows installs.
+        fragments: list[str] = []
+        for match in re.finditer(
+            r"<meta[^>]+(?:name|property)=[\"'](?:description|og:description)[\"'][^>]+content=[\"']([^\"']+)",
+            text,
+            flags=re.I,
+        ):
+            fragments.append(match.group(1))
+        for match in re.finditer(
+            r"<(?:p|h1|h2|h3)[^>]*>(.*?)</(?:p|h1|h2|h3)>",
+            text,
+            flags=re.I | re.S,
+        ):
+            fragments.append(match.group(1))
+            if sum(len(value) for value in fragments) >= MAX_EVIDENCE_CHARS * 2:
+                break
+        if not fragments:
+            fragments = [text]
+        joined = "\n".join(fragments)
+        joined = re.sub(r"<(script|style|noscript)[^>]*>.*?</\1>", " ", joined, flags=re.I | re.S)
+        joined = re.sub(r"<[^>]+>", " ", joined)
+        joined = html_lib.unescape(joined)
+        joined = re.sub(r"[\t\r ]+", " ", joined)
+        joined = re.sub(r"\n\s*\n+", "\n", joined)
+        return joined.strip()
 
     @staticmethod
     def _response_model(
@@ -580,7 +959,13 @@ class LLMMessageComposer:
                     "不得寒暄、不得问用户是否还在做某项任务。\n"
                     "- 输出 JSON 的 content_ref 字段必须填写该条目的 content_id；"
                     "没有合格条目时不要生成替代闲聊。\n"
-                    "- topic_mode 必须是 new_discovery，第一条气泡必须直接锚定新发现。"
+                    "- topic_mode 必须是 new_discovery，第一条气泡必须直接锚定新发现。\n"
+                    "- 所有事实只能来自候选证据；材料只有标题时，只能忠实转述标题能推出的内容。\n"
+                    "- 先判断整件事最值得分享的一个信息核心，再决定表达；"
+                    "没有信息的铺垫不构成独立气泡。\n"
+                    "- 观点和疑问必须建立在已陈述事实之上，不能用猜测代替尚未读取的来源。"
+                    "\n- 候选池里存在已取得页面正文的条目时，优先从中选择；"
+                    "不要为了偏好某个题材而选择证据贫乏的条目。"
                 )
 
         if user_context:
@@ -614,12 +999,13 @@ class LLMMessageComposer:
                     discovery_guidance
                     + "\n".join(discovery_lines)
                 )
-        parts.append(
-            "\n你的话题应该来自内心，而不是来自上下文中的信息。"
-            "就像一个人不会每句话都在汇报工作状态——"
-            "偶尔提到代码、日志、系统状态没问题，这是你存在的一部分。"
-            "但你的底色是庄奕这个人，不是监控面板。"
-        )
+        if not novel_value_mode:
+            parts.append(
+                "\n你的话题应该来自内心，而不是来自上下文中的信息。"
+                "就像一个人不会每句话都在汇报工作状态——"
+                "偶尔提到代码、日志、系统状态没问题，这是你存在的一部分。"
+                "但你的底色是庄奕这个人，不是监控面板。"
+            )
         # Rebuild and inject the cross-session effective context queue for
         # every compose operation.  The metadata is retained only as hashes,
         # counts, timestamps, roles, and health flags for safe observability.
@@ -697,10 +1083,17 @@ class LLMMessageComposer:
             if metadata:
                 lines.append("  " + "；".join(metadata))
             if item.get("summary"):
-                summary = item["summary"]
-                if len(summary) > 100:
-                    summary = summary[:97] + "..."
-                lines.append(f"  {summary}")
+                summary = str(item["summary"])
+                if len(summary) > 1200:
+                    summary = summary[:1197] + "..."
+                lines.append(f"  摘要证据={summary}")
+            if item.get("evidence_text"):
+                evidence = str(item["evidence_text"])
+                if len(evidence) > 1800:
+                    evidence = evidence[:1797] + "..."
+                lines.append(f"  页面正文证据={evidence}")
+            elif item.get("evidence_status") == "metadata_only":
+                lines.append("  页面正文未取得；不得推断标题和摘要之外的细节")
 
         for item in local[:5]:
             typ = item.get("type", "")

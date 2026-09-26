@@ -4,7 +4,7 @@
 
 **让 Hermes 偶尔主动开口，同时知道何时保持安静。**
 
-![version](https://img.shields.io/badge/version-2.7.1-blue)
+![version](https://img.shields.io/badge/version-2.8.0-blue)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB)
 ![Hermes](https://img.shields.io/badge/Hermes-gateway--native-6f42c1)
 ![license](https://img.shields.io/badge/license-MIT-green)
@@ -21,6 +21,7 @@ Hermes Alive 是独立的 Gateway 主动陪伴插件。它结合近期对话、�
 
 - 对话活跃、仍有待回复内容或用户连续未回应时主动克制；
 - 在时事、本地动态、人物文化、轻松趣闻、社区、技术与学术内容间轮换；
+- 先读取来源正文，再按事实、价值、时效、自然度、最少气泡与整体连贯性独立审查；
 - 以语义气泡表达，不把长段文字机械切片；来源链接以内联 Markdown 呈现；
 - 有边界地学习性格、兴趣和作息，并支持暂停、验证与回滚；
 - 复用 Hermes 当前模型、消息通道和认证，不维护第二套密钥。

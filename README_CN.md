@@ -6,7 +6,7 @@
 
 让 Hermes 拥有在场感、性格、记忆与作息，但不把每一次沉默都变成通知。
 
-![version](https://img.shields.io/badge/version-2.7.1-blue)
+![version](https://img.shields.io/badge/version-2.8.0-blue)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB)
 ![Hermes](https://img.shields.io/badge/Hermes-gateway--native-6f42c1)
 ![license](https://img.shields.io/badge/license-MIT-green)
@@ -34,6 +34,7 @@ Hermes Alive 复用 Hermes 已有的 Provider、模型配置、Gateway 和微信
 | 拟人作息 | 建模入睡、清醒、延迟入睡、睡眠债与恢复。 |
 | 打断与质量策略 | 拦截重复、施压、无依据的任务判断和不安全草稿。 |
 | Discovery | 在时事、合肥本地、人物文化、轻松趣闻、社区、技术与学术栏目间发现并轮换内容。 |
+| 证据化编辑 | 先读取候选正文，再按事实、价值、时效、自然度、最少气泡和整体连贯性独立审查；不合格内容不会发送。 |
 | Dream 记忆整合 | 可选地把高置信度对话证据转化为有边界的记忆更新。 |
 | 可追踪投递 | 保留真实路由模型，并用统一 `tick_id` 串联决策。 |
 | 安全生命周期 | 支持原子安装、验证、回滚、保留状态卸载和彻底清理。 |
@@ -45,7 +46,8 @@ Hermes Gateway
   → 近期上下文与活动检查
   → 作息与打断策略
   → 性格、记忆与可选 Discovery
-  → 模型生成
+  → 来源正文取证与模型生成
+  → 独立编辑审查，必要时整稿重写
   → 质量与重复检查
   → 微信投递
 ```

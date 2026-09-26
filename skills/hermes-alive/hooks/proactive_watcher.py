@@ -2443,6 +2443,28 @@ class ProactivePlatformWatcher:
         if self._feature_enabled(LLM_ENABLED_ENV):
             llm_result = await self._compose_llm_message(default_voice, discovery_context, policy_decision=policy_decision)
             if llm_result is not None:
+                review = getattr(
+                    self._llm_message_composer,
+                    "last_editorial_review",
+                    {},
+                )
+                if isinstance(review, dict) and review:
+                    dimensions = review.get("dimensions")
+                    self._log(
+                        "editorial_review",
+                        passed=review.get("pass") is True,
+                        dimensions=(
+                            {
+                                str(key): value is True
+                                for key, value in dimensions.items()
+                            }
+                            if isinstance(dimensions, dict)
+                            else {}
+                        ),
+                        content_ref=str(
+                            review.get("content_ref") or ""
+                        ),
+                    )
                 if len(llm_result) == 0:
                     rejection = str(
                         getattr(
