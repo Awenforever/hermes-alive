@@ -33,6 +33,7 @@ BASE = Path(_SHARED_DIR).expanduser()
 ENV_FILE = HERMES_HOME / ".env"
 CONTROL = BASE / "control.json"
 QUEUE = BASE / "control_queue.jsonl"
+DISCOVERY_REQUEST = BASE / "discovery_once.request"
 COOLDOWN = BASE / "cooldown.json"
 PROACTIVE_LOG = BASE / "proactive_log.jsonl"
 LOCK = BASE / "locks" / "proactive_watcher.lock"
@@ -127,6 +128,16 @@ def discover() -> int:
     data["discovery_once_requested_at"] = datetime.now().astimezone().isoformat()
     data["reason"] = "manual full-chain discovery via alive_control.py"
     save_control(data)
+    atomic_write_text(
+        DISCOVERY_REQUEST,
+        json.dumps(
+            {
+                "requested_at": data["discovery_once_requested_at"],
+                "kind": "full_chain_discovery",
+            },
+            ensure_ascii=False,
+        ) + "\n",
+    )
     print("Queued one full-chain Alive discovery run; no static message was supplied.")
     return 0
 

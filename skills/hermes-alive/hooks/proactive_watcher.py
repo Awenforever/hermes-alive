@@ -80,6 +80,8 @@ WATCHER_LOCK = BASE / "locks" / "proactive_watcher.lock"
 PROACTIVE_LOG = BASE / "proactive_log.jsonl"
 CONTROL = BASE / "control.json"
 QUEUE = BASE / "control_queue.jsonl"
+DISCOVERY_REQUEST = BASE / "discovery_once.request"
+DISCOVERY_REQUEST_LOCK = BASE / "locks" / "discovery_once.lock"
 
 SYSTEM_METADATA: dict[str, Any] = {
     "is_system": True,
@@ -145,7 +147,7 @@ class ProactivePlatformWatcher:
             if remaining <= 0:
                 return
             await asyncio.sleep(min(1.0, remaining))
-            if bool(self._control().get("discovery_once")):
+            if self._discovery_once_pending():
                 return
 
     async def tick(self) -> bool:
@@ -1060,15 +1062,25 @@ class ProactivePlatformWatcher:
         data = locked_read_json(CONTROL, {}, "control.lock")
         return data if isinstance(data, dict) else {}
 
+    def _discovery_once_pending(self) -> bool:
+        """Read the dedicated wake marker, retaining JSON compatibility."""
+        if DISCOVERY_REQUEST.is_file():
+            return True
+        return bool(self._control().get("discovery_once"))
+
     def _consume_discovery_once(self) -> bool:
         """Atomically consume the explicit one-shot full-chain request."""
-        control = self._control()
-        if not bool(control.get("discovery_once")):
-            return False
-        control["discovery_once"] = False
-        control["discovery_once_consumed_at"] = datetime.now().astimezone().isoformat()
-        locked_write_json(CONTROL, control, "control.lock")
-        return True
+        with file_lock(DISCOVERY_REQUEST_LOCK):
+            control = self._control()
+            marker_present = DISCOVERY_REQUEST.is_file()
+            if not marker_present and not bool(control.get("discovery_once")):
+                return False
+            control["discovery_once"] = False
+            control["discovery_once_consumed_at"] = datetime.now().astimezone().isoformat()
+            locked_write_json(CONTROL, control, "control.lock")
+            if marker_present:
+                DISCOVERY_REQUEST.unlink(missing_ok=True)
+            return True
 
     @staticmethod
     def _manual_discovery_policy() -> dict[str, Any]:
