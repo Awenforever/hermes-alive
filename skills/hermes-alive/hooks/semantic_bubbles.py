@@ -40,25 +40,6 @@ DISCOVERY_FIRST_ACTS = {
     "fact",
 }
 
-NEW_TOPIC_ANCHORS = (
-    "看到",
-    "发现",
-    "有篇",
-    "有个研究",
-    "有项研究",
-    "有个论文",
-    "一篇论文",
-    "这篇论文",
-    "这个研究",
-    "这项研究",
-    "有个项目",
-    "有个工具",
-    "开源",
-    "论文",
-    "研究",
-    "消息",
-)
-
 UNSUPPORTED_CONTINUATION_PATTERNS = (
     r"你之前",
     r"还记得",
@@ -399,8 +380,11 @@ def validate_semantic_plan(
         first = plan.bubbles[0]
         if first.act not in DISCOVERY_FIRST_ACTS:
             raise SemanticPlanError("new_discovery_missing_intro_act")
-        if not any(anchor in first.text for anchor in NEW_TOPIC_ANCHORS):
-            raise SemanticPlanError("new_discovery_missing_topic_anchor")
+        # Validate the plan's structure and provenance, not its prose.  A
+        # fixed phrase allow-list rejected valid direct leads and trained the
+        # model into repetitive wording.  New discoveries are grounded by a
+        # valid content_ref plus the typed first semantic act; the model and
+        # quality governor remain responsible for semantic quality.
         combined = "\n".join(bubble.text for bubble in plan.bubbles)
         for pattern in UNSUPPORTED_CONTINUATION_PATTERNS:
             if re.search(pattern, combined):

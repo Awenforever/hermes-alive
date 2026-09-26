@@ -340,13 +340,7 @@ def test_discovery_requires_new_topic_boundary() -> None:
             discovery_context=discovery_context(),
         )
     except SemanticPlanError as exc:
-        check(
-            str(exc) in {
-                "new_discovery_missing_intro_act",
-                "new_discovery_missing_topic_anchor",
-            },
-            str(exc),
-        )
+        check(str(exc) == "new_discovery_missing_intro_act", str(exc))
     else:
         raise AssertionError("unsupported discovery opener accepted")
 
@@ -355,7 +349,7 @@ def test_discovery_requires_new_topic_boundary() -> None:
         "bubbles": [
             {
                 "act": "discovery_intro",
-                "text": "看到一篇研究晴空湍流的论文",
+                "text": "晴空湍流现在可以用激光雷达提前识别了",
             },
             {
                 "act": "fact",

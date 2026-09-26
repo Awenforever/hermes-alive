@@ -563,6 +563,7 @@ class LLMMessageComposer:
         except Exception:
             pass
         policy = context.get("interruption_policy")
+        novel_value_mode = False
         if isinstance(policy, dict):
             policy_directives = str(
                 policy.get("prompt_directives") or ""
@@ -570,6 +571,7 @@ class LLMMessageComposer:
             if policy_directives:
                 parts.append(policy_directives)
             if str(policy.get("mode") or "") == "novel_value":
+                novel_value_mode = True
                 parts.append(
                     "## 新价值模式硬约束\n"
                     "- 上一条主动消息未获回应，旧话题已终止。\n"
@@ -593,17 +595,23 @@ class LLMMessageComposer:
         if discovery_context:
             discovery_lines = self._format_discovery(discovery_context)
             if discovery_lines:
-                parts.append(
+                discovery_guidance = (
                     "## 你最近发现的一些有趣内容\n"
-                    "如果你产生了真实的好奇可以用它们，但注意：\n"
-                    '1. 先说是什么事："我看到一个专利说电动车充电口能识别用户喜好"，不要只说"那事"\n'
-                    '2. 或者卖关子："我看到一个东西想吐槽……"，然后你自己决定要不要接着说\n'
-                    '3. 不刻意翻找——它要从你脑子里冒出来才算自然\n'
-                    "4. 只有当正文确实使用某一条外部内容时，"
-                    "在回复最后附上："
-                    "[[CONTENT_REF:该条目的content_id]]。"
-                    "不用外部内容时不要添加；"
-                    "不要解释这个标记。\n"
+                    "这些是编辑候选，不是必须逐条汇报的清单。\n"
+                    "1. 正文应自然说清所选条目的具体事件、人物、发现或价值；"
+                    "可以直接从事实切入，不要求使用固定开场白\n"
+                    "2. 不得只说‘那件事’‘有个东西’等无法独立理解的指代\n"
+                    "3. 只选择真正值得此刻分享的一条；没有合格条目就保持沉默\n"
+                    "4. 正文确实使用外部内容时，在 JSON 的 content_ref 字段填写"
+                    "对应 content_id；不要在气泡正文中输出协议标记\n"
+                )
+                if not novel_value_mode:
+                    discovery_guidance += (
+                        "5. 普通模式下不必为了使用候选而刻意翻找，"
+                        "它应当像自然想到的话题\n"
+                    )
+                parts.append(
+                    discovery_guidance
                     + "\n".join(discovery_lines)
                 )
         parts.append(
