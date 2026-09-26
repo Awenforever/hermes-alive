@@ -1,5 +1,5 @@
 name: hermes-alive
-version: 2.6.2
+version: 2.6.3
 manifest_version: 1
 api_version: 1
 description: Controlled proactive presence for Hermes with quiet hours, backpressure, and local state.

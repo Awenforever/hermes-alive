@@ -189,6 +189,7 @@ class LLMMessageComposer:
         # leak across retries or later proactive ticks.
         self.last_resolved_model = ""
         self.last_semantic_plan: dict[str, Any] = {}
+        self.last_repair_reason = ""
 
     async def compose(
         self,
@@ -199,6 +200,7 @@ class LLMMessageComposer:
         """Generate a semantic plan first, then return 1-5 complete bubbles."""
         self.last_resolved_model = ""
         self.last_semantic_plan = {}
+        self.last_repair_reason = ""
         self.last_context_snapshot = {}
         self.last_rejection_reason = ""
         try:
@@ -220,6 +222,17 @@ class LLMMessageComposer:
                 policy if isinstance(policy, dict) else None
             )
             default_type = self._msg_type(context)
+
+            candidate, repaired = self._cap_candidate_to_policy(
+                candidate,
+                policy_decision,
+            )
+            if repaired:
+                self.last_repair_reason = "bubble_count_capped_to_policy"
+                logger.info(
+                    "Repaired proactive semantic plan: %s",
+                    self.last_repair_reason,
+                )
 
             try:
                 plan = parse_semantic_plan(
@@ -309,6 +322,42 @@ class LLMMessageComposer:
             return [
                 (FALLBACK_MSG_TYPE, FALLBACK_CONTENT)
             ]
+
+    @staticmethod
+    def _cap_candidate_to_policy(
+        candidate: str,
+        policy_decision: dict[str, Any] | None,
+    ) -> tuple[str, bool]:
+        """Repair only a safe presentational overflow from otherwise valid JSON.
+
+        The model occasionally emits four or five independent semantic acts
+        when the current interruption policy permits fewer.  Dropping the
+        entire sourced plan loses its content reference and turns a harmless
+        formatting overrun into a failed delivery.  Preserve the original
+        bubbles verbatim up to the configured limit and retain all plan-level
+        provenance fields.
+        """
+        raw = str(candidate or "").strip()
+        if not raw.startswith("{"):
+            return candidate, False
+        try:
+            parsed = json.loads(raw)
+        except Exception:
+            return candidate, False
+        if not isinstance(parsed, dict):
+            return candidate, False
+        bubbles = parsed.get("bubbles")
+        if not isinstance(bubbles, list):
+            return candidate, False
+        try:
+            limit = int((policy_decision or {}).get("max_bubbles", 5))
+        except Exception:
+            limit = 5
+        limit = max(1, min(5, limit))
+        if len(bubbles) <= limit:
+            return candidate, False
+        parsed["bubbles"] = bubbles[:limit]
+        return json.dumps(parsed, ensure_ascii=False, separators=(",", ":")), True
 
     def _extract_content_ref(
         self,
