@@ -39,10 +39,12 @@ except Exception:  # pragma: no cover - Hermes normally ships PyYAML
 SKILL_NAME = "hermes-alive"
 HOOK_NAME = "hermes-alive"
 MANIFEST_VERSION = 1
-CONFIG_VERSION = 4
+CONFIG_VERSION = 5
 
 MANAGED_ENV_KEYS = {
     "enabled": "HERMES_PROACTIVE_PLATFORM_ENABLED",
+    "delivery_platform": "HERMES_PROACTIVE_DELIVERY_PLATFORM",
+    "delivery_chat_id": "HERMES_PROACTIVE_DELIVERY_CHAT_ID",
     "weixin_chat_id": "HERMES_PROACTIVE_WEIXIN_CHAT_ID",
     "timezone": "TZ",
     "quiet_start": "HERMES_PROACTIVE_QUIET_START",
@@ -798,11 +800,8 @@ def configure(args: argparse.Namespace) -> int:
     values = current.get("values", {}) if isinstance(current, dict) else {}
     if not isinstance(values, dict):
         values = {}
-    # New installations inherit the model already configured in Hermes.
-    # Provider-specific aliases belong to the user's Hermes profile, not to a
-    # portable plugin default. Upgrades preserve every explicit Alive route.
-    if "llm_model" not in values and provider.get("model"):
-        values["llm_model"] = str(provider["model"])
+    # Empty model fields intentionally inherit Hermes routing dynamically.
+    # Upgrades preserve every explicit Alive route.
 
     def assign(name: str, value: Any) -> None:
         if value is not None:
@@ -813,6 +812,8 @@ def configure(args: argparse.Namespace) -> int:
     if args.disable:
         assign("enabled", False)
     assign("weixin_chat_id", args.weixin_chat_id)
+    assign("delivery_platform", args.delivery_platform)
+    assign("delivery_chat_id", args.delivery_chat_id)
     assign("timezone", args.timezone)
     assign("quiet_start", args.quiet_start)
     assign("quiet_end", args.quiet_end)
@@ -1263,6 +1264,8 @@ def build_parser() -> argparse.ArgumentParser:
     enable_group.add_argument("--enable", action="store_true")
     enable_group.add_argument("--disable", action="store_true")
     configure_parser.add_argument("--weixin-chat-id")
+    configure_parser.add_argument("--delivery-platform")
+    configure_parser.add_argument("--delivery-chat-id")
     configure_parser.add_argument("--timezone")
     configure_parser.add_argument("--quiet-start")
     configure_parser.add_argument("--quiet-end")

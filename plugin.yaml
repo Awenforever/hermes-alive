@@ -1,12 +1,12 @@
 name: hermes-alive
-version: 2.8.13
+version: 2.9.0
 manifest_version: 1
 api_version: 1
 description: Controlled proactive presence for Hermes with quiet hours, backpressure, and local state.
 author: Awenforever
 license: MIT
 homepage: https://github.com/Awenforever/hermes-alive
-tags: [gateway, proactive, weixin, lifecycle]
+tags: [gateway, proactive, messaging, lifecycle]
 requires_hermes: ">=0.21.3,<0.22"
 config_schema:
   enabled:
@@ -15,8 +15,20 @@ config_schema:
     description: Enable proactive delivery after setup and explicit operator consent.
   delivery_platform:
     type: str
-    default: weixin
-    description: Messaging platform used for proactive delivery.
+    default: ""
+    description: Optional Hermes channel name; empty captures the setup conversation channel.
+  delivery_chat_id:
+    type: str
+    default: ""
+    description: Optional channel destination; empty captures the setup conversation destination.
+  llm_model:
+    type: str
+    default: ""
+    description: Optional Hermes model alias; empty inherits the active primary model.
+  llm_fallback_model:
+    type: str
+    default: ""
+    description: Optional Hermes model alias; empty inherits Hermes fallback routing.
   min_interval_seconds:
     type: int
     default: 21600

@@ -72,7 +72,7 @@ def _safe_work_dir(raw: str) -> str:
     return real
 
 WORK_DIR = _safe_work_dir(os.getenv("HERMES_DISCOVERY_WORK_DIR", ""))
-LOG_PATH = os.getenv("HERMES_DISCOVERY_LOG_PATH", "/opt/data/logs/gateway.log")
+LOG_PATH = os.getenv("HERMES_DISCOVERY_LOG_PATH", str(Path(os.getenv("HERMES_HOME", str(Path.home() / ".hermes"))) / "logs" / "gateway.log"))
 RECENT_FILE_EXTENSIONS = (".py", ".md", ".yaml", ".yml")
 
 # P0 guardrails: LocalDiscovery must remain explicitly allowlisted and deny sensitive files.
@@ -92,7 +92,7 @@ MAX_RECENT_FILES = int(os.getenv("HERMES_DISCOVERY_MAX_RECENT_FILES", "5"))
 
 SOURCES_CONFIG_PATH = os.getenv(
     "HERMES_SOURCES_CONFIG",
-    str(Path(os.getenv("HERMES_ALIVE_SHARED_DIR", str(Path(os.getenv("HERMES_HOME", "/opt/data")) / "plugin-data" / "hermes-alive" / "runtime"))) / "sources.yaml"),
+    str(Path(os.getenv("HERMES_ALIVE_SHARED_DIR", str(Path(os.getenv("HERMES_HOME", str(Path.home() / ".hermes"))) / "plugin-data" / "hermes-alive" / "runtime"))) / "sources.yaml"),
 )
 BUDGET_MAX_PER_RUN = int(os.getenv("HERMES_DISCOVERY_BUDGET_MAX_PER_RUN", "15"))
 BUDGET_MAX_PER_SOURCE = int(os.getenv("HERMES_DISCOVERY_BUDGET_MAX_PER_SOURCE", "5"))

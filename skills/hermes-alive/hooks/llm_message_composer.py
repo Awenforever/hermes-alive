@@ -1311,7 +1311,7 @@ class LLMMessageComposer:
     @staticmethod
     def _read_proactive_context() -> str:
         """Read proactive context file for user profile / memory injection."""
-        hermes_home = os.getenv("HERMES_HOME", "/opt/data")
+        hermes_home = os.getenv("HERMES_HOME", os.path.join(os.path.expanduser("~"), ".hermes"))
         context_path = os.path.join(hermes_home, "proactive_context.md")
         try:
             if os.path.exists(context_path):

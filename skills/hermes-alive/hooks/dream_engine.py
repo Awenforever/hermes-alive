@@ -34,8 +34,8 @@ from dream_prompt import (
 logger = logging.getLogger(__name__)
 
 # The Weixin user to track (matched by source + user_id in sessions table)
-WEIXIN_SOURCE = "weixin"
-HERMES_HOME = os.getenv("HERMES_HOME", "/opt/data")
+DEFAULT_SOURCE = "weixin"
+HERMES_HOME = os.getenv("HERMES_HOME", os.path.join(os.path.expanduser("~"), ".hermes"))
 STATE_DB_PATH = os.getenv("HERMES_STATE_DB", os.path.join(HERMES_HOME, "state.db"))
 
 
@@ -57,6 +57,15 @@ def _weixin_user_id() -> str:
         ).strip()
 
 
+def _delivery_source() -> str:
+    return os.getenv("HERMES_PROACTIVE_DELIVERY_PLATFORM", "").strip().lower() or DEFAULT_SOURCE
+
+
+def _delivery_user_id() -> str:
+    configured = os.getenv("HERMES_PROACTIVE_DELIVERY_CHAT_ID", "").strip()
+    return _weixin_user_id() if _delivery_source() == "weixin" else configured
+
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -76,7 +85,7 @@ class DreamEngine:
 
     def __init__(self, diff_path: str | None = None) -> None:
         self._diff_path = diff_path or os.getenv(
-                    "DREAM_DIFF_PATH", os.path.join(os.getenv("HERMES_HOME", "/opt/data"), "plugin-data", "hermes-alive", "runtime", "dream_diff.json")
+                    "DREAM_DIFF_PATH", os.path.join(os.getenv("HERMES_HOME", os.path.join(os.path.expanduser("~"), ".hermes")), "plugin-data", "hermes-alive", "runtime", "dream_diff.json")
                 )
 
     def should_run(self) -> bool:
@@ -145,7 +154,7 @@ class DreamEngine:
 
         # Read MEMORY.md
         memory_paths = [
-            os.getenv("HERMES_HOME", "/opt/data") + "/memories/MEMORY.md",
+            os.getenv("HERMES_HOME", os.path.join(os.path.expanduser("~"), ".hermes")) + "/memories/MEMORY.md",
         ]
         for mp in memory_paths:
             try:
@@ -161,8 +170,7 @@ class DreamEngine:
 
         # Read proactive_context.md (user profile)
         context_paths = [
-            os.getenv("HERMES_HOME", "/opt/data") + "/proactive_context.md",
-            "/opt/data/proactive_context.md",
+            os.getenv("HERMES_HOME", os.path.join(os.path.expanduser("~"), ".hermes")) + "/proactive_context.md",
         ]
         for cp in context_paths:
             try:
@@ -201,7 +209,7 @@ class DreamEngine:
         try:
             cursor = conn.cursor()
 
-            user_id = _weixin_user_id()
+            user_id = _delivery_user_id()
             if not user_id:
                 logger.debug("No WEIXIN_CHAT_ID configured; cannot read session transcripts")
                 return []
@@ -210,7 +218,7 @@ class DreamEngine:
             cursor.execute(
                 "SELECT id, started_at FROM sessions "
                 "WHERE source = ? AND user_id = ? ORDER BY started_at DESC LIMIT 5",
-                (WEIXIN_SOURCE, user_id)
+                (_delivery_source(), user_id)
             )
             sessions = cursor.fetchall()
             if not sessions:
@@ -434,7 +442,7 @@ class DreamEngine:
     def _resolve_memory_path(self) -> str | None:
         """Find the actual MEMORY.md path."""
         candidates = [
-            os.getenv("HERMES_HOME", "/opt/data") + "/memories/MEMORY.md",
+            os.getenv("HERMES_HOME", os.path.join(os.path.expanduser("~"), ".hermes")) + "/memories/MEMORY.md",
         ]
         for p in candidates:
             if os.path.isfile(p):

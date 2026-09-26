@@ -13,6 +13,8 @@ from typing import Any
 
 MANAGED_ENV_KEYS = {
     "enabled": "HERMES_PROACTIVE_PLATFORM_ENABLED",
+    "delivery_platform": "HERMES_PROACTIVE_DELIVERY_PLATFORM",
+    "delivery_chat_id": "HERMES_PROACTIVE_DELIVERY_CHAT_ID",
     "weixin_chat_id": "HERMES_PROACTIVE_WEIXIN_CHAT_ID",
     "timezone": "TZ",
     "quiet_start": "HERMES_PROACTIVE_QUIET_START",
@@ -101,7 +103,7 @@ def managed_config_path() -> Path:
     shared = Path(
         os.getenv(
             "HERMES_ALIVE_SHARED_DIR",
-            str(Path(os.getenv("HERMES_HOME", "/opt/data")) / "plugin-data" / "hermes-alive" / "runtime"),
+            str(Path(os.getenv("HERMES_HOME", str(Path.home() / ".hermes"))) / "plugin-data" / "hermes-alive" / "runtime"),
         )
     )
     return shared / "config" / "hermes-alive.json"

@@ -36,8 +36,9 @@ import re
 import sys
 from pathlib import Path
 # Hermes Alive import path bootstrap
-_HOOK_DIR = os.getenv("HERMES_HOOK_DIR", "/opt/data/hooks/hermes-alive")
-_SHARED_DIR = os.getenv("HERMES_ALIVE_SHARED_DIR", str(Path(os.getenv("HERMES_HOME", "/opt/data")) / "plugin-data" / "hermes-alive" / "runtime"))
+_PORTABLE_HOME = os.getenv("HERMES_HOME", str(Path.home() / ".hermes"))
+_HOOK_DIR = os.getenv("HERMES_HOOK_DIR", str(Path(_PORTABLE_HOME) / "hooks" / "hermes-alive"))
+_SHARED_DIR = os.getenv("HERMES_ALIVE_SHARED_DIR", str(Path(_PORTABLE_HOME) / "plugin-data" / "hermes-alive" / "runtime"))
 for _p in (_HOOK_DIR, _SHARED_DIR):
     if _p not in sys.path:
         sys.path.insert(0, _p)
@@ -90,6 +91,8 @@ def _refresh_managed_runtime_env() -> None:
 DEFAULT_INTERVAL_SECONDS = 300.0
 ENABLED_ENV = "HERMES_PROACTIVE_PLATFORM_ENABLED"
 CHAT_ID_ENV = "HERMES_PROACTIVE_WEIXIN_CHAT_ID"
+DELIVERY_PLATFORM_ENV = "HERMES_PROACTIVE_DELIVERY_PLATFORM"
+DELIVERY_CHAT_ID_ENV = "HERMES_PROACTIVE_DELIVERY_CHAT_ID"
 INTERVAL_ENV = "HERMES_PROACTIVE_PLATFORM_INTERVAL_SECONDS"
 VOICE_ENABLED_ENV = "VOICE_ENABLED"
 COOLDOWN_ENABLED_ENV = "COOLDOWN_ENABLED"
@@ -1160,12 +1163,27 @@ class ProactivePlatformWatcher:
         configured value to a context-bearing peer when runtime evidence is
         unambiguous; never guess between multiple peers.
         """
+        requested_platform = os.getenv(DELIVERY_PLATFORM_ENV, "").strip().lower()
+        requested_chat = os.getenv(DELIVERY_CHAT_ID_ENV, "").strip()
         weixin_adapter: Any | None = None
 
         for key, adapter in self.adapters.items():
             key_value = getattr(key, "value", key)
 
-            if str(key_value) == "weixin":
+            platform_key = str(key_value).strip().lower()
+            if requested_platform:
+                if platform_key != requested_platform:
+                    continue
+                platform_chat = requested_chat or os.getenv(
+                    f"HERMES_PROACTIVE_{requested_platform.upper()}_CHAT_ID", ""
+                ).strip()
+                if platform_key != "weixin":
+                    return (adapter, platform_chat) if platform_chat else (None, None)
+                weixin_adapter = adapter
+                requested_chat = platform_chat
+                continue
+
+            if platform_key == "weixin":
                 weixin_adapter = adapter
                 continue
 
@@ -1183,10 +1201,9 @@ class ProactivePlatformWatcher:
                 return adapter, chat_id
 
         if weixin_adapter is not None:
-            configured = os.getenv(
-                CHAT_ID_ENV,
-                "",
-            ).strip()
+            configured = (
+                requested_chat if requested_platform == "weixin" else ""
+            ) or os.getenv(CHAT_ID_ENV, "").strip()
 
             resolved, reason = resolve_weixin_peer(
                 configured,

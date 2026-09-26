@@ -31,7 +31,7 @@ STYLE_DIMENSIONS = (
 )
 
 RELATIONSHIP_STAGES = ("new", "exploring", "familiar", "close")
-_SHARED_DIR = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", str(Path(os.getenv("HERMES_HOME", "/opt/data")) / "plugin-data" / "hermes-alive" / "runtime")))
+_SHARED_DIR = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", str(Path(os.getenv("HERMES_HOME", str(Path.home() / ".hermes"))) / "plugin-data" / "hermes-alive" / "runtime")))
 SHARED_STATE_PATH = _SHARED_DIR / "voice_state.json"
 OLD_MOOD_STATE_PATH = _SHARED_DIR / "mood_state.json"
 PROACTIVE_LOG = _SHARED_DIR / "proactive_log.jsonl"

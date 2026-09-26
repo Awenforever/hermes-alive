@@ -26,7 +26,7 @@ except Exception:
     AliveStateEngine = None  # type: ignore[assignment]
 
 
-BASE = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", str(Path(os.getenv("HERMES_HOME", "/opt/data")) / "plugin-data" / "hermes-alive" / "runtime")))
+BASE = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", str(Path(os.getenv("HERMES_HOME", str(Path.home() / ".hermes"))) / "plugin-data" / "hermes-alive" / "runtime")))
 PROACTIVE_LOG = BASE / "proactive_log.jsonl"
 CONTEXT_QUEUE = BASE / "context_queue.json"
 VOICE_STATE = BASE / "voice_state.json"

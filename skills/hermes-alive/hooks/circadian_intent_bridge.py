@@ -26,7 +26,7 @@ from circadian_engine import CircadianEngine, load_circadian_config
 from safe_io import append_jsonl, locked_read_json, locked_write_json
 
 SCHEMA_VERSION = 1
-DEFAULT_SHARED_DIR = str(Path(os.getenv("HERMES_HOME", "/opt/data")) / "plugin-data" / "hermes-alive" / "runtime")
+DEFAULT_SHARED_DIR = str(Path(os.getenv("HERMES_HOME", str(Path.home() / ".hermes"))) / "plugin-data" / "hermes-alive" / "runtime")
 DEFAULT_MAX_MESSAGE_AGE_SECONDS = 2 * 60 * 60
 BRIDGE_STATE_NAME = "circadian_intent_bridge_state.json"
 BRIDGE_LOG_NAME = "circadian_intent_shadow.jsonl"

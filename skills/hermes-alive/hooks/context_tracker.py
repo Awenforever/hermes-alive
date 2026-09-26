@@ -45,16 +45,16 @@ ACTIVITY_LEASE_TTL_SECONDS = float(
 SHARED_DIR = Path(
     os.getenv(
         "HERMES_ALIVE_SHARED_DIR",
-        str(Path(os.getenv("HERMES_HOME", "/opt/data")) / "plugin-data" / "hermes-alive" / "runtime"),
+        str(Path(os.getenv("HERMES_HOME", str(Path.home() / ".hermes"))) / "plugin-data" / "hermes-alive" / "runtime"),
     )
 )
 QUEUE_FILE = SHARED_DIR / "context_queue.json"
 ACTIVITY_FILE = SHARED_DIR / "activity_leases.json"
 PROACTIVE_LOG = SHARED_DIR / "proactive_log.jsonl"
 
-WEIXIN_SOURCE = "weixin"
+DEFAULT_SOURCE = "weixin"
 
-HERMES_HOME = os.getenv("HERMES_HOME", "/opt/data")
+HERMES_HOME = os.getenv("HERMES_HOME", str(Path.home() / ".hermes"))
 STATE_DB = Path(
     os.getenv(
         "HERMES_STATE_DB",
@@ -89,6 +89,15 @@ def _weixin_user_id() -> str:
             "HERMES_PROACTIVE_WEIXIN_CHAT_ID",
             "",
         ).strip()
+
+
+def _delivery_source() -> str:
+    return os.getenv("HERMES_PROACTIVE_DELIVERY_PLATFORM", "").strip().lower() or DEFAULT_SOURCE
+
+
+def _delivery_user_id() -> str:
+    configured = os.getenv("HERMES_PROACTIVE_DELIVERY_CHAT_ID", "").strip()
+    return _weixin_user_id() if _delivery_source() == "weixin" else configured
 
 
 _session_busy = False
@@ -360,8 +369,8 @@ class ContextQueue:
         data = {
             "version": 2,
             "updated_at": datetime.now(CST).isoformat(),
-            "source": WEIXIN_SOURCE,
-            "user_id": _weixin_user_id(),
+            "source": _delivery_source(),
+            "user_id": _delivery_user_id(),
             "max_messages": self.max_messages,
             "message_count": len(rebuilt),
             "messages": rebuilt,
@@ -421,9 +430,9 @@ class ContextQueue:
         return {
             "version": int(data.get("version") or 2),
             "updated_at": str(data.get("updated_at") or ""),
-            "source": str(data.get("source") or WEIXIN_SOURCE),
+            "source": str(data.get("source") or _delivery_source()),
             "user_id": str(
-                _weixin_user_id()
+                _delivery_user_id()
                 or data.get("user_id")
                 or ""
             ),
@@ -439,8 +448,8 @@ class ContextQueue:
         return {
             "version": 2,
             "updated_at": "",
-            "source": WEIXIN_SOURCE,
-            "user_id": _weixin_user_id(),
+            "source": _delivery_source(),
+            "user_id": _delivery_user_id(),
             "max_messages": self.max_messages,
             "message_count": 0,
             "messages": [],
@@ -786,7 +795,7 @@ def read_recent_context(
 
 
 def _fetch_latest_rows(limit: int) -> list[dict[str, Any]]:
-    user_id = _weixin_user_id()
+    user_id = _delivery_user_id()
     if not user_id:
         logger.debug(
             "No WEIXIN_CHAT_ID configured; cannot refresh context queue"
@@ -810,7 +819,7 @@ def _fetch_latest_rows(limit: int) -> list[dict[str, Any]]:
             "AND m.role IN ('user', 'assistant') "
             "AND TRIM(COALESCE(m.content, '')) <> '' "
             "ORDER BY m.timestamp DESC, m.id DESC LIMIT ?",
-            (WEIXIN_SOURCE, user_id, limit),
+            (_delivery_source(), user_id, limit),
         )
         rows = [dict(row) for row in cursor.fetchall()]
     finally:

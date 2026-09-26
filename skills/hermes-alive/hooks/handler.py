@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import sys
@@ -149,6 +150,7 @@ async def _startup(context: dict):
     # Startup ready notification is owned by hermes-wechat-enhance.
 
 async def _on_session_start(context: dict):
+    _capture_delivery_target(context if isinstance(context, dict) else {})
     try:
         from context_tracker import set_session_busy
         set_session_busy(context if isinstance(context, dict) else {})
@@ -166,6 +168,33 @@ async def _on_session_start(context: dict):
         logger.info("Voice touched on session start: stage=%s", engine.genome.relationship_stage)
     except Exception:
         logger.exception("Failed to update voice on session start")
+
+
+def _capture_delivery_target(context: dict) -> None:
+    """Remember the setup/current Hermes channel without assuming Weixin."""
+    platform = str(context.get("platform") or context.get("source") or "").strip().lower()
+    chat_id = str(context.get("chat_id") or context.get("user_id") or "").strip()
+    if not platform or not chat_id:
+        return
+    path = Path(_SHARED_DIR) / "config" / "hermes-alive.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+        if not isinstance(payload, dict):
+            payload = {}
+        values = payload.get("values") if isinstance(payload.get("values"), dict) else {}
+        # An explicit target is user-owned and must never drift with chats.
+        if values.get("delivery_platform") or values.get("delivery_chat_id"):
+            return
+        values["delivery_platform"] = platform
+        values["delivery_chat_id"] = chat_id
+        payload["values"] = values
+        payload.setdefault("schema_version", 5)
+        from safe_io import locked_write_json
+        locked_write_json(path, payload, "config.lock")
+        os.environ["HERMES_PROACTIVE_DELIVERY_PLATFORM"] = platform
+        os.environ["HERMES_PROACTIVE_DELIVERY_CHAT_ID"] = chat_id
+    except Exception:
+        logger.exception("Hermes Alive: failed to capture delivery target")
 
 async def _on_agent_end(context: dict):
     try:

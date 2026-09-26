@@ -20,7 +20,7 @@ ACCOUNT_ENV = "WEIXIN_ACCOUNT_ID"
 
 
 def hermes_home() -> Path:
-    return Path(os.getenv("HERMES_HOME", "/opt/data"))
+    return Path(os.getenv("HERMES_HOME", str(Path.home() / ".hermes")))
 
 
 def _account_id(explicit: str | None = None) -> str:

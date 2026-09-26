@@ -4,7 +4,7 @@
 
 **让 Hermes 偶尔主动开口，同时知道何时保持安静。**
 
-![version](https://img.shields.io/badge/version-2.8.13-blue)
+![version](https://img.shields.io/badge/version-2.9.0-blue)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB)
 ![Hermes](https://img.shields.io/badge/Hermes-gateway--native-6f42c1)
 ![license](https://img.shields.io/badge/license-MIT-green)
@@ -47,7 +47,7 @@ Hermes 会用自然语言确认目标会话、地区、作息和内容偏好，�
 ```bash
 git clone --depth 1 https://github.com/Awenforever/hermes-alive.git /tmp/hermes-alive
 cd /tmp/hermes-alive
-HERMES_HOME=/opt/data bash scripts/bootstrap.sh
+HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}" bash scripts/bootstrap.sh
 ```
 
 安装脚本会写入标准 Hermes 数据目录并完成验证，但不会重启 Gateway：
@@ -63,7 +63,7 @@ $HERMES_HOME/plugin-data/hermes-alive/runtime
 ## 控制与卸载
 
 ```bash
-export HERMES_HOME=/opt/data
+export HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}"
 LIFECYCLE="$HERMES_HOME/skills/hermes-alive/scripts/hermes-alive-lifecycle"
 
 "$LIFECYCLE" status
