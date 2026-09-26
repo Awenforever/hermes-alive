@@ -267,6 +267,7 @@ def delivery_plans() -> None:
     engine = ContentDeliveryEngine(allowed_file_roots=[SHARED], max_file_bytes=1024)
     context = {"external": [
         {"id": "img", "title": "Smoke paper", "url": "https://example.invalid/paper", "image_url": "//img.example.invalid/a.jpg", "source": "example"},
+        {"id": "link", "title": "Compact source", "url": "https://example.invalid/story?a=1", "source": "example"},
         {"id": "bad", "title": "Bad URL", "url": "file:///outside/not-allowed", "source": "example"},
     ]}
     messages = [("research_ping", "Smoke paper", "fake-provider/fake-model")]
@@ -315,6 +316,44 @@ def delivery_plans() -> None:
     )
     assert system_exact.rich_payload
     assert system_exact.rich_payload.generated_by == "hermes"
+
+    semantic = [
+        ("discovery_intro", "看到一个有趣的消息", "fake-provider/fake-model"),
+        ("fact", "它的关键事实在这里", "fake-provider/fake-model"),
+        ("reaction", "这个角度挺意外", "fake-provider/fake-model"),
+    ]
+    inline = engine.plan(
+        semantic,
+        context,
+        {"allow_content_share": True, "max_bubbles": 3},
+        content_ref="link",
+        content_generated_by="fake-provider/fake-model",
+    )
+    assert inline.rich_payload is None
+    assert len(inline.text_messages) == 3
+    assert inline.text_messages[:2] == semantic[:2]
+    assert inline.text_messages[-1][1] == (
+        "这个角度挺意外\n\n"
+        "[查看原文](https://example.invalid/story?a=1)"
+    )
+    assert all(
+        "https://" not in content
+        for _kind, content, _model in inline.text_messages[:-1]
+    )
+
+    link_only = engine.plan(
+        [],
+        context,
+        {"allow_content_share": True, "max_bubbles": 1},
+        content_ref="link",
+        content_generated_by="fake-provider/fake-model",
+    )
+    assert link_only.rich_payload is None
+    assert link_only.text_messages == [(
+        "content_share",
+        "Compact source · [查看原文](https://example.invalid/story?a=1)",
+        "fake-provider/fake-model",
+    )]
     unknown = engine.plan(messages, context, {"allow_content_share": True, "max_bubbles": 3}, content_ref="missing")
     assert unknown.rich_payload is None and unknown.evidence_score == 0
     blocked = engine.plan(messages, context, {"allow_content_share": False, "max_bubbles": 1}, content_ref="img")

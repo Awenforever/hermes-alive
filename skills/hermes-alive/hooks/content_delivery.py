@@ -84,6 +84,45 @@ class DeliveryPlan:
     max_units: int
 
 
+def _markdown_link(label: str, url: str) -> str:
+    """Build a compact link from a runtime-validated URL."""
+    safe_url = _safe_http_url(url)
+    if not safe_url:
+        return ""
+    safe_label = re.sub(r"[\\[\\]\\\\]", "", str(label or "")).strip()
+    safe_label = safe_label or "查看原文"
+    # A literal closing parenthesis terminates a Markdown link destination.
+    safe_url = safe_url.replace(")", "%29")
+    return f"[{safe_label}]({safe_url})"
+
+
+def _embed_source_link(
+    messages: list[tuple[str, str, str]],
+    payload: DeliveryPayload,
+    *,
+    max_units: int,
+) -> list[tuple[str, str, str]]:
+    """Attach a source link to the final semantic bubble, never a new bubble."""
+    selected = list(messages[:max_units])
+    link = _markdown_link("查看原文", payload.url)
+    if not link:
+        return selected
+
+    if selected:
+        msg_type, content, generated_by = selected[-1]
+        if payload.url not in content and link not in content:
+            content = f"{content.rstrip()}\n\n{link}"
+        selected[-1] = (msg_type, content, generated_by)
+        return selected
+
+    title = payload.title.strip() or "这条内容"
+    return [(
+        "content_share",
+        f"{title} · {link}",
+        payload.generated_by,
+    )]
+
+
 def _safe_http_url(value: Any) -> str:
     raw = str(value or "").strip()
     if not raw:
@@ -322,6 +361,23 @@ class ContentDeliveryEngine:
         if rich_payload is None:
             return DeliveryPlan(
                 text_messages=cleaned[:max_units],
+                rich_payload=None,
+                selected_item=item,
+                evidence_score=evidence_score,
+                max_units=max_units,
+            )
+
+        # A plain source URL is part of the prose, not a separate rich-media
+        # unit.  Embed the trusted URL in the last semantic bubble so WeChat
+        # renders a compact clickable label and no model-authored act is
+        # discarded merely to reserve a bubble for a raw URL fallback.
+        if rich_payload.kind == "link":
+            return DeliveryPlan(
+                text_messages=_embed_source_link(
+                    cleaned,
+                    rich_payload,
+                    max_units=max_units,
+                ),
                 rich_payload=None,
                 selected_item=item,
                 evidence_score=evidence_score,

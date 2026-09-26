@@ -1,7 +1,7 @@
 ---
 name: hermes-alive
 description: "Gateway-native proactive companion with contextual discovery, live quality enforcement, production Circadian sleep/quiet enforcement, and reversible lifecycle management."
-version: 2.6.7
+version: 2.7.0
 ---
 
 # Hermes Alive — Hermes Installation Contract
@@ -18,13 +18,33 @@ Before installation:
 
 1. confirm Hermes is installed and `HERMES_HOME` is writable;
 2. confirm Hermes has a usable Provider/model;
-3. do not request API keys, timezone syntax, quiet-hour syntax, coordinates, or
-   internal feature flags in a terminal questionnaire;
+3. never request API keys, timezone syntax, coordinates, or internal feature
+   flags from the user; infer technical values from Hermes and the OS;
 4. do not modify Hermes Core, `weixin.py`, production configuration, or gateway
    state as part of installation.
 
 Provider setup remains owned by Hermes. If readiness fails, report the missing
 prerequisite and stop; do not launch a second skill-specific Provider flow.
+
+## Guided personalization
+
+Before enabling a fresh installation, guide the user in the current chat. This
+is part of installation, not optional documentation. Ask one compact natural
+language question at a time and accept “use recommended defaults”. Establish:
+
+1. which already-paired chat should receive proactive messages;
+2. the user's city/district if local weather or local discovery is wanted;
+3. approximate sleep/wake or do-not-disturb preferences;
+4. preferred content mix and whether proactive sharing should be conservative,
+   balanced, or lively.
+
+Do not make the user translate preferences into flags. Convert their answers
+to lifecycle arguments, summarize the resulting behavior, then ask for a final
+confirmation before enabling and restarting Gateway. Never send a test message
+without explicit approval. If the user accepts defaults, inherit Hermes' active
+model, current paired chat and system timezone; use balanced discovery,
+contextual emoji, dynamic sleep protection, and weather disabled until a
+location is confirmed.
 
 ## Paths
 

@@ -1,62 +1,97 @@
+<div align="center">
+
 # Hermes Alive
 
-Hermes 的克制型主动陪伴插件。它根据最近对话、安静时段、发送积压和互动频率，决定是否主动发起一条消息。
+**让 Hermes 偶尔主动开口，同时知道何时保持安静。**
 
-## 功能
+![version](https://img.shields.io/badge/version-2.7.0-blue)
+![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB)
+![Hermes](https://img.shields.io/badge/Hermes-gateway--native-6f42c1)
+![license](https://img.shields.io/badge/license-MIT-green)
 
-- 活跃对话或待发送队列存在时不打扰。
-- 支持安静时段和最小主动消息间隔。
-- 对重复、施压、无依据的任务声明和低质量草稿做拦截。
-- 人格、关系和记忆更新有界、可追踪、可关闭。
-- 使用 Hermes 已配置的模型与消息通道，不维护第二套密钥。
-- 默认关闭；必须由使用者明确启用。
+[详细说明](README_CN.md) · [安全](SECURITY.md) · [贡献](CONTRIBUTING.md)
 
-Hermes Alive 不负责普通入站回复、微信队列、邮件监控或学术周报。
+</div>
 
-## 要求
+Hermes Alive 是独立的 Gateway 主动陪伴插件。它结合近期对话、互动压力、
+作息、兴趣和外部内容，决定是否发起自然消息；不会接管普通回复、微信队列、
+邮件监控或周报。
 
-- Hermes `>=0.21.3,<0.22`
-- Python 3.11+
-- Hermes 中已有可用模型和目标消息通道
+## 主要能力
 
-## 安装
+- 对话活跃、仍有待回复内容或用户连续未回应时主动克制；
+- 在时事、本地动态、人物文化、轻松趣闻、社区、技术与学术内容间轮换；
+- 以语义气泡表达，不把长段文字机械切片；来源链接以内联 Markdown 呈现；
+- 有边界地学习性格、兴趣和作息，并支持暂停、验证与回滚；
+- 复用 Hermes 当前模型、消息通道和认证，不维护第二套密钥。
+
+## 让 Hermes 安装（推荐）
+
+把仓库地址发给 Hermes，并告诉它：
+
+> 阅读本仓库的 `README.md` 与 `skills/hermes-alive/SKILL.md`，引导我完成
+> 个性化配置，确认后安装 Hermes Alive。
+
+Hermes 会用自然语言确认目标会话、地区、作息和内容偏好，再转换成安装参数。
+用户无需填写 API Key、模型别名、时区字符串或经纬度。首次安装继承当前设备
+已配置的 Hermes 模型；升级保留已有 Alive 配置和学习状态。
+
+仓库不会复制作者的微信身份、USTC 模型、代理或私人偏好。所谓“一致体验”是
+相同的功能、引导、目录结构和安全边界，而不是复制另一位用户的凭据。
+
+## 命令行安装
+
+要求 Hermes `>=0.21.3,<0.22`、Python 3.11+，以及已经可用的模型和消息通道。
 
 ```bash
-hermes plugins install Awenforever/hermes-alive
-hermes plugins enable hermes-alive
-hermes alive install-runtime
+git clone --depth 1 https://github.com/Awenforever/hermes-alive.git /tmp/hermes-alive
+cd /tmp/hermes-alive
+HERMES_HOME=/opt/data bash scripts/bootstrap.sh
 ```
 
-确认状态后再启用主动消息：
+安装脚本会写入标准 Hermes 数据目录并完成验证，但不会重启 Gateway：
+
+```text
+$HERMES_HOME/skills/hermes-alive
+$HERMES_HOME/hooks/hermes-alive
+$HERMES_HOME/plugin-data/hermes-alive/runtime
+```
+
+它不使用 `personal_folder`、工作目录或仓库目录保存运行数据。
+
+## 控制与卸载
 
 ```bash
-hermes alive status
-hermes alive enable
+export HERMES_HOME=/opt/data
+LIFECYCLE="$HERMES_HOME/skills/hermes-alive/scripts/hermes-alive-lifecycle"
+
+"$LIFECYCLE" status
+python3 "$HERMES_HOME/hooks/hermes-alive/alive_control.py" disable
+python3 "$HERMES_HOME/hooks/hermes-alive/alive_control.py" enable
+bash "$HERMES_HOME/skills/hermes-alive/scripts/verify.sh"
 ```
 
-暂停时无需卸载：
+普通卸载保留学习与运行状态；`--purge` 才会删除全部 Alive 状态：
 
 ```bash
-hermes alive disable
+bash "$HERMES_HOME/skills/hermes-alive/scripts/uninstall.sh"
+bash "$HERMES_HOME/skills/hermes-alive/scripts/uninstall.sh" --purge
 ```
 
-## 默认策略
+## 安全边界
 
-| 选项 | 默认值 | 作用 |
-|---|---:|---|
-| `enabled` | `false` | 是否允许主动发送 |
-| `delivery_platform` | `weixin` | 主动消息通道 |
-| `min_interval_seconds` | `21600` | 两次主动消息的最短间隔 |
-| `quiet_hours_start` | `23:00` | 安静时段开始 |
-| `quiet_hours_end` | `08:00` | 安静时段结束 |
+- 不修改 Hermes Core 或 `weixin.py`；
+- 不把 Provider 密钥写入插件仓库或 Alive 配置；
+- 不在未经确认时发送测试消息或重启生产 Gateway；
+- 安装、更新与卸载均保留可验证的回滚路径。
 
-运行状态保存在当前 Hermes profile 的 `plugin-data/hermes-alive/`，Gateway hook 位于 `hooks/hermes-alive/`。插件不修改 Hermes Core。
+## 文档
 
-启用和禁用会同时原子更新 profile 内的托管配置与运行标记；它们优先于镜像中可能残留的旧环境变量，因此容器重建后不会意外反转状态。
-
-## 安全与隐私
-
-插件只应使用当前会话和本地状态中确有依据的信息。发现、记忆或主动发送功能均不得绕过 Hermes 的通道权限与队列规则。建议先在备用账号观察数天，再逐步缩短主动间隔。
+- [架构](skills/hermes-alive/docs/ARCHITECTURE.md)
+- [运行策略](skills/hermes-alive/docs/RUNTIME_POLICIES.md)
+- [生命周期与持久化](skills/hermes-alive/docs/LIFECYCLE_AND_PERSISTENCE.md)
+- [数据与隐私](skills/hermes-alive/docs/DATA_AND_PRIVACY.md)
+- [测试](skills/hermes-alive/tests/TESTING.md)
 
 ## License
 

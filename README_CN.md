@@ -6,7 +6,7 @@
 
 让 Hermes 拥有在场感、性格、记忆与作息，但不把每一次沉默都变成通知。
 
-![version](https://img.shields.io/badge/version-2.6.7-blue)
+![version](https://img.shields.io/badge/version-2.7.0-blue)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB)
 ![Hermes](https://img.shields.io/badge/Hermes-gateway--native-6f42c1)
 ![license](https://img.shields.io/badge/license-MIT-green)
@@ -61,6 +61,19 @@ Hermes Gateway
 - 已在 Hermes 中配置可用的 Provider 与模型；
 - 可写的 `HERMES_HOME`，通常为 `/opt/data`。
 
+### 让 Hermes 代为安装（推荐）
+
+把本仓库链接发给 Hermes，并让它“阅读 `README_CN.md` 与
+`skills/hermes-alive/SKILL.md` 后安装”。Hermes 会先在当前对话中确认接收
+消息的会话、地区、作息与内容偏好，再把自然语言偏好转换成配置；用户不需要
+填写 API Key、模型别名、时区字符串或经纬度。确认后才会启用并提示重启。
+
+模型和凭据继承当前 Hermes 配置。仓库不会把作者设备上的 USTC 模型、微信
+账号、代理或私人偏好写成公共默认值，因此新设备得到的是一致的功能和引导，
+而不是错误复制另一位用户的身份与凭据。
+
+### 命令行安装
+
 从完整仓库安装：
 
 ```bash
@@ -72,7 +85,10 @@ cd /tmp/hermes-alive
 HERMES_HOME=/opt/data bash scripts/bootstrap.sh
 ```
 
-bootstrap 会安装技能源码和 Gateway Hook、写入非敏感默认配置并执行验证，但不会重启 Gateway。确认结果后，请按当前部署方式正常重启 Hermes。
+bootstrap 会安装技能源码和 Gateway Hook、继承 Hermes 当前模型、写入非敏感
+默认配置并执行验证，但不会重启 Gateway。命令行路径适合已有明确配置的运维者；
+普通用户应优先采用上面的 Hermes 引导安装。确认结果后，请按当前部署方式正常
+重启 Hermes。
 
 ## 配置与运行
 
