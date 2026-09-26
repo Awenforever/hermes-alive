@@ -4,7 +4,7 @@
 
 **让 Hermes 偶尔主动开口，同时知道何时保持安静。**
 
-![version](https://img.shields.io/badge/version-2.8.4-blue)
+![version](https://img.shields.io/badge/version-2.8.5-blue)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB)
 ![Hermes](https://img.shields.io/badge/Hermes-gateway--native-6f42c1)
 ![license](https://img.shields.io/badge/license-MIT-green)

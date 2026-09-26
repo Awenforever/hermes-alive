@@ -478,6 +478,7 @@ class LLMMessageComposer:
         current = content
         current_model = resolved_model
         replacement_refs_used: set[str] = set()
+        rejected_refs: set[str] = set()
         max_revisions = max(
             1,
             min(
@@ -501,11 +502,22 @@ class LLMMessageComposer:
                 )
                 revised_model = current_model
             else:
+                rejected_ref = str(review.get("content_ref") or "").strip()
+                if rejected_ref:
+                    rejected_refs.add(rejected_ref)
+                reselection_context = self._without_content_refs(
+                    discovery_context,
+                    rejected_refs,
+                )
+                reselection_prompt = await self._user_prompt(
+                    voice,
+                    context,
+                    reselection_context,
+                )
                 revision_prompt = (
-                    generation_prompt
+                    reselection_prompt
                     + "\n\n## 独立编辑审查未通过\n"
-                    + "上一版：\n"
-                    + current
+                    + "不合格来源已从本轮候选集中移除，不得复用旧稿或旧 content_ref。"
                     + "\n审查意见：\n- "
                     + "\n- ".join(str(value) for value in issues[:8])
                     + "\n请从证据和信息核心重新设计整组消息，可以换选题、删减或合并气泡；"
@@ -546,6 +558,27 @@ class LLMMessageComposer:
             + (f":{reason}" if reason else "")
         )
         return ""
+
+    @staticmethod
+    def _without_content_refs(
+        discovery_context: dict[str, Any] | None,
+        rejected_refs: set[str],
+    ) -> dict[str, Any] | None:
+        """Return a copy whose external candidates exclude failed sources."""
+        if not isinstance(discovery_context, dict) or not rejected_refs:
+            return discovery_context
+        filtered = dict(discovery_context)
+        external = discovery_context.get("external")
+        if isinstance(external, list):
+            filtered["external"] = [
+                item
+                for item in external
+                if not (
+                    isinstance(item, dict)
+                    and str(item.get("id") or "").strip() in rejected_refs
+                )
+            ]
+        return filtered
 
     @staticmethod
     def _take_fresh_replacement(

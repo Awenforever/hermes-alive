@@ -316,6 +316,21 @@ def test_reviewer_rewrites_each_source_only_once_before_reselection() -> None:
     assert used == {"story-1", "story-2"}
 
 
+def test_failed_sources_are_removed_before_reselection() -> None:
+    context = {
+        "external": [
+            {"id": "story-1", "title": "weak"},
+            {"id": "story-2", "title": "strong"},
+        ],
+        "local": [{"id": "memory-1"}],
+    }
+    filtered = LLMMessageComposer._without_content_refs(context, {"story-1"})
+    assert filtered is not context
+    assert [item["id"] for item in filtered["external"]] == ["story-2"]
+    assert filtered["local"] == context["local"]
+    assert len(context["external"]) == 2
+
+
 def main() -> int:
     tests = [
         test_all_dimensions_are_required,
@@ -328,6 +343,7 @@ def main() -> int:
         test_evidence_failure_invokes_independent_rewriter,
         test_llm_route_retries_empty_primary_before_fallback,
         test_reviewer_rewrites_each_source_only_once_before_reselection,
+        test_failed_sources_are_removed_before_reselection,
     ]
     for test in tests:
         test()

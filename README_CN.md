@@ -6,7 +6,7 @@
 
 让 Hermes 拥有在场感、性格、记忆与作息，但不把每一次沉默都变成通知。
 
-![version](https://img.shields.io/badge/version-2.8.4-blue)
+![version](https://img.shields.io/badge/version-2.8.5-blue)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB)
 ![Hermes](https://img.shields.io/badge/Hermes-gateway--native-6f42c1)
 ![license](https://img.shields.io/badge/license-MIT-green)
