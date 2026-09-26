@@ -33,6 +33,10 @@ explicitly supplied.
 - Quality observability stores hashes, classifications, bounded counters,
   timestamps, and opaque episode identifiers.
 - Rejected candidate bodies are not written to enforcement observability.
+- Successfully delivered Alive outbound text is retained in the rotated local
+  proactive log so an owner can audit what was actually shown. Unsent drafts
+  and inbound user messages are excluded from this delivery record; the file
+  is owner-only (`0600`).
 - Logs and JSONL files are bounded or rotated.
 - Interest learning does not infer sensitive identity traits.
 

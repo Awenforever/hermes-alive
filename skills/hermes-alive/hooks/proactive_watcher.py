@@ -876,6 +876,8 @@ class ProactivePlatformWatcher:
                 generated_by=generated_by,
                 message_hash=sha256_text(content),
                 message_preview=redact_preview(content),
+                delivered_content=content,
+                delivery_audit_schema=1,
                 adapter_result="ok",
             )
             logger.info("Sent proactive platform heartbeat to chat %s [%d/%d]", _redact_chat(chat_id), msg_index, msg_count)
@@ -2156,6 +2158,8 @@ class ProactivePlatformWatcher:
             message_preview=redact_preview(
                 logical_content,
             ),
+            delivered_content=logical_content,
+            delivery_audit_schema=1,
             adapter_result="ok",
             logical_delivery=True,
             rich_kind=str(

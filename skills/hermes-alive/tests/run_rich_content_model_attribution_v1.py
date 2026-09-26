@@ -258,6 +258,8 @@ def test_rich_only_records_one_logical_sent_event() -> None:
     assert record["logical_delivery"] is True
     assert record["rich_kind"] == "link"
     assert record["content_item_id"] == "paper-1"
+    assert record["delivered_content"] == payload.text
+    assert record["delivery_audit_schema"] == 1
 
 
 def _fake_response(

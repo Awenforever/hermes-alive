@@ -133,6 +133,10 @@ def append_jsonl(path: Path, record: dict[str, Any], lock_name: str | None = Non
             fh.write(line + "\n")
             fh.flush()
             os.fsync(fh.fileno())
+        # Runtime JSONL may contain successful outbound message bodies. Keep
+        # it owner-only even when the parent process inherited a permissive
+        # umask or an older installation created the file as 0644.
+        os.chmod(path, 0o600)
 
 def sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", errors="ignore")).hexdigest()
