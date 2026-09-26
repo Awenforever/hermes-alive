@@ -442,13 +442,17 @@ class LLMMessageComposer:
             context,
             discovery_context,
         )
+        editorial_required = self._requires_editorial_review(
+            context,
+            discovery_context,
+        )
         messages = [
             {"role": "system", "content": self._system_prompt(voice)},
             {"role": "user", "content": generation_prompt},
         ]
         content, resolved_model = await self._call_routed_llm(
             async_call_llm,
-            task="proactive",
+            task=("proactive_structured" if editorial_required else "proactive"),
             messages=messages,
             temperature=0.65,
             max_tokens=500,
@@ -466,7 +470,7 @@ class LLMMessageComposer:
             self.last_repair_reason = "content_ref_recovered_from_exact_evidence"
         self.last_resolved_model = resolved_model
 
-        if not self._requires_editorial_review(context, discovery_context):
+        if not editorial_required:
             return content
 
         review = await self._review_editorial_candidate(
@@ -516,6 +520,9 @@ class LLMMessageComposer:
                     discovery_context,
                     rejected_refs,
                 )
+                if not locked_ref:
+                    self.last_rejection_reason = "no_acceptable_evidence_source"
+                    return ""
                 reselection_prompt = await self._user_prompt(
                     voice,
                     context,
@@ -533,7 +540,7 @@ class LLMMessageComposer:
                 )
                 revised, revised_model = await self._call_routed_llm(
                     async_call_llm,
-                    task="proactive",
+                    task="proactive_structured",
                     messages=[
                         {"role": "system", "content": self._system_prompt(voice)},
                         {"role": "user", "content": revision_prompt},
@@ -750,7 +757,10 @@ class LLMMessageComposer:
                         response.choices[0].message.content or ""
                     ).strip()
                     if content:
-                        if task.startswith("proactive") and not isinstance(
+                        if task in {
+                            "proactive_structured",
+                            "proactive_editorial_review",
+                        } and not isinstance(
                             self._json_object(content),
                             dict,
                         ):

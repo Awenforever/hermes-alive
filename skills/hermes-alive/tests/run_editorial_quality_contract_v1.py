@@ -289,7 +289,7 @@ def test_llm_route_retries_empty_primary_before_fallback() -> None:
         content, model = asyncio.run(
             composer._call_routed_llm(
                 fake_call,
-                task="proactive",
+                task="proactive_structured",
                 messages=[],
                 temperature=0.0,
                 max_tokens=10,
@@ -327,7 +327,7 @@ def test_llm_route_rejects_malformed_structured_output_and_uses_fallback() -> No
         content, model = asyncio.run(
             composer._call_routed_llm(
                 fake_call,
-                task="proactive",
+                task="proactive_structured",
                 messages=[],
                 temperature=0.0,
                 max_tokens=10,
@@ -422,6 +422,12 @@ def test_recovery_generation_is_locked_to_one_ranked_source() -> None:
     stale = json.dumps({"bubbles": [], "content_ref": "story-1"})
     rebound = LLMMessageComposer._bind_locked_content_ref(stale, locked_ref)
     assert json.loads(rebound)["content_ref"] == "story-2"
+    empty, empty_ref = LLMMessageComposer._next_source_context(
+        context,
+        {"story-1", "story-2"},
+    )
+    assert empty_ref == ""
+    assert empty["external"] == []
 
 
 def test_structured_plan_is_extracted_from_model_wrapping() -> None:

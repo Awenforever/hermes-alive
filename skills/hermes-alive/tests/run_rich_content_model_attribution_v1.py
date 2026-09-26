@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import json
 import os
 import sys
@@ -19,7 +20,22 @@ sys.path.insert(0, str(HOOKS))
 
 from content_delivery import ContentDeliveryEngine, DeliveryOutcome, DeliveryPayload
 from proactive_watcher import ProactivePlatformWatcher
-from llm_message_composer import LLMMessageComposer
+
+
+def _load_candidate_composer_class():
+    """Load the staged source even when production import hooks take precedence."""
+    module_path = HOOKS / "llm_message_composer.py"
+    spec = importlib.util.spec_from_file_location(
+        "hermes_alive_candidate_llm_message_composer",
+        module_path,
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.LLMMessageComposer
+
+
+LLMMessageComposer = _load_candidate_composer_class()
 
 
 def context() -> dict:
@@ -302,7 +318,10 @@ def test_composer_captures_primary_response_model() -> None:
 
     original = auxiliary_client.async_call_llm
 
-    async def fake_call(**_kwargs):
+    calls = []
+
+    async def fake_call(**kwargs):
+        calls.append(kwargs)
         return _fake_response(
             "真实 Provider 模型归属测试",
             "provider/actual-primary-model",
@@ -319,7 +338,11 @@ def test_composer_captures_primary_response_model() -> None:
                 None,
             )
         )
-        assert value == "真实 Provider 模型归属测试"
+        assert value == "真实 Provider 模型归属测试", (
+            repr(value),
+            composer.last_rejection_reason,
+            [call.get("task") for call in calls],
+        )
         assert (
             composer.last_resolved_model
             == "provider/actual-primary-model"
