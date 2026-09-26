@@ -47,7 +47,8 @@ FALLBACK_MSG_TYPE = "heartbeat"
 FALLBACK_CONTENT = "嘿，我在。"
 MAX_CONTENT_CHARS = 800
 MAX_EDITORIAL_CANDIDATES = 8
-MAX_EVIDENCE_CHARS = 6000
+MAX_EVIDENCE_CHARS = 10000
+MAX_RAW_ARTICLE_CHARS = 50000
 
 TIME_BUCKETS: dict[str, dict[str, list[str] | str]] = {
     "凌晨": {
@@ -173,7 +174,7 @@ Discovery 是编辑候选池，不是论文列表。时事、本地政策、人�
 
 【输出协议】
 只输出一个 JSON 对象，不要 markdown，不要代码围栏，不要额外解释：
-{"topic_mode":"ambient|context_continuation|new_discovery","bubbles":[{"act":"语义动作","text":"气泡正文"}],"content_ref":null}
+{"topic_mode":"ambient|context_continuation|new_discovery","bubbles":[{"act":"语义动作","text":"气泡正文","evidence":["来源摘要或正文中的逐字片段"]}],"content_ref":null}
 
 要求：
 - act 只能从以下枚举中选择，不得创造近义标签或英文变体：self_talk、observation、question、care、dry_observation、debug_companion、research_ping、discovery_intro、fact、reaction、turn、source_link、closing、poke、casual
@@ -186,6 +187,7 @@ Discovery 是编辑候选池，不是论文列表。时事、本地政策、人�
 - 不得使用 --- 作为分隔符
 - Discovery 无相关上下文时，topic_mode 必须是 new_discovery，第一条 act 必须是 discovery_intro、research_ping 或 fact，并直接说清新发现是什么
 - content_ref 只有正文真实使用外部条目时才填写对应 content_id，否则为 null
+- new_discovery 中每个陈述外部事实的气泡都必须提供 evidence；每项必须逐字复制自所选条目的摘要或页面正文，不能复制标题、不能改写。evidence 只用于发送前核验，不会显示给用户
 - text 使用自然中文微信口吻，不要解释 JSON 协议"""
 class LLMMessageComposer:
     """Composes proactive Chinese messages through Hermes' auxiliary LLM API."""
@@ -198,6 +200,8 @@ class LLMMessageComposer:
         self.last_semantic_plan: dict[str, Any] = {}
         self.last_repair_reason = ""
         self.last_editorial_review: dict[str, Any] = {}
+        self.last_context_snapshot: dict[str, Any] = {}
+        self.last_rejection_reason = ""
 
     async def compose(
         self,
@@ -476,34 +480,43 @@ class LLMMessageComposer:
             1,
             min(
                 3,
-                int(os.getenv("HERMES_ALIVE_EDITORIAL_MAX_REVISIONS", "2")),
+                int(os.getenv("HERMES_ALIVE_EDITORIAL_MAX_REVISIONS", "3")),
             ),
         )
         for _attempt in range(max_revisions):
             issues = review.get("issues")
             if not isinstance(issues, list):
                 issues = ["the draft did not satisfy the editorial contract"]
-            revision_prompt = (
-                generation_prompt
-                + "\n\n## 独立编辑审查未通过\n"
-                + "上一版：\n"
-                + current
-                + "\n审查意见：\n- "
-                + "\n- ".join(str(value) for value in issues[:8])
-                + "\n请从证据和信息核心重新设计整组消息，可以换选题、删减或合并气泡；"
-                + "不要逐字修补旧稿。仍只输出约定 JSON。"
-            )
-            revised, revised_model = await self._call_routed_llm(
-                async_call_llm,
-                task="proactive",
-                messages=[
-                    {"role": "system", "content": self._system_prompt(voice)},
-                    {"role": "user", "content": revision_prompt},
-                ],
-                temperature=0.25,
-                max_tokens=500,
-                preferred_model=model_override,
-            )
+            replacement = review.get("replacement_plan")
+            if isinstance(replacement, dict):
+                revised = json.dumps(
+                    replacement,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+                revised_model = current_model
+            else:
+                revision_prompt = (
+                    generation_prompt
+                    + "\n\n## 独立编辑审查未通过\n"
+                    + "上一版：\n"
+                    + current
+                    + "\n审查意见：\n- "
+                    + "\n- ".join(str(value) for value in issues[:8])
+                    + "\n请从证据和信息核心重新设计整组消息，可以换选题、删减或合并气泡；"
+                    + "不要逐字修补旧稿。仍只输出约定 JSON。"
+                )
+                revised, revised_model = await self._call_routed_llm(
+                    async_call_llm,
+                    task="proactive",
+                    messages=[
+                        {"role": "system", "content": self._system_prompt(voice)},
+                        {"role": "user", "content": revision_prompt},
+                    ],
+                    temperature=0.25,
+                    max_tokens=500,
+                    preferred_model=model_override,
+                )
             if not revised:
                 self.last_rejection_reason = "editorial_revision_unavailable"
                 return ""
@@ -612,6 +625,36 @@ class LLMMessageComposer:
                 "issues": ["missing or invalid content_ref"],
                 "dimensions": {},
             }
+        try:
+            parse_semantic_plan(
+                candidate,
+                default_msg_type="fact",
+                policy_decision={
+                    "mode": "novel_value",
+                    "max_bubbles": 5,
+                },
+                discovery_context=discovery_context,
+                context_snapshot=self.last_context_snapshot,
+            )
+        except SemanticPlanError as exc:
+            return {
+                "pass": False,
+                "issues": [
+                    "semantic structure is invalid: " + str(exc)
+                ],
+                "dimensions": {},
+                "content_ref": str(selected.get("id") or ""),
+                "replacement_plan": None,
+            }
+        evidence_issue = self._evidence_mapping_issue(candidate, selected)
+        if evidence_issue:
+            return {
+                "pass": False,
+                "issues": [evidence_issue],
+                "dimensions": {},
+                "content_ref": str(selected.get("id") or ""),
+                "replacement_plan": None,
+            }
         evidence = self._evidence_document(selected)
         review_prompt = f"""你是独立的微信内容编辑，不负责讨好作者。
 
@@ -625,8 +668,9 @@ class LLMMessageComposer:
 5. minimal_bubbles：气泡数是表达所需的最少数量；纯铺垫、同义重复、可无损合并都判失败。
 6. coherent_whole：整组消息脱离后台上下文仍能独立理解，问题或观点必须建立在已给事实之上。
 
-只有六项全部通过，pass 才能为 true。输出一个 JSON 对象：
-{{"pass":true|false,"dimensions":{{"factual_grounding":true|false,"informational_value":true|false,"source_and_time":true|false,"natural_voice":true|false,"minimal_bubbles":true|false,"coherent_whole":true|false}},"issues":["简明、可执行的原则性问题"]}}
+只有六项全部通过，pass 才能为 true。失败时，如果现有证据足以形成值得发送的内容，请像独立编辑一样从信息核心重新写一个 replacement_plan；它不是逐句修改原稿，气泡数应当最少。证据不足则 replacement_plan 为 null。
+输出一个 JSON 对象：
+{{"pass":true|false,"dimensions":{{"factual_grounding":true|false,"informational_value":true|false,"source_and_time":true|false,"natural_voice":true|false,"minimal_bubbles":true|false,"coherent_whole":true|false}},"issues":["简明、可执行的原则性问题"],"replacement_plan":null或{{"topic_mode":"new_discovery","bubbles":[{{"act":"fact","text":"正文","evidence":["摘要或正文中的逐字片段"]}}],"content_ref":"原 content_id"}}}}
 
 证据：
 {evidence}
@@ -671,6 +715,13 @@ class LLMMessageComposer:
         )
         issues = parsed.get("issues")
         issue_list = issues if isinstance(issues, list) else []
+        replacement = parsed.get("replacement_plan")
+        if not isinstance(replacement, dict):
+            replacement = None
+        elif str(replacement.get("content_ref") or "") != str(
+            selected.get("id") or ""
+        ):
+            replacement = None
         return {
             "pass": (
                 parsed.get("pass") is True
@@ -680,6 +731,7 @@ class LLMMessageComposer:
             "dimensions": dimensions if isinstance(dimensions, dict) else {},
             "issues": issue_list,
             "content_ref": str(selected.get("id") or ""),
+            "replacement_plan": replacement,
         }
 
     @staticmethod
@@ -693,6 +745,68 @@ class LLMMessageComposer:
         except Exception:
             return None
         return parsed if isinstance(parsed, dict) else None
+
+    def _evidence_mapping_issue(
+        self,
+        candidate: str,
+        item: dict[str, Any],
+    ) -> str:
+        """Validate exact source spans for every externally factual bubble."""
+        parsed = self._json_object(candidate)
+        if not isinstance(parsed, dict):
+            return "candidate is not a JSON object with evidence mappings"
+        bubbles = parsed.get("bubbles")
+        if not isinstance(bubbles, list) or not bubbles:
+            return "candidate has no bubbles to map to source evidence"
+
+        title = self._normalized_evidence_text(item.get("title"))
+        body = self._normalized_evidence_text(
+            "\n".join(
+                value
+                for value in (
+                    str(item.get("summary") or ""),
+                    str(item.get("evidence_text") or ""),
+                )
+                if value.strip()
+            )
+        )
+        if not body:
+            return "selected source has no summary or retrieved body evidence"
+
+        factual_acts = {
+            "discovery_intro",
+            "research_ping",
+            "fact",
+            "content_share",
+        }
+        body_evidence_seen = False
+        for index, bubble in enumerate(bubbles, start=1):
+            if not isinstance(bubble, dict):
+                return f"bubble {index} is not an evidence-mappable object"
+            act = str(bubble.get("act") or "").strip().lower()
+            quotes = bubble.get("evidence")
+            if act not in factual_acts and not quotes:
+                continue
+            if not isinstance(quotes, list) or not quotes:
+                return f"bubble {index} has an external claim but no evidence spans"
+            for quote in quotes:
+                normalized = self._normalized_evidence_text(quote)
+                if len(normalized) < 12:
+                    return f"bubble {index} has an evidence span that is too short"
+                if len(normalized) > 500:
+                    return f"bubble {index} has an evidence span that is too long"
+                if normalized not in body:
+                    if normalized in title:
+                        return f"bubble {index} cites only the title, not summary or body evidence"
+                    return f"bubble {index} cites text absent from the selected source evidence"
+                body_evidence_seen = True
+        if not body_evidence_seen:
+            return "candidate contains no verified summary or body evidence"
+        return ""
+
+    @staticmethod
+    def _normalized_evidence_text(value: Any) -> str:
+        return re.sub(r"\s+", " ", str(value or "")).strip()
 
     def _selected_evidence(
         self,
@@ -798,23 +912,96 @@ class LLMMessageComposer:
             return ""
         if host in {"localhost", "localhost.localdomain"} or host.endswith(".local"):
             return ""
-        try:
-            async with session.get(
-                url,
-                allow_redirects=True,
-                max_redirects=5,
-            ) as response:
-                if response.status >= 400:
-                    return ""
-                content_type = str(response.headers.get("Content-Type") or "").lower()
-                if not any(value in content_type for value in ("text", "html", "xml", "json")):
-                    return ""
-                body = await response.content.read(750_000)
-                charset = response.charset or "utf-8"
-                raw = body.decode(charset, errors="replace")
-        except Exception:
+        raw = ""
+        for attempt in range(2):
+            try:
+                async with session.get(
+                    url,
+                    allow_redirects=True,
+                    max_redirects=5,
+                ) as response:
+                    if 400 <= response.status < 500:
+                        return ""
+                    if response.status >= 500:
+                        if attempt == 0:
+                            continue
+                        return ""
+                    content_type = str(response.headers.get("Content-Type") or "").lower()
+                    if not any(value in content_type for value in ("text", "html", "xml", "json")):
+                        return ""
+                    body = await response.content.read(750_000)
+                    charset = response.charset or "utf-8"
+                    raw = body.decode(charset, errors="replace")
+                    break
+            except Exception:
+                if attempt == 0:
+                    continue
+                return ""
+        if not raw:
             return ""
-        return self._readable_text(raw)[:MAX_EVIDENCE_CHARS]
+        readable = self._readable_text(raw)
+        return self._focus_evidence(
+            readable,
+            title=str(item.get("title") or ""),
+        )
+
+    @staticmethod
+    def _focus_evidence(text: str, *, title: str) -> str:
+        """Keep lead, conclusion and title-relevant passages from long pages.
+
+        A prefix-only slice systematically hides the explanation in essays and
+        puts generators in a title-guessing regime.  This extractive selector
+        never invents or summarizes text; it only chooses complete source
+        passages and preserves their original order.
+        """
+        raw = str(text or "").strip()
+        if len(raw) <= MAX_EVIDENCE_CHARS:
+            return raw
+        units = [
+            value.strip()
+            for value in re.split(r"\n+|(?<=[.!?。！？])\s+", raw)
+            if len(value.strip()) >= 24
+        ]
+        if not units:
+            return raw[:MAX_EVIDENCE_CHARS]
+
+        title_lower = str(title or "").lower()
+        ascii_terms = {
+            token
+            for token in re.findall(r"[a-z0-9+#.-]{4,}", title_lower)
+            if token not in {"with", "from", "that", "this", "what", "when"}
+        }
+        chinese = "".join(re.findall(r"[\u4e00-\u9fff]", title_lower))
+        chinese_terms = {
+            chinese[index:index + 2]
+            for index in range(max(0, len(chinese) - 1))
+        }
+
+        selected = set(range(min(3, len(units))))
+        selected.update(range(max(0, len(units) - 2), len(units)))
+        scored: list[tuple[int, int]] = []
+        for index, unit in enumerate(units):
+            lowered = unit.lower()
+            score = sum(2 for term in ascii_terms if term in lowered)
+            score += sum(1 for term in chinese_terms if term in unit)
+            if score:
+                scored.append((score, index))
+        for _score, index in sorted(scored, reverse=True)[:16]:
+            selected.add(index)
+            if index > 0:
+                selected.add(index - 1)
+            if index + 1 < len(units):
+                selected.add(index + 1)
+
+        focused: list[str] = []
+        total = 0
+        for index in sorted(selected):
+            unit = units[index]
+            if total + len(unit) + 1 > MAX_EVIDENCE_CHARS:
+                continue
+            focused.append(unit)
+            total += len(unit) + 1
+        return "\n".join(focused).strip()
 
     @staticmethod
     def _readable_text(raw: str) -> str:
@@ -834,7 +1021,7 @@ class LLMMessageComposer:
             flags=re.I | re.S,
         ):
             fragments.append(match.group(1))
-            if sum(len(value) for value in fragments) >= MAX_EVIDENCE_CHARS * 2:
+            if sum(len(value) for value in fragments) >= MAX_RAW_ARTICLE_CHARS:
                 break
         if not fragments:
             fragments = [text]
@@ -966,6 +1153,8 @@ class LLMMessageComposer:
                     "- 观点和疑问必须建立在已陈述事实之上，不能用猜测代替尚未读取的来源。"
                     "\n- 候选池里存在已取得页面正文的条目时，优先从中选择；"
                     "不要为了偏好某个题材而选择证据贫乏的条目。"
+                    "\n- 每个事实气泡的 evidence 数组必须逐字引用所选条目的摘要或页面正文；"
+                    "仅引用标题、改写引文或提供不存在的片段都会被拒绝。"
                 )
 
         if user_context:
@@ -1089,8 +1278,8 @@ class LLMMessageComposer:
                 lines.append(f"  摘要证据={summary}")
             if item.get("evidence_text"):
                 evidence = str(item["evidence_text"])
-                if len(evidence) > 1800:
-                    evidence = evidence[:1797] + "..."
+                if len(evidence) > 5000:
+                    evidence = evidence[:4997] + "..."
                 lines.append(f"  页面正文证据={evidence}")
             elif item.get("evidence_status") == "metadata_only":
                 lines.append("  页面正文未取得；不得推断标题和摘要之外的细节")

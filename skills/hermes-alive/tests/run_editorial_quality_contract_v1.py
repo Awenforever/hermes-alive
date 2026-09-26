@@ -15,6 +15,7 @@ HOOKS = ROOT / "hooks"
 sys.path.insert(0, str(HOOKS))
 
 from llm_message_composer import LLMMessageComposer  # noqa: E402
+from semantic_bubbles import parse_semantic_plan  # noqa: E402
 
 
 def response(payload: dict) -> SimpleNamespace:
@@ -47,6 +48,9 @@ CANDIDATE = json.dumps(
             {
                 "act": "fact",
                 "text": "这家小型收容所说，他们在 2026 年已经为 40 只猫找到了领养家庭",
+                "evidence": [
+                    "The shelter reported 40 adoptions during 2026."
+                ],
             }
         ],
         "content_ref": "story-1",
@@ -156,12 +160,71 @@ def test_prompt_contains_retrieved_evidence_and_metadata_only_boundary() -> None
     assert "不得推断标题和摘要之外的细节" in rendered
 
 
+def test_long_article_keeps_title_relevant_middle_passage() -> None:
+    filler = "unrelated historical background " * 30
+    lines = [f"{index} {filler}" for index in range(30)]
+    lines[17] = (
+        "Google Play billing changes made Conversations difficult to sustain, "
+        "so the Android client is now free."
+    )
+    focused = LLMMessageComposer._focus_evidence(
+        "\n".join(lines),
+        title="Why Conversations Is Now Free on Google Play",
+    )
+    assert "billing changes" in focused
+    assert len(focused) <= 10000
+
+
+def test_distinct_facts_may_share_the_fact_act() -> None:
+    plan = parse_semantic_plan(
+        json.dumps(
+            {
+                "topic_mode": "new_discovery",
+                "bubbles": [
+                    {"act": "fact", "text": "第一条独立事实，说明事件本身。"},
+                    {"act": "fact", "text": "第二条独立事实，说明事件的结果。"},
+                ],
+                "content_ref": "story-1",
+            },
+            ensure_ascii=False,
+        ),
+        default_msg_type="fact",
+        policy_decision={"mode": "novel_value", "max_bubbles": 3},
+        discovery_context={"external": [ITEM]},
+        context_snapshot={},
+    )
+    assert len(plan.bubbles) == 2
+
+
+def test_title_only_evidence_is_rejected() -> None:
+    composer = LLMMessageComposer()
+    candidate = json.dumps(
+        {
+            "topic_mode": "new_discovery",
+            "bubbles": [
+                {
+                    "act": "fact",
+                    "text": "一个只翻译标题的事实。",
+                    "evidence": [ITEM["title"]],
+                }
+            ],
+            "content_ref": "story-1",
+        },
+        ensure_ascii=False,
+    )
+    issue = composer._evidence_mapping_issue(candidate, ITEM)
+    assert "only the title" in issue
+
+
 def main() -> int:
     tests = [
         test_all_dimensions_are_required,
         test_valid_reference_and_full_contract_pass,
         test_invalid_reference_fails_before_model_call,
         test_prompt_contains_retrieved_evidence_and_metadata_only_boundary,
+        test_long_article_keeps_title_relevant_middle_passage,
+        test_distinct_facts_may_share_the_fact_act,
+        test_title_only_evidence_is_rejected,
     ]
     for test in tests:
         test()

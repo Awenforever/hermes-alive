@@ -297,7 +297,6 @@ def validate_semantic_plan(
         raise SemanticPlanError("bubble_count_above_policy_limit")
 
     seen: list[str] = []
-    acts: list[str] = []
     for bubble in plan.bubbles:
         text = str(bubble.text or "").strip()
         if len(text) < 2:
@@ -311,10 +310,6 @@ def validate_semantic_plan(
             if normalized == prior or _similarity(normalized, prior) >= 0.82:
                 raise SemanticPlanError("cross_bubble_semantic_duplicate")
         seen.append(normalized)
-        acts.append(bubble.act)
-
-    if count > 1 and len(set(acts)) == 1:
-        raise SemanticPlanError("multi_bubble_same_semantic_act")
 
     snapshot = (
         context_snapshot
