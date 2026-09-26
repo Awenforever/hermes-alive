@@ -477,6 +477,7 @@ class LLMMessageComposer:
         # selection and structure without growing a phrase-specific patch set.
         current = content
         current_model = resolved_model
+        replacement_refs_used: set[str] = set()
         max_revisions = max(
             1,
             min(
@@ -488,8 +489,11 @@ class LLMMessageComposer:
             issues = review.get("issues")
             if not isinstance(issues, list):
                 issues = ["the draft did not satisfy the editorial contract"]
-            replacement = review.get("replacement_plan")
-            if isinstance(replacement, dict):
+            replacement = self._take_fresh_replacement(
+                review,
+                replacement_refs_used,
+            )
+            if replacement is not None:
                 revised = json.dumps(
                     replacement,
                     ensure_ascii=False,
@@ -505,6 +509,7 @@ class LLMMessageComposer:
                     + "\n审查意见：\n- "
                     + "\n- ".join(str(value) for value in issues[:8])
                     + "\n请从证据和信息核心重新设计整组消息，可以换选题、删减或合并气泡；"
+                    + "如果当前来源无法支撑具体而有价值的分享，必须放弃它并从候选中改选其他 content_ref；"
                     + "不要逐字修补旧稿。仍只输出约定 JSON。"
                 )
                 revised, revised_model = await self._call_routed_llm(
@@ -541,6 +546,26 @@ class LLMMessageComposer:
             + (f":{reason}" if reason else "")
         )
         return ""
+
+    @staticmethod
+    def _take_fresh_replacement(
+        review: dict[str, Any],
+        used_refs: set[str],
+    ) -> dict[str, Any] | None:
+        """Use at most one reviewer rewrite per source before reselection.
+
+        Repeatedly polishing an evidence-poor story cannot create information.
+        After one independent rewrite, control returns to the selector so it
+        can choose another source from the full Discovery set.
+        """
+        replacement = review.get("replacement_plan")
+        if not isinstance(replacement, dict):
+            return None
+        content_ref = str(replacement.get("content_ref") or "").strip()
+        if not content_ref or content_ref in used_refs:
+            return None
+        used_refs.add(content_ref)
+        return replacement
 
     async def _call_routed_llm(
         self,

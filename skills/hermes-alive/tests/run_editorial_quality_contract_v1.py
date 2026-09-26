@@ -306,6 +306,16 @@ def test_llm_route_retries_empty_primary_before_fallback() -> None:
     assert calls == ["deepseek-flash", "deepseek-flash"]
 
 
+def test_reviewer_rewrites_each_source_only_once_before_reselection() -> None:
+    used: set[str] = set()
+    first = {"replacement_plan": {"content_ref": "story-1", "bubbles": []}}
+    second = {"replacement_plan": {"content_ref": "story-2", "bubbles": []}}
+    assert LLMMessageComposer._take_fresh_replacement(first, used) is not None
+    assert LLMMessageComposer._take_fresh_replacement(first, used) is None
+    assert LLMMessageComposer._take_fresh_replacement(second, used) is not None
+    assert used == {"story-1", "story-2"}
+
+
 def main() -> int:
     tests = [
         test_all_dimensions_are_required,
@@ -317,6 +327,7 @@ def main() -> int:
         test_title_only_evidence_is_rejected,
         test_evidence_failure_invokes_independent_rewriter,
         test_llm_route_retries_empty_primary_before_fallback,
+        test_reviewer_rewrites_each_source_only_once_before_reselection,
     ]
     for test in tests:
         test()
