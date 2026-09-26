@@ -457,6 +457,7 @@ class LLMMessageComposer:
         if not content:
             self.last_rejection_reason = "generation_unavailable"
             return ""
+        content = self._normalize_json_candidate(content)
         content, ref_repaired = self._repair_unambiguous_content_ref(
             content,
             discovery_context,
@@ -545,6 +546,7 @@ class LLMMessageComposer:
             if not revised:
                 self.last_rejection_reason = "editorial_revision_unavailable"
                 return ""
+            revised = self._normalize_json_candidate(revised)
             revised, ref_repaired = self._repair_unambiguous_content_ref(
                 revised,
                 discovery_context,
@@ -929,8 +931,27 @@ class LLMMessageComposer:
         try:
             parsed = json.loads(raw)
         except Exception:
-            return None
+            decoder = json.JSONDecoder()
+            objects: list[dict[str, Any]] = []
+            for index, character in enumerate(raw):
+                if character != "{":
+                    continue
+                try:
+                    candidate, _end = decoder.raw_decode(raw[index:])
+                except Exception:
+                    continue
+                if isinstance(candidate, dict):
+                    objects.append(candidate)
+            plans = [value for value in objects if isinstance(value.get("bubbles"), list)]
+            parsed = plans[0] if len(plans) == 1 else (objects[0] if len(objects) == 1 else None)
         return parsed if isinstance(parsed, dict) else None
+
+    @classmethod
+    def _normalize_json_candidate(cls, value: str) -> str:
+        parsed = cls._json_object(value)
+        if not isinstance(parsed, dict):
+            return value
+        return json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
 
     def _evidence_mapping_issue(
         self,

@@ -379,6 +379,12 @@ def test_recovery_generation_is_locked_to_one_ranked_source() -> None:
     assert json.loads(bound)["content_ref"] == "story-2"
 
 
+def test_structured_plan_is_extracted_from_model_wrapping() -> None:
+    wrapped = "下面是结果：\n```json\n" + CANDIDATE + "\n```\n请查收。"
+    normalized = LLMMessageComposer._normalize_json_candidate(wrapped)
+    assert json.loads(normalized) == json.loads(CANDIDATE)
+
+
 def main() -> int:
     tests = [
         test_all_dimensions_are_required,
@@ -395,6 +401,7 @@ def main() -> int:
         test_title_only_candidates_are_not_selectable,
         test_missing_reference_is_recovered_only_from_unique_exact_evidence,
         test_recovery_generation_is_locked_to_one_ranked_source,
+        test_structured_plan_is_extracted_from_model_wrapping,
     ]
     for test in tests:
         test()
