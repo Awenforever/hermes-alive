@@ -331,6 +331,15 @@ def test_failed_sources_are_removed_before_reselection() -> None:
     assert len(context["external"]) == 2
 
 
+def test_title_only_candidates_are_not_selectable() -> None:
+    assert LLMMessageComposer._has_source_evidence(
+        {"title": "Headline without evidence", "summary": ""}
+    ) is False
+    assert LLMMessageComposer._has_source_evidence(
+        {"title": "Headline", "summary": "A concrete summary with enough source evidence to verify."}
+    ) is True
+
+
 def main() -> int:
     tests = [
         test_all_dimensions_are_required,
@@ -344,6 +353,7 @@ def main() -> int:
         test_llm_route_retries_empty_primary_before_fallback,
         test_reviewer_rewrites_each_source_only_once_before_reselection,
         test_failed_sources_are_removed_before_reselection,
+        test_title_only_candidates_are_not_selectable,
     ]
     for test in tests:
         test()

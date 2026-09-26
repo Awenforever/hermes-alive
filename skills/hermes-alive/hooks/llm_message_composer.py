@@ -980,8 +980,17 @@ class LLMMessageComposer:
                 item["evidence_status"] = "retrieved"
             else:
                 item["evidence_status"] = "metadata_only"
-        enriched["external"] = items
+        enriched["external"] = [
+            item for item in items if self._has_source_evidence(item)
+        ]
         return enriched
+
+    @classmethod
+    def _has_source_evidence(cls, item: dict[str, Any]) -> bool:
+        """Exclude title-only candidates before model selection."""
+        summary = cls._normalized_evidence_text(item.get("summary"))
+        body = cls._normalized_evidence_text(item.get("evidence_text"))
+        return len(summary) >= 24 or len(body) >= 24
 
     async def _fetch_readable_evidence(
         self,
