@@ -407,6 +407,11 @@ def test_managed_enforcement_modes_override_stale_container_env() -> None:
             "_refresh_managed_env()" in startup_body,
             "gateway startup does not refresh authoritative managed config",
         )
+        watcher_source = (HOOKS / "proactive_watcher.py").read_text(encoding="utf-8")
+        check(
+            watcher_source.count("_refresh_managed_runtime_env()") >= 5,
+            "runtime policy engines do not refresh managed config at consumption",
+        )
     finally:
         for k, v in previous.items():
             if v is None:

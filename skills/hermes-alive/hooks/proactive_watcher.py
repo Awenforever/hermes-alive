@@ -65,6 +65,18 @@ from weixin_peer import (
 
 logger = logging.getLogger(__name__)
 
+
+def _refresh_managed_runtime_env() -> None:
+    """Reapply lifecycle-owned settings immediately before consumption.
+
+    Gateway and third-party hooks may mutate process environment after hook
+    discovery. Runtime policy engines therefore refresh their authoritative
+    managed values at initialization instead of depending on import order.
+    """
+    from managed_config import load_managed_env
+
+    load_managed_env(overwrite=False)
+
 DEFAULT_INTERVAL_SECONDS = 300.0
 ENABLED_ENV = "HERMES_PROACTIVE_PLATFORM_ENABLED"
 CHAT_ID_ENV = "HERMES_PROACTIVE_WEIXIN_CHAT_ID"
@@ -1437,6 +1449,7 @@ class ProactivePlatformWatcher:
         # HERMES_ALIVE_CIRCADIAN_WATCHER_SHADOW_V1
         if self._circadian_engine is None:
             try:
+                _refresh_managed_runtime_env()
                 from circadian_engine import CircadianEngine, load_circadian_config
 
                 self._circadian_engine = CircadianEngine(
@@ -1448,6 +1461,7 @@ class ProactivePlatformWatcher:
         return None if self._circadian_engine is False else self._circadian_engine
 
     def _circadian_live_requested(self) -> bool:
+        _refresh_managed_runtime_env()
         mode = str(
             os.getenv("HERMES_ALIVE_CIRCADIAN_MODE", "shadow")
             or "shadow"
@@ -1667,6 +1681,7 @@ class ProactivePlatformWatcher:
         }
 
     def _quality_enforcement_requested(self) -> bool:
+        _refresh_managed_runtime_env()
         return (
             str(
                 os.getenv(
@@ -1684,6 +1699,7 @@ class ProactivePlatformWatcher:
         # HERMES_ALIVE_PROACTIVE_QUALITY_GOVERNOR_SHADOW_V1
         if self._proactive_quality_governor is None:
             try:
+                _refresh_managed_runtime_env()
                 from proactive_quality_governor import ProactiveQualityGovernor
 
                 self._proactive_quality_governor = ProactiveQualityGovernor()
