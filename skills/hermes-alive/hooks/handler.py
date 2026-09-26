@@ -47,10 +47,23 @@ def _promote_runtime_import_paths() -> None:
 
 _promote_runtime_import_paths()
 
+
+def _refresh_managed_env() -> dict[str, str]:
+    """Apply lifecycle-owned settings at the point they are consumed.
+
+    Hook modules can be imported while Gateway is still assembling its own
+    environment. A later dotenv/defaults pass must not silently put live
+    enforcement back into shadow mode, so startup refreshes the authoritative
+    managed keys immediately before constructing the watcher.
+    """
+    from managed_config import load_managed_env
+
+    return load_managed_env(overwrite=False)
+
+
 # Marker: HERMES_ALIVE_MANAGED_CONFIG_BOOTSTRAP_V1
 try:
-    from managed_config import load_managed_env
-    load_managed_env(overwrite=False)
+    _refresh_managed_env()
 except Exception as exc:
     # Configuration loading must never prevent hook import.
     logging.getLogger(__name__).warning(
@@ -73,6 +86,13 @@ async def handle(event_type: str, context: dict):
 
 async def _startup(context: dict):
     global _watcher_task
+    try:
+        _refresh_managed_env()
+    except Exception as exc:
+        logger.warning(
+            "Hermes Alive: managed config startup refresh failed: %s",
+            exc,
+        )
     if not _env_enabled():
         logger.warning("Hermes Alive: env disabled")
         return

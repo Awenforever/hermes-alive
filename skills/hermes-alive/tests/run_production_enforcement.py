@@ -401,6 +401,12 @@ def test_managed_enforcement_modes_override_stale_container_env() -> None:
         check(loaded["HERMES_ALIVE_CIRCADIAN_MODE"] == "live", "managed circadian live did not override stale env")
         check(loaded["HERMES_ALIVE_QUALITY_GOVERNOR_MODE"] == "enforce", "managed quality enforce did not override stale env")
         check(os.environ["HERMES_ALIVE_CIRCADIAN_MODE"] == "live", "effective circadian env not authoritative")
+        handler_source = (HOOKS / "handler.py").read_text(encoding="utf-8")
+        startup_body = handler_source.split("async def _startup", 1)[1]
+        check(
+            "_refresh_managed_env()" in startup_body,
+            "gateway startup does not refresh authoritative managed config",
+        )
     finally:
         for k, v in previous.items():
             if v is None:
