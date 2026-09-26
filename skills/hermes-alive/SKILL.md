@@ -1,7 +1,7 @@
 ---
 name: hermes-alive
 description: "Gateway-native proactive companion with contextual discovery, live quality enforcement, production Circadian sleep/quiet enforcement, and reversible lifecycle management."
-version: 2.8.1
+version: 2.8.2
 ---
 
 # Hermes Alive — Hermes Installation Contract

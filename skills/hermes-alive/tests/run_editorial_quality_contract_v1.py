@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -216,6 +217,46 @@ def test_title_only_evidence_is_rejected() -> None:
     assert "only the title" in issue
 
 
+def test_llm_route_retries_empty_primary_before_fallback() -> None:
+    composer = LLMMessageComposer()
+    calls: list[str] = []
+
+    async def fake_call(**kwargs):
+        model = str(kwargs.get("model") or "")
+        calls.append(model)
+        if len(calls) == 1:
+            return SimpleNamespace(
+                model=model,
+                choices=[SimpleNamespace(message=SimpleNamespace(content=""))],
+            )
+        return SimpleNamespace(
+            model=model,
+            choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))],
+        )
+
+    old = os.environ.get("HERMES_PROACTIVE_LLM_ROUTE_ATTEMPTS")
+    os.environ["HERMES_PROACTIVE_LLM_ROUTE_ATTEMPTS"] = "2"
+    try:
+        content, model = asyncio.run(
+            composer._call_routed_llm(
+                fake_call,
+                task="proactive",
+                messages=[],
+                temperature=0.0,
+                max_tokens=10,
+                preferred_model="deepseek-flash",
+            )
+        )
+    finally:
+        if old is None:
+            os.environ.pop("HERMES_PROACTIVE_LLM_ROUTE_ATTEMPTS", None)
+        else:
+            os.environ["HERMES_PROACTIVE_LLM_ROUTE_ATTEMPTS"] = old
+    assert content == "ok"
+    assert model == "deepseek-flash"
+    assert calls == ["deepseek-flash", "deepseek-flash"]
+
+
 def main() -> int:
     tests = [
         test_all_dimensions_are_required,
@@ -225,6 +266,7 @@ def main() -> int:
         test_long_article_keeps_title_relevant_middle_passage,
         test_distinct_facts_may_share_the_fact_act,
         test_title_only_evidence_is_rejected,
+        test_llm_route_retries_empty_primary_before_fallback,
     ]
     for test in tests:
         test()

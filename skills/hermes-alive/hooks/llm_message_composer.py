@@ -455,6 +455,7 @@ class LLMMessageComposer:
             preferred_model=model_override,
         )
         if not content:
+            self.last_rejection_reason = "generation_unavailable"
             return ""
         self.last_resolved_model = resolved_model
 
@@ -562,35 +563,56 @@ class LLMMessageComposer:
         if not models[0]:
             models[0] = ""
 
+        attempts = max(
+            1,
+            min(
+                3,
+                int(os.getenv("HERMES_PROACTIVE_LLM_ROUTE_ATTEMPTS", "2")),
+            ),
+        )
         for index, model in enumerate(models):
-            try:
-                response = await call(
-                    task=task,
-                    messages=messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    timeout=_env_float(
-                        "HERMES_PROACTIVE_LLM_TIMEOUT",
-                        60,
-                    ),
-                    model=model or None,
-                )
-                content = str(
-                    response.choices[0].message.content or ""
-                ).strip()
-                if content:
-                    return content, self._response_model(
-                        response,
-                        fallback=model,
+            for attempt in range(attempts):
+                try:
+                    response = await call(
+                        task=task,
+                        messages=messages,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        timeout=_env_float(
+                            "HERMES_PROACTIVE_LLM_TIMEOUT",
+                            60,
+                        ),
+                        model=model or None,
                     )
-            except Exception:
-                if index + 1 < len(models):
+                    content = str(
+                        response.choices[0].message.content or ""
+                    ).strip()
+                    if content:
+                        return content, self._response_model(
+                            response,
+                            fallback=model,
+                        )
                     logger.info(
-                        "LLM call failed; trying configured fallback model: %s",
-                        models[index + 1],
+                        "Configured LLM route returned empty content "
+                        "(model=%s attempt=%s/%s)",
+                        model or "default",
+                        attempt + 1,
+                        attempts,
                     )
-                else:
-                    logger.exception("Configured LLM route failed")
+                except Exception:
+                    logger.info(
+                        "Configured LLM route failed "
+                        "(model=%s attempt=%s/%s)",
+                        model or "default",
+                        attempt + 1,
+                        attempts,
+                        exc_info=True,
+                    )
+            if index + 1 < len(models):
+                logger.info(
+                    "Trying configured fallback model after route exhaustion: %s",
+                    models[index + 1],
+                )
         return "", ""
 
     @staticmethod
