@@ -340,6 +340,27 @@ def test_title_only_candidates_are_not_selectable() -> None:
     ) is True
 
 
+def test_missing_reference_is_recovered_only_from_unique_exact_evidence() -> None:
+    composer = LLMMessageComposer()
+    parsed = json.loads(CANDIDATE)
+    parsed["content_ref"] = None
+    repaired, changed = composer._repair_unambiguous_content_ref(
+        json.dumps(parsed, ensure_ascii=False),
+        {"external": [ITEM]},
+    )
+    assert changed is True
+    assert json.loads(repaired)["content_ref"] == "story-1"
+
+    duplicate = dict(ITEM)
+    duplicate["id"] = "story-2"
+    unchanged, changed = composer._repair_unambiguous_content_ref(
+        json.dumps(parsed, ensure_ascii=False),
+        {"external": [ITEM, duplicate]},
+    )
+    assert changed is False
+    assert json.loads(unchanged)["content_ref"] is None
+
+
 def main() -> int:
     tests = [
         test_all_dimensions_are_required,
@@ -354,6 +375,7 @@ def main() -> int:
         test_reviewer_rewrites_each_source_only_once_before_reselection,
         test_failed_sources_are_removed_before_reselection,
         test_title_only_candidates_are_not_selectable,
+        test_missing_reference_is_recovered_only_from_unique_exact_evidence,
     ]
     for test in tests:
         test()

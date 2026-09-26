@@ -457,6 +457,12 @@ class LLMMessageComposer:
         if not content:
             self.last_rejection_reason = "generation_unavailable"
             return ""
+        content, ref_repaired = self._repair_unambiguous_content_ref(
+            content,
+            discovery_context,
+        )
+        if ref_repaired:
+            self.last_repair_reason = "content_ref_recovered_from_exact_evidence"
         self.last_resolved_model = resolved_model
 
         if not self._requires_editorial_review(context, discovery_context):
@@ -538,6 +544,12 @@ class LLMMessageComposer:
             if not revised:
                 self.last_rejection_reason = "editorial_revision_unavailable"
                 return ""
+            revised, ref_repaired = self._repair_unambiguous_content_ref(
+                revised,
+                discovery_context,
+            )
+            if ref_repaired:
+                self.last_repair_reason = "content_ref_recovered_from_exact_evidence"
             current = revised
             current_model = revised_model or current_model
             review = await self._review_editorial_candidate(
@@ -558,6 +570,59 @@ class LLMMessageComposer:
             + (f":{reason}" if reason else "")
         )
         return ""
+
+    def _repair_unambiguous_content_ref(
+        self,
+        candidate: str,
+        discovery_context: dict[str, Any] | None,
+    ) -> tuple[str, bool]:
+        """Recover a missing reference only from unique exact evidence spans."""
+        parsed = self._json_object(candidate)
+        if not isinstance(parsed, dict) or parsed.get("content_ref"):
+            return candidate, False
+        bubbles = parsed.get("bubbles")
+        external = (
+            discovery_context.get("external")
+            if isinstance(discovery_context, dict)
+            else None
+        )
+        if not isinstance(bubbles, list) or not isinstance(external, list):
+            return candidate, False
+        quotes = [
+            self._normalized_evidence_text(quote)
+            for bubble in bubbles
+            if isinstance(bubble, dict)
+            for quote in (
+                bubble.get("evidence")
+                if isinstance(bubble.get("evidence"), list)
+                else []
+            )
+            if len(self._normalized_evidence_text(quote)) >= 12
+        ]
+        if not quotes:
+            return candidate, False
+        matches: list[str] = []
+        for item in external:
+            if not isinstance(item, dict):
+                continue
+            source_text = self._normalized_evidence_text(
+                "\n".join(
+                    value
+                    for value in (
+                        str(item.get("summary") or ""),
+                        str(item.get("evidence_text") or ""),
+                    )
+                    if value.strip()
+                )
+            )
+            if source_text and all(quote in source_text for quote in quotes):
+                item_id = str(item.get("id") or "").strip()
+                if item_id:
+                    matches.append(item_id)
+        if len(matches) != 1:
+            return candidate, False
+        parsed["content_ref"] = matches[0]
+        return json.dumps(parsed, ensure_ascii=False, separators=(",", ":")), True
 
     @staticmethod
     def _without_content_refs(
