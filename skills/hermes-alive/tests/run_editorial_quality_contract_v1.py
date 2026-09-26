@@ -280,7 +280,7 @@ def test_llm_route_retries_empty_primary_before_fallback() -> None:
             )
         return SimpleNamespace(
             model=model,
-            choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))],
+            choices=[SimpleNamespace(message=SimpleNamespace(content=CANDIDATE))],
         )
 
     old = os.environ.get("HERMES_PROACTIVE_LLM_ROUTE_ATTEMPTS")
@@ -301,9 +301,51 @@ def test_llm_route_retries_empty_primary_before_fallback() -> None:
             os.environ.pop("HERMES_PROACTIVE_LLM_ROUTE_ATTEMPTS", None)
         else:
             os.environ["HERMES_PROACTIVE_LLM_ROUTE_ATTEMPTS"] = old
-    assert content == "ok"
+    assert json.loads(content) == json.loads(CANDIDATE)
     assert model == "deepseek-flash"
     assert calls == ["deepseek-flash", "deepseek-flash"]
+
+
+def test_llm_route_rejects_malformed_structured_output_and_uses_fallback() -> None:
+    composer = LLMMessageComposer()
+    calls: list[str] = []
+
+    async def fake_call(**kwargs):
+        model = str(kwargs.get("model") or "")
+        calls.append(model)
+        content = "not json" if model == "deepseek-flash" else CANDIDATE
+        return SimpleNamespace(
+            model=model,
+            choices=[SimpleNamespace(message=SimpleNamespace(content=content))],
+        )
+
+    old_attempts = os.environ.get("HERMES_PROACTIVE_LLM_ROUTE_ATTEMPTS")
+    old_fallback = os.environ.get("HERMES_PROACTIVE_LLM_FALLBACK_MODEL")
+    os.environ["HERMES_PROACTIVE_LLM_ROUTE_ATTEMPTS"] = "2"
+    os.environ["HERMES_PROACTIVE_LLM_FALLBACK_MODEL"] = "qwen3.6-chat"
+    try:
+        content, model = asyncio.run(
+            composer._call_routed_llm(
+                fake_call,
+                task="proactive",
+                messages=[],
+                temperature=0.0,
+                max_tokens=10,
+                preferred_model="deepseek-flash",
+            )
+        )
+    finally:
+        if old_attempts is None:
+            os.environ.pop("HERMES_PROACTIVE_LLM_ROUTE_ATTEMPTS", None)
+        else:
+            os.environ["HERMES_PROACTIVE_LLM_ROUTE_ATTEMPTS"] = old_attempts
+        if old_fallback is None:
+            os.environ.pop("HERMES_PROACTIVE_LLM_FALLBACK_MODEL", None)
+        else:
+            os.environ["HERMES_PROACTIVE_LLM_FALLBACK_MODEL"] = old_fallback
+    assert json.loads(content) == json.loads(CANDIDATE)
+    assert model == "qwen3.6-chat"
+    assert calls == ["deepseek-flash", "deepseek-flash", "qwen3.6-chat"]
 
 
 def test_reviewer_rewrites_each_source_only_once_before_reselection() -> None:
@@ -399,6 +441,7 @@ def main() -> int:
         test_title_only_evidence_is_rejected,
         test_evidence_failure_invokes_independent_rewriter,
         test_llm_route_retries_empty_primary_before_fallback,
+        test_llm_route_rejects_malformed_structured_output_and_uses_fallback,
         test_reviewer_rewrites_each_source_only_once_before_reselection,
         test_failed_sources_are_removed_before_reselection,
         test_title_only_candidates_are_not_selectable,

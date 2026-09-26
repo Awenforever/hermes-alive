@@ -750,6 +750,18 @@ class LLMMessageComposer:
                         response.choices[0].message.content or ""
                     ).strip()
                     if content:
+                        if task.startswith("proactive") and not isinstance(
+                            self._json_object(content),
+                            dict,
+                        ):
+                            logger.info(
+                                "Configured LLM route returned malformed "
+                                "structured output (model=%s attempt=%s/%s)",
+                                model or "default",
+                                attempt + 1,
+                                attempts,
+                            )
+                            continue
                         return content, self._response_model(
                             response,
                             fallback=model,
