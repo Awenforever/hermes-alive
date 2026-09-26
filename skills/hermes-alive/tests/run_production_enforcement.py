@@ -412,6 +412,11 @@ def test_managed_enforcement_modes_override_stale_container_env() -> None:
             watcher_source.count("_refresh_managed_runtime_env()") >= 5,
             "runtime policy engines do not refresh managed config at consumption",
         )
+        check(
+            "_hermes_alive_active_managed_config" in watcher_source
+            and "spec_from_file_location" in watcher_source,
+            "managed config remains vulnerable to generic module-name collisions",
+        )
     finally:
         for k, v in previous.items():
             if v is None:

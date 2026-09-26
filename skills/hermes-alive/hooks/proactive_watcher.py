@@ -28,6 +28,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import json
 import logging
 import os
@@ -73,9 +74,18 @@ def _refresh_managed_runtime_env() -> None:
     discovery. Runtime policy engines therefore refresh their authoritative
     managed values at initialization instead of depending on import order.
     """
-    from managed_config import load_managed_env
-
-    load_managed_env(overwrite=False)
+    module_name = "_hermes_alive_active_managed_config"
+    module_path = Path(_HOOK_DIR) / "managed_config.py"
+    module = sys.modules.get(module_name)
+    loaded_path = Path(str(getattr(module, "__file__", ""))).resolve() if module else None
+    if module is None or loaded_path != module_path.resolve():
+        spec = importlib.util.spec_from_file_location(module_name, module_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"cannot load managed config from {module_path}")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+    module.load_managed_env(overwrite=False)
 
 DEFAULT_INTERVAL_SECONDS = 300.0
 ENABLED_ENV = "HERMES_PROACTIVE_PLATFORM_ENABLED"
