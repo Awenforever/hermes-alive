@@ -511,7 +511,7 @@ class LLMMessageComposer:
                 rejected_ref = str(review.get("content_ref") or "").strip()
                 if rejected_ref:
                     rejected_refs.add(rejected_ref)
-                reselection_context = self._without_content_refs(
+                reselection_context, locked_ref = self._next_source_context(
                     discovery_context,
                     rejected_refs,
                 )
@@ -541,6 +541,7 @@ class LLMMessageComposer:
                     max_tokens=500,
                     preferred_model=model_override,
                 )
+                revised = self._bind_locked_content_ref(revised, locked_ref)
             if not revised:
                 self.last_rejection_reason = "editorial_revision_unavailable"
                 return ""
@@ -570,6 +571,43 @@ class LLMMessageComposer:
             + (f":{reason}" if reason else "")
         )
         return ""
+
+    @classmethod
+    def _next_source_context(
+        cls,
+        discovery_context: dict[str, Any] | None,
+        rejected_refs: set[str],
+    ) -> tuple[dict[str, Any] | None, str]:
+        """Lock recovery generation to the next ranked evidence source."""
+        filtered = cls._without_content_refs(discovery_context, rejected_refs)
+        if not isinstance(filtered, dict):
+            return filtered, ""
+        external = filtered.get("external")
+        if not isinstance(external, list):
+            return filtered, ""
+        selected = next(
+            (
+                item for item in external
+                if isinstance(item, dict)
+                and str(item.get("id") or "").strip()
+            ),
+            None,
+        )
+        if selected is None:
+            return filtered, ""
+        locked = dict(filtered)
+        locked["external"] = [selected]
+        return locked, str(selected.get("id") or "").strip()
+
+    @classmethod
+    def _bind_locked_content_ref(cls, candidate: str, locked_ref: str) -> str:
+        """Bind a valid JSON draft to the sole source shown during recovery."""
+        parsed = cls._json_object(candidate)
+        if not isinstance(parsed, dict) or not locked_ref:
+            return candidate
+        if not str(parsed.get("content_ref") or "").strip():
+            parsed["content_ref"] = locked_ref
+        return json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
 
     def _repair_unambiguous_content_ref(
         self,

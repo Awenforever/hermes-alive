@@ -361,6 +361,24 @@ def test_missing_reference_is_recovered_only_from_unique_exact_evidence() -> Non
     assert json.loads(unchanged)["content_ref"] is None
 
 
+def test_recovery_generation_is_locked_to_one_ranked_source() -> None:
+    context = {
+        "external": [
+            {"id": "story-1", "summary": "first ranked evidence source is available"},
+            {"id": "story-2", "summary": "second ranked evidence source is available"},
+        ]
+    }
+    locked, locked_ref = LLMMessageComposer._next_source_context(
+        context,
+        {"story-1"},
+    )
+    assert locked_ref == "story-2"
+    assert [item["id"] for item in locked["external"]] == ["story-2"]
+    draft = json.dumps({"bubbles": [], "content_ref": None})
+    bound = LLMMessageComposer._bind_locked_content_ref(draft, locked_ref)
+    assert json.loads(bound)["content_ref"] == "story-2"
+
+
 def main() -> int:
     tests = [
         test_all_dimensions_are_required,
@@ -376,6 +394,7 @@ def main() -> int:
         test_failed_sources_are_removed_before_reselection,
         test_title_only_candidates_are_not_selectable,
         test_missing_reference_is_recovered_only_from_unique_exact_evidence,
+        test_recovery_generation_is_locked_to_one_ranked_source,
     ]
     for test in tests:
         test()
