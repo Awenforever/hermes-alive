@@ -535,6 +535,7 @@ class ProactivePlatformWatcher:
             )
 
         await self._check_dream()
+        self._active_tick_id = tick_id
         messages = await self._compose_message(
             voice,
             compose_discovery_context,
@@ -553,6 +554,9 @@ class ProactivePlatformWatcher:
                 tick_id=tick_id,
                 reason="user_active_before_send",
             )
+            return False
+
+        if not messages:
             return False
 
         try:
@@ -2452,6 +2456,7 @@ class ProactivePlatformWatcher:
                     dimensions = review.get("dimensions")
                     self._log(
                         "editorial_review",
+                        tick_id=getattr(self, "_active_tick_id", None),
                         passed=review.get("pass") is True,
                         dimensions=(
                             {
@@ -2477,6 +2482,7 @@ class ProactivePlatformWatcher:
                     if rejection:
                         self._log(
                             "compose_rejected",
+                            tick_id=getattr(self, "_active_tick_id", None),
                             reason=rejection,
                         )
                     return []

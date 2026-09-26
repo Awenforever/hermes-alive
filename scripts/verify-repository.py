@@ -230,7 +230,7 @@ def main() -> int:
     match = re.search(r"^version:\s*([^\s]+)\s*$", skill_text, re.MULTILINE)
     skill_version = match.group(1) if match else ""
 
-    if version != "2.8.2":
+    if version != "2.8.3":
         errors.append(f"unexpected_version:{version}")
     if metadata.get("version") != version:
         errors.append("metadata_version_mismatch")

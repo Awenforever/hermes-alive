@@ -669,15 +669,14 @@ class LLMMessageComposer:
                 "replacement_plan": None,
             }
         evidence_issue = self._evidence_mapping_issue(candidate, selected)
-        if evidence_issue:
-            return {
-                "pass": False,
-                "issues": [evidence_issue],
-                "dimensions": {},
-                "content_ref": str(selected.get("id") or ""),
-                "replacement_plan": None,
-            }
         evidence = self._evidence_document(selected)
+        machine_review = (
+            "\n确定性证据校验已发现：" + evidence_issue
+            + "\n当前候选不得判定通过；若原文足够，请直接基于下方证据"
+            + "重写 replacement_plan，并为每个事实附上原文中的逐字证据片段。\n"
+            if evidence_issue
+            else ""
+        )
         review_prompt = f"""你是独立的微信内容编辑，不负责讨好作者。
 
 请审查候选消息是否值得主动打扰用户。只根据给出的证据判断，不使用外部常识补洞。
@@ -693,6 +692,7 @@ class LLMMessageComposer:
 只有六项全部通过，pass 才能为 true。失败时，如果现有证据足以形成值得发送的内容，请像独立编辑一样从信息核心重新写一个 replacement_plan；它不是逐句修改原稿，气泡数应当最少。证据不足则 replacement_plan 为 null。
 输出一个 JSON 对象：
 {{"pass":true|false,"dimensions":{{"factual_grounding":true|false,"informational_value":true|false,"source_and_time":true|false,"natural_voice":true|false,"minimal_bubbles":true|false,"coherent_whole":true|false}},"issues":["简明、可执行的原则性问题"],"replacement_plan":null或{{"topic_mode":"new_discovery","bubbles":[{{"act":"fact","text":"正文","evidence":["摘要或正文中的逐字片段"]}}],"content_ref":"原 content_id"}}}}
+{machine_review}
 
 证据：
 {evidence}
@@ -737,6 +737,8 @@ class LLMMessageComposer:
         )
         issues = parsed.get("issues")
         issue_list = issues if isinstance(issues, list) else []
+        if evidence_issue and evidence_issue not in issue_list:
+            issue_list = [evidence_issue, *issue_list]
         replacement = parsed.get("replacement_plan")
         if not isinstance(replacement, dict):
             replacement = None
@@ -749,6 +751,7 @@ class LLMMessageComposer:
                 parsed.get("pass") is True
                 and dimension_pass
                 and not issue_list
+                and not evidence_issue
             ),
             "dimensions": dimensions if isinstance(dimensions, dict) else {},
             "issues": issue_list,

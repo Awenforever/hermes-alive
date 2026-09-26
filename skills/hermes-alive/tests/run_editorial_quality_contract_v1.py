@@ -217,6 +217,55 @@ def test_title_only_evidence_is_rejected() -> None:
     assert "only the title" in issue
 
 
+def test_evidence_failure_invokes_independent_rewriter() -> None:
+    composer = LLMMessageComposer()
+    candidate = json.dumps(
+        {
+            "topic_mode": "new_discovery",
+            "bubbles": [
+                {
+                    "act": "fact",
+                    "text": "这条事实的证据是模型编造的。",
+                    "evidence": ["This sentence does not exist in the source."],
+                }
+            ],
+            "content_ref": "story-1",
+        },
+        ensure_ascii=False,
+    )
+    called = False
+
+    async def fake_call(**kwargs):
+        nonlocal called
+        called = True
+        prompt = kwargs["messages"][-1]["content"]
+        assert "确定性证据校验已发现" in prompt
+        return response(
+            {
+                "pass": False,
+                "dimensions": {
+                    **PASS_DIMENSIONS,
+                    "factual_grounding": False,
+                },
+                "issues": ["原候选没有逐字证据"],
+                "replacement_plan": json.loads(CANDIDATE),
+            }
+        )
+
+    review = asyncio.run(
+        composer._review_editorial_candidate(
+            fake_call,
+            candidate,
+            {"external": [ITEM]},
+            preferred_model="deepseek-flash",
+        )
+    )
+    assert called is True
+    assert review["pass"] is False
+    assert review["replacement_plan"] == json.loads(CANDIDATE)
+    assert any("absent" in issue for issue in review["issues"])
+
+
 def test_llm_route_retries_empty_primary_before_fallback() -> None:
     composer = LLMMessageComposer()
     calls: list[str] = []
@@ -266,6 +315,7 @@ def main() -> int:
         test_long_article_keeps_title_relevant_middle_passage,
         test_distinct_facts_may_share_the_fact_act,
         test_title_only_evidence_is_rejected,
+        test_evidence_failure_invokes_independent_rewriter,
         test_llm_route_retries_empty_primary_before_fallback,
     ]
     for test in tests:
