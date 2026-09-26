@@ -109,6 +109,24 @@ def test_manual_discovery_is_real_content_only() -> None:
     check("await self._wait_for_next_tick()" in watcher_source, "one-shot request is not prompt")
 
 
+def test_manual_discovery_stays_evidence_bound_after_discovery() -> None:
+    reason = ProactivePlatformWatcher._manual_discovery_terminal_reason(
+        manual_discovery=True,
+        discovery_available=False,
+    )
+    check(reason == "no_acceptable_evidence_source", reason)
+    reason = ProactivePlatformWatcher._manual_discovery_terminal_reason(
+        manual_discovery=True,
+        discovery_available=True,
+    )
+    check(reason == "", reason)
+    reason = ProactivePlatformWatcher._manual_discovery_terminal_reason(
+        manual_discovery=False,
+        discovery_available=False,
+    )
+    check(reason == "", reason)
+
+
 def main() -> int:
     tests = [
         test_no_academic_source_bonus,
@@ -117,6 +135,7 @@ def main() -> int:
         test_proxy_is_opt_in_and_applied,
         test_news_aggregator_caps_real_publishers,
         test_manual_discovery_is_real_content_only,
+        test_manual_discovery_stays_evidence_bound_after_discovery,
     ]
     for test in tests:
         test()

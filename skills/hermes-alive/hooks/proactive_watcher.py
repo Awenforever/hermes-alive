@@ -486,9 +486,21 @@ class ProactivePlatformWatcher:
             )
             return False
 
+        manual_terminal = self._manual_discovery_terminal_reason(
+            manual_discovery=manual_discovery,
+            discovery_available=discovery_available,
+        )
+        if manual_terminal:
+            self._log(
+                "compose_rejected",
+                tick_id=tick_id,
+                reason=manual_terminal,
+            )
+            return False
+
         final_policy = (
             self._manual_discovery_policy()
-            if manual_discovery and discovery_available
+            if manual_discovery
             else self._evaluate_interruption_policy(
                 voice=voice,
                 user_active=user_active,
@@ -1109,6 +1121,17 @@ class ProactivePlatformWatcher:
             if marker_present:
                 DISCOVERY_REQUEST.unlink(missing_ok=True)
             return True
+
+    @staticmethod
+    def _manual_discovery_terminal_reason(
+        *,
+        manual_discovery: bool,
+        discovery_available: bool,
+    ) -> str:
+        """Keep an operator full-chain request evidence-bound for its whole tick."""
+        if manual_discovery and not discovery_available:
+            return "no_acceptable_evidence_source"
+        return ""
 
     @staticmethod
     def _manual_discovery_policy() -> dict[str, Any]:
