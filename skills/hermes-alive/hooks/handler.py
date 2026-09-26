@@ -19,9 +19,33 @@ _SHARED_DIR = os.getenv(
 os.environ.setdefault("HERMES_HOME", str(_HERMES_HOME))
 os.environ["HERMES_HOOK_DIR"] = _HOOK_DIR
 os.environ.setdefault("HERMES_ALIVE_SHARED_DIR", _SHARED_DIR)
-for _p in (_HOOK_DIR, _SHARED_DIR):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
+
+
+def _promote_runtime_import_paths() -> None:
+    """Make the deployed hook authoritative over stale plugin source copies.
+
+    Hermes may already have both the plugin checkout and the active hook on
+    ``sys.path``.  Merely checking membership leaves the checkout ahead of the
+    hook, so an upgrade can silently execute an older module.  Normalize and
+    reinsert both runtime paths in deterministic priority order.
+    """
+    desired = (_HOOK_DIR, _SHARED_DIR)
+    normalized = {
+        os.path.normcase(os.path.abspath(os.path.expanduser(path)))
+        for path in desired
+    }
+    sys.path[:] = [
+        entry
+        for entry in sys.path
+        if os.path.normcase(
+            os.path.abspath(os.path.expanduser(entry or os.curdir))
+        ) not in normalized
+    ]
+    for path in reversed(desired):
+        sys.path.insert(0, path)
+
+
+_promote_runtime_import_paths()
 
 # Marker: HERMES_ALIVE_MANAGED_CONFIG_BOOTSTRAP_V1
 try:
@@ -58,10 +82,19 @@ async def _startup(context: dict):
         return
 
     try:
-        from proactive_watcher import ProactivePlatformWatcher
+        import proactive_watcher as watcher_module
+        expected = (Path(_HOOK_DIR) / "proactive_watcher.py").resolve()
+        loaded = Path(str(watcher_module.__file__)).resolve()
+        if loaded != expected:
+            raise ImportError(
+                f"runtime module mismatch: expected {expected}, loaded {loaded}"
+            )
+        ProactivePlatformWatcher = watcher_module.ProactivePlatformWatcher
     except ImportError as e:
         logger.warning("Hermes Alive: watcher import failed: %s", e)
         return
+
+    logger.warning("Hermes Alive: watcher runtime loaded from %s", loaded)
 
     try:
         from gateway.run import _gateway_runner_ref
