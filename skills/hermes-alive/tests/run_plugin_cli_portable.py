@@ -56,6 +56,11 @@ def main() -> int:
         assert Path(installed["hook"]) == hook
         assert (hook / "HOOK.yaml").is_file()
         assert (hook / "proactive_watcher.py").is_file()
+        assert Path(installed["source"]) == home / "skills" / "hermes-alive"
+        assert Path(installed["manifest"]).is_file()
+        manifest = json.loads(Path(installed["manifest"]).read_text(encoding="utf-8"))
+        assert manifest["manifest_version"] == 1
+        assert manifest["hook_hashes"]
 
     print("HERMES_ALIVE_PLUGIN_CLI_PORTABLE_RESULT=PASS")
     return 0

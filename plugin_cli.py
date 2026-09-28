@@ -5,7 +5,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import shutil
+import subprocess
+import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -38,47 +39,31 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
     parser.set_defaults(func=alive_command)
 
 
-def _replace_tree(source: Path, target: Path, backup_root: Path) -> str | None:
-    target.parent.mkdir(parents=True, exist_ok=True)
-    stage = target.with_name(f".{target.name}.stage")
-    if stage.exists():
-        shutil.rmtree(stage)
-    shutil.copytree(source, stage)
-    backup = None
-    if target.exists():
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        backup_path = backup_root / stamp
-        backup_path.parent.mkdir(parents=True, exist_ok=True)
-        target.replace(backup_path)
-        backup = str(backup_path)
-    stage.replace(target)
-    return backup
-
-
 def _install_runtime() -> int:
-    source = _source()
-    hook_backup = _replace_tree(
-        source / "hooks",
-        _hook_target(),
-        _home() / "plugin-data" / "hermes-alive" / "hook-backups",
+    lifecycle = _source() / "scripts" / "hermes-alive-lifecycle.py"
+    result = subprocess.run(
+        [sys.executable, str(lifecycle), "install", "--hermes-home", str(_home())],
+        text=True,
+        capture_output=True,
+        timeout=180,
     )
-    shared = _shared_target()
-    shared.mkdir(parents=True, exist_ok=True)
-    marker = shared / "install.json"
-    marker.write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "source": str(source),
-                "hook": str(_hook_target()),
-                "installed_at": datetime.now(timezone.utc).isoformat(),
-            },
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    print(json.dumps({"ok": True, "hook": str(_hook_target()), "backup": hook_backup}))
+    if result.returncode:
+        detail = (result.stderr or result.stdout or "lifecycle installation failed").strip()
+        print(detail, file=sys.stderr)
+        return result.returncode
+    manifest_path = _shared_target() / "install" / "manifest.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception:
+        print("Hermes Alive lifecycle did not publish a valid manifest", file=sys.stderr)
+        return 2
+    print(json.dumps({
+        "ok": True,
+        "hook": str(_hook_target()),
+        "source": str(_home() / "skills" / "hermes-alive"),
+        "manifest": str(manifest_path),
+        "backup_tag": manifest.get("backup_tag"),
+    }))
     return 0
 
 
