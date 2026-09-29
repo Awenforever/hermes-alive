@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -120,6 +121,96 @@ def test_manual_discovery_stays_evidence_bound_after_discovery() -> None:
         discovery_available=True,
     )
     check(reason == "", reason)
+
+
+def test_manual_discovery_forces_refresh_after_empty_cache() -> None:
+    class Config:
+        proactive_platform_enabled = True
+
+    class Engine:
+        def __init__(self) -> None:
+            self.collect_calls = 0
+
+        def should_run(self) -> bool:
+            return False
+
+        async def collect(self) -> dict[str, object]:
+            self.collect_calls += 1
+            return {}
+
+        def has_fresh(self) -> bool:
+            return True
+
+        def get_recent(self) -> dict[str, object]:
+            return {"external": [{"id": "fresh"}], "local": []}
+
+    watcher = ProactivePlatformWatcher({}, Config())
+    watcher._feature_enabled = lambda _name: True
+    engine = Engine()
+    watcher._discovery_engine = engine
+    result = asyncio.run(watcher._check_discovery(force_refresh=True))
+    check(engine.collect_calls == 1, str(engine.collect_calls))
+    check(result is not None and result["external"][0]["id"] == "fresh", str(result))
+
+
+def test_unconsumed_candidates_survive_refresh() -> None:
+    engine = DiscoveryEngine()
+    engine._topic_dedup.filter_candidates = lambda items: (items, [])
+    item = {
+        "source": "example",
+        "lane": "technology",
+        "title": "A useful item",
+        "url": "https://example.test/item",
+    }
+    first = engine._dedup([dict(item)])
+    second = engine._dedup([dict(item)])
+    check(len(first) == 1, str(first))
+    check(len(second) == 1, str(second))
+
+
+def test_configured_queries_drive_source_requests() -> None:
+    class Response:
+        status = 200
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return False
+
+        async def text(self) -> str:
+            return "<feed xmlns='http://www.w3.org/2005/Atom'></feed>"
+
+        async def json(self) -> dict[str, list]:
+            return {"items": []}
+
+    async def exercise() -> None:
+        engine = ExternalDiscovery(
+            {
+                "sources": {
+                    "arxiv": {"query": "cat:stat.ML", "max_results": 7},
+                    "github": {"query": "topic:robotics stars:>42", "sort": "forks", "per_page": 6},
+                }
+            }
+        )
+        urls: list[str] = []
+
+        async def session() -> object:
+            return object()
+
+        def request(_session: object, url: str, **_kwargs: object) -> Response:
+            urls.append(url)
+            return Response()
+
+        engine._get_session = session
+        engine._request = request
+        await engine._collect_arxiv()
+        await engine._collect_github_trending()
+        check("cat%3Astat.ML" in urls[0] and "max_results=7" in urls[0], urls[0])
+        check("topic%3Arobotics+stars%3A%3E42" in urls[1], urls[1])
+        check("sort=forks" in urls[1] and "per_page=6" in urls[1], urls[1])
+
+    asyncio.run(exercise())
     reason = ProactivePlatformWatcher._manual_discovery_terminal_reason(
         manual_discovery=False,
         discovery_available=False,
@@ -136,6 +227,9 @@ def main() -> int:
         test_news_aggregator_caps_real_publishers,
         test_manual_discovery_is_real_content_only,
         test_manual_discovery_stays_evidence_bound_after_discovery,
+        test_manual_discovery_forces_refresh_after_empty_cache,
+        test_unconsumed_candidates_survive_refresh,
+        test_configured_queries_drive_source_requests,
     ]
     for test in tests:
         test()

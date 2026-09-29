@@ -101,8 +101,8 @@ SHARE_THRESHOLD_MIN_SCORE = float(os.getenv("HERMES_DISCOVERY_SHARE_THRESHOLD_MI
 # Default sources config (used if sources.yaml not found)
 DEFAULT_SOURCES_CONFIG: dict[str, Any] = {
     "sources": {
-        "arxiv": {"enabled": True, "query": "(satellite AND smoke detection) OR (remote sensing AND computer vision) OR (wildfire AND deep learning)", "max_results": 3},
-        "github": {"enabled": True, "query": "stars:>50 pushed:>2026-04-01", "sort": "stars", "per_page": 3},
+        "arxiv": {"enabled": True, "query": "cat:cs.AI OR cat:cs.CL OR cat:cs.CV OR cat:cs.LG", "max_results": 3},
+        "github": {"enabled": True, "query": "stars:>500", "sort": "updated", "per_page": 3},
         "hackernews": {"enabled": True, "max_stories": 15, "target_count": 3},
         "news_search": {"enabled": False, "queries": []},
         "rss": {"enabled": False, "feeds": []},
@@ -194,14 +194,17 @@ class ExternalDiscovery:
     async def _collect_arxiv(self) -> list[dict[str, Any]]:
         """Fetch recent papers from arXiv API in relevant fields."""
         session = await self._get_session()
-        query = (
-            "search_query="
-            "(all:satellite AND all:smoke+detection)"
-            "+OR+(all:remote+sensing AND all:computer+vision)"
-            "+OR+(all:wildfire AND all:deep+learning)"
-            "&sortBy=submittedDate&sortOrder=descending&max_results=3"
+        cfg = self.sources_config.get("sources", {}).get("arxiv", {})
+        search_query = str(
+            cfg.get("query")
+            or DEFAULT_SOURCES_CONFIG["sources"]["arxiv"]["query"]
+        ).strip()
+        max_results = max(1, min(int(cfg.get("max_results", 3)), 20))
+        url = (
+            "https://export.arxiv.org/api/query?search_query="
+            f"{quote_plus(search_query)}&sortBy=submittedDate"
+            f"&sortOrder=descending&max_results={max_results}"
         )
-        url = f"https://export.arxiv.org/api/query?{query}"
         headers = {"User-Agent": "HermesAlive/1.0 (discovery)"}
 
         async with self._request(session, url, headers=headers) as resp:
@@ -225,7 +228,18 @@ class ExternalDiscovery:
             logger.exception("Failed to parse arXiv response")
             return []
 
-        for entry in root.findall("atom:entry", ns)[:3]:
+        max_results = max(
+            1,
+            min(
+                int(
+                    self.sources_config.get("sources", {})
+                    .get("arxiv", {})
+                    .get("max_results", 3)
+                ),
+                20,
+            ),
+        )
+        for entry in root.findall("atom:entry", ns)[:max_results]:
             title = entry.findtext("atom:title", "", ns).strip().replace("\n", " ").replace("  ", " ")
             summary = entry.findtext("atom:summary", "", ns).strip().replace("\n", " ").replace("  ", " ")
 
@@ -441,10 +455,19 @@ class ExternalDiscovery:
     async def _collect_github_trending(self) -> list[dict[str, Any]]:
         """Fetch trending/recent GitHub repos."""
         session = await self._get_session()
-        # Use GitHub search with reasonable limits to avoid rate limiting
+        cfg = self.sources_config.get("sources", {}).get("github", {})
+        query = str(
+            cfg.get("query")
+            or DEFAULT_SOURCES_CONFIG["sources"]["github"]["query"]
+        ).strip()
+        sort = str(cfg.get("sort") or "updated").strip()
+        if sort not in {"stars", "forks", "help-wanted-issues", "updated"}:
+            sort = "updated"
+        per_page = max(1, min(int(cfg.get("per_page", 3)), 20))
         url = (
             "https://api.github.com/search/repositories"
-            "?q=stars:>50+pushed:>2026-04-01&sort=stars&order=desc&per_page=3"
+            f"?q={quote_plus(query)}&sort={quote_plus(sort)}"
+            f"&order=desc&per_page={per_page}"
         )
         headers = {
             "User-Agent": "HermesAlive/1.0 (discovery)",
@@ -459,7 +482,7 @@ class ExternalDiscovery:
             data = await resp.json()
             items = data.get("items", [])
             results = []
-            for repo in items[:3]:
+            for repo in items[:per_page]:
                 results.append({
                     "source": "github",
                     "lane": "technology",
@@ -1476,8 +1499,6 @@ class DiscoveryEngine:
         self._cached: dict[str, Any] | None = None
         self._last_fetch: float = 0.0
         self._in_progress: bool = False
-        # Content-identity cache complements the persistent delivery guard.
-        self._url_cache: set[str] = set()
         self._topic_dedup = TopicDedupStore()
         self._interest_engine: Any | None = None
 
@@ -1648,13 +1669,19 @@ class DiscoveryEngine:
                 sorted({str(value.get("reason") or "unknown") for value in rejected}),
             )
 
+        # Suppress duplicates inside this fetch only.  Cross-fetch suppression
+        # belongs to TopicDedupStore, whose durable state records actual
+        # reservations and deliveries.  Keeping every merely-seen URL in
+        # memory caused transient/unused candidates to disappear forever on
+        # the next refresh.
+        seen_this_batch: set[str] = set()
         new_items: list[dict[str, Any]] = []
         for item in guarded:
             identity = item_identity(item)
             cache_key = identity["content_identity"]
-            if cache_key in self._url_cache:
+            if cache_key in seen_this_batch:
                 continue
-            self._url_cache.add(cache_key)
+            seen_this_batch.add(cache_key)
             item.update(identity)
             new_items.append(item)
         return new_items

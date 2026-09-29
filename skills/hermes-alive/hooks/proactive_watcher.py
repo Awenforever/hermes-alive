@@ -468,7 +468,10 @@ class ProactivePlatformWatcher:
         # conversational policy allows immediate sharing. This prevents a
         # stale debug/pressure flow from starving the background discovery
         # cache forever.
-        discovery_context = await self._check_discovery()
+        if manual_discovery:
+            discovery_context = await self._check_discovery(force_refresh=True)
+        else:
+            discovery_context = await self._check_discovery()
         discovery_available = self._external_discovery_available(
             discovery_context
         )
@@ -2611,7 +2614,11 @@ class ProactivePlatformWatcher:
             for item in external
         )
 
-    async def _check_discovery(self) -> dict[str, Any] | None:
+    async def _check_discovery(
+        self,
+        *,
+        force_refresh: bool = False,
+    ) -> dict[str, Any] | None:
         if not self._feature_enabled(DISCOVERY_ENABLED_ENV):
             return None
         if self._discovery_engine is None:
@@ -2625,7 +2632,10 @@ class ProactivePlatformWatcher:
         if self._discovery_engine is False:
             return None
         engine = self._discovery_engine
-        if engine.should_run():
+        # An operator-requested full-chain run is an explicit request to fetch
+        # current evidence.  It must not inherit an empty cache produced by a
+        # transient source failure for the remainder of the normal interval.
+        if force_refresh or engine.should_run():
             try:
                 logger.debug("Running discovery engine")
                 await engine.collect()

@@ -1,5 +1,4 @@
 # Hermes Alive discovery sources
-# Branch: feat/playwright-multi-platform (2026-07-05)
 # Sources by method:
 #   API (aiohttp): arxiv, github, hackernews, v2ex, bilibili
 #   News search (RSS): configurable current affairs, local, culture and light-interest lanes
@@ -16,13 +15,14 @@ network:
 sources:
   arxiv:
     enabled: true
-    query: "(satellite AND smoke detection) OR (remote sensing AND computer vision) OR (wildfire AND deep learning) OR (flame AND microgravity)"
+    # Broad, useful default. Replace this with the user's own fields during onboarding.
+    query: "cat:cs.AI OR cat:cs.CL OR cat:cs.CV OR cat:cs.LG"
     max_results: 3
 
   github:
     enabled: true
-    query: "stars:>50 pushed:>2026-04-01"
-    sort: stars
+    query: "stars:>500"
+    sort: updated
     per_page: 3
 
   hackernews:
@@ -54,11 +54,6 @@ sources:
         query: "中国 国际 重大进展 when:3d"
         max_results: 4
         source_trust: 0.78
-      - name: "合肥本地"
-        lane: "local_hefei"
-        query: "\"合肥\" (政策 OR 公示 OR 新规 OR 发布) when:7d"
-        max_results: 4
-        source_trust: 0.80
       - name: "人物与文化"
         lane: "culture_people"
         query: "作家 OR 艺术家 OR 文化 新作 OR 逝世 when:7d"
@@ -109,13 +104,11 @@ budgets:
     academic: 2
     technology: 3
     current_affairs: 4
-    local_hefei: 4
     culture_people: 3
     social_fun: 4
 
 freshness:
   current_affairs: 168
-  local_hefei: 336
   culture_people: 336
   social_fun: 168
   technology: 336
@@ -124,7 +117,6 @@ freshness:
 editorial:
   lane_order:
     - current_affairs
-    - local_hefei
     - social_fun
     - culture_people
     - technology
