@@ -103,6 +103,7 @@ def lifecycle_cmd(home: Path, *args: str, source: Path | None = None) -> subproc
     return subprocess.run(
         [sys.executable, str(lifecycle), *args, "--hermes-home", str(home)],
         text=True,
+        encoding="utf-8",
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         env=env,
@@ -1012,6 +1013,33 @@ def no_secret_output() -> None:
     assert secret not in result.stdout
 
 
+def control_status_forces_utf8_on_legacy_console() -> None:
+    home = Path(tempfile.mkdtemp(prefix="alive-utf8-console-"))
+    shared = home / "hermes_alive_shared"
+    shared.mkdir(parents=True)
+    (shared / "proactive_log.jsonl").write_text(
+        json.dumps({"message": "合肥今天有一件有趣的事"}, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    env = dict(os.environ)
+    env.update({
+        "HERMES_HOME": str(home),
+        "HERMES_ALIVE_SHARED_DIR": str(shared),
+        "PYTHONIOENCODING": "cp1252",
+    })
+    result = subprocess.run(
+        [sys.executable, str(SKILL / "hooks" / "alive_control.py"), "status"],
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout
+    assert "合肥今天有一件有趣的事" in result.stdout
+
+
 def main() -> int:
     runner = Runner()
     cases = [
@@ -1036,6 +1064,7 @@ def main() -> int:
         ("manifest_failure_transaction_rollback", manifest_failure_transaction_rollback),
         ("permissions_under_umask_zero", permissions_under_umask_zero),
         ("no_secret_output", no_secret_output),
+        ("control_status_forces_utf8_on_legacy_console", control_status_forces_utf8_on_legacy_console),
     ]
     for name, func in cases:
         runner.run(name, func)

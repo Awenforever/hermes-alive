@@ -1498,7 +1498,7 @@ class DiscoveryEngine:
         try:
             import yaml
             if os.path.isfile(path):
-                with open(path, "r") as f:
+                with open(path, "r", encoding="utf-8") as f:
                     cfg: dict[str, Any] = yaml.safe_load(f) or {}
                 return cfg
         except Exception:

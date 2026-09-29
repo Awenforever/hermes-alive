@@ -38,6 +38,13 @@ COOLDOWN = BASE / "cooldown.json"
 PROACTIVE_LOG = BASE / "proactive_log.jsonl"
 LOCK = BASE / "locks" / "proactive_watcher.lock"
 
+
+def _configure_stdio() -> None:
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            reconfigure(encoding="utf-8", errors="backslashreplace")
+
 def read_env_file() -> dict[str, str]:
     result = {}
     if not ENV_FILE.exists():
@@ -147,6 +154,7 @@ def clear_test_queue() -> int:
     return 0
 
 def main() -> int:
+    _configure_stdio()
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=["status", "enable", "disable", "test", "discover", "clear-test-queue"])
     args = parser.parse_args()
