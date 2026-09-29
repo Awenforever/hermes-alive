@@ -885,9 +885,14 @@ def lifecycle_matrix() -> None:
     un = lifecycle_cmd(home, "uninstall")
     assert un.returncode == 0, un.stdout
     assert marker.is_file()
+    assert managed_path.is_file()
+    preserved = json.loads(managed_path.read_text(encoding="utf-8"))
+    assert preserved["values"]["quality_governor_mode"] == "shadow"
+    assert preserved["values"]["context_flow_max_age_seconds"] == 7200
     assert not (home / "hooks" / "hermes-alive").exists()
     reinstall = lifecycle_cmd(home, "install", "--source-root", str(SKILL))
     assert reinstall.returncode == 0, reinstall.stdout
+    assert json.loads(managed_path.read_text(encoding="utf-8")) == preserved
     purge = lifecycle_cmd(home, "purge")
     assert purge.returncode == 0, purge.stdout
     assert not (home / "hermes_alive_shared").exists()
@@ -983,6 +988,8 @@ def manifest_failure_transaction_rollback() -> None:
 
 
 def permissions_under_umask_zero() -> None:
+    if os.name == "nt":
+        return
     home = Path(tempfile.mkdtemp(prefix="umask-zero-"))
     command = [sys.executable, str(SCRIPTS / "hermes-alive-lifecycle.py"), "install", "--hermes-home", str(home), "--source-root", str(SKILL)]
     env = dict(os.environ)

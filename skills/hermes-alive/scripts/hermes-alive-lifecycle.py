@@ -534,8 +534,10 @@ def _prune_backups(root: Path, keep: int) -> None:
 
 
 def _hermes_cli() -> list[str] | None:
+    executable = Path(sys.executable)
     candidates = [
         os.getenv("HERMES_CLI"),
+        str(executable.with_name("hermes.exe" if os.name == "nt" else "hermes")),
         "/opt/hermes/.venv/bin/hermes",
         "/opt/hermes/bin/hermes",
         shutil.which("hermes"),
@@ -563,9 +565,42 @@ def _hermes_config_path(cli: list[str], paths: Paths) -> Path:
     )
     for raw in reversed((result.stdout or "").splitlines()):
         value = raw.strip()
-        if value.startswith("/") and value.endswith((".yaml", ".yml")):
-            return _safe_resolve(Path(value))
+        candidate = Path(value)
+        if candidate.is_absolute() and candidate.suffix.casefold() in {".yaml", ".yml"}:
+            return _safe_resolve(candidate)
     return paths.hermes_home / "config.yaml"
+
+
+def _minimal_model_yaml(text: str) -> dict[str, Any]:
+    """Read only the non-secret top-level model block without a YAML dependency."""
+
+    lines = text.lstrip("\ufeff").splitlines()
+    for index, raw in enumerate(lines):
+        if not raw.strip() or raw.lstrip().startswith("#"):
+            continue
+        if raw[:1].isspace() or not raw.startswith("model:"):
+            continue
+        remainder = raw.split(":", 1)[1].split(" #", 1)[0].strip()
+        if remainder:
+            if remainder[:1] in "[{" or remainder in {"|", ">"}:
+                raise ValueError("unsupported or malformed model value")
+            return {"model": remainder.strip("\"'")}
+        model: dict[str, str] = {}
+        for nested in lines[index + 1 :]:
+            if not nested.strip() or nested.lstrip().startswith("#"):
+                continue
+            if not nested[:1].isspace():
+                break
+            stripped = nested.strip()
+            if ":" not in stripped:
+                raise ValueError("malformed model mapping")
+            key, value = stripped.split(":", 1)
+            key = key.strip()
+            value = value.split(" #", 1)[0].strip().strip("\"'")
+            if key in {"provider", "default", "name", "model", "base_url"} and value:
+                model[key] = value
+        return {"model": model}
+    return {}
 
 
 def _model_config_status(config_path: Path) -> dict[str, Any]:
@@ -578,20 +613,10 @@ def _model_config_status(config_path: Path) -> dict[str, Any]:
             "model": "",
             "base_url_configured": False,
         }
-    if yaml is None:
-        return {
-            "ready": False,
-            "reason": "pyyaml_unavailable",
-            "config_path": str(config_path),
-            "provider": "",
-            "model": "",
-            "base_url_configured": False,
-        }
-
     try:
-        payload = yaml.safe_load(
-            config_path.read_text(encoding="utf-8", errors="strict")
-        ) or {}
+        raw_config = config_path.read_text(encoding="utf-8", errors="strict")
+        payload = yaml.safe_load(raw_config) if yaml is not None else _minimal_model_yaml(raw_config)
+        payload = payload or {}
     except Exception as exc:
         return {
             "ready": False,
@@ -661,13 +686,13 @@ def _model_config_status(config_path: Path) -> dict[str, Any]:
 def _provider_status(paths: Paths) -> dict[str, Any]:
     cli = _hermes_cli()
     if cli is None:
-        return {
-            "ready": False,
-            "reason": "hermes_cli_missing",
-            "setup_command": "hermes setup model",
-            "provider": "",
-            "model": "",
-        }
+        # A copied lifecycle script can be invoked by an absolute Python path
+        # before the Hermes launcher is on PATH. The profile config is still a
+        # valid readiness source; only the optional setup launcher is missing.
+        status = _model_config_status(paths.hermes_home / "config.yaml")
+        status["setup_command"] = "hermes setup model"
+        status["config_check_is_readiness_signal"] = False
+        return status
 
     config_path = _hermes_config_path(cli, paths)
     status = _model_config_status(config_path)
@@ -1187,7 +1212,12 @@ def uninstall(args: argparse.Namespace, *, purge: bool) -> int:
 
     if paths.hook_target.exists():
         shutil.rmtree(paths.hook_target)
-    _remove_managed_config(paths)
+    # Normal uninstall removes executable code only. The managed config is
+    # user-owned state and must survive uninstall/reinstall just like learned
+    # preferences, cooldowns, and delivery history. Purge is the sole path
+    # allowed to remove it.
+    if purge:
+        _remove_managed_config(paths)
 
     source_removed = False
     source_message = ""

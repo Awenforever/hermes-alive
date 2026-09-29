@@ -4,7 +4,7 @@
 
 **让 Hermes 偶尔主动开口，同时知道何时保持安静。**
 
-![version](https://img.shields.io/badge/version-2.9.1-blue)
+![version](https://img.shields.io/badge/version-2.9.2-blue)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB)
 ![Hermes](https://img.shields.io/badge/Hermes-gateway--native-6f42c1)
 ![license](https://img.shields.io/badge/license-MIT-green)
@@ -72,9 +72,13 @@ python3 "$HERMES_HOME/hooks/hermes-alive/alive_control.py" enable
 bash "$HERMES_HOME/skills/hermes-alive/scripts/verify.sh"
 ```
 
-普通卸载保留学习与运行状态；`--purge` 才会删除全部 Alive 状态：
+普通卸载保留个性化配置、学习与运行状态；`--purge` 才会删除全部 Alive 状态。所有支持的平台优先使用 Hermes CLI：
 
 ```bash
+hermes alive uninstall-runtime
+hermes plugins remove hermes-alive
+
+# 传统 POSIX 安装仍可使用：
 bash "$HERMES_HOME/skills/hermes-alive/scripts/uninstall.sh"
 bash "$HERMES_HOME/skills/hermes-alive/scripts/uninstall.sh" --purge
 ```

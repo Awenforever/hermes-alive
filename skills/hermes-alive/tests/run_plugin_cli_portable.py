@@ -62,6 +62,16 @@ def main() -> int:
         assert manifest["manifest_version"] == 1
         assert manifest["hook_hashes"]
 
+        state_marker = state / "preferences" / "keep.json"
+        state_marker.parent.mkdir(parents=True, exist_ok=True)
+        state_marker.write_text('{"preserved": true}\n', encoding="utf-8")
+        removed = command(module, "uninstall-runtime")
+        assert removed["hook_removed"] is True
+        assert removed["runtime_source_removed"] is True
+        assert removed["user_state_preserved"] is True
+        assert state_marker.read_text(encoding="utf-8") == '{"preserved": true}\n'
+        assert (state / "config" / "hermes-alive.json").is_file()
+
     print("HERMES_ALIVE_PLUGIN_CLI_PORTABLE_RESULT=PASS")
     return 0
 

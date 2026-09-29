@@ -34,6 +34,7 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
     actions = parser.add_subparsers(dest="alive_action")
     actions.add_parser("status", help="Show installation and enablement state")
     actions.add_parser("install-runtime", help="Install or refresh the profile-scoped gateway hook")
+    actions.add_parser("uninstall-runtime", help="Remove owned runtime code while preserving user state")
     actions.add_parser("enable", help="Enable proactive delivery")
     actions.add_parser("disable", help="Disable proactive delivery")
     parser.set_defaults(func=alive_command)
@@ -63,6 +64,28 @@ def _install_runtime() -> int:
         "source": str(_home() / "skills" / "hermes-alive"),
         "manifest": str(manifest_path),
         "backup_tag": manifest.get("backup_tag"),
+    }))
+    return 0
+
+
+def _uninstall_runtime() -> int:
+    lifecycle = _source() / "scripts" / "hermes-alive-lifecycle.py"
+    result = subprocess.run(
+        [sys.executable, str(lifecycle), "uninstall", "--hermes-home", str(_home())],
+        text=True,
+        capture_output=True,
+        timeout=180,
+    )
+    if result.returncode:
+        detail = (result.stderr or result.stdout or "lifecycle uninstall failed").strip()
+        print(detail, file=sys.stderr)
+        return result.returncode
+    print(json.dumps({
+        "ok": True,
+        "hook_removed": not _hook_target().exists(),
+        "runtime_source_removed": not (_home() / "skills" / "hermes-alive").exists(),
+        "user_state_preserved": _shared_target().exists(),
+        "restart_required": True,
     }))
     return 0
 
@@ -144,6 +167,8 @@ def alive_command(args: argparse.Namespace) -> int:
     action = getattr(args, "alive_action", None)
     if action == "install-runtime":
         return _install_runtime()
+    if action == "uninstall-runtime":
+        return _uninstall_runtime()
     if action == "enable":
         _set_enabled(True)
         print(json.dumps({"ok": True, "enabled": True, "restart_required": True}))
