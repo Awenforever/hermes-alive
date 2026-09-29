@@ -47,6 +47,7 @@ sources:
   # no Python patch is required to personalize region or interests.
   news_search:
     enabled: true
+    timeout_seconds: 8
     max_results_per_query: 4
     queries:
       - name: "重要时事"

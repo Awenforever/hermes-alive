@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -211,6 +212,48 @@ def test_configured_queries_drive_source_requests() -> None:
         check("sort=forks" in urls[1] and "per_page=6" in urls[1], urls[1])
 
     asyncio.run(exercise())
+
+
+def test_news_lanes_fetch_concurrently() -> None:
+    class Response:
+        status = 200
+
+        async def __aenter__(self):
+            await asyncio.sleep(0.05)
+            return self
+
+        async def __aexit__(self, *_args):
+            return False
+
+        async def text(self) -> str:
+            return "<rss><channel></channel></rss>"
+
+    async def exercise() -> float:
+        engine = ExternalDiscovery(
+            {
+                "sources": {
+                    "news_search": {
+                        "timeout_seconds": 2,
+                        "queries": [
+                            {"lane": f"lane-{index}", "query": f"query-{index}"}
+                            for index in range(4)
+                        ],
+                    }
+                }
+            }
+        )
+
+        async def session() -> object:
+            return object()
+
+        engine._get_session = session
+        engine._request = lambda *_args, **_kwargs: Response()
+        started = time.perf_counter()
+        await engine._collect_news_search()
+        return time.perf_counter() - started
+
+    elapsed = asyncio.run(exercise())
+    check(elapsed < 0.14, f"news lanes were serialized: {elapsed:.3f}s")
     reason = ProactivePlatformWatcher._manual_discovery_terminal_reason(
         manual_discovery=False,
         discovery_available=False,
@@ -230,6 +273,7 @@ def main() -> int:
         test_manual_discovery_forces_refresh_after_empty_cache,
         test_unconsumed_candidates_survive_refresh,
         test_configured_queries_drive_source_requests,
+        test_news_lanes_fetch_concurrently,
     ]
     for test in tests:
         test()

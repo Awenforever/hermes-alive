@@ -177,7 +177,11 @@ class ExternalDiscovery:
         gathered = await asyncio.gather(*coros, return_exceptions=True)
         for source_name, result in zip(names, gathered):
             if isinstance(result, Exception):
-                logger.exception("ExternalDiscovery[%s] failed: %s", source_name, result)
+                logger.warning(
+                    "ExternalDiscovery[%s] unavailable: %s",
+                    source_name,
+                    type(result).__name__,
+                )
                 self.last_health[source_name] = {"ok": False, "fetched": 0, "error": type(result).__name__}
             else:
                 items = result or []
@@ -398,15 +402,16 @@ class ExternalDiscovery:
         if not isinstance(queries, list):
             return []
         session = await self._get_session()
-        results: list[dict[str, Any]] = []
         default_limit = int(cfg.get("max_results_per_query", 4))
-        for spec in queries:
+        request_timeout = max(2.0, min(float(cfg.get("timeout_seconds", 8)), 15.0))
+
+        async def collect_query(spec: dict[str, Any]) -> list[dict[str, Any]]:
             if not isinstance(spec, dict) or not spec.get("enabled", True):
-                continue
+                return []
             query = str(spec.get("query") or "").strip()
             lane = str(spec.get("lane") or "current_affairs").strip()
             if not query:
-                continue
+                return []
             language = str(spec.get("language") or "zh-CN")
             country = str(spec.get("country") or "CN")
             ceid = str(spec.get("ceid") or f"{country}:zh-Hans")
@@ -419,20 +424,25 @@ class ExternalDiscovery:
                     session,
                     url,
                     headers={"User-Agent": "HermesAlive/2.6 (editorial-discovery)"},
+                    timeout=request_timeout,
                 ) as resp:
                     if resp.status != 200:
                         logger.warning("News search lane %s returned status %d", lane, resp.status)
-                        continue
+                        return []
                     payload = await resp.text()
-            except Exception:
-                logger.exception("News search lane %s failed", lane)
-                continue
+            except asyncio.TimeoutError:
+                logger.warning("News search lane %s timed out after %.0fs", lane, request_timeout)
+                return []
+            except Exception as exc:
+                logger.warning("News search lane %s unavailable: %s", lane, type(exc).__name__)
+                return []
             try:
                 root = ET.fromstring(payload)
             except ET.ParseError:
                 logger.warning("News search lane %s returned invalid RSS", lane)
-                continue
+                return []
             limit = int(spec.get("max_results", default_limit))
+            lane_results: list[dict[str, Any]] = []
             for node in root.findall(".//item")[:limit]:
                 title = html.unescape((node.findtext("title", "") or "").strip())
                 link = (node.findtext("link", "") or "").strip()
@@ -440,7 +450,7 @@ class ExternalDiscovery:
                 source_node = node.find("source")
                 publisher = (source_node.text or "").strip() if source_node is not None else ""
                 if title and link:
-                    results.append({
+                    lane_results.append({
                         "source": "news_search",
                         "publisher": publisher,
                         "lane": lane,
@@ -450,6 +460,26 @@ class ExternalDiscovery:
                         "source_trust": float(spec.get("source_trust", 0.72)),
                         "content_type": "news",
                     })
+            return lane_results
+
+        enabled_queries = [
+            spec
+            for spec in queries
+            if isinstance(spec, dict) and spec.get("enabled", True)
+        ]
+        batches = await asyncio.gather(
+            *(collect_query(spec) for spec in enabled_queries),
+            return_exceptions=True,
+        )
+        results: list[dict[str, Any]] = []
+        for batch in batches:
+            if isinstance(batch, Exception):
+                logger.warning(
+                    "News search query unavailable: %s",
+                    type(batch).__name__,
+                )
+                continue
+            results.extend(batch)
         return results
 
     async def _collect_github_trending(self) -> list[dict[str, Any]]:
