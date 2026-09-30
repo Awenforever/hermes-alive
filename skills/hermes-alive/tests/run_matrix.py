@@ -1013,6 +1013,24 @@ def no_secret_output() -> None:
     assert secret not in result.stdout
 
 
+def model_attribution_never_invents_a_provider_model() -> None:
+    watcher = ProactivePlatformWatcher.__new__(ProactivePlatformWatcher)
+    names = ("HERMES_PROACTIVE_LLM_MODEL", "HERMES_PROACTIVE_MODEL")
+    previous = {name: os.environ.get(name) for name in names}
+    try:
+        for name in names:
+            os.environ.pop(name, None)
+        assert watcher._llm_model_name() == "hermes"
+        os.environ["HERMES_PROACTIVE_LLM_MODEL"] = "provider/custom-model"
+        assert watcher._llm_model_name() == "provider/custom-model"
+    finally:
+        for name, value in previous.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+
+
 def control_status_forces_utf8_on_legacy_console() -> None:
     home = Path(tempfile.mkdtemp(prefix="alive-utf8-console-"))
     shared = home / "hermes_alive_shared"
@@ -1064,6 +1082,7 @@ def main() -> int:
         ("manifest_failure_transaction_rollback", manifest_failure_transaction_rollback),
         ("permissions_under_umask_zero", permissions_under_umask_zero),
         ("no_secret_output", no_secret_output),
+        ("model_attribution_never_invents_a_provider_model", model_attribution_never_invents_a_provider_model),
         ("control_status_forces_utf8_on_legacy_console", control_status_forces_utf8_on_legacy_console),
     ]
     for name, func in cases:

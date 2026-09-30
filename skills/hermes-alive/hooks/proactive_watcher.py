@@ -2777,7 +2777,10 @@ class ProactivePlatformWatcher:
         return _truthy(raw)
 
     def _llm_model_name(self) -> str:
-        return os.getenv(LLM_MODEL_ENV, os.getenv("HERMES_PROACTIVE_MODEL", "deepseek-flash")).strip() or "deepseek-flash"
+        # Hermes owns model selection and routing.  This value is attribution
+        # metadata only: honour an explicit plugin override, otherwise report
+        # that the active Hermes route was used instead of inventing a model.
+        return os.getenv(LLM_MODEL_ENV, os.getenv("HERMES_PROACTIVE_MODEL", "")).strip() or "hermes"
 
     async def _check_dream(self) -> None:
         """Run dream memory consolidation if interval has elapsed."""
