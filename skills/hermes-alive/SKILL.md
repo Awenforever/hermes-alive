@@ -1,7 +1,7 @@
 ---
 name: hermes-alive
 description: "Gateway-native proactive companion with contextual discovery, live quality enforcement, production Circadian sleep/quiet enforcement, and reversible lifecycle management."
-version: 2.9.6
+version: 2.9.7
 ---
 
 # Hermes Alive — Hermes Installation Contract
@@ -117,6 +117,11 @@ Weather is optional. Without confirmed location, keep it disabled. When
 network-assisted discovery was explicitly requested, Hermes may ask one natural
 question in the existing chat to confirm, correct, or decline the suggested
 district/county-level area. Never block installation waiting for that reply.
+Forward geocoding uses Open-Meteo first and Nominatim as an independent
+fallback. Failure of either or both providers must not block installation or
+fabricate coordinates; keep weather disabled and allow correction later. An
+explicit `latitude, longitude` answer is accepted as an offline escape hatch,
+but installers must not require users to provide coordinates.
 
 ## Verify
 

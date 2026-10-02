@@ -29,6 +29,7 @@ from typing import Any, Callable
 IP_GEO_URL = "https://ipapi.co/json/"
 NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse"
 NOMINATIM_SEARCH_URL = "https://nominatim.openstreetmap.org/search"
+OPEN_METEO_GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
 USER_AGENT = "hermes-alive-location-onboarding/1.0"
 
 FetchJson = Callable[[str, float], Any]
@@ -306,7 +307,72 @@ def geocode_location_text(
     query_text = _text(text)
     if not query_text:
         return LocationCandidate(timezone=timezone, source="manual_empty")
-    query = urllib.parse.urlencode(
+
+    # Offline escape hatch: a user-supplied coordinate pair never needs DNS,
+    # proxy, or a third-party geocoder.  City/district text remains the normal
+    # guided path; coordinates are accepted rather than required.
+    coordinate_match = re.fullmatch(
+        r"\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*[,，\s]\s*"
+        r"([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*",
+        query_text,
+    )
+    if coordinate_match:
+        latitude = _coord(coordinate_match.group(1), latitude=True)
+        longitude = _coord(coordinate_match.group(2), latitude=False)
+        if latitude is not None and longitude is not None:
+            return LocationCandidate(
+                locality=f"{latitude:.6f}, {longitude:.6f}",
+                latitude=latitude,
+                longitude=longitude,
+                timezone=timezone,
+                source="manual_coordinates",
+                precision="coordinates",
+                confidence=0.95,
+            )
+
+    # Prefer Open-Meteo: Alive already uses the same service family for
+    # weather, it requires no API key, and it remains reachable on networks
+    # where the whole openstreetmap.org DNS zone is interfered with.  Nominatim
+    # remains an independent fallback for coverage—not a single point of
+    # failure.  Each provider failure is contained so onboarding can continue.
+    open_meteo_query = urllib.parse.urlencode(
+        {
+            "name": query_text,
+            "count": "1",
+            "language": (language or "en").split("_", 1)[0].split("-", 1)[0],
+            "format": "json",
+        }
+    )
+    try:
+        payload = fetch_json(f"{OPEN_METEO_GEOCODING_URL}?{open_meteo_query}", timeout)
+        rows = payload.get("results") if isinstance(payload, dict) else None
+        if isinstance(rows, list) and rows and isinstance(rows[0], dict):
+            row = rows[0]
+            latitude = _coord(row.get("latitude"), latitude=True)
+            longitude = _coord(row.get("longitude"), latitude=False)
+            if latitude is not None and longitude is not None:
+                return LocationCandidate(
+                    country_code=_text(row.get("country_code")).upper(),
+                    country_name=_text(row.get("country")),
+                    admin1=_text(row.get("admin1")),
+                    admin2=_text(row.get("admin2")),
+                    admin3=_text(row.get("admin3") or row.get("admin4")),
+                    locality=_text(row.get("name")) or query_text,
+                    latitude=latitude,
+                    longitude=longitude,
+                    timezone=_text(row.get("timezone") or timezone),
+                    source="manual_text_geocoded_open_meteo",
+                    precision=(
+                        "district_or_county"
+                        if row.get("admin2") or row.get("admin3") or row.get("admin4")
+                        else "city"
+                    ),
+                    confidence=0.76,
+                )
+    except Exception:
+        pass
+
+    nominatim_query = urllib.parse.urlencode(
         {
             "format": "jsonv2",
             "q": query_text,
@@ -315,41 +381,46 @@ def geocode_location_text(
             "accept-language": language or "en",
         }
     )
-    payload = fetch_json(f"{NOMINATIM_SEARCH_URL}?{query}", timeout)
-    if isinstance(payload, dict):
-        rows = payload.get("results")
-    else:
-        rows = payload
-    if not isinstance(rows, list) or not rows:
-        return LocationCandidate(
-            locality=query_text,
-            timezone=timezone,
-            source="manual_text_unresolved",
-            precision="user_text",
-            confidence=0.4,
-        )
-    row = rows[0] if isinstance(rows[0], dict) else {}
-    address = row.get("address") if isinstance(row.get("address"), dict) else {}
-    latitude = _coord(row.get("lat"), latitude=True)
-    longitude = _coord(row.get("lon"), latitude=False)
-    candidate = _address_candidate(
-        address,
-        latitude=latitude,
-        longitude=longitude,
+    try:
+        payload = fetch_json(f"{NOMINATIM_SEARCH_URL}?{nominatim_query}", timeout)
+        rows = payload.get("results") if isinstance(payload, dict) else payload
+        if isinstance(rows, list) and rows and isinstance(rows[0], dict):
+            row = rows[0]
+            address = row.get("address") if isinstance(row.get("address"), dict) else {}
+            latitude = _coord(row.get("lat"), latitude=True)
+            longitude = _coord(row.get("lon"), latitude=False)
+            candidate = _address_candidate(
+                address,
+                latitude=latitude,
+                longitude=longitude,
+                timezone=timezone,
+                source="manual_text_geocoded_nominatim",
+            )
+            if candidate.display_name and candidate.has_coordinates:
+                return candidate
+            if latitude is not None and longitude is not None:
+                return LocationCandidate(
+                    locality=_text(row.get("display_name")) or query_text,
+                    latitude=latitude,
+                    longitude=longitude,
+                    timezone=timezone,
+                    source="manual_text_geocoded_nominatim",
+                    precision="user_text",
+                    confidence=0.65,
+                )
+    except Exception:
+        pass
+
+    # Provider outage must never block installation or complete onboarding with
+    # fabricated coordinates.  The caller can keep weather disabled, ask for a
+    # correction later, or accept an explicit coordinate pair offline.
+    return LocationCandidate(
+        locality=query_text,
         timezone=timezone,
-        source="manual_text_geocoded",
+        source="manual_text_unresolved",
+        precision="user_text",
+        confidence=0.4,
     )
-    if not candidate.display_name:
-        candidate = LocationCandidate(
-            locality=_text(row.get("display_name")) or query_text,
-            latitude=latitude,
-            longitude=longitude,
-            timezone=timezone,
-            source="manual_text_geocoded",
-            precision="user_text",
-            confidence=0.65,
-        )
-    return candidate
 
 
 def profile_values(

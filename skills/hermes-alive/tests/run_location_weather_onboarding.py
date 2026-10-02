@@ -23,6 +23,7 @@ from location_weather_profile import (  # noqa: E402
     IP_GEO_URL,
     NOMINATIM_REVERSE_URL,
     NOMINATIM_SEARCH_URL,
+    OPEN_METEO_GEOCODING_URL,
     LocationCandidate,
     confirm_location_onboarding,
     contains_raw_ip,
@@ -79,6 +80,19 @@ def fake_fetch(url: str, timeout: float):
                 },
             }
         ]
+    if url.startswith(OPEN_METEO_GEOCODING_URL):
+        return {
+            "results": [{
+                "name": "Jurong East",
+                "latitude": 1.3329,
+                "longitude": 103.7436,
+                "country_code": "SG",
+                "country": "Singapore",
+                "admin1": "Singapore",
+                "admin3": "Jurong East",
+                "timezone": "Asia/Singapore",
+            }]
+        }
     raise AssertionError(f"unexpected URL: {url}")
 
 
@@ -197,8 +211,72 @@ def test_manual_chat_correction() -> None:
         environ={"TZ": "Asia/Singapore", "LANG": "en_SG.UTF-8"},
     )
     check(values["weather_admin3"] == "Jurong East", "manual district not resolved")
-    check(values["weather_location_source"] == "manual_text_geocoded", "source class wrong")
+    check(values["weather_location_source"] == "manual_text_geocoded_open_meteo", "source class wrong")
     check(values["weather_onboarding_complete"] is True, "manual correction not completed")
+
+
+def test_open_meteo_survives_nominatim_dns_failure() -> None:
+    calls: list[str] = []
+
+    def fetch(url: str, timeout: float):
+        del timeout
+        calls.append(url)
+        if url.startswith(OPEN_METEO_GEOCODING_URL):
+            return fake_fetch(url, 1)
+        if "openstreetmap.org" in url:
+            raise OSError("DNS resolution failed")
+        raise AssertionError(url)
+
+    candidate = confirm_location_onboarding(
+        {}, user_location="Jurong East", fetch_json=fetch,
+        environ={"TZ": "Asia/Singapore", "LANG": "en_SG.UTF-8"},
+    )
+    check(candidate["weather_enabled"] is True, "fallback did not enable confirmed weather")
+    check(candidate["weather_location_source"] == "manual_text_geocoded_open_meteo", "wrong provider")
+    check(not any("openstreetmap.org" in url for url in calls), "healthy primary unnecessarily hit Nominatim")
+
+
+def test_nominatim_is_independent_fallback() -> None:
+    def fetch(url: str, timeout: float):
+        del timeout
+        if url.startswith(OPEN_METEO_GEOCODING_URL):
+            raise OSError("Open-Meteo unavailable")
+        return fake_fetch(url, 1)
+
+    values = confirm_location_onboarding(
+        {}, user_location="Jurong East", fetch_json=fetch,
+        environ={"TZ": "Asia/Singapore", "LANG": "en_SG.UTF-8"},
+    )
+    check(values["weather_enabled"] is True, "Nominatim fallback did not resolve")
+    check(values["weather_location_source"] == "manual_text_geocoded_nominatim", "fallback source wrong")
+
+
+def test_all_geocoders_down_never_blocks_or_fabricates() -> None:
+    def unavailable(_url: str, _timeout: float):
+        raise OSError("network unavailable")
+
+    values = confirm_location_onboarding(
+        {}, user_location="Hefei", fetch_json=unavailable,
+        environ={"TZ": "Asia/Shanghai", "LANG": "zh_CN.UTF-8"},
+    )
+    check(values["weather_onboarding_complete"] is True, "outage left onboarding pending")
+    check(values["weather_enabled"] is False, "unresolved location enabled weather")
+    check(values["weather_location_source"] == "manual_text_unresolved", "outage source wrong")
+    check("weather_lat" not in values and "weather_lon" not in values, "coordinates fabricated")
+
+
+def test_coordinate_pair_is_offline_escape_hatch() -> None:
+    def must_not_fetch(_url: str, _timeout: float):
+        raise AssertionError("coordinate input unexpectedly used network")
+
+    values = confirm_location_onboarding(
+        {}, user_location="31.8206, 117.2272", fetch_json=must_not_fetch,
+        environ={"TZ": "Asia/Shanghai", "LANG": "zh_CN.UTF-8"},
+    )
+    check(values["weather_enabled"] is True, "offline coordinates did not enable weather")
+    check(values["weather_location_source"] == "manual_coordinates", "coordinate source wrong")
+    check(values["weather_lat"] == "31.820600", "latitude wrong")
+    check(values["weather_lon"] == "117.227200", "longitude wrong")
 
 
 def test_disable_weather_finishes_onboarding() -> None:
@@ -240,7 +318,7 @@ def test_lifecycle_zero_touch_defaults() -> None:
         check("HERMES_ALIVE_ZERO_TOUCH_CONFIG_OK" in result.stdout, "zero-touch marker missing")
         payload = json.loads((shared / "config" / "hermes-alive.json").read_text())
         values = payload["values"]
-        check(payload["config_version"] == 4, "config version not upgraded")
+        check(payload["config_version"] == 5, "config version not upgraded")
         check(values["enabled"] is False, "safe default should remain disabled")
         check(values["timezone"] == "Asia/Singapore", "timezone not auto-detected")
         check(values["circadian_timezone"] == "Asia/Singapore", "circadian timezone diverged")
@@ -278,7 +356,7 @@ def test_lifecycle_structured_profile_is_safe() -> None:
         check(result.returncode == 0, f"configure failed: {result.stdout} {result.stderr}")
         payload = json.loads((shared / "config" / "hermes-alive.json").read_text())
         values = payload["values"]
-        check(payload["config_version"] == 4, "config version wrong")
+        check(payload["config_version"] == 5, "config version wrong")
         check(values["weather_admin3"] == "Tampines", "district not persisted")
         check(values["weather_location_confirmed"] is True, "confirmation not persisted")
         check(values["weather_onboarding_complete"] is True, "onboarding completion missing")
@@ -414,6 +492,10 @@ def main() -> int:
         test_chat_prompt_is_natural_and_single_question,
         test_confirm_existing_suggestion,
         test_manual_chat_correction,
+        test_open_meteo_survives_nominatim_dns_failure,
+        test_nominatim_is_independent_fallback,
+        test_all_geocoders_down_never_blocks_or_fabricates,
+        test_coordinate_pair_is_offline_escape_hatch,
         test_disable_weather_finishes_onboarding,
         test_lifecycle_zero_touch_defaults,
         test_lifecycle_structured_profile_is_safe,
