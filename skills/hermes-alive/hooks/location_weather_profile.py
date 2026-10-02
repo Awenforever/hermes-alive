@@ -39,6 +39,28 @@ def _text(value: Any) -> str:
     return str(value or "").strip()
 
 
+def _geocoding_language(text: str, requested: str) -> str:
+    """Choose the query-index language from the user's text script.
+
+    Open-Meteo localizes both output and its searchable name index.  A system
+    locale such as ``C.UTF-8`` must therefore not force a Chinese, Japanese or
+    Korean place name through the English index and silently turn a healthy
+    primary provider into a fallback request.
+    """
+
+    if re.search(r"[\u3040-\u30ff]", text):
+        return "ja"
+    if re.search(r"[\uac00-\ud7af]", text):
+        return "ko"
+    if re.search(r"[\u3400-\u4dbf\u4e00-\u9fff]", text):
+        return "zh"
+    if re.search(r"[\u0400-\u04ff]", text):
+        return "ru"
+    if re.search(r"[\u0600-\u06ff]", text):
+        return "ar"
+    return (requested or "en").split("_", 1)[0].split("-", 1)[0]
+
+
 def _float(value: Any) -> float | None:
     try:
         number = float(value)
@@ -339,7 +361,7 @@ def geocode_location_text(
         {
             "name": query_text,
             "count": "1",
-            "language": (language or "en").split("_", 1)[0].split("-", 1)[0],
+            "language": _geocoding_language(query_text, language),
             "format": "json",
         }
     )

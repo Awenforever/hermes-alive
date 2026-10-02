@@ -236,6 +236,37 @@ def test_open_meteo_survives_nominatim_dns_failure() -> None:
     check(not any("openstreetmap.org" in url for url in calls), "healthy primary unnecessarily hit Nominatim")
 
 
+def test_query_script_selects_open_meteo_index_language() -> None:
+    calls: list[str] = []
+
+    def fetch(url: str, timeout: float):
+        del timeout
+        calls.append(url)
+        check("language=zh" in url, "Chinese place name used the system locale index")
+        return {
+            "results": [
+                {
+                    "name": "合肥",
+                    "latitude": 31.86389,
+                    "longitude": 117.28083,
+                    "country_code": "CN",
+                    "country": "中国",
+                    "admin1": "安徽",
+                    "admin2": "合肥市",
+                    "timezone": "Asia/Shanghai",
+                }
+            ]
+        }
+
+    values = confirm_location_onboarding(
+        {}, user_location="合肥", fetch_json=fetch,
+        environ={"TZ": "Asia/Shanghai", "LANG": "C.UTF-8"},
+    )
+    check(values["weather_enabled"] is True, "script-aware lookup did not resolve")
+    check(values["weather_location_source"] == "manual_text_geocoded_open_meteo", "wrong provider")
+    check(len(calls) == 1, "healthy Open-Meteo result fell through to another provider")
+
+
 def test_nominatim_is_independent_fallback() -> None:
     def fetch(url: str, timeout: float):
         del timeout
@@ -493,6 +524,7 @@ def main() -> int:
         test_confirm_existing_suggestion,
         test_manual_chat_correction,
         test_open_meteo_survives_nominatim_dns_failure,
+        test_query_script_selects_open_meteo_index_language,
         test_nominatim_is_independent_fallback,
         test_all_geocoders_down_never_blocks_or_fabricates,
         test_coordinate_pair_is_offline_escape_hatch,

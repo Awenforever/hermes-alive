@@ -57,3 +57,16 @@ Permanent constraints:
 - no public IP or raw lookup payload is persisted;
 - existing confirmation, lifecycle, managed-config, and weather-composer
   contracts remain green.
+
+## Query language is not the machine locale
+
+Open-Meteo's `language` parameter selects a localized place-name search index,
+not merely the response language. A Chinese place name such as `合肥` returns
+no result from the English index even while the provider is healthy. Falling
+through from that empty result to an unreachable Nominatim endpoint recreates
+the apparent onboarding hang.
+
+The input script therefore takes precedence over a container's often-generic
+`C.UTF-8` locale for CJK, Cyrillic, and Arabic place names. A regression test
+must prove that Chinese text sent under `C.UTF-8` uses Open-Meteo's `zh` index,
+resolves in one request, and never touches Nominatim.
