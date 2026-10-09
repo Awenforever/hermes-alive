@@ -142,6 +142,8 @@ ingestion is harmless, and no secret-bearing payload crosses ingestion policy.
 
 ### Phase 2 — Typed memory and beliefs
 
+- [x] Define memory kinds, authority classes, lifecycle states and admission
+  principles; see `adr/0002-typed-memory-is-a-projection.md`.
 - [ ] Implement episodic, semantic, preference, commitment and self-model
   records with provenance, confidence, validity, sensitivity and supersession.
 - [ ] Retrieve by recency, relevance and importance without losing provenance.
@@ -255,3 +257,6 @@ For each material change:
   records hook structure and pseudonymous linkage, never raw message content,
   credentials or external platform IDs. It defaults off until deployment
   acceptance explicitly enables it.
+- Defined typed memory as a replayable projection. Model confidence is now
+  explicitly rejected as a promotion authority; raw conversation ingestion
+  remains blocked until real erasure semantics exist.
