@@ -76,6 +76,7 @@ _watcher_task: asyncio.Task | None = None
 
 async def handle(event_type: str, context: dict):
     logger.warning("[Hermes Alive] handle() called, event=%s", event_type)
+    _mirror_kernel_shadow(event_type, context if isinstance(context, dict) else {})
     if event_type == "gateway:startup":
         await _startup(context)
     elif event_type == "session:start":
@@ -84,6 +85,27 @@ async def handle(event_type: str, context: dict):
         await _on_agent_end(context)
     else:
         logger.warning("Hermes Alive: unknown event type %s", event_type)
+
+
+def _mirror_kernel_shadow(event_type: str, context: dict) -> None:
+    """Record structural hook evidence without affecting legacy behavior."""
+    try:
+        from alive_kernel.shadow_bridge import mirror_hook_event, shadow_enabled
+
+        if not shadow_enabled():
+            return
+        result = mirror_hook_event(_SHARED_DIR, event_type, context)
+        if result is not None:
+            logger.debug(
+                "Alive kernel shadow event sequence=%s created=%s type=%s",
+                result.sequence,
+                result.created,
+                event_type,
+            )
+    except Exception:
+        # Shadow capture cannot alter production hook behavior. It is promoted
+        # only after fault injection and replay acceptance.
+        logger.exception("Alive kernel shadow ingestion failed")
 
 async def _startup(context: dict):
     global _watcher_task

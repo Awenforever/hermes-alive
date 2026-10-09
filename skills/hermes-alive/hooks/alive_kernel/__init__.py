@@ -1,0 +1,30 @@
+"""Hermes Alive kernel foundations.
+
+The package is deliberately not imported by the production watcher yet.  Phase
+1 develops the durable history boundary in shadow before it can affect sends.
+"""
+
+from .events import EventEnvelope, EventValidationError, Sensitivity
+from .event_store import (
+    AppendResult,
+    EventConflictError,
+    EventIntegrityError,
+    ExperienceJournal,
+)
+from .privacy import LocalIdentityProtector, structural_hook_payload
+from .shadow_bridge import ShadowKernelBridge, mirror_hook_event, shadow_enabled
+
+__all__ = [
+    "AppendResult",
+    "EventConflictError",
+    "EventEnvelope",
+    "EventIntegrityError",
+    "EventValidationError",
+    "ExperienceJournal",
+    "LocalIdentityProtector",
+    "Sensitivity",
+    "ShadowKernelBridge",
+    "mirror_hook_event",
+    "shadow_enabled",
+    "structural_hook_payload",
+]

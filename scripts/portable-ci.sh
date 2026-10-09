@@ -62,6 +62,8 @@ run_and_require() {
   }
 }
 
+run_and_require run_alive_kernel_journal.py '^HERMES_ALIVE_KERNEL_JOURNAL_OK$'
+run_and_require run_alive_kernel_shadow.py '^HERMES_ALIVE_KERNEL_SHADOW_OK$'
 run_and_require run_circadian.py '^HERMES_ALIVE_CIRCADIAN_CORE_RESULT=PASS$'
 run_and_require run_circadian_shadow.py '^HERMES_ALIVE_CIRCADIAN_SHADOW_RESULT=PASS$'
 run_and_require run_circadian_intent_bridge.py '^HERMES_ALIVE_CIRCADIAN_INTENT_RESULT=PASS$'
