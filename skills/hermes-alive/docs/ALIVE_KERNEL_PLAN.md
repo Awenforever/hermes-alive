@@ -260,3 +260,11 @@ For each material change:
 - Defined typed memory as a replayable projection. Model confidence is now
   explicitly rejected as a promotion authority; raw conversation ingestion
   remains blocked until real erasure semantics exist.
+- Phase-1 journal/privacy contracts passed repeatedly on Windows and as part of
+  the complete Linux suite. The full-scale Linux stress run also passed: 32
+  concurrent safe-I/O workers, 6,000 interest deliveries, 4,000 feedback
+  updates, 10,000 delivery plans, 10,000 policy evaluations, 2,000 watcher
+  ticks, 20 lifecycle cycles and 50 injected failures, with zero file-descriptor
+  or thread leakage. A Windows-only legacy test invocation exposed console GBK
+  decoding in the existing location test harness; the same test passed under
+  the authoritative Linux suite and is not attributed to the kernel change.
