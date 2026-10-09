@@ -288,3 +288,8 @@ For each material change:
   Linux regression/matrix/scaled-stress suite, including concurrent projection,
   discard-and-rebuild replay, lifecycle rollback and failure injection. The
   kernel remains shadow-only and has not ingested production conversation data.
+- The first memory prototype exposed a deliberate boundary problem: private
+  values embedded in an append-only event cannot be genuinely forgotten.
+  ADR-0003 therefore proposes a durable metadata journal plus a separately
+  erasable content vault. Production plaintext ingestion remains blocked until
+  WAL, backup and interrupted-erasure tests prove the selected design.
