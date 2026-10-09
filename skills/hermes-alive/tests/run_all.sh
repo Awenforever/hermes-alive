@@ -3,6 +3,7 @@ set -Eeuo pipefail
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_journal.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_shadow.py"
+PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_memory.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_circadian.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_circadian_shadow.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_circadian_intent_bridge.py"

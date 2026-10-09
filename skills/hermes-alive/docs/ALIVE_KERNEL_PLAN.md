@@ -4,7 +4,7 @@ Status: active
 
 Last reviewed: 2026-10-09
 
-Current phase: Phase 1 — durable experience journal
+Current phase: Phase 1/2 — event adapters and typed memory projection
 
 Working branch: `feat/alive-kernel-3`
 
@@ -144,7 +144,7 @@ ingestion is harmless, and no secret-bearing payload crosses ingestion policy.
 
 - [x] Define memory kinds, authority classes, lifecycle states and admission
   principles; see `adr/0002-typed-memory-is-a-projection.md`.
-- [ ] Implement episodic, semantic, preference, commitment and self-model
+- [x] Implement episodic, semantic, preference, commitment and self-model
   records with provenance, confidence, validity, sensitivity and supersession.
 - [ ] Retrieve by recency, relevance and importance without losing provenance.
 - [ ] Make correction, forgetting and privacy erasure propagate predictably.
@@ -268,3 +268,23 @@ For each material change:
   or thread leakage. A Windows-only legacy test invocation exposed console GBK
   decoding in the existing location test harness; the same test passed under
   the authoritative Linux suite and is not attributed to the kernel change.
+
+### 2026-10-09 — Typed memory projection begins
+
+- Implemented idempotent memory projection in the same transactional store as
+  the experience journal, with explicit kind, authority, state, validity,
+  sensitivity, provenance and transition history.
+- A confidence-1.0 model inference remains `proposed`; only admitted authority
+  can activate it. Direct observations cannot activate inferred preferences.
+- Contradictory evidence contests both claims instead of overwriting either.
+  An explicit user correction can supersede a live matching target, but cannot
+  reuse an already superseded target to create parallel active truths.
+- Retrieval now requires an explicit sensitivity clearance. Projection state
+  can be discarded and deterministically rebuilt from journal history.
+- Implementation review changed correction ordering: explicit supersession is
+  processed before same-value deduplication so user authority is not erased by
+  a prior contested observation.
+- The typed-memory contracts passed repeated Windows runs and the complete
+  Linux regression/matrix/scaled-stress suite, including concurrent projection,
+  discard-and-rebuild replay, lifecycle rollback and failure injection. The
+  kernel remains shadow-only and has not ingested production conversation data.

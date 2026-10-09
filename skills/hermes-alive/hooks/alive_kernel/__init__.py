@@ -13,6 +13,17 @@ from .event_store import (
 )
 from .privacy import LocalIdentityProtector, structural_hook_payload
 from .shadow_bridge import ShadowKernelBridge, mirror_hook_event, shadow_enabled
+from .memory import (
+    MemoryAuthority,
+    MemoryKind,
+    MemoryProjection,
+    MemoryProposal,
+    MemoryRecord,
+    MemoryState,
+    MemoryValidationError,
+    ProjectionDecision,
+    ProjectionDecisionKind,
+)
 
 __all__ = [
     "AppendResult",
@@ -22,6 +33,15 @@ __all__ = [
     "EventValidationError",
     "ExperienceJournal",
     "LocalIdentityProtector",
+    "MemoryAuthority",
+    "MemoryKind",
+    "MemoryProjection",
+    "MemoryProposal",
+    "MemoryRecord",
+    "MemoryState",
+    "MemoryValidationError",
+    "ProjectionDecision",
+    "ProjectionDecisionKind",
     "Sensitivity",
     "ShadowKernelBridge",
     "mirror_hook_event",
