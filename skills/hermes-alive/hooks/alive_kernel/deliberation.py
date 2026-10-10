@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 import math
 from types import MappingProxyType
-from typing import Iterable, Mapping
+from typing import Any, Iterable, Mapping
 from uuid import uuid4
 
 
@@ -179,9 +179,10 @@ def build_frame(
     *,
     frame_id: str | None = None,
 ) -> DeliberationFrame:
+    resolved_frame_id = str(frame_id or uuid4())
     values = list(candidates)
     if not any(value.action_kind is ActionKind.SILENCE for value in values):
-        values.append(silence_candidate())
+        values.append(silence_candidate(candidate_id=f"silence:{resolved_frame_id}"))
     ids = [value.candidate_id for value in values]
     if len(ids) != len(set(ids)):
         raise DeliberationValidationError("candidate IDs must be unique")
@@ -214,7 +215,7 @@ def build_frame(
         else:
             admissible.append(candidate.candidate_id)
     return DeliberationFrame(
-        frame_id=str(frame_id or uuid4()),
+        frame_id=resolved_frame_id,
         candidates=tuple(values),
         admissible_ids=tuple(admissible),
         rejections=tuple(rejected),
@@ -246,3 +247,119 @@ def validate_selection(
         selected_by=model,
         rationale=rationale[:2000],
     )
+
+
+_DIMENSION_NAMES = (
+    "user_value",
+    "urgency",
+    "novelty",
+    "confidence",
+    "interruption_cost",
+    "risk",
+)
+
+
+def serialize_frame(
+    frame: DeliberationFrame, context: PolicyContext
+) -> dict[str, Any]:
+    """Serialize the full auditable frame for encrypted persistence."""
+
+    candidates: list[dict[str, Any]] = []
+    for candidate in frame.candidates:
+        dimensions = None
+        if candidate.dimensions is not None:
+            dimensions = {}
+            for name in _DIMENSION_NAMES:
+                assessment = getattr(candidate.dimensions, name)
+                dimensions[name] = {
+                    "value": assessment.value,
+                    "basis": assessment.basis.value,
+                    "evidence_event_ids": list(assessment.evidence_event_ids),
+                    "reason": assessment.reason,
+                }
+        candidates.append(
+            {
+                "candidate_id": candidate.candidate_id,
+                "action_kind": candidate.action_kind.value,
+                "side_effect": candidate.side_effect.value,
+                "authority": candidate.authority.value,
+                "agenda_item_id": candidate.agenda_item_id,
+                "content_id": candidate.content_id,
+                "dimensions": dimensions,
+            }
+        )
+    return {
+        "schema_version": 1,
+        "frame_id": frame.frame_id,
+        "policy": {
+            "can_interrupt": context.can_interrupt,
+            "minimum_confidence": context.minimum_confidence,
+            "maximum_risk": context.maximum_risk,
+            "allowed_side_effects": sorted(value.value for value in context.allowed_side_effects),
+        },
+        "candidates": candidates,
+        "admissible_ids": list(frame.admissible_ids),
+        "rejections": [
+            {"candidate_id": item.candidate_id, "reasons": list(item.reasons)}
+            for item in frame.rejections
+        ],
+        "silence_id": frame.silence_id,
+    }
+
+
+def deserialize_frame(value: Mapping[str, Any]) -> tuple[DeliberationFrame, PolicyContext]:
+    """Rebuild and independently re-evaluate one persisted frame."""
+
+    if int(value.get("schema_version", 0)) != 1:
+        raise DeliberationValidationError("unsupported deliberation frame schema")
+    try:
+        policy_value = value["policy"]
+        context = PolicyContext(
+            can_interrupt=bool(policy_value["can_interrupt"]),
+            minimum_confidence=float(policy_value["minimum_confidence"]),
+            maximum_risk=float(policy_value["maximum_risk"]),
+            allowed_side_effects=frozenset(policy_value["allowed_side_effects"]),
+        )
+        candidates: list[ActionCandidate] = []
+        for item in value["candidates"]:
+            dimensions_value = item.get("dimensions")
+            dimensions = None
+            if dimensions_value is not None:
+                assessments = {}
+                for name in _DIMENSION_NAMES:
+                    assessment = dimensions_value[name]
+                    assessments[name] = DimensionAssessment(
+                        value=assessment["value"],
+                        basis=assessment["basis"],
+                        evidence_event_ids=tuple(assessment["evidence_event_ids"]),
+                        reason=assessment["reason"],
+                    )
+                dimensions = DecisionDimensions(**assessments)
+            candidates.append(
+                ActionCandidate(
+                    candidate_id=item["candidate_id"],
+                    action_kind=item["action_kind"],
+                    side_effect=item["side_effect"],
+                    authority=item["authority"],
+                    agenda_item_id=item.get("agenda_item_id"),
+                    content_id=item.get("content_id"),
+                    dimensions=dimensions,
+                )
+            )
+        rebuilt = build_frame(candidates, context, frame_id=str(value["frame_id"]))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise DeliberationValidationError("invalid deliberation frame document") from exc
+    expected_admissible = tuple(str(item) for item in value.get("admissible_ids", ()))
+    expected_rejections = tuple(
+        CandidateRejection(
+            str(item["candidate_id"]), tuple(str(reason) for reason in item["reasons"])
+        )
+        for item in value.get("rejections", ())
+    )
+    if (
+        rebuilt.admissible_ids != expected_admissible
+        or rebuilt.rejections != expected_rejections
+        or rebuilt.silence_id != value.get("silence_id")
+    ):
+        raise DeliberationValidationError("persisted policy result does not recompute")
+    return rebuilt, context

@@ -161,11 +161,13 @@ corrections are represented rather than overwritten.
 
 - [x] Add durable commitments and opportunity records (ADR-0006; shadow-only
   authority, lifecycle, encrypted content and replay baseline implemented).
-- [x] Generate multiple typed candidate actions, including deliberate silence
-  (pure shadow decision boundary; durable recording is the next gate).
+- [x] Generate multiple typed candidate actions, including deliberate silence;
+  candidate sets and their encrypted explanations now replay durably.
 - [x] Evaluate user value, urgency, novelty, confidence, interruption cost,
   risk and authority separately without an opaque weighted score (ADR-0007).
-- [ ] Let the model deliberate within structured bounds; keep policy external.
+- [x] Let the model deliberate within structured bounds; keep policy external.
+  Frames, rationales, policy rejections and validated choices now have an
+  encrypted, deterministic replay projection; provider execution remains off.
 - [ ] Run the new decision engine in shadow against production events.
 
 Exit: every proposed action has a stable reason and every rejection is
@@ -378,3 +380,20 @@ For each material change:
   Proposal retries are semantically idempotent despite fresh wall-clock values.
 - The agenda remains shadow-only and performs no scheduling, policy decision,
   delivery or other external action.
+
+### 2026-10-10 — Policy-bounded deliberation baseline
+
+- Replaced the idea of one opaque “proactivity score” with independently
+  evidenced value, urgency, novelty, confidence, interruption-cost, risk and
+  authority assessments (ADR-0007).
+- Every frame has exactly one deterministic silence candidate. Hard policy
+  filters run before a model can choose, and selection is checked again after
+  the model response.
+- Candidate content, assessment reasons and model rationale live in the
+  encrypted erasable vault. Structural journal events retain IDs, policy
+  outcomes and causal links without private prose.
+- Frame loading recomputes policy, verifies every cited evidence event and
+  resolves every candidate content reference. Dangling evidence cannot appear
+  as an auditable reason.
+- Accepted and rejected selections survive discard-and-rebuild identically.
+  No provider is called and no selected action is executed in this phase.

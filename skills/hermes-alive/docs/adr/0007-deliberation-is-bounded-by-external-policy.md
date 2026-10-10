@@ -39,5 +39,7 @@ default when no actionable candidate survives or model output is invalid.
   choice instead of treating them as one opaque answer.
 - Later evaluators can measure whether silence or interruption was correct.
 
-This ADR defines the pure decision boundary first. Durable deliberation events,
-provider calls and production shadow comparison are separate gates.
+The implemented durable projection re-runs policy when loading a frame, stores
+private reasons and model rationale in the erasable content vault, and records
+both accepted and rejected selections. Provider calls and production shadow
+comparison remain separate gates.
