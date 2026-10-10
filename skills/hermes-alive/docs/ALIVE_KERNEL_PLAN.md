@@ -586,3 +586,17 @@ For each material change:
   developer machine's incidental packages. The same clean-image run confirmed
   that YAML parsing was also an undeclared runtime assumption, so `PyYAML` is
   now part of the plugin dependency contract rather than only CI setup.
+
+### 2026-10-11 — Ordered crash recovery supervisor
+
+- Added one startup recovery boundary for every implemented kernel projection
+  instead of relying on whichever command or subsystem happens to run next.
+- Recovery resumes erasure/expiry first, then advances consent, memory, agenda,
+  deliberation, outcomes, reflection, preference and exploration in explicit
+  dependency order (ADR-0017).
+- Checkpoints advance in bounded batches and no-progress is a hard diagnostic.
+  Repeated startup is a no-op after convergence; an interrupted run resumes
+  from each projection's durable checkpoint.
+- The supervisor is cross-process locked, creates no kernel store on a fresh
+  install and has no channel, provider or tool side effects. Kernel recovery
+  failure remains observable without preventing the legacy watcher startup.

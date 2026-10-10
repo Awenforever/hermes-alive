@@ -56,6 +56,9 @@ records a durable event history, projects typed memory/agenda/outcome state and
 keeps model consolidation behind independent retention and learning consent.
 Model-derived memory is review-only until the user explicitly accepts it. See
 `ALIVE_KERNEL_PLAN.md` and ADR-0016. It does not yet drive production sends.
+An existing kernel store is recovered at gateway startup in dependency order;
+this replays only Alive-owned local projections and never calls a model or
+performs an external action (ADR-0017).
 
 ## Decision ownership
 

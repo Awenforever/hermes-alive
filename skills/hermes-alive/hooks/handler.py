@@ -129,7 +129,7 @@ def _mirror_kernel_shadow(event_type: str, context: dict) -> None:
 
 async def _startup(context: dict):
     global _watcher_task
-    _resume_retention_maintenance()
+    _recover_kernel_state()
     try:
         _refresh_managed_env()
     except Exception as exc:
@@ -193,16 +193,28 @@ async def _startup(context: dict):
     # Startup ready notification is owned by hermes-wechat-enhance.
 
 
-def _resume_retention_maintenance() -> None:
-    """User erasure and expiry remain live even when kernel shadow capture is off."""
+def _recover_kernel_state() -> None:
+    """Finish durable projection and erasure work before legacy startup."""
     try:
-        from alive_kernel.retention_command import resume_retention_maintenance
+        from alive_kernel.recovery import recover_kernel_state
 
-        result = resume_retention_maintenance(_SHARED_DIR)
-        if result["erasures_resumed"] or result["expired_erased"]:
-            logger.info("Alive retention maintenance: %s", result)
+        result = recover_kernel_state(_SHARED_DIR)
+        if result is not None:
+            changed = sum(item.decisions for item in result.projections)
+            if changed or result.erasures_resumed or result.expired_content_erased:
+                logger.info(
+                    "Alive kernel recovery target=%s final=%s decisions=%s "
+                    "erasures=%s expired=%s",
+                    result.target_sequence,
+                    result.final_sequence,
+                    changed,
+                    result.erasures_resumed,
+                    result.expired_content_erased,
+                )
     except Exception:
-        logger.exception("Alive retention maintenance failed")
+        # Recovery is side-effect free outside Alive-owned local state and may
+        # not make the legacy watcher unavailable. The error remains visible.
+        logger.exception("Alive kernel recovery failed")
 
 async def _on_session_start(context: dict):
     _capture_delivery_target(context if isinstance(context, dict) else {})

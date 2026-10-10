@@ -135,6 +135,13 @@ from .retention import (
     RetentionValidationError,
 )
 from .retention_command import handle_memory_command, resume_retention_maintenance
+from .recovery import (
+    KernelRecoveryError,
+    KernelRecoveryReport,
+    KernelRecoverySupervisor,
+    ProjectionRecoveryReport,
+    recover_kernel_state,
+)
 from .tool_receipts import (
     ToolOutcome,
     ToolReceiptAssessment,
@@ -208,6 +215,9 @@ __all__ = [
     "ExplorationValidationError",
     "ExposureRecord",
     "LocalIdentityProtector",
+    "KernelRecoveryError",
+    "KernelRecoveryReport",
+    "KernelRecoverySupervisor",
     "MemoryAuthority",
     "MemoryKind",
     "MemoryProjection",
@@ -225,6 +235,7 @@ __all__ = [
     "OutcomeValidationError",
     "ProjectionDecision",
     "ProjectionDecisionKind",
+    "ProjectionRecoveryReport",
     "PolicyContext",
     "PreferenceAxis",
     "PreferenceContentStatus",
@@ -279,6 +290,7 @@ __all__ = [
     "handle_memory_command",
     "resume_retention_maintenance",
     "rank_records",
+    "recover_kernel_state",
     "record_post_tool_call",
     "serialize_frame",
     "shadow_enabled",
