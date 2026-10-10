@@ -80,6 +80,18 @@ from .outcomes import (
     OutcomeValidationError,
 )
 from .retrieval import RetrievalHit, rank_records
+from .reflection import (
+    ReflectionAuthority,
+    ReflectionContentStatus,
+    ReflectionProjection,
+    ReflectionProjectionDecision,
+    ReflectionProposal,
+    ReflectionRecord,
+    ReflectionReview,
+    ReflectionScope,
+    ReflectionState,
+    ReflectionValidationError,
+)
 
 __all__ = [
     "ActionAuthority",
@@ -135,6 +147,16 @@ __all__ = [
     "ProjectionDecisionKind",
     "PolicyContext",
     "RetrievalHit",
+    "ReflectionAuthority",
+    "ReflectionContentStatus",
+    "ReflectionProjection",
+    "ReflectionProjectionDecision",
+    "ReflectionProposal",
+    "ReflectionRecord",
+    "ReflectionReview",
+    "ReflectionScope",
+    "ReflectionState",
+    "ReflectionValidationError",
     "Sensitivity",
     "SelectionProposal",
     "SideEffect",

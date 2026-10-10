@@ -180,7 +180,8 @@ inspectable; replay is deterministic outside explicitly recorded model calls.
 - [ ] Learn timing, topic and presentation preferences conservatively.
 - [x] Treat no reply as ambiguous, never as punishment evidence; absence is
   intentionally not representable as an outcome kind.
-- [ ] Store reflections as evidence-backed proposals with expiry and rollback.
+- [x] Store reflections as evidence-backed proposals with bounded expiry,
+  explicit user review and retractable acceptance (ADR-0009).
 - [ ] Add constrained exploration budgets and anti-echo-chamber diversity.
 
 Exit: learning improves held-out replay metrics without increasing interruption,
@@ -413,3 +414,18 @@ For each material change:
 - Private outcome detail is encrypted and erasable. Erasure preserves the
   structural fact and replay result while returning an explicit erased status.
 - The result ledger remains shadow-only; no production delivery is attempted.
+
+### 2026-10-10 — Reviewable reflection baseline
+
+- Reflections are now expiring hypotheses rather than direct memory mutations
+  or invisible prompt edits (ADR-0009).
+- Delivery receipts and ordinary replies cannot support a reflection. Model
+  synthesis requires explicit correction/dismissal/feedback or repeated task
+  outcomes from independent attempts.
+- Every proposal points to real outcome rows and the corresponding causal event.
+  A historical user message from before the proposal cannot approve it.
+- Acceptance, rejection and later retraction require matching user inbound
+  evidence. Even accepted reflections do not automatically alter memory,
+  thresholds or delivery policy.
+- Encrypted reflection prose can be erased while its proposal/review history
+  remains deterministic and visibly marked as erased.
