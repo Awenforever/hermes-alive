@@ -8,4 +8,5 @@ events:
   - agent:start
   - agent:step
   - agent:end
+  - command:memory
 description: "Hermes Alive lifecycle watcher and shadow kernel event adapter"

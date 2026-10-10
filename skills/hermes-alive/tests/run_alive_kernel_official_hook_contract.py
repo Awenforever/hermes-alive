@@ -13,7 +13,7 @@ import tempfile
 
 EXPECTED_EVENTS = {
     "gateway:startup", "session:start", "session:end", "session:reset",
-    "agent:start", "agent:step", "agent:end",
+    "agent:start", "agent:step", "agent:end", "command:memory",
 }
 
 
@@ -55,7 +55,7 @@ def main() -> int:
             "message": "official private message must not persist",
         }
 
-        async def dispatch() -> None:
+        async def dispatch() -> tuple[list[object], list[object]]:
             await registry.emit("agent:start", dict(context))
             await registry.emit("agent:step", {
                 **context, "iteration": 1, "tool_names": ["terminal"],
@@ -63,8 +63,19 @@ def main() -> int:
             })
             await registry.emit("session:end", dict(context))
             await registry.emit("session:reset", dict(context))
+            alive = await registry.emit_collect("command:memory", {
+                "platform": "weixin", "user_id": "official-user",
+                "command": "memory", "args": "alive status",
+            })
+            ordinary = await registry.emit_collect("command:memory", {
+                "platform": "weixin", "user_id": "official-user",
+                "command": "memory", "args": "pending",
+            })
+            return alive, ordinary
 
-        asyncio.run(dispatch())
+        alive_results, ordinary_results = asyncio.run(dispatch())
+        assert alive_results and alive_results[0]["decision"] == "handled"
+        assert ordinary_results == []
 
         sys.path.insert(0, str(installed_hook))
         from alive_kernel import ExperienceJournal

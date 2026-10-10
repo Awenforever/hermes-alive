@@ -136,8 +136,10 @@ Exit: old behavior can be replayed and scored without sending messages.
 - [x] Add privacy-bounded structural adapters for official Hermes lifecycle,
   inbound/outbound turn and tool-round hooks, including persistent causal turn
   linkage and crash interruption facts (ADR-0013).
-- [ ] Add consent-gated erasable conversation content and authoritative typed
-  tool outcome receipts; never infer tool success by parsing result prose.
+- [x] Add per-user, Hermes-authorized, expiry-bounded and erasable conversation
+  content retention while keeping fresh installs structural-only (ADR-0014).
+- [ ] Add authoritative typed tool outcome receipts; never infer tool success
+  by parsing result prose.
 - [x] Add opt-in shadow mirroring that cannot influence legacy decisions.
 
 Exit: restart/replay reconstructs the same ordered experience stream, duplicate
@@ -508,3 +510,25 @@ For each material change:
   absent from SQLite/WAL evidence.
 - This does not yet claim semantic message ingestion or authoritative tool
   outcomes; those remain gated on retention controls and native typed receipts.
+
+### 2026-10-10 — Explicit erasable content consent
+
+- Added `/memory alive` controls on Hermes' own slash authorization path. The
+  hook consumes only its `alive` sub-namespace and leaves ordinary `/memory`
+  behavior untouched across every Hermes channel.
+- Default retention is off per pseudonymous user. Explicit consent chooses
+  inbound, outbound or both, with a one-to-365-day fixed expiry. A model event
+  cannot grant or widen consent.
+- Authorized hook text is encrypted in the erasable vault; journal events keep
+  only opaque authenticated references, the consent event and an honest marker
+  that the official hook may truncate at 500 characters. Tool arguments and
+  results remain forbidden.
+- `retain off` stops future capture without rewriting history. `forget` is a
+  durable request/execution/completion workflow that deletes subject content
+  and managed backups, resumes after interruption, and works even when kernel
+  shadow decision capture is disabled.
+- Windows and Linux tests prove default-off behavior, per-user authorization, model
+  rejection, encrypted-at-rest capture, ordinary `/memory` pass-through,
+  disable-versus-forget semantics, replay and crash-resumed erasure. The real
+  Hermes container also discovered `command:memory`, intercepted only `alive`
+  requests and left ordinary memory commands untouched.

@@ -119,6 +119,14 @@ from .preference_learning import (
     PreferenceSignalState,
 )
 from .retrieval import RetrievalHit, rank_records
+from .retention import (
+    RetentionDirection,
+    RetentionPolicy,
+    RetentionProjection,
+    RetentionProjectionDecision,
+    RetentionValidationError,
+)
+from .retention_command import handle_memory_command, resume_retention_maintenance
 from .reflection import (
     ReflectionAuthority,
     ReflectionContentStatus,
@@ -208,6 +216,11 @@ __all__ = [
     "PreferenceSignalProposal",
     "PreferenceSignalState",
     "RetrievalHit",
+    "RetentionDirection",
+    "RetentionPolicy",
+    "RetentionProjection",
+    "RetentionProjectionDecision",
+    "RetentionValidationError",
     "ReplayComparison",
     "ReplayEpisode",
     "ReplayEvaluationError",
@@ -238,6 +251,8 @@ __all__ = [
     "mirror_hook_event",
     "evaluate_submission",
     "labels_from_outcomes",
+    "handle_memory_command",
+    "resume_retention_maintenance",
     "rank_records",
     "serialize_frame",
     "shadow_enabled",

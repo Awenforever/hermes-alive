@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextlib import closing
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import logging
 import os
 from pathlib import Path
@@ -13,7 +13,9 @@ from uuid import uuid4
 
 from .event_store import AppendResult, ExperienceJournal
 from .events import EventEnvelope, Sensitivity
+from .content_vault import ContentVault
 from .privacy import LocalIdentityProtector, assert_no_obvious_secret, structural_hook_payload
+from .retention import RetentionDirection, RetentionProjection
 
 
 logger = logging.getLogger(__name__)
@@ -43,6 +45,13 @@ class ShadowKernelBridge:
         self.kernel_dir = Path(shared_dir).expanduser().resolve() / "kernel"
         self.protector = LocalIdentityProtector(self.kernel_dir / "identity.key")
         self.journal = ExperienceJournal(self.kernel_dir / "experience.sqlite3")
+        self.content_vault = ContentVault(
+            self.kernel_dir / "content-vault",
+            backup_root=self.kernel_dir / "content-backups",
+        )
+        self.retention = RetentionProjection(
+            self.journal, content_vault=self.content_vault
+        )
         self._initialize_ingestion_state()
 
     def _connect(self) -> sqlite3.Connection:
@@ -153,6 +162,63 @@ class ShadowKernelBridge:
             str(subject) if subject else None,
             str(correlation) if correlation else None,
         )
+
+    def _retain_conversation_content(
+        self,
+        *,
+        event_id: str,
+        event_name: str,
+        subject: str | None,
+        causation_id: str | None,
+        context: Mapping[str, Any],
+        payload: dict[str, Any],
+        now: datetime,
+    ) -> Sensitivity:
+        payload["erasable_content_stored"] = False
+        if subject is None or event_name not in {"agent:start", "agent:end"}:
+            return Sensitivity.PRIVATE
+        direction = (
+            RetentionDirection.INBOUND
+            if event_name == "agent:start"
+            else RetentionDirection.OUTBOUND
+        )
+        if direction is RetentionDirection.OUTBOUND and causation_id is None:
+            payload["content_retention_status"] = "orphaned_not_retained"
+            return Sensitivity.PRIVATE
+        policy = self.retention.policy(subject)
+        if policy is None or not policy.allows(direction):
+            payload["content_retention_status"] = "not_authorized"
+            return Sensitivity.PRIVATE
+        field = "message" if direction is RetentionDirection.INBOUND else "response"
+        text = context.get(field)
+        if not isinstance(text, str) or not text:
+            payload["content_retention_status"] = "empty"
+            return policy.sensitivity
+        retention_until = now + timedelta(days=policy.retention_days)
+        reference = self.content_vault.put_json(
+            {
+                "text": text,
+                "direction": direction.value,
+                "source_contract": "hermes-hook-500",
+                "may_be_truncated": len(text) >= 500,
+            },
+            subject=subject,
+            purpose=f"conversation.{direction.value}",
+            sensitivity=policy.sensitivity,
+            retention_until=retention_until,
+            content_id=f"experience:{event_id}:{direction.value}",
+        )
+        payload.update(
+            {
+                "erasable_content_stored": True,
+                "content_retention_status": "retained",
+                "content": reference.to_event_payload(),
+                "content_contract": "hermes-hook-500",
+                "content_may_be_truncated": len(text) >= 500,
+                "consent_event_id": policy.consent_event_id,
+            }
+        )
+        return policy.sensitivity
 
     def _claim_turn(
         self, correlation_id: str, message_digest: str, now: datetime
@@ -434,8 +500,19 @@ class ShadowKernelBridge:
                     )
                 return AppendResult(existing.sequence, existing.event, False)
 
+        event_id = event_id or str(uuid4())
+        sensitivity = self._retain_conversation_content(
+            event_id=event_id,
+            event_name=event_name,
+            subject=subject,
+            causation_id=causation_id,
+            context=safe_context,
+            payload=payload,
+            now=occurred_at,
+        )
+        assert_no_obvious_secret(payload)
         event = EventEnvelope(
-            event_id=event_id or str(uuid4()),
+            event_id=event_id,
             event_type=event_type,
             source="hermes.hook",
             actor=actor,
@@ -445,7 +522,7 @@ class ShadowKernelBridge:
             payload=payload,
             occurred_at=occurred_at,
             observed_at=occurred_at,
-            sensitivity=Sensitivity.PRIVATE,
+            sensitivity=sensitivity,
         )
         result = self.journal.append(event)
         if event_name == "gateway:startup":

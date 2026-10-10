@@ -355,6 +355,7 @@ def _validate_source_tree(source_root: Path) -> dict[str, Any]:
     for event in (
         "gateway:startup", "session:start", "session:end", "session:reset",
         "agent:start", "agent:step", "agent:end",
+        "command:memory",
     ):
         if event not in hook_yaml:
             raise LifecycleError(f"HOOK.yaml missing event: {event}")

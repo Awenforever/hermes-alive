@@ -77,6 +77,8 @@ _watcher_task: asyncio.Task | None = None
 async def handle(event_type: str, context: dict):
     logger.warning("[Hermes Alive] handle() called, event=%s", event_type)
     _mirror_kernel_shadow(event_type, context if isinstance(context, dict) else {})
+    if event_type == "command:memory":
+        return _handle_memory_command(context if isinstance(context, dict) else {})
     if event_type == "gateway:startup":
         await _startup(context)
     elif event_type == "session:start":
@@ -89,6 +91,20 @@ async def handle(event_type: str, context: dict):
         return
     else:
         logger.warning("Hermes Alive: unknown event type %s", event_type)
+
+
+def _handle_memory_command(context: dict):
+    """Use Hermes' authorized `/memory` namespace without consuming other actions."""
+    try:
+        from alive_kernel.retention_command import handle_memory_command
+
+        return handle_memory_command(_SHARED_DIR, context)
+    except Exception:
+        logger.exception("Hermes Alive retention command failed")
+        return {
+            "decision": "handled",
+            "message": "Alive 内容保留设置未更改；内部验证失败，请检查插件状态。",
+        }
 
 
 def _mirror_kernel_shadow(event_type: str, context: dict) -> None:
@@ -113,6 +129,7 @@ def _mirror_kernel_shadow(event_type: str, context: dict) -> None:
 
 async def _startup(context: dict):
     global _watcher_task
+    _resume_retention_maintenance()
     try:
         _refresh_managed_env()
     except Exception as exc:
@@ -174,6 +191,18 @@ async def _startup(context: dict):
     logger.warning("Hermes Alive: watcher task created")
 
     # Startup ready notification is owned by hermes-wechat-enhance.
+
+
+def _resume_retention_maintenance() -> None:
+    """User erasure and expiry remain live even when kernel shadow capture is off."""
+    try:
+        from alive_kernel.retention_command import resume_retention_maintenance
+
+        result = resume_retention_maintenance(_SHARED_DIR)
+        if result["erasures_resumed"] or result["expired_erased"]:
+            logger.info("Alive retention maintenance: %s", result)
+    except Exception:
+        logger.exception("Alive retention maintenance failed")
 
 async def _on_session_start(context: dict):
     _capture_delivery_target(context if isinstance(context, dict) else {})
