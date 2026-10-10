@@ -6,7 +6,6 @@ from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import StrEnum
-import hashlib
 import json
 import math
 from pathlib import Path
@@ -15,7 +14,14 @@ import sqlite3
 from typing import Any, Iterable, Mapping
 from uuid import uuid4
 
-from .event_store import ExperienceJournal, JournalRecord
+from .content_vault import (
+    ContentErasedError,
+    ContentIntegrityError,
+    ContentReference,
+    ContentUnavailableError,
+    ContentVault,
+)
+from .event_store import EventConflictError, ExperienceJournal, JournalRecord
 from .events import EventEnvelope, Sensitivity, _freeze_json, _thaw_json
 
 
@@ -65,6 +71,14 @@ class ProjectionDecisionKind(StrEnum):
     CONTESTED = "contested"
     DEDUPLICATED = "deduplicated"
     REJECTED = "rejected"
+    RETRACTED = "retracted"
+
+
+class ContentStatus(StrEnum):
+    AVAILABLE = "available"
+    ERASED = "erased"
+    MISSING = "missing"
+    INTEGRITY_ERROR = "integrity_error"
 
 
 def _utc(value: datetime | None, name: str) -> datetime | None:
@@ -86,10 +100,6 @@ def _canonical_json(value: Any) -> str:
         )
     except (TypeError, ValueError) as exc:
         raise MemoryValidationError("memory value must be finite JSON") from exc
-
-
-def _value_hash(value_json: str) -> str:
-    return hashlib.sha256(value_json.encode("utf-8")).hexdigest()
 
 
 def _validate_commitment(value: Any) -> None:
@@ -166,17 +176,15 @@ class MemoryProposal:
                 raise MemoryValidationError("invalid supersedes_id")
             object.__setattr__(self, "supersedes_id", supersedes)
 
-    @property
-    def value_json(self) -> str:
-        return _canonical_json(_thaw_json(self.value))
-
-    def to_payload(self) -> dict[str, Any]:
+    def to_payload(self, content: ContentReference) -> dict[str, Any]:
+        if content.sensitivity is not self.sensitivity:
+            raise MemoryValidationError("content sensitivity does not match proposal")
         return {
             "proposal_id": self.proposal_id,
             "kind": self.kind.value,
             "subject": self.subject,
             "predicate": self.predicate,
-            "value": _thaw_json(self.value),
+            "content": content.to_event_payload(),
             "authority": self.authority.value,
             "source_event_ids": list(self.source_event_ids),
             "confidence": self.confidence,
@@ -187,26 +195,76 @@ class MemoryProposal:
             "supersedes_id": self.supersedes_id,
         }
 
+
+@dataclass(frozen=True, slots=True)
+class StoredMemoryProposal:
+    proposal_id: str
+    kind: MemoryKind
+    subject: str
+    predicate: str
+    content: ContentReference
+    authority: MemoryAuthority
+    source_event_ids: tuple[str, ...]
+    confidence: float
+    importance: float
+    sensitivity: Sensitivity
+    valid_from: datetime | None
+    valid_until: datetime | None
+    supersedes_id: str | None
+
     @classmethod
-    def from_payload(cls, payload: Mapping[str, Any]) -> "MemoryProposal":
+    def from_payload(cls, payload: Mapping[str, Any]) -> "StoredMemoryProposal":
         def parsed(name: str) -> datetime | None:
             value = payload.get(name)
-            return datetime.fromisoformat(str(value)) if value else None
+            return _utc(datetime.fromisoformat(str(value)), name) if value else None
 
+        proposal_id = str(payload.get("proposal_id") or "").strip()
+        subject = str(payload["subject"]).strip()
+        predicate = str(payload["predicate"]).strip().lower()
+        if not _SUBJECT_RE.fullmatch(proposal_id):
+            raise MemoryValidationError("invalid proposal_id")
+        if not _SUBJECT_RE.fullmatch(subject):
+            raise MemoryValidationError("invalid memory subject")
+        if not _PREDICATE_RE.fullmatch(predicate):
+            raise MemoryValidationError("invalid memory predicate")
+        content = ContentReference.from_event_payload(payload.get("content"))
+        sensitivity = Sensitivity(payload.get("sensitivity", Sensitivity.PRIVATE.value))
+        if content.sensitivity is not sensitivity:
+            raise MemoryValidationError("content sensitivity does not match proposal")
+        confidence = float(payload["confidence"])
+        importance = float(payload.get("importance", 0.5))
+        if not math.isfinite(confidence) or not 0.0 <= confidence <= 1.0:
+            raise MemoryValidationError("confidence must be between 0 and 1")
+        if not math.isfinite(importance) or not 0.0 <= importance <= 1.0:
+            raise MemoryValidationError("importance must be between 0 and 1")
+        source_ids = tuple(
+            dict.fromkeys(str(item).strip() for item in payload.get("source_event_ids") or ())
+        )
+        if not source_ids or any(not value for value in source_ids):
+            raise MemoryValidationError("at least one source_event_id is required")
+        valid_from = parsed("valid_from")
+        valid_until = parsed("valid_until")
+        if valid_from and valid_until and valid_until <= valid_from:
+            raise MemoryValidationError("valid_until must be after valid_from")
+        supersedes = payload.get("supersedes_id")
+        if supersedes is not None:
+            supersedes = str(supersedes).strip()
+            if not _SUBJECT_RE.fullmatch(supersedes):
+                raise MemoryValidationError("invalid supersedes_id")
         return cls(
-            proposal_id=str(payload.get("proposal_id") or ""),
+            proposal_id=proposal_id,
             kind=MemoryKind(payload["kind"]),
-            subject=str(payload["subject"]),
-            predicate=str(payload["predicate"]),
-            value=payload.get("value"),
+            subject=subject,
+            predicate=predicate,
+            content=content,
             authority=MemoryAuthority(payload["authority"]),
-            source_event_ids=tuple(payload.get("source_event_ids") or ()),
-            confidence=float(payload["confidence"]),
-            importance=float(payload.get("importance", 0.5)),
-            sensitivity=Sensitivity(payload.get("sensitivity", Sensitivity.PRIVATE.value)),
-            valid_from=parsed("valid_from"),
-            valid_until=parsed("valid_until"),
-            supersedes_id=payload.get("supersedes_id"),
+            source_event_ids=source_ids,
+            confidence=confidence,
+            importance=importance,
+            sensitivity=sensitivity,
+            valid_from=valid_from,
+            valid_until=valid_until,
+            supersedes_id=supersedes,
         )
 
 
@@ -225,6 +283,8 @@ class MemoryRecord:
     subject: str
     predicate: str
     value: Any
+    content_id: str
+    content_status: ContentStatus
     authority: MemoryAuthority
     state: MemoryState
     confidence: float
@@ -242,11 +302,17 @@ class MemoryRecord:
 class MemoryProjection:
     """Idempotent typed-memory projection over an ExperienceJournal."""
 
-    CHECKPOINT = "typed-memory-v1"
+    CHECKPOINT = "typed-memory-v2"
 
-    def __init__(self, journal: ExperienceJournal) -> None:
+    def __init__(
+        self, journal: ExperienceJournal, *, content_vault: ContentVault | None = None
+    ) -> None:
         self.journal = journal
         self.path = Path(journal.path)
+        self.content_vault = content_vault or ContentVault(
+            self.path.parent / f"{self.path.stem}-content-vault",
+            backup_root=self.path.parent / f"{self.path.stem}-content-backups",
+        )
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
@@ -261,14 +327,15 @@ class MemoryProjection:
             connection.executescript(
                 """
                 BEGIN IMMEDIATE;
-                CREATE TABLE IF NOT EXISTS memory_records (
+                CREATE TABLE IF NOT EXISTS memory_records_v2 (
                     memory_id TEXT PRIMARY KEY,
                     proposal_event_id TEXT NOT NULL UNIQUE,
                     kind TEXT NOT NULL,
                     subject TEXT NOT NULL,
                     predicate TEXT NOT NULL,
-                    value_json TEXT NOT NULL,
-                    value_hash TEXT NOT NULL,
+                    content_id TEXT NOT NULL,
+                    content_digest TEXT NOT NULL,
+                    content_size INTEGER NOT NULL,
                     authority TEXT NOT NULL,
                     state TEXT NOT NULL,
                     confidence REAL NOT NULL,
@@ -280,23 +347,30 @@ class MemoryProjection:
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
-                CREATE INDEX IF NOT EXISTS idx_memory_lookup
-                    ON memory_records(subject, predicate, state);
-                CREATE TABLE IF NOT EXISTS memory_sources (
+                CREATE INDEX IF NOT EXISTS idx_memory_lookup_v2
+                    ON memory_records_v2(subject, predicate, state);
+                CREATE TABLE IF NOT EXISTS memory_contents_v2 (
+                    memory_id TEXT NOT NULL,
+                    content_id TEXT NOT NULL,
+                    PRIMARY KEY(memory_id, content_id),
+                    FOREIGN KEY(memory_id) REFERENCES memory_records_v2(memory_id)
+                        ON DELETE CASCADE
+                );
+                CREATE TABLE IF NOT EXISTS memory_sources_v2 (
                     memory_id TEXT NOT NULL,
                     event_id TEXT NOT NULL,
                     PRIMARY KEY(memory_id, event_id),
-                    FOREIGN KEY(memory_id) REFERENCES memory_records(memory_id)
+                    FOREIGN KEY(memory_id) REFERENCES memory_records_v2(memory_id)
                         ON DELETE CASCADE
                 );
-                CREATE TABLE IF NOT EXISTS memory_projection_decisions (
+                CREATE TABLE IF NOT EXISTS memory_projection_decisions_v2 (
                     proposal_event_id TEXT PRIMARY KEY,
                     decision TEXT NOT NULL,
                     reason TEXT NOT NULL,
                     memory_id TEXT,
                     decided_at TEXT NOT NULL
                 );
-                CREATE TABLE IF NOT EXISTS memory_transitions (
+                CREATE TABLE IF NOT EXISTS memory_transitions_v2 (
                     transition_id INTEGER PRIMARY KEY AUTOINCREMENT,
                     memory_id TEXT NOT NULL,
                     from_state TEXT,
@@ -304,7 +378,7 @@ class MemoryProjection:
                     reason TEXT NOT NULL,
                     caused_by_event_id TEXT NOT NULL,
                     occurred_at TEXT NOT NULL,
-                    FOREIGN KEY(memory_id) REFERENCES memory_records(memory_id)
+                    FOREIGN KEY(memory_id) REFERENCES memory_records_v2(memory_id)
                         ON DELETE CASCADE
                 );
                 COMMIT;
@@ -315,20 +389,56 @@ class MemoryProjection:
         self,
         proposal: MemoryProposal,
         *,
+        content: ContentReference,
         actor: str,
         correlation_id: str | None = None,
     ) -> EventEnvelope:
         return EventEnvelope(
+            event_id=f"memory.proposal:{proposal.proposal_id}",
             event_type="memory.proposed",
             source="alive.memory",
             actor=actor,
             subject=proposal.subject,
             correlation_id=correlation_id,
             causation_id=proposal.source_event_ids[-1],
-            payload=proposal.to_payload(),
+            payload=proposal.to_payload(content),
             sensitivity=proposal.sensitivity,
             confidence=proposal.confidence,
         )
+
+    def _append_idempotent_event(self, event: EventEnvelope) -> JournalRecord:
+        def compatible(existing: JournalRecord) -> JournalRecord:
+            prior = existing.event
+            semantic_fields = (
+                "event_type",
+                "source",
+                "actor",
+                "subject",
+                "correlation_id",
+                "causation_id",
+                "schema_version",
+                "sensitivity",
+                "confidence",
+                "expires_at",
+                "payload",
+            )
+            if any(getattr(prior, name) != getattr(event, name) for name in semantic_fields):
+                raise MemoryValidationError(
+                    f"event_id {event.event_id!r} was reused with different semantics"
+                )
+            return existing
+
+        existing = self.journal.get(event.event_id)
+        if existing is not None:
+            return compatible(existing)
+        try:
+            appended = self.journal.append(event)
+        except EventConflictError:
+            raced = self.journal.get(event.event_id)
+            if raced is None:
+                raise
+            return compatible(raced)
+        return JournalRecord(appended.sequence, appended.event)
 
     def append_proposal(
         self,
@@ -337,9 +447,106 @@ class MemoryProjection:
         actor: str,
         correlation_id: str | None = None,
     ) -> JournalRecord:
-        event = self.proposal_event(proposal, actor=actor, correlation_id=correlation_id)
-        result = self.journal.append(event)
-        return JournalRecord(result.sequence, result.event)
+        content_id = f"memory:{proposal.proposal_id}"
+        content = self.content_vault.put_json(
+            _thaw_json(proposal.value),
+            subject=proposal.subject,
+            purpose=f"memory.{proposal.kind.value}",
+            sensitivity=proposal.sensitivity,
+            retention_until=proposal.valid_until,
+            content_id=content_id,
+        )
+        if content.digest != self.content_vault.digest_json(_thaw_json(proposal.value)):
+            raise MemoryValidationError("content digest does not match proposal value")
+        event = self.proposal_event(
+            proposal,
+            content=content,
+            actor=actor,
+            correlation_id=correlation_id,
+        )
+        # The deterministic content/event IDs make a retry converge after a
+        # crash between these two durable writes.  An orphan is encrypted and
+        # can be garbage-collected; tombstoning it here would make retry
+        # impossible and turn a transient journal failure into data loss.
+        return self._append_idempotent_event(event)
+
+    def forget_item(
+        self, memory_id: str, *, actor: str, request_id: str | None = None
+    ) -> bool:
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                "SELECT subject FROM memory_records_v2 WHERE memory_id=?",
+                (memory_id,),
+            ).fetchone()
+            content_ids = [
+                str(item["content_id"])
+                for item in connection.execute(
+                    "SELECT content_id FROM memory_contents_v2 WHERE memory_id=? ORDER BY content_id",
+                    (memory_id,),
+                )
+            ]
+        if row is None:
+            return False
+        event = EventEnvelope(
+            event_id=f"memory.forget:{request_id or uuid4()}",
+            event_type="memory.forgotten",
+            source="alive.memory",
+            actor=actor,
+            subject=str(row["subject"]),
+            payload={
+                "scope": "item",
+                "memory_id": str(memory_id),
+                "content_ids": content_ids,
+                "reason": "user_requested",
+            },
+            sensitivity=Sensitivity.INTERNAL,
+        )
+        appended = self._append_idempotent_event(event)
+        self._apply_forgetting(appended)
+        return True
+
+    def forget_subject(
+        self, subject: str, *, actor: str, request_id: str | None = None
+    ) -> int:
+        subject = str(subject).strip()
+        if not _SUBJECT_RE.fullmatch(subject):
+            raise MemoryValidationError("invalid memory subject")
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                """
+                SELECT records.memory_id, contents.content_id
+                FROM memory_records_v2 AS records
+                JOIN memory_contents_v2 AS contents
+                  ON contents.memory_id=records.memory_id
+                WHERE records.subject=? AND records.state<>?
+                ORDER BY records.memory_id, contents.content_id
+                """,
+                (subject, MemoryState.RETRACTED.value),
+            ).fetchall()
+        grouped: dict[str, list[str]] = {}
+        for row in rows:
+            grouped.setdefault(str(row["memory_id"]), []).append(str(row["content_id"]))
+        targets = [
+            {"memory_id": memory_id, "content_ids": content_ids}
+            for memory_id, content_ids in grouped.items()
+        ]
+        count = len(grouped)
+        event = EventEnvelope(
+            event_id=f"memory.forget:{request_id or uuid4()}",
+            event_type="memory.forgotten",
+            source="alive.memory",
+            actor=actor,
+            subject=subject,
+            payload={
+                "scope": "subject",
+                "targets": targets,
+                "reason": "user_requested",
+            },
+            sensitivity=Sensitivity.INTERNAL,
+        )
+        appended = self._append_idempotent_event(event)
+        self._apply_forgetting(appended)
+        return count
 
     def project_new(self, *, limit: int = 1000) -> list[ProjectionDecision]:
         after = self.journal.checkpoint(self.CHECKPOINT)
@@ -348,8 +555,96 @@ class MemoryProjection:
         for record in records:
             if record.event.event_type == "memory.proposed":
                 decisions.append(self.apply(record))
+            elif record.event.event_type == "memory.forgotten":
+                self._apply_forgetting(record)
             self.journal.advance_checkpoint(self.CHECKPOINT, record.sequence)
         return decisions
+
+    def _apply_forgetting(self, record: JournalRecord) -> None:
+        event = record.event
+        payload = event.payload
+        scope = str(payload.get("scope") or "")
+        if event.event_type != "memory.forgotten" or scope not in {"item", "subject"}:
+            raise MemoryValidationError("invalid memory forgetting event")
+
+        def content_ids(value: Any) -> tuple[str, ...]:
+            if not isinstance(value, (list, tuple)):
+                raise MemoryValidationError("forgotten content_ids must be a list")
+            result = tuple(dict.fromkeys(str(item).strip() for item in value))
+            if not result or any(not item or len(item) > 255 for item in result):
+                raise MemoryValidationError("invalid forgotten content_id")
+            return result
+
+        if scope == "item":
+            memory_id = str(payload.get("memory_id") or "").strip()
+            selected_content_ids = content_ids(payload.get("content_ids"))
+            if not _SUBJECT_RE.fullmatch(memory_id):
+                raise MemoryValidationError("invalid forgotten item target")
+            targets = [(memory_id, selected_content_ids)]
+        else:
+            subject = str(event.subject or "").strip()
+            if not _SUBJECT_RE.fullmatch(subject):
+                raise MemoryValidationError("invalid forgotten subject")
+            raw_targets = payload.get("targets")
+            if not isinstance(raw_targets, (list, tuple)):
+                raise MemoryValidationError("forgotten subject targets must be a list")
+            targets = []
+            for target in raw_targets:
+                if not isinstance(target, Mapping):
+                    raise MemoryValidationError("invalid forgotten subject target")
+                memory_id = str(target.get("memory_id") or "").strip()
+                selected_content_ids = content_ids(target.get("content_ids"))
+                if not _SUBJECT_RE.fullmatch(memory_id):
+                    raise MemoryValidationError("invalid forgotten subject target")
+                targets.append((memory_id, selected_content_ids))
+
+        with closing(self._connect()) as connection:
+            for memory_id, selected_content_ids in targets:
+                row = connection.execute(
+                    "SELECT subject FROM memory_records_v2 WHERE memory_id=?",
+                    (memory_id,),
+                ).fetchone()
+                if row is not None:
+                    known_ids = {
+                        str(item["content_id"])
+                        for item in connection.execute(
+                            "SELECT content_id FROM memory_contents_v2 WHERE memory_id=?",
+                            (memory_id,),
+                        )
+                    }
+                    if row["subject"] != event.subject or not set(selected_content_ids).issubset(known_ids):
+                        raise MemoryValidationError(
+                            "forgetting target crosses a memory boundary"
+                        )
+
+        for _memory_id, selected_content_ids in targets:
+            for content_id in selected_content_ids:
+                self.content_vault.erase_item(content_id)
+        memory_ids = list(dict.fromkeys(memory_id for memory_id, _ids in targets))
+
+        with closing(self._connect()) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                for memory_id in memory_ids:
+                    row = connection.execute(
+                        "SELECT state FROM memory_records_v2 WHERE memory_id=?",
+                        (memory_id,),
+                    ).fetchone()
+                    if row is None or row["state"] == MemoryState.RETRACTED.value:
+                        continue
+                    self._transition(
+                        connection,
+                        memory_id,
+                        MemoryState(row["state"]),
+                        MemoryState.RETRACTED,
+                        "user_requested_forgetting",
+                        event.event_id,
+                    )
+                connection.execute("COMMIT")
+            except Exception:
+                if connection.in_transaction:
+                    connection.execute("ROLLBACK")
+                raise
 
     def rebuild(self, *, batch_size: int = 1000) -> list[ProjectionDecision]:
         """Discard derived state and deterministically replay journal facts."""
@@ -359,10 +654,11 @@ class MemoryProjection:
         with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
-                connection.execute("DELETE FROM memory_transitions")
-                connection.execute("DELETE FROM memory_sources")
-                connection.execute("DELETE FROM memory_projection_decisions")
-                connection.execute("DELETE FROM memory_records")
+                connection.execute("DELETE FROM memory_transitions_v2")
+                connection.execute("DELETE FROM memory_sources_v2")
+                connection.execute("DELETE FROM memory_contents_v2")
+                connection.execute("DELETE FROM memory_projection_decisions_v2")
+                connection.execute("DELETE FROM memory_records_v2")
                 connection.execute(
                     "DELETE FROM consumer_checkpoints WHERE consumer_name=?",
                     (self.CHECKPOINT,),
@@ -383,7 +679,7 @@ class MemoryProjection:
 
     def _existing_decision(self, connection: sqlite3.Connection, event_id: str) -> ProjectionDecision | None:
         row = connection.execute(
-            "SELECT * FROM memory_projection_decisions WHERE proposal_event_id=?",
+            "SELECT * FROM memory_projection_decisions_v2 WHERE proposal_event_id=?",
             (event_id,),
         ).fetchone()
         if row is None:
@@ -404,7 +700,7 @@ class MemoryProjection:
         memory_id: str | None,
     ) -> ProjectionDecision:
         connection.execute(
-            "INSERT INTO memory_projection_decisions VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO memory_projection_decisions_v2 VALUES (?, ?, ?, ?, ?)",
             (event_id, decision.value, reason, memory_id, datetime.now(timezone.utc).isoformat()),
         )
         return ProjectionDecision(event_id, decision, reason, memory_id)
@@ -420,7 +716,7 @@ class MemoryProjection:
         return True
 
     @staticmethod
-    def _admitted_state(proposal: MemoryProposal) -> tuple[MemoryState, str]:
+    def _admitted_state(proposal: StoredMemoryProposal) -> tuple[MemoryState, str]:
         if proposal.authority in {MemoryAuthority.MODEL_INFERENCE, MemoryAuthority.REFLECTION}:
             return MemoryState.PROPOSED, "model_output_requires_review"
         if proposal.authority is MemoryAuthority.DIRECT_OBSERVATION and proposal.kind not in {
@@ -442,13 +738,26 @@ class MemoryProjection:
                     connection.execute("COMMIT")
                     return existing_decision
                 try:
-                    proposal = MemoryProposal.from_payload(event.payload)
+                    proposal = StoredMemoryProposal.from_payload(event.payload)
                 except (KeyError, TypeError, ValueError, MemoryValidationError) as exc:
                     decision = self._decide(
                         connection,
                         event.event_id,
                         ProjectionDecisionKind.REJECTED,
                         f"invalid_proposal:{type(exc).__name__}",
+                        None,
+                    )
+                    connection.execute("COMMIT")
+                    return decision
+                if (
+                    event.subject != proposal.subject
+                    or event.sensitivity is not proposal.sensitivity
+                ):
+                    decision = self._decide(
+                        connection,
+                        event.event_id,
+                        ProjectionDecisionKind.REJECTED,
+                        "event_proposal_boundary_mismatch",
                         None,
                     )
                     connection.execute("COMMIT")
@@ -464,16 +773,58 @@ class MemoryProjection:
                     connection.execute("COMMIT")
                     return decision
 
-                value_json = proposal.value_json
-                value_hash = _value_hash(value_json)
+                value_hash = proposal.content.digest
+                try:
+                    resolved_value = self.content_vault.resolve_json(
+                        proposal.content.content_id,
+                        expected_subject=proposal.subject,
+                        expected_purpose=f"memory.{proposal.kind.value}",
+                        expected_sensitivity=proposal.sensitivity,
+                    )
+                    if self.content_vault.digest_json(resolved_value) != value_hash:
+                        raise ContentIntegrityError("memory content digest mismatch")
+                    if proposal.kind is MemoryKind.COMMITMENT:
+                        _validate_commitment(resolved_value)
+                except ContentErasedError:
+                    pass
+                except ContentUnavailableError:
+                    decision = self._decide(
+                        connection,
+                        event.event_id,
+                        ProjectionDecisionKind.REJECTED,
+                        "content_unavailable_missing",
+                        None,
+                    )
+                    connection.execute("COMMIT")
+                    return decision
+                except ContentIntegrityError:
+                    decision = self._decide(
+                        connection,
+                        event.event_id,
+                        ProjectionDecisionKind.REJECTED,
+                        "content_integrity_error",
+                        None,
+                    )
+                    connection.execute("COMMIT")
+                    return decision
+                except MemoryValidationError:
+                    decision = self._decide(
+                        connection,
+                        event.event_id,
+                        ProjectionDecisionKind.REJECTED,
+                        "invalid_memory_content",
+                        None,
+                    )
+                    connection.execute("COMMIT")
+                    return decision
                 duplicate = None
                 # An explicit supersession is a state-changing correction, not
                 # merely additional evidence for a same-valued contested row.
                 if proposal.supersedes_id is None:
                     duplicate = connection.execute(
                         """
-                        SELECT memory_id FROM memory_records
-                        WHERE subject=? AND predicate=? AND value_hash=?
+                        SELECT memory_id FROM memory_records_v2
+                        WHERE subject=? AND predicate=? AND content_digest=?
                           AND state IN (?, ?, ?)
                         ORDER BY created_at DESC LIMIT 1
                         """,
@@ -488,9 +839,13 @@ class MemoryProjection:
                     ).fetchone()
                 if duplicate is not None:
                     memory_id = str(duplicate["memory_id"])
+                    connection.execute(
+                        "INSERT OR IGNORE INTO memory_contents_v2 VALUES (?, ?)",
+                        (memory_id, proposal.content.content_id),
+                    )
                     for source_id in proposal.source_event_ids:
                         connection.execute(
-                            "INSERT OR IGNORE INTO memory_sources VALUES (?, ?)",
+                            "INSERT OR IGNORE INTO memory_sources_v2 VALUES (?, ?)",
                             (memory_id, source_id),
                         )
                     decision = self._decide(
@@ -508,7 +863,7 @@ class MemoryProjection:
 
                 if proposal.supersedes_id:
                     target = connection.execute(
-                        "SELECT * FROM memory_records WHERE memory_id=?",
+                        "SELECT * FROM memory_records_v2 WHERE memory_id=?",
                         (proposal.supersedes_id,),
                     ).fetchone()
                     authorized = proposal.authority in {
@@ -539,8 +894,8 @@ class MemoryProjection:
 
                 conflicts = connection.execute(
                     """
-                    SELECT memory_id, state FROM memory_records
-                    WHERE subject=? AND predicate=? AND value_hash<>?
+                    SELECT memory_id, state FROM memory_records_v2
+                    WHERE subject=? AND predicate=? AND content_digest<>?
                       AND state IN (?, ?)
                     """,
                     (
@@ -568,8 +923,8 @@ class MemoryProjection:
                 memory_id = proposal.proposal_id
                 connection.execute(
                     """
-                    INSERT INTO memory_records VALUES (
-                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                    INSERT INTO memory_records_v2 VALUES (
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
                     )
                     """,
                     (
@@ -578,8 +933,9 @@ class MemoryProjection:
                         proposal.kind.value,
                         proposal.subject,
                         proposal.predicate,
-                        value_json,
+                        proposal.content.content_id,
                         value_hash,
+                        proposal.content.size_bytes,
                         proposal.authority.value,
                         state.value,
                         proposal.confidence,
@@ -594,12 +950,16 @@ class MemoryProjection:
                 )
                 for source_id in proposal.source_event_ids:
                     connection.execute(
-                        "INSERT INTO memory_sources VALUES (?, ?)",
+                        "INSERT INTO memory_sources_v2 VALUES (?, ?)",
                         (memory_id, source_id),
                     )
                 connection.execute(
+                    "INSERT INTO memory_contents_v2 VALUES (?, ?)",
+                    (memory_id, proposal.content.content_id),
+                )
+                connection.execute(
                     """
-                    INSERT INTO memory_transitions(
+                    INSERT INTO memory_transitions_v2(
                         memory_id, from_state, to_state, reason,
                         caused_by_event_id, occurred_at
                     ) VALUES (?, NULL, ?, ?, ?, ?)
@@ -610,6 +970,7 @@ class MemoryProjection:
                     MemoryState.ACTIVE: ProjectionDecisionKind.ACTIVATED,
                     MemoryState.PROPOSED: ProjectionDecisionKind.PROPOSED,
                     MemoryState.CONTESTED: ProjectionDecisionKind.CONTESTED,
+                    MemoryState.RETRACTED: ProjectionDecisionKind.RETRACTED,
                 }[state]
                 decision = self._decide(
                     connection,
@@ -636,12 +997,12 @@ class MemoryProjection:
     ) -> None:
         now = datetime.now(timezone.utc).isoformat()
         connection.execute(
-            "UPDATE memory_records SET state=?, updated_at=? WHERE memory_id=? AND state=?",
+            "UPDATE memory_records_v2 SET state=?, updated_at=? WHERE memory_id=? AND state=?",
             (to_state.value, now, memory_id, from_state.value),
         )
         connection.execute(
             """
-            INSERT INTO memory_transitions(
+            INSERT INTO memory_transitions_v2(
                 memory_id, from_state, to_state, reason,
                 caused_by_event_id, occurred_at
             ) VALUES (?, ?, ?, ?, ?, ?)
@@ -659,6 +1020,7 @@ class MemoryProjection:
         clearance: Sensitivity,
         as_of: datetime | None = None,
         limit: int = 100,
+        include_unavailable: bool = False,
     ) -> list[MemoryRecord]:
         if not 1 <= limit <= 10_000:
             raise ValueError("limit must be between 1 and 10000")
@@ -697,22 +1059,36 @@ class MemoryProjection:
                 "(valid_until IS NULL OR valid_until>?)",
             ]
         )
-        parameters.extend([current_text, current_text, limit])
+        parameters.extend([current_text, current_text, 10_000])
         query = (
-            "SELECT * FROM memory_records WHERE "
+            "SELECT * FROM memory_records_v2 WHERE "
             + " AND ".join(clauses)
             + " ORDER BY importance DESC, updated_at DESC LIMIT ?"
         )
         with closing(self._connect()) as connection:
-            return [self._record(connection, row) for row in connection.execute(query, parameters)]
+            records: list[MemoryRecord] = []
+            for row in connection.execute(query, parameters):
+                record = self._record(connection, row)
+                if include_unavailable or record.content_status is ContentStatus.AVAILABLE:
+                    records.append(record)
+                if len(records) >= limit:
+                    break
+            return records
 
-    def get(self, memory_id: str) -> MemoryRecord | None:
+    def get(
+        self, memory_id: str, *, clearance: Sensitivity
+    ) -> MemoryRecord | None:
         with closing(self._connect()) as connection:
             row = connection.execute(
-                "SELECT * FROM memory_records WHERE memory_id=?",
+                "SELECT * FROM memory_records_v2 WHERE memory_id=?",
                 (memory_id,),
             ).fetchone()
-            return self._record(connection, row) if row is not None else None
+            if row is None:
+                return None
+            clearance_value = Sensitivity(clearance)
+            if _SENSITIVITY_ORDER.index(Sensitivity(row["sensitivity"])) > _SENSITIVITY_ORDER.index(clearance_value):
+                return None
+            return self._record(connection, row)
 
     def transition_history(self, memory_id: str) -> list[dict[str, Any]]:
         with closing(self._connect()) as connection:
@@ -727,7 +1103,7 @@ class MemoryProjection:
                 for row in connection.execute(
                     """
                     SELECT from_state, to_state, reason, caused_by_event_id, occurred_at
-                    FROM memory_transitions WHERE memory_id=?
+                    FROM memory_transitions_v2 WHERE memory_id=?
                     ORDER BY transition_id
                     """,
                     (memory_id,),
@@ -738,7 +1114,7 @@ class MemoryProjection:
         sources = tuple(
             str(value["event_id"])
             for value in connection.execute(
-                "SELECT event_id FROM memory_sources WHERE memory_id=? ORDER BY event_id",
+                "SELECT event_id FROM memory_sources_v2 WHERE memory_id=? ORDER BY event_id",
                 (row["memory_id"],),
             )
         )
@@ -747,12 +1123,33 @@ class MemoryProjection:
             value = row[name]
             return datetime.fromisoformat(str(value)) if value else None
 
+        content_id = str(row["content_id"])
+        try:
+            value = self.content_vault.resolve_json(
+                content_id,
+                expected_subject=str(row["subject"]),
+                expected_purpose=f"memory.{row['kind']}",
+                expected_sensitivity=Sensitivity(row["sensitivity"]),
+            )
+            content_status = ContentStatus.AVAILABLE
+        except ContentErasedError:
+            value = None
+            content_status = ContentStatus.ERASED
+        except ContentUnavailableError:
+            value = None
+            content_status = ContentStatus.MISSING
+        except ContentIntegrityError:
+            value = None
+            content_status = ContentStatus.INTEGRITY_ERROR
+
         return MemoryRecord(
             memory_id=str(row["memory_id"]),
             kind=MemoryKind(row["kind"]),
             subject=str(row["subject"]),
             predicate=str(row["predicate"]),
-            value=json.loads(row["value_json"]),
+            value=value,
+            content_id=content_id,
+            content_status=content_status,
             authority=MemoryAuthority(row["authority"]),
             state=MemoryState(row["state"]),
             confidence=float(row["confidence"]),

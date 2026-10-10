@@ -185,6 +185,19 @@ class ExperienceJournal:
         value = json.loads(canonical)
         return JournalRecord(int(row["sequence"]), EventEnvelope.from_canonical_dict(value))
 
+    def get(self, event_id: str) -> JournalRecord | None:
+        """Return one integrity-checked event by identity, if it exists."""
+
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                """
+                SELECT sequence, canonical_json, integrity_hash
+                FROM experience_events WHERE event_id=?
+                """,
+                (event_id,),
+            ).fetchone()
+        return self._record(row) if row is not None else None
+
     def read(
         self,
         *,

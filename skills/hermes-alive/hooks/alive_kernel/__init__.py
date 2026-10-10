@@ -23,6 +23,7 @@ from .content_vault import (
     ErasureResult,
 )
 from .memory import (
+    ContentStatus,
     MemoryAuthority,
     MemoryKind,
     MemoryProjection,
@@ -39,6 +40,7 @@ __all__ = [
     "ContentErasedError",
     "ContentIntegrityError",
     "ContentReference",
+    "ContentStatus",
     "ContentUnavailableError",
     "ContentVault",
     "ContentVaultError",

@@ -149,7 +149,8 @@ ingestion is harmless, and no secret-bearing payload crosses ingestion policy.
 - [ ] Retrieve by recency, relevance and importance without losing provenance.
 - [ ] Make correction, forgetting and privacy erasure propagate predictably
   (encrypted content-vault primitive and resumable managed-backup purge pass;
-  memory projection integration and WSL proof remain).
+  reference-only memory events and replay-safe item/subject forgetting pass;
+  WSL, lifecycle and operator-control proof remain).
 - [ ] Replace direct Dream mutation with reviewable memory proposals.
 
 Exit: every retrieved memory explains why it exists; contradictions and user
@@ -316,6 +317,26 @@ For each material change:
   backup/erase races are covered. Repeated Windows runs, Linux host, the actual
   Hermes NAS container, and the full Linux regression/matrix/stress suite
   passed.
-- Production plaintext ingestion remains disabled. Next, memory proposals must
-  carry only content references/digests and replay must preserve an explicit
-  `content_unavailable_erased` result.
+- Production plaintext ingestion remained disabled while the next phase moved
+  proposal values behind content references and defined explicit erased-state
+  replay semantics.
+
+### 2026-10-10 — Private memory leaves durable history
+
+- Replaced persisted memory values with opaque encrypted-content references;
+  neither `memory.proposed` nor `memory_records_v2` carries plaintext.
+- Replaced plain value SHA-256 with an installation-keyed HMAC after threat
+  review showed that cities, languages and booleans could otherwise be
+  dictionary-enumerated from the journal.
+- Made forgetting a durable, replayed event with exact target snapshots.
+  Subject replay therefore erases only memories that existed when the user
+  requested it, never later memories for the same person.
+- Added one-to-many logical-memory/content associations so deduplicated
+  proposals cannot leave orphaned private copies behind.
+- Retrieval by ID now requires the same explicit sensitivity clearance as set
+  retrieval. Missing, corrupted and erased content is typed and excluded from
+  normal recall rather than fabricated.
+- Repeated/concurrent append, cross-subject substitution, crash continuation,
+  item/subject erasure and discard-and-rebuild pass on Windows, Linux and the
+  actual Hermes Docker runtime. Production ingestion remains disabled pending
+  WSL, lifecycle/doctor and operator-control gates.

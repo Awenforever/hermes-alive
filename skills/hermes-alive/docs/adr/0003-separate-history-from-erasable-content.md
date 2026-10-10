@@ -51,9 +51,10 @@ events, but the event history alone cannot reconstruct erased plaintext.
 The first implementation uses AES-256-GCM from Hermes' pinned
 `cryptography` dependency, one random nonce per object, and authenticated
 metadata binding the ciphertext to its content ID, pseudonymous subject,
-purpose, sensitivity and creation time. SQLite stores ciphertext and
-non-secret metadata only. The key is a profile-local mode-0600 file, matching
-Hermes' current local-vault operational posture.
+purpose, sensitivity and creation time. Its durable digest is an
+installation-keyed HMAC rather than enumerable plain SHA-256. SQLite stores
+ciphertext and non-secret metadata only. The key is a profile-local mode-0600
+file, matching Hermes' current local-vault operational posture.
 
 Erasure is a resumable workflow rather than a best-effort `DELETE`:
 
@@ -142,9 +143,11 @@ contracts, this decision should be revisited.
   scaled stress suite passed with the new vault test in the authoritative
   runner.
 
-Still required before production plaintext ingestion: wire memory events to
-content references, prove journal/projection replay after erasure, exercise a
-real WSL filesystem lifecycle, and integrate managed backups with the plugin
+Memory events and projections now carry only content references; replay after
+item/subject erasure yields an explicit unavailable state and preserves
+post-forgetting memories. See ADR-0004. Still required before production
+plaintext ingestion: exercise a real WSL filesystem lifecycle and integrate
+managed backups, migration diagnostics and user controls with the plugin
 lifecycle/doctor surface.
 
 ## Immediate constraint

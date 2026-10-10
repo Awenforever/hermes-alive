@@ -17,6 +17,7 @@ from contextlib import closing, contextmanager, suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
+import hmac
 import json
 import os
 from pathlib import Path
@@ -24,13 +25,13 @@ import shutil
 import sqlite3
 import threading
 import time
-from typing import Any
+from typing import Any, Mapping
 from uuid import uuid4
 
 from .events import Sensitivity
 
 
-_SCHEMA_VERSION = 1
+_SCHEMA_VERSION = 2
 _MAX_CONTENT_BYTES = 4 * 1024 * 1024
 _OPERATION_LOCK = threading.Lock()
 
@@ -79,6 +80,33 @@ class ContentReference:
                 self.retention_until.isoformat() if self.retention_until else None
             ),
         }
+
+    @classmethod
+    def from_event_payload(cls, payload: Any) -> "ContentReference":
+        if not isinstance(payload, Mapping):
+            raise ValueError("content reference must be an object")
+        content_id = str(payload.get("content_id") or "").strip()
+        digest = str(payload.get("digest") or "").strip().lower()
+        size_bytes = int(payload.get("size_bytes", -1))
+        if not content_id or len(content_id) > 255:
+            raise ValueError("content reference has an invalid ID")
+        if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+            raise ValueError("content reference has an invalid digest")
+        if not 0 <= size_bytes <= _MAX_CONTENT_BYTES:
+            raise ValueError("content reference has an invalid size")
+        retention = payload.get("retention_until")
+        retention_until = (
+            _utc(datetime.fromisoformat(str(retention)), "retention_until")
+            if retention
+            else None
+        )
+        return cls(
+            content_id=content_id,
+            digest=digest,
+            size_bytes=size_bytes,
+            sensitivity=Sensitivity(payload["sensitivity"]),
+            retention_until=retention_until,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -195,9 +223,23 @@ class ContentVault:
 
     def _initialize(self) -> None:
         with closing(self._connect()) as connection:
+            legacy = connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='content_items'"
+            ).fetchone()
+            has_meta = connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='vault_meta'"
+            ).fetchone()
+            if legacy is not None and has_meta is None:
+                raise ContentVaultError(
+                    "unsupported pre-release content-vault schema; migrate or remove it before use"
+                )
             connection.executescript(
                 """
                 BEGIN IMMEDIATE;
+                CREATE TABLE IF NOT EXISTS vault_meta (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS content_items (
                     content_id TEXT PRIMARY KEY,
                     subject TEXT NOT NULL,
@@ -237,9 +279,16 @@ class ContentVault:
                     outcome TEXT NOT NULL,
                     occurred_at TEXT NOT NULL
                 );
+                INSERT INTO vault_meta(key, value) VALUES ('schema_version', '2')
+                    ON CONFLICT(key) DO NOTHING;
                 COMMIT;
                 """
             )
+            row = connection.execute(
+                "SELECT value FROM vault_meta WHERE key='schema_version'"
+            ).fetchone()
+            if row is None or int(row["value"]) != _SCHEMA_VERSION:
+                raise ContentVaultError("unsupported content-vault schema")
 
     @contextmanager
     def _exclusive_operation(self):
@@ -247,9 +296,11 @@ class ContentVault:
 
         with _OPERATION_LOCK:
             lock_path = self.base_dir / ".content-vault.lock"
-            if msvcrt and (not lock_path.exists() or lock_path.stat().st_size == 0):
-                lock_path.write_text(" ", encoding="utf-8")
-            with open(lock_path, "r+" if msvcrt else "a+", encoding="utf-8") as handle:
+            descriptor = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+            if msvcrt and os.fstat(descriptor).st_size == 0:
+                os.write(descriptor, b" ")
+                os.fsync(descriptor)
+            with os.fdopen(descriptor, "r+", encoding="utf-8") as handle:
                 if fcntl:
                     fcntl.flock(handle, fcntl.LOCK_EX)
                 elif msvcrt:
@@ -312,6 +363,17 @@ class ContentVault:
             ) from exc
         return AESGCM(key)
 
+    @staticmethod
+    def _keyed_digest(key: bytes, payload: bytes) -> str:
+        return hmac.new(
+            key, b"hermes-alive-content-v1\0" + payload, hashlib.sha256
+        ).hexdigest()
+
+    def digest_json(self, value: Any) -> str:
+        """Installation-local non-enumerable identity for one JSON value."""
+
+        return self._keyed_digest(self._key(), _canonical_json(value))
+
     def put_json(
         self,
         value: Any,
@@ -332,7 +394,8 @@ class ContentVault:
         if not content_id or len(content_id) > 255:
             raise ValueError("invalid content_id")
         payload = _canonical_json(value)
-        digest = hashlib.sha256(payload).hexdigest()
+        key = self._key()
+        digest = self._keyed_digest(key, payload)
         created_at = datetime.now(timezone.utc).isoformat()
         aad = _metadata_aad(
             content_id=content_id,
@@ -342,7 +405,7 @@ class ContentVault:
             created_at=created_at,
         )
         nonce = os.urandom(12)
-        ciphertext = self._aesgcm(self._key()).encrypt(nonce, payload, aad)
+        ciphertext = self._aesgcm(key).encrypt(nonce, payload, aad)
         with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
@@ -354,6 +417,25 @@ class ContentVault:
                     raise ContentErasedError(
                         "an erased content_id cannot be reused"
                     )
+                existing = connection.execute(
+                    "SELECT * FROM content_items WHERE content_id=?", (content_id,)
+                ).fetchone()
+                if existing is not None:
+                    expected_retention = retention_until.isoformat() if retention_until else None
+                    same = (
+                        existing["subject"] == subject
+                        and existing["purpose"] == purpose
+                        and existing["sensitivity"] == sensitivity.value
+                        and existing["retention_until"] == expected_retention
+                        and existing["digest"] == digest
+                        and int(existing["size_bytes"]) == len(payload)
+                    )
+                    if not same:
+                        raise ContentIntegrityError(
+                            "content_id already belongs to different content or metadata"
+                        )
+                    connection.execute("COMMIT")
+                    return self._reference(existing)
                 connection.execute(
                     """
                     INSERT INTO content_items VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -380,7 +462,28 @@ class ContentVault:
             content_id, digest, len(payload), sensitivity, retention_until
         )
 
-    def resolve_json(self, content_id: str) -> Any:
+    @staticmethod
+    def _reference(row: sqlite3.Row) -> ContentReference:
+        return ContentReference(
+            content_id=str(row["content_id"]),
+            digest=str(row["digest"]),
+            size_bytes=int(row["size_bytes"]),
+            sensitivity=Sensitivity(row["sensitivity"]),
+            retention_until=(
+                datetime.fromisoformat(str(row["retention_until"]))
+                if row["retention_until"]
+                else None
+            ),
+        )
+
+    def resolve_json(
+        self,
+        content_id: str,
+        *,
+        expected_subject: str | None = None,
+        expected_purpose: str | None = None,
+        expected_sensitivity: Sensitivity | None = None,
+    ) -> Any:
         with closing(self._connect()) as connection:
             row = connection.execute(
                 "SELECT * FROM content_items WHERE content_id=?", (content_id,)
@@ -391,6 +494,16 @@ class ContentVault:
                 if erased:
                     raise ContentErasedError("content_unavailable_erased")
                 raise ContentUnavailableError("content_unavailable_missing")
+            if (
+                (expected_subject is not None and row["subject"] != expected_subject)
+                or (expected_purpose is not None and row["purpose"] != expected_purpose)
+                or (
+                    expected_sensitivity is not None
+                    and row["sensitivity"] != Sensitivity(expected_sensitivity).value
+                )
+            ):
+                self._audit(connection, content_id, "resolve", "metadata_mismatch")
+                raise ContentIntegrityError("content reference metadata mismatch")
             aad = _metadata_aad(
                 content_id=str(row["content_id"]),
                 subject=str(row["subject"]),
@@ -405,7 +518,7 @@ class ContentVault:
             except Exception as exc:
                 self._audit(connection, content_id, "resolve", "integrity_error")
                 raise ContentIntegrityError("content authentication failed") from exc
-            if hashlib.sha256(payload).hexdigest() != row["digest"]:
+            if self._keyed_digest(self._key(), payload) != row["digest"]:
                 self._audit(connection, content_id, "resolve", "digest_mismatch")
                 raise ContentIntegrityError("content digest mismatch")
             self._audit(connection, content_id, "resolve", "resolved")
@@ -576,6 +689,10 @@ class ContentVault:
                 shutil.rmtree(resolved)
                 removed += 1
                 continue
+            if manifest.get("schema") != _SCHEMA_VERSION:
+                shutil.rmtree(resolved)
+                removed += 1
+                continue
             manifest_ids = set(str(value) for value in manifest.get("content_ids", []))
             manifest_subjects = set(str(value) for value in manifest.get("subjects", []))
             if ids.intersection(manifest_ids) or (subject and subject in manifest_subjects):
@@ -635,6 +752,12 @@ class ContentVault:
     ) -> "ContentVault":
         backup = Path(backup)
         destination = Path(destination)
+        try:
+            manifest = json.loads((backup / "manifest.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise ContentVaultError("managed backup manifest is missing or invalid") from exc
+        if manifest.get("schema") != _SCHEMA_VERSION:
+            raise ContentVaultError("managed backup schema is unsupported")
         if destination.exists() and any(destination.iterdir()):
             raise ContentVaultError("restore destination must be empty")
         destination.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -651,17 +774,7 @@ class ContentVault:
                 "SELECT * FROM content_items ORDER BY created_at, content_id"
             ).fetchall()
         return [
-            ContentReference(
-                content_id=str(row["content_id"]),
-                digest=str(row["digest"]),
-                size_bytes=int(row["size_bytes"]),
-                sensitivity=Sensitivity(row["sensitivity"]),
-                retention_until=(
-                    datetime.fromisoformat(str(row["retention_until"]))
-                    if row["retention_until"]
-                    else None
-                ),
-            )
+            self._reference(row)
             for row in rows
         ]
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from concurrent.futures import ThreadPoolExecutor
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -58,6 +59,10 @@ def main() -> None:
             purpose="memory.fact",
             sensitivity=Sensitivity.PRIVATE,
         )
+        plain_digest = hashlib.sha256(
+            ('{"nested":[1,{"ok":true}],"note":"' + sentinel + '"}').encode("utf-8")
+        ).hexdigest()
+        require(first.digest != plain_digest, "journal digest is enumerable plaintext SHA-256")
         other = vault.put_json(
             {"note": "unrelated-value"},
             subject="subject:beta",
