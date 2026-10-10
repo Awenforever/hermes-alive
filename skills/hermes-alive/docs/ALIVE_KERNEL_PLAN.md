@@ -138,8 +138,9 @@ Exit: old behavior can be replayed and scored without sending messages.
   linkage and crash interruption facts (ADR-0013).
 - [x] Add per-user, Hermes-authorized, expiry-bounded and erasable conversation
   content retention while keeping fresh installs structural-only (ADR-0014).
-- [ ] Add authoritative typed tool outcome receipts; never infer tool success
-  by parsing result prose.
+- [x] Add privacy-bounded native tool receipts. Treat ordinary prose-derived
+  `ok/error` classifications as `outcome=unknown`; learn only from explicit
+  executor terminal facts until Hermes exposes effect proof (ADR-0015).
 - [x] Add opt-in shadow mirroring that cannot influence legacy decisions.
 
 Exit: restart/replay reconstructs the same ordered experience stream, duplicate
@@ -532,3 +533,21 @@ For each material change:
   disable-versus-forget semantics, replay and crash-resumed erasure. The real
   Hermes container also discovered `command:memory`, intercepted only `alive`
   requests and left ordinary memory commands untouched.
+
+### 2026-10-10 — Honest native tool receipts
+
+- Registered Alive against Hermes' public `post_tool_call` plugin hook instead
+  of scraping assistant text or the lossy gateway step summary.
+- Receipts contain pseudonymous call coordinates, tool name, bounded duration
+  and terminal classification only. Arguments, results and error messages are
+  excluded, and the observer stays inert unless kernel shadow mode is enabled.
+- Hermes' ordinary `ok` and `error/tool_error` labels currently depend on
+  return-value inspection. They are retained only as reported diagnostics and
+  mapped to `outcome=unknown`, never to success/failure learning evidence.
+- Explicit policy blocks, cancellations, timeouts and exception-backed errors
+  are typed, learning-eligible terminal facts (ADR-0015).
+- A clean-container run exposed that the base Hermes 0.21.3 image does not
+  itself include `cryptography`. The repository now declares
+  `cryptography>=50.0.2,<51` and the install/upgrade contract routes dependency
+  consent through `hermes plugins install --yes-deps`; an isolated install of
+  50.0.2 plus the complete container suite passed without changing production.

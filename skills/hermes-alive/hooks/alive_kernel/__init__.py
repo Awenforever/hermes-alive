@@ -127,6 +127,13 @@ from .retention import (
     RetentionValidationError,
 )
 from .retention_command import handle_memory_command, resume_retention_maintenance
+from .tool_receipts import (
+    ToolOutcome,
+    ToolReceiptAssessment,
+    ToolReceiptRecorder,
+    assess_reported_outcome,
+    record_post_tool_call,
+)
 from .reflection import (
     ReflectionAuthority,
     ReflectionContentStatus,
@@ -242,8 +249,12 @@ __all__ = [
     "StoredDeliberation",
     "StrategyReport",
     "StrategySubmission",
+    "ToolOutcome",
+    "ToolReceiptAssessment",
+    "ToolReceiptRecorder",
     "ValidatedSelection",
     "apply_exploration_gate",
+    "assess_reported_outcome",
     "build_frame",
     "build_factual_episodes",
     "compare_reports",
@@ -254,6 +265,7 @@ __all__ = [
     "handle_memory_command",
     "resume_retention_maintenance",
     "rank_records",
+    "record_post_tool_call",
     "serialize_frame",
     "shadow_enabled",
     "silence_candidate",

@@ -357,7 +357,7 @@ class ContentVault:
     def _aesgcm(key: bytes):
         try:
             from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-        except ImportError as exc:  # Hermes >=0.21.3 includes cryptography.
+        except ImportError as exc:  # Installed through the plugin dependency contract.
             raise ContentVaultError(
                 "Hermes runtime is missing its required cryptography dependency"
             ) from exc

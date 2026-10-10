@@ -76,18 +76,16 @@ Hermes Gateway
 
 ### 命令行安装
 
-从完整仓库安装：
+通过 Hermes 插件管理器安装完整仓库及其运行依赖：
 
 ```bash
-git clone --depth 1 \
-  https://github.com/Awenforever/hermes-alive.git \
-  /tmp/hermes-alive
-
-cd /tmp/hermes-alive
-HERMES_HOME=/opt/data bash scripts/bootstrap.sh
+hermes plugins install Awenforever/hermes-alive --force --yes-deps --enable
+hermes alive install-runtime
 ```
 
-bootstrap 会安装技能源码和 Gateway Hook、继承 Hermes 当前模型、写入非敏感
+升级也使用同一组命令，不要只执行 `git pull` 或向另一套系统 Python 手工装包。
+Hermes 会按插件声明安装 `cryptography>=50.0.2,<51`，用于可擦除内容保险库。
+安装流程会部署技能源码和 Gateway Hook、继承 Hermes 当前模型、写入非敏感
 默认配置并执行验证，但不会重启 Gateway。命令行路径适合已有明确配置的运维者；
 普通用户应优先采用上面的 Hermes 引导安装。确认结果后，请按当前部署方式正常
 重启 Hermes。

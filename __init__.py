@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from .plugin_cli import alive_command, register_cli
+from .tool_receipt_bridge import register_tool_receipt_hook
 
 
 def register(ctx) -> None:
+    register_tool_receipt_hook(ctx)
     ctx.register_cli_command(
         name="alive",
         help="Install, inspect, and control Hermes Alive",

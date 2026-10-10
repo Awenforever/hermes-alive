@@ -8,6 +8,10 @@ license: MIT
 homepage: https://github.com/Awenforever/hermes-alive
 tags: [gateway, proactive, messaging, lifecycle]
 requires_hermes: ">=0.21.3,<0.22"
+provides_hooks:
+  - post_tool_call
+python_dependencies:
+  - "cryptography>=50.0.2,<51"
 config_schema:
   enabled:
     type: bool

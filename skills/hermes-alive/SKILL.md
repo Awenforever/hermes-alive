@@ -60,7 +60,18 @@ The shared directory must be a strict child of `HERMES_HOME`.
 
 ## Install
 
-From the repository skill root:
+Install or refresh the complete repository through Hermes' package manager so
+its declared cryptographic runtime is resolved in the same Python environment
+as Gateway:
+
+```bash
+hermes plugins install Awenforever/hermes-alive --force --yes-deps --enable
+hermes alive install-runtime
+```
+
+Do not replace this with a raw `git pull` or an unrelated system `pip`; Hermes'
+plugin manager owns dependency consent and environment selection. From an
+already package-managed repository checkout, the lifecycle implementation is:
 
 ```bash
 bash scripts/install.sh
@@ -74,6 +85,11 @@ HERMES_ALIVE_LIFECYCLE_INSTALL_OK
 
 Run the command a second time to verify idempotence. On failure, stop and surface
 the lifecycle error; never report success from partial output.
+
+On upgrade, use the same `plugins install --force --yes-deps --enable` command
+rather than plain `plugins update`: the latter reports newly declared Python
+dependencies but does not install them. Existing runtime state remains outside
+the plugin checkout and must be preserved.
 
 ## Configure
 

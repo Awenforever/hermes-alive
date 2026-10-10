@@ -25,6 +25,7 @@ def main() -> int:
         return 0
 
     skill_root = Path(__file__).resolve().parents[1]
+    repo_root = skill_root.parents[1]
     with tempfile.TemporaryDirectory(prefix="alive-official-hook-") as directory:
         root = Path(directory)
         hermes_home = root / "hermes-home"
@@ -35,6 +36,10 @@ def main() -> int:
         os.environ["HERMES_ALIVE_SHARED_DIR"] = str(shared)
         os.environ["HERMES_ALIVE_KERNEL_SHADOW_ENABLED"] = "true"
         os.environ["HERMES_PROACTIVE_PLATFORM_ENABLED"] = "false"
+        os.environ["HERMES_BUNDLED_PLUGINS"] = str(hermes_home / "empty-bundled")
+        (hermes_home / "config.yaml").write_text(
+            "plugins:\n  enabled: [hermes-alive]\n", encoding="utf-8"
+        )
 
         # gateway.hooks may have been imported before HERMES_HOME was changed;
         # its supported test/runtime override is the module-level HOOKS_DIR.
@@ -77,13 +82,48 @@ def main() -> int:
         assert alive_results and alive_results[0]["decision"] == "handled"
         assert ordinary_results == []
 
+        # Discover the package through Hermes' real plugin manager and dispatch
+        # its native post_tool_call observer. Copy only distributable material,
+        # never the working tree metadata.
+        installed_plugin = hermes_home / "plugins" / "hermes-alive"
+        installed_plugin.mkdir(parents=True)
+        for name in ("__init__.py", "plugin_cli.py", "tool_receipt_bridge.py", "plugin.yaml"):
+            shutil.copy2(repo_root / name, installed_plugin / name)
+        shutil.copytree(
+            skill_root, installed_plugin / "skills" / "hermes-alive"
+        )
+        from hermes_cli.plugins import PluginManager
+        manager = PluginManager()
+        manager.discover_and_load()
+        assert manager.has_hook("post_tool_call")
+        manager.invoke_hook(
+            "post_tool_call",
+            tool_name="terminal",
+            args={"command": "official private argument"},
+            result="official private result",
+            error_message="official private error",
+            status="timeout",
+            error_type="tool_timeout",
+            duration_ms=25,
+            task_id="official-task",
+            session_id="official-session",
+            tool_call_id="official-tool-call",
+            turn_id="official-turn",
+            api_request_id="official-request",
+        )
+        manager.unload()
+
         sys.path.insert(0, str(installed_hook))
         from alive_kernel import ExperienceJournal
         journal = ExperienceJournal(shared / "kernel" / "experience.sqlite3")
         records = journal.read(limit=100)
         assert [record.event.event_type for record in records] == [
-            "conversation.inbound", "tool.round_observed", "session.ended", "session.reset"
+            "conversation.inbound", "tool.round_observed", "session.ended", "session.reset",
+            "tool.execution_observed",
         ]
+        receipt = records[-1].event
+        assert receipt.payload["outcome"] == "timed_out"
+        assert receipt.payload["learning_eligible"] is True
         database = (shared / "kernel" / "experience.sqlite3").read_bytes()
         wal = shared / "kernel" / "experience.sqlite3-wal"
         if wal.exists():
@@ -91,6 +131,9 @@ def main() -> int:
         assert b"official private message" not in database
         assert b'"arguments":"private"' not in database
         assert b'"result":"private"' not in database
+        assert b"official private argument" not in database
+        assert b"official private result" not in database
+        assert b"official private error" not in database
 
     print("HERMES_ALIVE_OFFICIAL_HOOK_CONTRACT_OK")
     return 0
