@@ -161,9 +161,10 @@ corrections are represented rather than overwritten.
 
 - [x] Add durable commitments and opportunity records (ADR-0006; shadow-only
   authority, lifecycle, encrypted content and replay baseline implemented).
-- [ ] Generate multiple candidate actions, including deliberate silence.
-- [ ] Evaluate user value, urgency, novelty, confidence, interruption cost,
-  risk and authority separately.
+- [x] Generate multiple typed candidate actions, including deliberate silence
+  (pure shadow decision boundary; durable recording is the next gate).
+- [x] Evaluate user value, urgency, novelty, confidence, interruption cost,
+  risk and authority separately without an opaque weighted score (ADR-0007).
 - [ ] Let the model deliberate within structured bounds; keep policy external.
 - [ ] Run the new decision engine in shadow against production events.
 
