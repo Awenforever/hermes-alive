@@ -159,7 +159,8 @@ corrections are represented rather than overwritten.
 
 ### Phase 3 — Agenda, intentions and deliberation
 
-- [ ] Add durable commitments and opportunity records.
+- [x] Add durable commitments and opportunity records (ADR-0006; shadow-only
+  authority, lifecycle, encrypted content and replay baseline implemented).
 - [ ] Generate multiple candidate actions, including deliberate silence.
 - [ ] Evaluate user value, urgency, novelty, confidence, interruption cost,
   risk and authority separately.
@@ -362,3 +363,17 @@ For each material change:
 - Projection decisions, record timestamps and transitions now derive from the
   durable event clock rather than replay wall time. Rebuild tests compare
   timestamps as well as rankings, preventing recency drift after recovery.
+
+### 2026-10-10 — Durable agenda baseline
+
+- Added separate commitment and opportunity records instead of treating every
+  interesting signal as a task or every task as ordinary memory (ADR-0006).
+- Model and observation authorities may propose a commitment but cannot
+  activate one. User-authorized transitions must cite a matching durable
+  inbound event; a caller-provided authority label alone is insufficient.
+- Agenda content uses the same encrypted, erasable vault boundary as memory.
+  Deadlines, availability, provenance and lifecycle remain structural events.
+- Snooze, completion, dismissal and expiry are distinct replayable states.
+  Proposal retries are semantically idempotent despite fresh wall-clock values.
+- The agenda remains shadow-only and performs no scheduling, policy decision,
+  delivery or other external action.

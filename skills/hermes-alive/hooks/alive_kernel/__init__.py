@@ -4,6 +4,17 @@ The package is deliberately not imported by the production watcher yet.  Phase
 1 develops the durable history boundary in shadow before it can affect sends.
 """
 
+from .agenda import (
+    AgendaAuthority,
+    AgendaContentStatus,
+    AgendaDecision,
+    AgendaItemKind,
+    AgendaProjection,
+    AgendaProposal,
+    AgendaRecord,
+    AgendaState,
+    AgendaValidationError,
+)
 from .events import EventEnvelope, EventValidationError, Sensitivity
 from .event_store import (
     AppendResult,
@@ -37,6 +48,15 @@ from .memory import (
 from .retrieval import RetrievalHit, rank_records
 
 __all__ = [
+    "AgendaAuthority",
+    "AgendaContentStatus",
+    "AgendaDecision",
+    "AgendaItemKind",
+    "AgendaProjection",
+    "AgendaProposal",
+    "AgendaRecord",
+    "AgendaState",
+    "AgendaValidationError",
     "AppendResult",
     "ContentErasedError",
     "ContentIntegrityError",
