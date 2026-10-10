@@ -175,9 +175,11 @@ inspectable; replay is deterministic outside explicitly recorded model calls.
 
 ### Phase 4 — Outcomes, reflection and learning
 
-- [ ] Link delivery, reply, correction and downstream task outcomes to actions.
+- [x] Link action attempts and evidence-backed delivery, reply, correction,
+  feedback and downstream task outcomes to validated selections (ADR-0008).
 - [ ] Learn timing, topic and presentation preferences conservatively.
-- [ ] Treat no reply as ambiguous, never as punishment evidence.
+- [x] Treat no reply as ambiguous, never as punishment evidence; absence is
+  intentionally not representable as an outcome kind.
 - [ ] Store reflections as evidence-backed proposals with expiry and rollback.
 - [ ] Add constrained exploration budgets and anti-echo-chamber diversity.
 
@@ -397,3 +399,17 @@ For each material change:
   as an auditable reason.
 - Accepted and rejected selections survive discard-and-rebuild identically.
   No provider is called and no selected action is executed in this phase.
+
+### 2026-10-10 — Evidence-backed outcome baseline
+
+- Added an explicit action-attempt boundary between model selection and an
+  external effect. Attempts carry stable idempotency keys but do not execute
+  channel or tool operations themselves (ADR-0008).
+- Delivery receipts, user replies/corrections/dismissals, explicit feedback and
+  downstream task completion/failure require compatible source events that
+  occur after the attempt and match its subject.
+- `no_reply` is intentionally absent from the outcome vocabulary. Time passing
+  cannot silently become rejection, negative reward or a social penalty.
+- Private outcome detail is encrypted and erasable. Erasure preserves the
+  structural fact and replay result while returning an explicit erased status.
+- The result ledger remains shadow-only; no production delivery is attempted.

@@ -70,12 +70,22 @@ from .memory import (
     ProjectionDecision,
     ProjectionDecisionKind,
 )
+from .outcomes import (
+    ActionAttemptRecord,
+    OutcomeContentStatus,
+    OutcomeKind,
+    OutcomeProjection,
+    OutcomeProjectionDecision,
+    OutcomeRecord,
+    OutcomeValidationError,
+)
 from .retrieval import RetrievalHit, rank_records
 
 __all__ = [
     "ActionAuthority",
     "ActionCandidate",
     "ActionKind",
+    "ActionAttemptRecord",
     "AgendaAuthority",
     "AgendaContentStatus",
     "AgendaDecision",
@@ -115,6 +125,12 @@ __all__ = [
     "MemoryRecord",
     "MemoryState",
     "MemoryValidationError",
+    "OutcomeContentStatus",
+    "OutcomeKind",
+    "OutcomeProjection",
+    "OutcomeProjectionDecision",
+    "OutcomeRecord",
+    "OutcomeValidationError",
     "ProjectionDecision",
     "ProjectionDecisionKind",
     "PolicyContext",
