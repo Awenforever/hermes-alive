@@ -29,6 +29,7 @@ from alive_kernel.outcomes import (  # noqa: E402
     OutcomeKind,
     OutcomeProjection,
 )
+from alive_kernel_testkit import install_exploration_gate  # noqa: E402
 
 
 def main() -> int:
@@ -89,6 +90,10 @@ def main() -> int:
             },
         )
         deliberation.apply(frame_record)
+        gate_event_id = install_exploration_gate(
+            journal, deliberation, frame,
+            subject="user:test", fixture_name="outcomes",
+        )
         selection_record = deliberation.append_selection(
             SelectionProposal(
                 frame.frame_id,
@@ -99,6 +104,7 @@ def main() -> int:
             actor="model:test",
             subject="user:test",
             selection_id="selection:outcome-test",
+            exploration_gate_event_id=gate_event_id,
         )
         assert deliberation.apply(selection_record).outcome == "validated"
 

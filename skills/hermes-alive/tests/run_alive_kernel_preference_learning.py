@@ -28,6 +28,7 @@ from alive_kernel.preference_learning import (  # noqa: E402
 from alive_kernel.reflection import (  # noqa: E402
     ReflectionProjection, ReflectionProposal, ReflectionReview, ReflectionScope
 )
+from alive_kernel_testkit import install_exploration_gate  # noqa: E402
 
 
 def main() -> int:
@@ -66,10 +67,15 @@ def main() -> int:
             candidate_contents={candidate.content_id: {"message": "test"}},
         )
         deliberation.apply(framed)
+        gate_event_id = install_exploration_gate(
+            journal, deliberation, frame,
+            subject="user:test", fixture_name="preference-learning",
+        )
         selected = deliberation.append_selection(
             SelectionProposal(frame.frame_id, candidate.candidate_id, "model", "safe"),
             actor="model:test", subject="user:test",
             selection_id="selection:preference-test",
+            exploration_gate_event_id=gate_event_id,
         )
         deliberation.apply(selected)
         attempted = outcomes.append_attempt(

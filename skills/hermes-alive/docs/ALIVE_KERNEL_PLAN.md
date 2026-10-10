@@ -184,7 +184,9 @@ inspectable; replay is deterministic outside explicitly recorded model calls.
   intentionally not representable as an outcome kind.
 - [x] Store reflections as evidence-backed proposals with bounded expiry,
   explicit user review and retractable acceptance (ADR-0009).
-- [ ] Add constrained exploration budgets and anti-echo-chamber diversity.
+- [x] Add constrained exploration budgets, delivered-exposure history and
+  topic/source anti-echo-chamber gates that can only narrow base policy
+  (ADR-0011).
 
 Exit: learning improves held-out replay metrics without increasing interruption,
 factual error or user-control violations.
@@ -448,3 +450,21 @@ For each material change:
 - Retracting a reflection removes its contribution immediately. Explicit user
   retraction removes a signal, and discard-and-rebuild reproduces the result.
 - Estimates are shadow-only and are not yet consumed by live deliberation.
+
+### 2026-10-10 — Constrained exploration baseline
+
+- Added a second gate that can only narrow candidates already admitted by the
+  main authority/risk/interruption policy; it can never rescue an unsafe action
+  (ADR-0011).
+- Exploration count, topic share, source share and same-topic streak have
+  explicit rolling limits. Silence always remains admissible when diversity
+  rejects every action.
+- Only successful delivery receipts enter exposure history. Selection, attempt,
+  failed delivery and no-response do not pretend that the user saw an item.
+- Topic and source labels are encrypted; structural history accepts only keyed
+  digests, preventing accidental plaintext metadata leakage.
+- Gate results are recomputed on replay and stored as causal receipts. Every
+  non-silence model selection must cite an earlier receipt that admits its exact
+  candidate; direct bypass is rejected.
+- The mechanism remains shadow-only and has not altered production discovery
+  or delivery behavior.

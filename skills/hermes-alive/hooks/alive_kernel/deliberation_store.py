@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contextlib import closing
 from dataclasses import dataclass
+import json
 from pathlib import Path
 import sqlite3
 from typing import Any, Iterable, Mapping
@@ -93,6 +94,7 @@ class DeliberationProjection:
                     selection_id TEXT NOT NULL UNIQUE,
                     frame_id TEXT NOT NULL,
                     candidate_id TEXT NOT NULL,
+                    exploration_gate_event_id TEXT,
                     model TEXT NOT NULL,
                     content_id TEXT NOT NULL,
                     outcome TEXT NOT NULL,
@@ -215,6 +217,7 @@ class DeliberationProjection:
         subject: str,
         sensitivity: Sensitivity = Sensitivity.PRIVATE,
         selection_id: str | None = None,
+        exploration_gate_event_id: str | None = None,
     ) -> JournalRecord:
         selection_id = str(selection_id or uuid4()).strip()
         if not selection_id:
@@ -233,12 +236,16 @@ class DeliberationProjection:
             source="alive.deliberation",
             actor=actor,
             subject=subject,
-            causation_id=f"deliberation.frame:{proposal.frame_id}",
+            causation_id=(
+                exploration_gate_event_id
+                or f"deliberation.frame:{proposal.frame_id}"
+            ),
             sensitivity=sensitivity,
             payload={
                 "selection_id": selection_id,
                 "frame_id": proposal.frame_id,
                 "candidate_id": proposal.candidate_id,
+                "exploration_gate_event_id": exploration_gate_event_id,
                 "model": proposal.model,
                 "content": content.to_event_payload(),
             },
@@ -411,6 +418,37 @@ class DeliberationProjection:
                 rationale=str(rationale_document["rationale"]),
             )
             selection = validate_selection(frame, proposal)
+            gate_event_id = str(payload.get("exploration_gate_event_id") or "")
+            if selection.candidate.action_kind.value != "silence":
+                gate_schema = connection.execute(
+                    """
+                    SELECT 1 FROM sqlite_master
+                    WHERE type='table' AND name='exploration_evaluations_v1'
+                    """
+                ).fetchone()
+                gate = connection.execute(
+                    """
+                    SELECT e.*, d.outcome AS decision_outcome
+                    FROM exploration_evaluations_v1 e
+                    JOIN exploration_decisions_v1 d ON d.event_id=e.event_id
+                    WHERE e.event_id=? AND e.frame_id=?
+                    """,
+                    (gate_event_id, frame_id),
+                ).fetchone() if gate_event_id and gate_schema else None
+                gate_record = self.journal.get(gate_event_id) if gate_event_id else None
+                selection_record = self.journal.get(event.event_id)
+                if (
+                    gate is None
+                    or gate["decision_outcome"] != "recorded"
+                    or candidate_id not in json.loads(gate["admissible_json"])
+                    or gate_record is None
+                    or selection_record is None
+                    or gate_record.sequence >= selection_record.sequence
+                    or event.causation_id != gate_event_id
+                ):
+                    raise DeliberationValidationError(
+                        "selection lacks an admissible exploration receipt"
+                    )
             if (
                 event.subject != frame_row["subject"]
                 or event.sensitivity.value != frame_row["sensitivity"]
@@ -424,6 +462,7 @@ class DeliberationProjection:
                 "model selected a policy-rejected candidate": "policy_rejected_candidate",
                 "selection requires model provenance and rationale": "selection_metadata_missing",
                 "selection subject does not match frame": "selection_boundary_mismatch",
+                "selection lacks an admissible exploration receipt": "exploration_gate_invalid",
             }.get(str(exc), "invalid_selection")
             outcome = "rejected"
             selection = None
@@ -439,12 +478,13 @@ class DeliberationProjection:
         else:
             content_id = content.content_id
         connection.execute(
-            "INSERT INTO deliberation_selections_v1 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO deliberation_selections_v1 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 event.event_id,
                 str(payload.get("selection_id") or ""),
                 frame_id,
                 candidate_id,
+                str(payload.get("exploration_gate_event_id") or "") or None,
                 str(payload.get("model") or ""),
                 content_id,
                 outcome,

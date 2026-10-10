@@ -36,6 +36,7 @@ from alive_kernel.reflection import (  # noqa: E402
     ReflectionScope,
     ReflectionState,
 )
+from alive_kernel_testkit import install_exploration_gate  # noqa: E402
 
 
 def main() -> int:
@@ -81,6 +82,10 @@ def main() -> int:
             candidate_contents={candidate.content_id: {"message": "test"}},
         )
         deliberation.apply(frame_event)
+        gate_event_id = install_exploration_gate(
+            journal, deliberation, frame,
+            subject="user:test", fixture_name="reflection",
+        )
         selection_event = deliberation.append_selection(
             SelectionProposal(
                 frame.frame_id, candidate.candidate_id, "provider/model", "admissible"
@@ -88,6 +93,7 @@ def main() -> int:
             actor="model:test",
             subject="user:test",
             selection_id="selection:reflection-test",
+            exploration_gate_event_id=gate_event_id,
         )
         deliberation.apply(selection_event)
         attempt_event = outcomes.append_attempt(

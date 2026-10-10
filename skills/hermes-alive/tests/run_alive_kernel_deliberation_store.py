@@ -24,6 +24,7 @@ from alive_kernel.deliberation import (  # noqa: E402
 from alive_kernel.deliberation_store import DeliberationProjection  # noqa: E402
 from alive_kernel.event_store import ExperienceJournal  # noqa: E402
 from alive_kernel.events import Sensitivity  # noqa: E402
+from alive_kernel_testkit import install_exploration_gate  # noqa: E402
 from alive_kernel.events import EventEnvelope  # noqa: E402
 
 
@@ -88,6 +89,10 @@ def main() -> int:
             },
         )
         assert projection.apply(frame_record).outcome == "recorded"
+        gate_event_id = install_exploration_gate(
+            journal, projection, frame,
+            subject="user:test", fixture_name="deliberation-store",
+        )
         retry_record, retry_frame = projection.append_frame(
             (safe, risky),
             PolicyContext(can_interrupt=True),
@@ -113,6 +118,22 @@ def main() -> int:
         }
         assert before_selection.frame.rejections[0].candidate_id == "candidate:risky"
 
+        bypass_record = projection.append_selection(
+            SelectionProposal(
+                frame.frame_id,
+                "candidate:safe",
+                "provider/model",
+                "Attempt to bypass the diversity gate.",
+            ),
+            actor="model:provider",
+            subject="user:test",
+            sensitivity=Sensitivity.PRIVATE,
+            selection_id="selection:bypass-test",
+        )
+        bypass = projection.apply(bypass_record)
+        assert bypass.outcome == "rejected"
+        assert bypass.reason == "exploration_gate_invalid"
+
         selection_record = projection.append_selection(
             SelectionProposal(
                 frame.frame_id,
@@ -124,6 +145,7 @@ def main() -> int:
             subject="user:test",
             sensitivity=Sensitivity.PRIVATE,
             selection_id="selection:safe-test",
+            exploration_gate_event_id=gate_event_id,
         )
         assert projection.apply(selection_record).outcome == "validated"
         selected = projection.inspect(frame.frame_id, clearance=Sensitivity.PRIVATE)
@@ -141,6 +163,7 @@ def main() -> int:
             subject="user:test",
             sensitivity=Sensitivity.PRIVATE,
             selection_id="selection:risky-test",
+            exploration_gate_event_id=gate_event_id,
         )
         rejected = projection.apply(rejected_record)
         assert rejected.outcome == "rejected"

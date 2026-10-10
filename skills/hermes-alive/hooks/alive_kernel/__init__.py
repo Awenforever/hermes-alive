@@ -16,6 +16,19 @@ from .agenda import (
     AgendaValidationError,
 )
 from .events import EventEnvelope, EventValidationError, Sensitivity
+from .exploration import (
+    DiversityAnnotation,
+    DiversityTagger,
+    ExplorationGateResult,
+    ExplorationMode,
+    ExplorationPolicy,
+    ExplorationRejection,
+    ExplorationValidationError,
+    ExposureRecord,
+    apply_exploration_gate,
+    validate_exploratory_selection,
+)
+from .exploration_store import ExplorationProjection, ExplorationProjectionDecision
 from .event_store import (
     AppendResult,
     EventConflictError,
@@ -135,12 +148,22 @@ __all__ = [
     "DeliberationProjection",
     "DeliberationValidationError",
     "DimensionAssessment",
+    "DiversityAnnotation",
+    "DiversityTagger",
     "EventConflictError",
     "EventEnvelope",
     "EventIntegrityError",
     "EventValidationError",
     "ErasureResult",
     "ExperienceJournal",
+    "ExplorationGateResult",
+    "ExplorationMode",
+    "ExplorationPolicy",
+    "ExplorationProjection",
+    "ExplorationProjectionDecision",
+    "ExplorationRejection",
+    "ExplorationValidationError",
+    "ExposureRecord",
     "LocalIdentityProtector",
     "MemoryAuthority",
     "MemoryKind",
@@ -185,6 +208,7 @@ __all__ = [
     "ShadowKernelBridge",
     "StoredDeliberation",
     "ValidatedSelection",
+    "apply_exploration_gate",
     "build_frame",
     "deserialize_frame",
     "mirror_hook_event",
@@ -194,4 +218,5 @@ __all__ = [
     "silence_candidate",
     "structural_hook_payload",
     "validate_selection",
+    "validate_exploratory_selection",
 ]
