@@ -52,7 +52,7 @@ hermes alive install-runtime
 ```
 
 升级也使用上述命令；不要只执行 `git pull` 或向另一套系统 Python 手工安装依赖。
-插件声明并由 Hermes 安装 `cryptography>=50.0.2,<51`，用于可擦除内容保险库。
+插件声明并复用 Hermes 锁定的 `cryptography==50.0.0`，用于可擦除内容保险库，避免插件升级破坏宿主依赖解析。
 
 安装脚本会写入标准 Hermes 数据目录并完成验证，但不会重启 Gateway：
 

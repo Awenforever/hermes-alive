@@ -12,6 +12,7 @@ Focused suites:
 python3 tests/run_circadian.py
 python3 tests/run_alive_kernel_retention.py
 python3 tests/run_alive_kernel_consolidation.py
+python3 tests/run_alive_kernel_consolidation_synthesis.py
 python3 tests/run_alive_kernel_recovery.py
 python3 tests/run_legacy_dream_retirement.py
 python3 tests/run_circadian_shadow.py

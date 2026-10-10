@@ -60,6 +60,13 @@ An existing kernel store is recovered at gateway startup in dependency order;
 this replays only Alive-owned local projections and never calls a model or
 performs an external action (ADR-0017).
 
+The shadow kernel also has an unscheduled consolidation synthesizer (ADR-0018).
+It gathers only consented retained evidence, calls Hermes' auxiliary model
+route, validates each strict-JSON candidate independently and sends survivors
+through the same review-only consolidation service. It owns no provider key or
+fallback list. Raw prompts and responses are ephemeral; durable records contain
+only structural receipts, actual-model attribution and encrypted proposals.
+
 ## Decision ownership
 
 - The model owns wording and style inside structured constraints.

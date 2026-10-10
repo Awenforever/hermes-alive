@@ -43,6 +43,11 @@ explicitly supplied.
 - Fresh installs retain no conversation body and perform no model memory
   consolidation. Content retention and model learning require two separate,
   per-user Hermes-authorized choices.
+- Consent-gated memory synthesis reads only live decryptable retained excerpts.
+  Its prompt and raw response exist only for the model call and are never
+  written to the journal, logs or receipts. Receipts retain evidence IDs,
+  actual-model attribution, bounded counts and error classes; accepted parser
+  output enters only the encrypted review-proposal path.
 
 ## Topic-delivery privacy
 

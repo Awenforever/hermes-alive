@@ -94,6 +94,8 @@ class ExperienceJournal:
                 );
                 CREATE INDEX IF NOT EXISTS idx_experience_type_sequence
                     ON experience_events(event_type, sequence);
+                CREATE INDEX IF NOT EXISTS idx_experience_subject_sequence
+                    ON experience_events(subject, sequence);
                 CREATE INDEX IF NOT EXISTS idx_experience_correlation_sequence
                     ON experience_events(correlation_id, sequence);
                 CREATE INDEX IF NOT EXISTS idx_experience_causation
@@ -243,6 +245,59 @@ class ExperienceJournal:
                 return
             yield from batch
             cursor = batch[-1].sequence
+
+    def iter_reverse(
+        self,
+        *,
+        event_types: tuple[str, ...] = (),
+        subject: str | None = None,
+        batch_size: int = 500,
+        max_records: int | None = None,
+    ) -> Iterator[JournalRecord]:
+        """Read newest records first through a bounded, filtered cursor."""
+
+        if not 1 <= batch_size <= 10_000:
+            raise ValueError("batch_size must be between 1 and 10000")
+        if max_records is not None and max_records < 1:
+            raise ValueError("max_records must be positive")
+        types = tuple(dict.fromkeys(str(value).strip() for value in event_types))
+        if any(not value for value in types):
+            raise ValueError("event_types must not contain empty values")
+        normalized_subject = str(subject).strip() if subject is not None else None
+        if subject is not None and not normalized_subject:
+            raise ValueError("subject must not be empty")
+        before: int | None = None
+        yielded = 0
+        while max_records is None or yielded < max_records:
+            clauses: list[str] = []
+            parameters: list[object] = []
+            if before is not None:
+                clauses.append("sequence < ?")
+                parameters.append(before)
+            if types:
+                placeholders = ",".join("?" for _ in types)
+                clauses.append(f"event_type IN ({placeholders})")
+                parameters.extend(types)
+            if normalized_subject is not None:
+                clauses.append("subject = ?")
+                parameters.append(normalized_subject)
+            remaining = batch_size
+            if max_records is not None:
+                remaining = min(remaining, max_records - yielded)
+            parameters.append(remaining)
+            where = " WHERE " + " AND ".join(clauses) if clauses else ""
+            query = (
+                "SELECT sequence, canonical_json, integrity_hash "
+                f"FROM experience_events{where} ORDER BY sequence DESC LIMIT ?"
+            )
+            with closing(self._connect()) as connection:
+                rows = list(connection.execute(query, parameters))
+            if not rows:
+                return
+            for row in rows:
+                yield self._record(row)
+                yielded += 1
+            before = int(rows[-1]["sequence"])
 
     def last_sequence(self) -> int:
         with closing(self._connect()) as connection:

@@ -3,6 +3,51 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## Model synthesis must never become Dream again
+
+The semantic need is real, but the old coupling is forbidden. Conversation
+interpretation must not combine raw transcript persistence, plugin-owned model
+routing and direct memory mutation.
+
+Permanent constraints:
+
+- retention permission and model-learning permission are separate;
+- Hermes owns model credentials, primary/fallback routing and channel state;
+- only the actual response model is valid attribution;
+- evidence text is untrusted prompt data and every citation must refer to the
+  bounded evidence window;
+- parsing is candidate-local: one malformed candidate does not erase valid
+  siblings, and no malformed candidate is repaired with phrase-specific rules;
+- model output can create only expiring review proposals, never active memory,
+  commitments, actions or user authority;
+- raw prompts, raw responses and provider error bodies are not durable data;
+- repeated operation IDs cannot repeat the model call;
+- no timer or startup hook may invoke synthesis until replay evaluation proves
+  usefulness, false-memory rate and review burden are acceptable.
+
+Regression proof lives in
+`tests/run_alive_kernel_consolidation_synthesis.py`; the architectural contract
+is ADR-0018.
+
+## Plugin dependencies must respect the Hermes environment lock
+
+The supported Hermes runtime already provides `cryptography==50.0.0`. Alive's
+content vault needs AES-GCM, not a newer patch release. Declaring
+`cryptography>=50.0.2` caused an isolated plugin install to upgrade the shared
+environment against Hermes' exact lock and an MSAL upper bound. Tests still ran,
+but the environment was no longer dependency-consistent.
+
+Permanent constraints:
+
+- dependency success means a consistent Hermes environment, not merely an
+  importable module after an installer prints a conflict warning;
+- pin cryptography to the supported Hermes lock while this plugin targets the
+  current Hermes compatibility range;
+- change the pin only together with a newer Hermes compatibility declaration
+  and a clean-image dependency-resolution test;
+- never use an unrelated system Python as evidence for the Hermes plugin
+  environment.
+
 ## Location onboarding is optional, bounded, and multi-provider
 
 Location/weather personalization must never be an installation prerequisite.

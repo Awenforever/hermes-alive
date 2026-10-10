@@ -84,7 +84,7 @@ hermes alive install-runtime
 ```
 
 升级也使用同一组命令，不要只执行 `git pull` 或向另一套系统 Python 手工装包。
-Hermes 会按插件声明安装 `cryptography>=50.0.2,<51`，用于可擦除内容保险库。
+插件声明并复用 Hermes 锁定的 `cryptography==50.0.0`，用于可擦除内容保险库，避免插件升级破坏宿主依赖解析。
 安装流程会部署技能源码和 Gateway Hook、继承 Hermes 当前模型、写入非敏感
 默认配置并执行验证，但不会重启 Gateway。命令行路径适合已有明确配置的运维者；
 普通用户应优先采用上面的 Hermes 引导安装。确认结果后，请按当前部署方式正常

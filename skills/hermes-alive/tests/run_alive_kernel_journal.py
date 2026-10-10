@@ -110,6 +110,21 @@ def main() -> int:
         reopened = ExperienceJournal(path)
         assert reopened.last_sequence() == 4
         assert [record.sequence for record in reopened.iter_replay(batch_size=1)] == [1, 2, 3, 4]
+        assert [
+            record.sequence
+            for record in reopened.iter_reverse(batch_size=1, max_records=3)
+        ] == [4, 3, 2]
+        assert [
+            record.sequence
+            for record in reopened.iter_reverse(
+                event_types=("conversation.inbound",),
+                subject="conversation:test",
+                max_records=2,
+            )
+        ] == [1]
+        assert list(
+            reopened.iter_reverse(subject="conversation:missing", max_records=2)
+        ) == []
         assert reopened.verify_integrity() == 4
 
         try:

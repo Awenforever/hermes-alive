@@ -160,8 +160,11 @@ ingestion is harmless, and no secret-bearing payload crosses ingestion policy.
   WSL, lifecycle and operator-control proof remain).
 - [x] Retire direct Dream mutation and replace it with separately consented,
   evidence-bound, expiring memory proposals that require explicit user review
-  before activation (ADR-0016). Automated synthesis remains shadow/off until
-  longitudinal quality evidence exists.
+  before activation (ADR-0016).
+- [x] Add a provider-neutral synthesis boundary that uses Hermes model routing,
+  independently validates candidates, records actual-model attribution and
+  persists no raw prompt/response (ADR-0018). Automated invocation remains
+  shadow/off until longitudinal quality evidence exists.
 
 Exit: every retrieved memory explains why it exists; contradictions and user
 corrections are represented rather than overwritten.
@@ -549,11 +552,13 @@ For each material change:
   mapped to `outcome=unknown`, never to success/failure learning evidence.
 - Explicit policy blocks, cancellations, timeouts and exception-backed errors
   are typed, learning-eligible terminal facts (ADR-0015).
-- A clean-container run exposed that the base Hermes 0.21.3 image does not
-  itself include `cryptography`. The repository now declares
-  `cryptography>=50.0.2,<51` and the install/upgrade contract routes dependency
-  consent through `hermes plugins install --yes-deps`; an isolated install of
-  50.0.2 plus the complete container suite passed without changing production.
+- A clean-container run initially used the system Python instead of Hermes'
+  virtual environment and incorrectly concluded that cryptography was absent.
+  The supported Hermes environment actually locks `cryptography==50.0.0` and
+  already provides AES-GCM. A later isolated dependency-resolution run caught
+  that the resulting `>=50.0.2` declaration would force a host conflict. The
+  plugin now matches the Hermes lock and still routes dependency consent
+  through `hermes plugins install --yes-deps`.
 
 ### 2026-10-11 — Legacy Dream retirement and consented consolidation
 
@@ -600,3 +605,20 @@ For each material change:
 - The supervisor is cross-process locked, creates no kernel store on a fresh
   install and has no channel, provider or tool side effects. Kernel recovery
   failure remains observable without preventing the legacy watcher startup.
+
+### 2026-10-11 — Review-only model synthesis boundary
+
+- Replaced the missing link between retained evidence and reviewable memory
+  with a provider-neutral synthesizer rather than reviving Dream.
+- Synthesis requires both retention and learning consent, consumes a bounded
+  decryptable evidence window and delegates provider/fallback selection to
+  Hermes' auxiliary model route.
+- Strict JSON is only an interchange boundary: every candidate is validated
+  independently, tied to in-window evidence and admitted solely as an
+  encrypted, expiring proposal. Invalid siblings do not cancel valid ones.
+- Actual response-model attribution is mandatory. Structural receipts contain
+  no raw prompt, response or provider error text, and repeated operation IDs
+  cannot trigger another model call.
+- The callable remains unscheduled and cannot affect production behavior. The
+  next evidence gate is a sanitized historical replay corpus with
+  longitudinal usefulness, false-memory and review-burden metrics.
