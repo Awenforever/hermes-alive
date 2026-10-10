@@ -4,7 +4,7 @@ Status: active
 
 Last reviewed: 2026-10-09
 
-Current phase: Phase 1/2 — event adapters, typed memory and erasable content
+Current phase: Phase 4 — outcome learning and longitudinal evaluation
 
 Working branch: `feat/alive-kernel-3`
 
@@ -187,6 +187,9 @@ inspectable; replay is deterministic outside explicitly recorded model calls.
 - [x] Add constrained exploration budgets, delivered-exposure history and
   topic/source anti-echo-chamber gates that can only narrow base policy
   (ADR-0011).
+- [x] Add time-separated factual replay evaluation that rejects future
+  evidence, preserves unknown feedback and forbids unsupported counterfactual
+  policy claims (ADR-0012).
 
 Exit: learning improves held-out replay metrics without increasing interruption,
 factual error or user-control violations.
@@ -468,3 +471,17 @@ For each material change:
   candidate; direct bypass is rejected.
 - The mechanism remains shadow-only and has not altered production discovery
   or delivery behavior.
+
+### 2026-10-10 — Honest held-out replay baseline
+
+- Added time-separated evaluation of predictions made before factual action
+  attempts. Training state cannot cross the holdout boundary and cited evidence
+  must precede the attempted action.
+- No response and missing labels remain unknown. Conflicting positive and
+  negative evidence is also unknown rather than silently averaged into a
+  convenient reward.
+- Calibration comparisons require the exact same executed-attempt cohort.
+  Reports explicitly refuse to claim that an unexecuted action or a different
+  selection policy would have performed better.
+- This closes the measurement primitive, not the Phase-4 exit gate: a real
+  sanitized corpus and longitudinal shadow results are still required.

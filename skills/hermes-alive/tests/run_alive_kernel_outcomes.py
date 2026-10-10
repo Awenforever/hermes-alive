@@ -24,6 +24,7 @@ from alive_kernel.deliberation import (  # noqa: E402
 from alive_kernel.deliberation_store import DeliberationProjection  # noqa: E402
 from alive_kernel.event_store import ExperienceJournal  # noqa: E402
 from alive_kernel.events import EventEnvelope, Sensitivity  # noqa: E402
+from alive_kernel.evaluation import build_factual_episodes  # noqa: E402
 from alive_kernel.outcomes import (  # noqa: E402
     OutcomeContentStatus,
     OutcomeKind,
@@ -118,6 +119,7 @@ def main() -> int:
             attempt_id="attempt:outcome-test",
         )
         assert outcomes.apply(attempt_record).outcome == "recorded"
+        snapshot_before_outcomes = journal.last_sequence()
         retry = outcomes.append_attempt(
             selection_event_id=selection_record.event.event_id,
             candidate_id=candidate.candidate_id,
@@ -212,6 +214,19 @@ def main() -> int:
             "attempt:outcome-test", clearance=Sensitivity.PRIVATE
         )
         assert observed_before[0].content_status is OutcomeContentStatus.ERASED
+        historical_episodes = build_factual_episodes(
+            journal, outcomes, clearance=Sensitivity.PRIVATE,
+            observed_through_sequence=snapshot_before_outcomes,
+        )
+        assert len(historical_episodes) == 1
+        assert historical_episodes[0].labels.delivery_succeeded is None
+        assert historical_episodes[0].labels.useful is None
+        assert historical_episodes[0].outcome_event_ids == ()
+        current_episodes = build_factual_episodes(
+            journal, outcomes, clearance=Sensitivity.PRIVATE
+        )
+        assert current_episodes[0].labels.delivery_succeeded is True
+        assert current_episodes[0].labels.useful is None
         outcomes.rebuild(batch_size=2)
         assert outcomes.attempts(clearance=Sensitivity.PRIVATE) == attempts_before
         assert (
