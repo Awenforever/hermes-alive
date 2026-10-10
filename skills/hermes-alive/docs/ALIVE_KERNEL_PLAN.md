@@ -177,7 +177,9 @@ inspectable; replay is deterministic outside explicitly recorded model calls.
 
 - [x] Link action attempts and evidence-backed delivery, reply, correction,
   feedback and downstream task outcomes to validated selections (ADR-0008).
-- [ ] Learn timing, topic and presentation preferences conservatively.
+- [x] Learn timing, topic, presentation and interruption estimates from bounded,
+  expiring, retractable reviewed evidence without overriding explicit memory
+  preferences (ADR-0010).
 - [x] Treat no reply as ambiguous, never as punishment evidence; absence is
   intentionally not representable as an outcome kind.
 - [x] Store reflections as evidence-backed proposals with bounded expiry,
@@ -429,3 +431,20 @@ For each material change:
   thresholds or delivery policy.
 - Encrypted reflection prose can be erased while its proposal/review history
   remains deterministic and visibly marked as erased.
+
+### 2026-10-10 — Conservative preference-estimation baseline
+
+- Kept explicit preferences in the typed-memory authority model and introduced
+  a separate advisory estimator for weak learned patterns (ADR-0010).
+- Only explicit feedback outcomes and currently accepted reflections can create
+  learning signals. Delivery success, ordinary replies, model opinion and
+  non-response cannot enter the estimator.
+- Each source contributes once, per-origin weight is capped, total evidence
+  mass is bounded and every signal expires. Repetition therefore cannot turn a
+  weak estimate into an authoritative rule.
+- Preference targets and rationale remain encrypted; only a keyed digest enters
+  structural history. A stricter source can never be projected at a lower
+  sensitivity.
+- Retracting a reflection removes its contribution immediately. Explicit user
+  retraction removes a signal, and discard-and-rebuild reproduces the result.
+- Estimates are shadow-only and are not yet consumed by live deliberation.

@@ -79,6 +79,18 @@ from .outcomes import (
     OutcomeRecord,
     OutcomeValidationError,
 )
+from .preference_learning import (
+    PreferenceAxis,
+    PreferenceContentStatus,
+    PreferenceDirection,
+    PreferenceEstimate,
+    PreferenceLearningError,
+    PreferenceLearningProjection,
+    PreferenceProjectionDecision,
+    PreferenceSignalOrigin,
+    PreferenceSignalProposal,
+    PreferenceSignalState,
+)
 from .retrieval import RetrievalHit, rank_records
 from .reflection import (
     ReflectionAuthority,
@@ -146,6 +158,16 @@ __all__ = [
     "ProjectionDecision",
     "ProjectionDecisionKind",
     "PolicyContext",
+    "PreferenceAxis",
+    "PreferenceContentStatus",
+    "PreferenceDirection",
+    "PreferenceEstimate",
+    "PreferenceLearningError",
+    "PreferenceLearningProjection",
+    "PreferenceProjectionDecision",
+    "PreferenceSignalOrigin",
+    "PreferenceSignalProposal",
+    "PreferenceSignalState",
     "RetrievalHit",
     "ReflectionAuthority",
     "ReflectionContentStatus",
