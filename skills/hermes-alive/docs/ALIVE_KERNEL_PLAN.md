@@ -146,7 +146,8 @@ ingestion is harmless, and no secret-bearing payload crosses ingestion policy.
   principles; see `adr/0002-typed-memory-is-a-projection.md`.
 - [x] Implement episodic, semantic, preference, commitment and self-model
   records with provenance, confidence, validity, sensitivity and supersession.
-- [ ] Retrieve by recency, relevance and importance without losing provenance.
+- [x] Retrieve by relevance, importance, recency and authority without losing
+  provenance; BM25 + explainable RRF is the deterministic baseline (ADR-0005).
 - [ ] Make correction, forgetting and privacy erasure propagate predictably
   (encrypted content-vault primitive and resumable managed-backup purge pass;
   reference-only memory events and replay-safe item/subject forgetting pass;
@@ -340,3 +341,24 @@ For each material change:
   item/subject erasure and discard-and-rebuild pass on Windows, Linux and the
   actual Hermes Docker runtime. Production ingestion remains disabled pending
   WSL, lifecycle/doctor and operator-control gates.
+
+### 2026-10-10 — Explainable recall baseline
+
+- Added authorization-first memory search using BM25 and Reciprocal Rank
+  Fusion over independent relevance, importance, recency and authority lists.
+  This replaces a tempting but opaque hand-weighted “memory score.”
+- Each result exposes matched terms, component ranks and the original source
+  event IDs. A query cannot admit an unrelated memory merely because it is
+  newer or marked important.
+- CJK bigrams avoid the false matches produced by common single characters;
+  no-match queries return silence rather than the least-bad memory.
+- Semantic embeddings remain an optional future Hermes capability: private
+  memory will not be silently exported to whichever model happens to be
+  configured.
+- Review of duplicate evidence found and fixed a privacy escalation bug: the
+  logical memory now inherits the strictest sensitivity seen across equal
+  claims, never the first/least restrictive label. Its primary reference also
+  moves to ciphertext authenticated at that stricter sensitivity.
+- Projection decisions, record timestamps and transitions now derive from the
+  durable event clock rather than replay wall time. Rebuild tests compare
+  timestamps as well as rankings, preventing recency drift after recovery.

@@ -699,11 +699,21 @@ class MemoryProjection:
         reason: str,
         memory_id: str | None,
     ) -> ProjectionDecision:
+        decided_at = self._event_time(connection, event_id)
         connection.execute(
             "INSERT INTO memory_projection_decisions_v2 VALUES (?, ?, ?, ?, ?)",
-            (event_id, decision.value, reason, memory_id, datetime.now(timezone.utc).isoformat()),
+            (event_id, decision.value, reason, memory_id, decided_at),
         )
         return ProjectionDecision(event_id, decision, reason, memory_id)
+
+    @staticmethod
+    def _event_time(connection: sqlite3.Connection, event_id: str) -> str:
+        row = connection.execute(
+            "SELECT observed_at FROM experience_events WHERE event_id=?", (event_id,)
+        ).fetchone()
+        if row is None:
+            raise MemoryValidationError(f"missing event time for {event_id!r}")
+        return str(row["observed_at"])
 
     def _sources_exist(self, connection: sqlite3.Connection, ids: Iterable[str]) -> bool:
         for event_id in ids:
@@ -823,7 +833,7 @@ class MemoryProjection:
                 if proposal.supersedes_id is None:
                     duplicate = connection.execute(
                         """
-                        SELECT memory_id FROM memory_records_v2
+                        SELECT memory_id, sensitivity FROM memory_records_v2
                         WHERE subject=? AND predicate=? AND content_digest=?
                           AND state IN (?, ?, ?)
                         ORDER BY created_at DESC LIMIT 1
@@ -839,6 +849,23 @@ class MemoryProjection:
                     ).fetchone()
                 if duplicate is not None:
                     memory_id = str(duplicate["memory_id"])
+                    existing_sensitivity = Sensitivity(duplicate["sensitivity"])
+                    proposal_level = _SENSITIVITY_ORDER.index(proposal.sensitivity)
+                    existing_level = _SENSITIVITY_ORDER.index(existing_sensitivity)
+                    if proposal_level > existing_level:
+                        connection.execute(
+                            """
+                            UPDATE memory_records_v2
+                            SET content_id=?, sensitivity=?, updated_at=?
+                            WHERE memory_id=?
+                            """,
+                            (
+                                proposal.content.content_id,
+                                proposal.sensitivity.value,
+                                self._event_time(connection, event.event_id),
+                                memory_id,
+                            ),
+                        )
                     connection.execute(
                         "INSERT OR IGNORE INTO memory_contents_v2 VALUES (?, ?)",
                         (memory_id, proposal.content.content_id),
@@ -859,7 +886,7 @@ class MemoryProjection:
                     return decision
 
                 state, reason = self._admitted_state(proposal)
-                now = datetime.now(timezone.utc).isoformat()
+                now = event.observed_at.isoformat()
 
                 if proposal.supersedes_id:
                     target = connection.execute(
@@ -995,7 +1022,7 @@ class MemoryProjection:
         reason: str,
         event_id: str,
     ) -> None:
-        now = datetime.now(timezone.utc).isoformat()
+        now = self._event_time(connection, event_id)
         connection.execute(
             "UPDATE memory_records_v2 SET state=?, updated_at=? WHERE memory_id=? AND state=?",
             (to_state.value, now, memory_id, from_state.value),
@@ -1075,6 +1102,34 @@ class MemoryProjection:
                     break
             return records
 
+    def search(
+        self,
+        query: str,
+        *,
+        clearance: Sensitivity,
+        subject: str | None = None,
+        predicate: str | None = None,
+        kinds: Iterable[MemoryKind] | None = None,
+        states: Iterable[MemoryState] = (MemoryState.ACTIVE,),
+        as_of: datetime | None = None,
+        limit: int = 20,
+        candidate_limit: int = 2000,
+    ) -> list["RetrievalHit"]:
+        if not 1 <= candidate_limit <= 10_000:
+            raise ValueError("candidate_limit must be between 1 and 10000")
+        from .retrieval import rank_records
+
+        records = self.retrieve(
+            subject=subject,
+            predicate=predicate,
+            kinds=kinds,
+            states=states,
+            clearance=clearance,
+            as_of=as_of,
+            limit=candidate_limit,
+        )
+        return rank_records(records, query, limit=limit)
+
     def get(
         self, memory_id: str, *, clearance: Sensitivity
     ) -> MemoryRecord | None:
@@ -1123,6 +1178,11 @@ class MemoryProjection:
             value = row[name]
             return datetime.fromisoformat(str(value)) if value else None
 
+        created_at = parsed("created_at")
+        updated_at = parsed("updated_at")
+        if created_at is None or updated_at is None:
+            raise MemoryValidationError("memory record is missing durable timestamps")
+
         content_id = str(row["content_id"])
         try:
             value = self.content_vault.resolve_json(
@@ -1160,6 +1220,6 @@ class MemoryProjection:
             valid_until=parsed("valid_until"),
             supersedes_id=row["supersedes_id"],
             created_from_event_id=str(row["proposal_event_id"]),
-            created_at=parsed("created_at") or datetime.now(timezone.utc),
-            updated_at=parsed("updated_at") or datetime.now(timezone.utc),
+            created_at=created_at,
+            updated_at=updated_at,
         )

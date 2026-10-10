@@ -34,6 +34,7 @@ from .memory import (
     ProjectionDecision,
     ProjectionDecisionKind,
 )
+from .retrieval import RetrievalHit, rank_records
 
 __all__ = [
     "AppendResult",
@@ -60,9 +61,11 @@ __all__ = [
     "MemoryValidationError",
     "ProjectionDecision",
     "ProjectionDecisionKind",
+    "RetrievalHit",
     "Sensitivity",
     "ShadowKernelBridge",
     "mirror_hook_event",
+    "rank_records",
     "shadow_enabled",
     "structural_hook_payload",
 ]

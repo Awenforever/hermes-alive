@@ -226,6 +226,35 @@ def main() -> int:
             )
         ) == 1
 
+        sensitivity_source = source(journal)
+        low_sensitivity = proposal(
+            sensitivity_source,
+            predicate="profile.classified_value",
+            value="same-claim",
+            sensitivity=Sensitivity.PRIVATE,
+        )
+        memory.apply(memory.append_proposal(low_sensitivity, actor="user:test"))
+        sensitivity_upgrade_source = source(journal)
+        high_sensitivity = proposal(
+            sensitivity_upgrade_source,
+            predicate="profile.classified_value",
+            value="same-claim",
+            sensitivity=Sensitivity.RESTRICTED,
+        )
+        upgraded = memory.apply(
+            memory.append_proposal(high_sensitivity, actor="user:test")
+        )
+        assert upgraded.decision is ProjectionDecisionKind.DEDUPLICATED
+        assert memory.get(
+            low_sensitivity.proposal_id, clearance=Sensitivity.PRIVATE
+        ) is None
+        upgraded_record = memory.get(
+            low_sensitivity.proposal_id, clearance=Sensitivity.RESTRICTED
+        )
+        assert upgraded_record is not None
+        assert upgraded_record.content_status is ContentStatus.AVAILABLE
+        assert upgraded_record.value == "same-claim"
+
         concurrent_source = source(journal)
         concurrent_proposal = proposal(
             concurrent_source,
