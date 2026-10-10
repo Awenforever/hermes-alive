@@ -12,6 +12,8 @@ provides_hooks:
   - post_tool_call
 python_dependencies:
   - "cryptography>=50.0.2,<51"
+  - "PyYAML>=6.0.3,<7"
+  - "tzdata>=2025.2"
 config_schema:
   enabled:
     type: bool

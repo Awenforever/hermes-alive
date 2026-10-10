@@ -13,7 +13,7 @@ gateway:startup
       -> live Circadian pre-compose gate
       -> cooldown and interruption policy
       -> legacy fixed quiet override only when live dynamic-awake is authoritative
-      -> discovery and dream cycles
+      -> discovery cycle (legacy Dream is retired and inert)
       -> LLM composition
       -> live proactive quality audit/enforcement
       -> per-send activity/context guard
@@ -50,6 +50,12 @@ comparison/rollback evidence and as the active safeguard when Circadian is
 | `content_delivery.py` | Capability-aware text/link/image/file delivery with safe fallbacks. |
 | `managed_config.py` | Non-secret managed configuration and environment export. |
 | `safe_io.py` | Atomic writes, locks, bounded JSONL, and shared-path ownership. |
+
+The shadow Alive kernel is deliberately separate from this legacy watcher. It
+records a durable event history, projects typed memory/agenda/outcome state and
+keeps model consolidation behind independent retention and learning consent.
+Model-derived memory is review-only until the user explicitly accepts it. See
+`ALIVE_KERNEL_PLAN.md` and ADR-0016. It does not yet drive production sends.
 
 ## Decision ownership
 

@@ -60,6 +60,13 @@ from .content_vault import (
     ContentVaultError,
     ErasureResult,
 )
+from .consolidation import (
+    ConsolidationCandidate,
+    ConsolidationPolicy,
+    ConsolidationPolicyProjection,
+    ConsolidationService,
+    ConsolidationValidationError,
+)
 from .deliberation import (
     ActionAuthority,
     ActionCandidate,
@@ -92,6 +99,7 @@ from .memory import (
     MemoryProjection,
     MemoryProposal,
     MemoryRecord,
+    MemoryReview,
     MemoryState,
     MemoryValidationError,
     ProjectionDecision,
@@ -171,6 +179,11 @@ __all__ = [
     "ContentUnavailableError",
     "ContentVault",
     "ContentVaultError",
+    "ConsolidationCandidate",
+    "ConsolidationPolicy",
+    "ConsolidationPolicyProjection",
+    "ConsolidationService",
+    "ConsolidationValidationError",
     "DecisionDimensions",
     "DeliberationAuditDecision",
     "DeliberationFrame",
@@ -200,6 +213,7 @@ __all__ = [
     "MemoryProjection",
     "MemoryProposal",
     "MemoryRecord",
+    "MemoryReview",
     "MemoryState",
     "MemoryValidationError",
     "MetricScore",

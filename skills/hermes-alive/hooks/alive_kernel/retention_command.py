@@ -3,12 +3,21 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import json
 from pathlib import Path
 from typing import Any, Mapping
 
 from .content_vault import ContentVault
+from .consolidation import ConsolidationPolicyProjection, ConsolidationValidationError
 from .event_store import ExperienceJournal
 from .events import Sensitivity
+from .memory import (
+    MemoryProjection,
+    MemoryReview,
+    MemoryState,
+    MemoryValidationError,
+    ProjectionDecisionKind,
+)
 from .privacy import LocalIdentityProtector
 from .retention import (
     RetentionDirection,
@@ -18,16 +27,20 @@ from .retention import (
 
 
 USAGE = (
-    "Alive 内容保留控制：\n"
+    "Alive 记忆与内容控制：\n"
     "- `/memory alive status`\n"
     "- `/memory alive retain on [1-365天] [inbound|outbound|both]`\n"
     "- `/memory alive retain off`（停止新增，不删除既有内容）\n"
+    "- `/memory alive learn on|off`（是否允许模型提出长期记忆）\n"
+    "- `/memory alive proposals`（查看待审记忆）\n"
+    "- `/memory alive accept <id>` 或 `/memory alive reject <id>`\n"
+    "- `/memory alive retract <id>`（撤回已接受记忆）\n"
     "- `/memory alive forget`（擦除该用户的 Alive 加密内容）"
 )
 
 
 def _runtime(shared_dir: str | Path) -> tuple[
-    LocalIdentityProtector, RetentionProjection
+    LocalIdentityProtector, RetentionProjection, ConsolidationPolicyProjection, MemoryProjection
 ]:
     kernel_dir = Path(shared_dir).expanduser().resolve() / "kernel"
     protector = LocalIdentityProtector(kernel_dir / "identity.key")
@@ -35,7 +48,12 @@ def _runtime(shared_dir: str | Path) -> tuple[
     vault = ContentVault(
         kernel_dir / "content-vault", backup_root=kernel_dir / "content-backups"
     )
-    return protector, RetentionProjection(journal, content_vault=vault)
+    return (
+        protector,
+        RetentionProjection(journal, content_vault=vault),
+        ConsolidationPolicyProjection(journal),
+        MemoryProjection(journal, content_vault=vault),
+    )
 
 
 def _subject(
@@ -44,12 +62,20 @@ def _subject(
     return protector.pseudonym("user", context.get("user_id"))
 
 
-def _policy_message(projection: RetentionProjection, subject: str) -> str:
+def _policy_message(
+    projection: RetentionProjection,
+    learning: ConsolidationPolicyProjection,
+    subject: str,
+) -> str:
     policy = projection.policy(subject)
+    learning_policy = learning.policy(subject)
+    learning_state = "已授权（仅生成待审提案）" if learning_policy and learning_policy.enabled else "未授权（默认关闭）"
     if policy is None:
         return (
             "Alive 长期内容保留：**未授权（默认关闭）**。\n\n"
-            "当前只记录匿名化结构事件，不保存消息或回复正文。\n\n" + USAGE
+            f"Alive 模型记忆学习：**{learning_state}**。\n\n"
+            "当前只记录匿名化结构事件，不保存消息或回复正文。"
+            "即使开启学习，没有获准保留的证据也不能产生记忆提案。\n\n" + USAGE
         )
     directions = ", ".join(sorted(value.value for value in policy.directions))
     state = "已开启" if policy.enabled else "已关闭"
@@ -59,8 +85,31 @@ def _policy_message(projection: RetentionProjection, subject: str) -> str:
         f"- 保留：`{policy.retention_days}` 天\n"
         f"- 级别：`{policy.sensitivity.value}`\n"
         f"- 授权事件：`{policy.consent_event_id}`\n\n"
+        f"Alive 模型记忆学习：**{learning_state}**。\n\n"
         + USAGE
     )
+
+
+def _proposals_message(memory: MemoryProjection, subject: str) -> str:
+    records = memory.retrieve(
+        subject=subject,
+        states=(MemoryState.PROPOSED,),
+        clearance=Sensitivity.RESTRICTED,
+        limit=10,
+    )
+    if not records:
+        return "当前没有可用的待审记忆提案。"
+    lines = ["Alive 待审记忆（最多显示 10 条）："]
+    for record in records:
+        rendered = json.dumps(record.value, ensure_ascii=False, separators=(",", ":"))
+        if len(rendered) > 240:
+            rendered = rendered[:237] + "…"
+        lines.append(
+            f"- `{record.memory_id}` · `{record.kind.value}` · "
+            f"`{record.predicate}`：{rendered}"
+        )
+    lines.append("\n使用 `/memory alive accept <id>` 或 `/memory alive reject <id>`。")
+    return "\n".join(lines)
 
 
 def handle_memory_command(
@@ -73,7 +122,7 @@ def handle_memory_command(
     tokens = raw_args.split()
     if not tokens or tokens[0].lower() != "alive":
         return None
-    protector, projection = _runtime(shared_dir)
+    protector, projection, learning, memory = _runtime(shared_dir)
     subject = _subject(values, protector)
     if subject is None:
         return {
@@ -83,7 +132,7 @@ def handle_memory_command(
     action = tokens[1].lower() if len(tokens) > 1 else "status"
     try:
         if action in {"status", "show"}:
-            message = _policy_message(projection, subject)
+            message = _policy_message(projection, learning, subject)
         elif action == "retain":
             mode = tokens[2].lower() if len(tokens) > 2 else ""
             current = projection.policy(subject)
@@ -128,9 +177,53 @@ def handle_memory_command(
                 )
             else:
                 message = USAGE
+        elif action == "learn":
+            mode = tokens[2].lower() if len(tokens) > 2 else ""
+            if mode not in {"on", "off"}:
+                message = USAGE
+            else:
+                record = learning.append_consent(
+                    subject=subject, actor=subject, enabled=mode == "on"
+                )
+                learning.apply(record)
+                if mode == "on":
+                    retention = projection.policy(subject)
+                    suffix = (
+                        " 已保留的合格证据可用于生成待审提案；任何提案都不会自动生效。"
+                        if retention and retention.enabled
+                        else " 目前内容保留未开启，因此仍没有正文证据可供学习。"
+                    )
+                    message = "已授权 Alive 提出长期记忆候选。" + suffix
+                else:
+                    message = "已停止 Alive 生成新的模型记忆提案；既有待审或已接受记忆不变。"
+        elif action == "proposals":
+            message = _proposals_message(memory, subject)
+        elif action in {"accept", "reject", "retract"}:
+            if len(tokens) != 3:
+                message = USAGE
+            else:
+                review = {
+                    "accept": MemoryReview.ACCEPT,
+                    "reject": MemoryReview.REJECT,
+                    "retract": MemoryReview.RETRACT,
+                }[action]
+                record = memory.append_review(
+                    tokens[2], review=review, subject=subject, actor=subject
+                )
+                decision = memory.apply(record)
+                if decision.decision is ProjectionDecisionKind.REJECTED:
+                    message = f"未更改记忆：`{decision.reason}`。"
+                else:
+                    labels = {"accept": "已接受", "reject": "已拒绝", "retract": "已撤回"}
+                    message = f"{labels[action]}记忆 `{tokens[2]}`。"
         elif action == "forget":
             request = projection.append_erasure_request(
                 subject=subject, actor=subject
+            )
+            memory.forget_subject(
+                subject,
+                actor=subject,
+                request_id=request.event.event_id,
             )
             result, _completion = projection.execute_erasure(request)
             message = (
@@ -142,7 +235,12 @@ def handle_memory_command(
             )
         else:
             message = USAGE
-    except (RetentionValidationError, ValueError) as error:
+    except (
+        ConsolidationValidationError,
+        MemoryValidationError,
+        RetentionValidationError,
+        ValueError,
+    ) as error:
         message = f"未更改设置：{error}\n\n{USAGE}"
     return {"decision": "handled", "message": message}
 
@@ -153,8 +251,11 @@ def resume_retention_maintenance(shared_dir: str | Path) -> dict[str, int]:
     kernel_dir = Path(shared_dir).expanduser().resolve() / "kernel"
     if not (kernel_dir / "experience.sqlite3").is_file():
         return {"erasures_resumed": 0, "expired_erased": 0}
-    _protector, projection = _runtime(shared_dir)
+    _protector, projection, _learning, _memory = _runtime(shared_dir)
     resumed = projection.resume_pending_erasures()
+    # A crash after the durable erasure/forget event but before projection must
+    # converge on startup: content is erased and logical memories are retracted.
+    _memory.project_new()
     expired = projection.content_vault.erase_expired(now=datetime.now(timezone.utc))
     return {
         "erasures_resumed": resumed,

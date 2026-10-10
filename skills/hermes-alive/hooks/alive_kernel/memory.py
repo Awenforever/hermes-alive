@@ -74,6 +74,12 @@ class ProjectionDecisionKind(StrEnum):
     RETRACTED = "retracted"
 
 
+class MemoryReview(StrEnum):
+    ACCEPT = "accept"
+    REJECT = "reject"
+    RETRACT = "retract"
+
+
 class ContentStatus(StrEnum):
     AVAILABLE = "available"
     ERASED = "erased"
@@ -370,6 +376,13 @@ class MemoryProjection:
                     memory_id TEXT,
                     decided_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS memory_review_decisions_v1 (
+                    review_event_id TEXT PRIMARY KEY,
+                    decision TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    memory_id TEXT,
+                    decided_at TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS memory_transitions_v2 (
                     transition_id INTEGER PRIMARY KEY AUTOINCREMENT,
                     memory_id TEXT NOT NULL,
@@ -470,6 +483,37 @@ class MemoryProjection:
         # impossible and turn a transient journal failure into data loss.
         return self._append_idempotent_event(event)
 
+    def append_review(
+        self,
+        memory_id: str,
+        *,
+        review: MemoryReview,
+        subject: str,
+        actor: str,
+        operation_id: str | None = None,
+    ) -> JournalRecord:
+        memory_id = str(memory_id).strip()
+        subject = str(subject).strip()
+        actor = str(actor).strip()
+        if not _SUBJECT_RE.fullmatch(memory_id):
+            raise MemoryValidationError("invalid memory_id")
+        if not _SUBJECT_RE.fullmatch(subject) or actor != subject:
+            raise MemoryValidationError("memory review must be self-authorized")
+        event = EventEnvelope(
+            event_id=f"memory.review:{operation_id or uuid4()}",
+            event_type="memory.reviewed",
+            source="hermes.command.memory",
+            actor=actor,
+            subject=subject,
+            payload={
+                "memory_id": memory_id,
+                "review": MemoryReview(review).value,
+                "raw_command_stored": False,
+            },
+            sensitivity=Sensitivity.PRIVATE,
+        )
+        return self._append_idempotent_event(event)
+
     def forget_item(
         self, memory_id: str, *, actor: str, request_id: str | None = None
     ) -> bool:
@@ -487,6 +531,8 @@ class MemoryProjection:
             ]
         if row is None:
             return False
+        if str(actor).strip() != str(row["subject"]):
+            raise MemoryValidationError("memory forgetting must be self-authorized")
         event = EventEnvelope(
             event_id=f"memory.forget:{request_id or uuid4()}",
             event_type="memory.forgotten",
@@ -511,6 +557,8 @@ class MemoryProjection:
         subject = str(subject).strip()
         if not _SUBJECT_RE.fullmatch(subject):
             raise MemoryValidationError("invalid memory subject")
+        if str(actor).strip() != subject:
+            raise MemoryValidationError("memory forgetting must be self-authorized")
         with closing(self._connect()) as connection:
             rows = connection.execute(
                 """
@@ -553,7 +601,7 @@ class MemoryProjection:
         records = self.journal.read(after_sequence=after, limit=limit)
         decisions: list[ProjectionDecision] = []
         for record in records:
-            if record.event.event_type == "memory.proposed":
+            if record.event.event_type in {"memory.proposed", "memory.reviewed"}:
                 decisions.append(self.apply(record))
             elif record.event.event_type == "memory.forgotten":
                 self._apply_forgetting(record)
@@ -564,7 +612,13 @@ class MemoryProjection:
         event = record.event
         payload = event.payload
         scope = str(payload.get("scope") or "")
-        if event.event_type != "memory.forgotten" or scope not in {"item", "subject"}:
+        if (
+            event.event_type != "memory.forgotten"
+            or event.source != "alive.memory"
+            or event.subject is None
+            or event.actor != event.subject
+            or scope not in {"item", "subject"}
+        ):
             raise MemoryValidationError("invalid memory forgetting event")
 
         def content_ids(value: Any) -> tuple[str, ...]:
@@ -658,6 +712,7 @@ class MemoryProjection:
                 connection.execute("DELETE FROM memory_sources_v2")
                 connection.execute("DELETE FROM memory_contents_v2")
                 connection.execute("DELETE FROM memory_projection_decisions_v2")
+                connection.execute("DELETE FROM memory_review_decisions_v1")
                 connection.execute("DELETE FROM memory_records_v2")
                 connection.execute(
                     "DELETE FROM consumer_checkpoints WHERE consumer_name=?",
@@ -738,8 +793,10 @@ class MemoryProjection:
 
     def apply(self, record: JournalRecord) -> ProjectionDecision:
         event = record.event
-        if event.event_type != "memory.proposed":
-            raise MemoryValidationError("projection accepts only memory.proposed events")
+        if event.event_type not in {"memory.proposed", "memory.reviewed"}:
+            raise MemoryValidationError("unsupported memory projection event")
+        if event.event_type == "memory.reviewed":
+            return self._apply_review(record)
         with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
@@ -1008,6 +1065,115 @@ class MemoryProjection:
                 )
                 connection.execute("COMMIT")
                 return decision
+            except Exception:
+                if connection.in_transaction:
+                    connection.execute("ROLLBACK")
+                raise
+
+    def _apply_review(self, record: JournalRecord) -> ProjectionDecision:
+        event = record.event
+        with closing(self._connect()) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                prior = connection.execute(
+                    "SELECT * FROM memory_review_decisions_v1 WHERE review_event_id=?",
+                    (event.event_id,),
+                ).fetchone()
+                if prior is not None:
+                    connection.execute("COMMIT")
+                    return ProjectionDecision(
+                        event.event_id,
+                        ProjectionDecisionKind(prior["decision"]),
+                        str(prior["reason"]),
+                        prior["memory_id"],
+                    )
+
+                def decide(
+                    decision: ProjectionDecisionKind,
+                    reason: str,
+                    memory_id: str | None,
+                ) -> ProjectionDecision:
+                    connection.execute(
+                        "INSERT INTO memory_review_decisions_v1 VALUES (?, ?, ?, ?, ?)",
+                        (
+                            event.event_id,
+                            decision.value,
+                            reason,
+                            memory_id,
+                            event.observed_at.isoformat(),
+                        ),
+                    )
+                    return ProjectionDecision(event.event_id, decision, reason, memory_id)
+
+                try:
+                    memory_id = str(event.payload["memory_id"]).strip()
+                    review = MemoryReview(event.payload["review"])
+                except (KeyError, ValueError):
+                    result = decide(
+                        ProjectionDecisionKind.REJECTED, "review_payload_invalid", None
+                    )
+                    connection.execute("COMMIT")
+                    return result
+                row = connection.execute(
+                    "SELECT * FROM memory_records_v2 WHERE memory_id=?", (memory_id,)
+                ).fetchone()
+                authorized = (
+                    row is not None
+                    and event.source == "hermes.command.memory"
+                    and event.subject == row["subject"]
+                    and event.actor == event.subject
+                    and event.payload.get("raw_command_stored") is False
+                )
+                if not authorized:
+                    result = decide(
+                        ProjectionDecisionKind.REJECTED,
+                        "review_authority_invalid",
+                        memory_id if row is not None else None,
+                    )
+                    connection.execute("COMMIT")
+                    return result
+                current = MemoryState(row["state"])
+                transition = {
+                    (MemoryState.PROPOSED, MemoryReview.ACCEPT): MemoryState.ACTIVE,
+                    (MemoryState.PROPOSED, MemoryReview.REJECT): MemoryState.RETRACTED,
+                    (MemoryState.ACTIVE, MemoryReview.RETRACT): MemoryState.RETRACTED,
+                    (MemoryState.CONTESTED, MemoryReview.RETRACT): MemoryState.RETRACTED,
+                }.get((current, review))
+                if transition is None:
+                    result = decide(
+                        ProjectionDecisionKind.REJECTED,
+                        "invalid_review_transition",
+                        memory_id,
+                    )
+                    connection.execute("COMMIT")
+                    return result
+                valid_until = row["valid_until"]
+                if (
+                    review is MemoryReview.ACCEPT
+                    and valid_until
+                    and event.observed_at >= datetime.fromisoformat(str(valid_until))
+                ):
+                    result = decide(
+                        ProjectionDecisionKind.REJECTED, "memory_expired", memory_id
+                    )
+                    connection.execute("COMMIT")
+                    return result
+                self._transition(
+                    connection,
+                    memory_id,
+                    current,
+                    transition,
+                    f"user_{review.value}",
+                    event.event_id,
+                )
+                decision = (
+                    ProjectionDecisionKind.ACTIVATED
+                    if transition is MemoryState.ACTIVE
+                    else ProjectionDecisionKind.RETRACTED
+                )
+                result = decide(decision, f"user_{review.value}", memory_id)
+                connection.execute("COMMIT")
+                return result
             except Exception:
                 if connection.in_transaction:
                     connection.execute("ROLLBACK")

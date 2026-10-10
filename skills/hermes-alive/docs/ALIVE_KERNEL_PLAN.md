@@ -2,7 +2,7 @@
 
 Status: active
 
-Last reviewed: 2026-10-09
+Last reviewed: 2026-10-11
 
 Current phase: Phase 4 — outcome learning and longitudinal evaluation
 
@@ -158,7 +158,10 @@ ingestion is harmless, and no secret-bearing payload crosses ingestion policy.
   (encrypted content-vault primitive and resumable managed-backup purge pass;
   reference-only memory events and replay-safe item/subject forgetting pass;
   WSL, lifecycle and operator-control proof remain).
-- [ ] Replace direct Dream mutation with reviewable memory proposals.
+- [x] Retire direct Dream mutation and replace it with separately consented,
+  evidence-bound, expiring memory proposals that require explicit user review
+  before activation (ADR-0016). Automated synthesis remains shadow/off until
+  longitudinal quality evidence exists.
 
 Exit: every retrieved memory explains why it exists; contradictions and user
 corrections are represented rather than overwritten.
@@ -551,3 +554,35 @@ For each material change:
   `cryptography>=50.0.2,<51` and the install/upgrade contract routes dependency
   consent through `hermes plugins install --yes-deps`; an isolated install of
   50.0.2 plus the complete container suite passed without changing production.
+
+### 2026-10-11 — Legacy Dream retirement and consented consolidation
+
+- Source review disproved the legacy Dream documentation: the runtime did not
+  merely save a diff for review. It read raw session transcripts without the
+  new retention boundary and could directly mutate `MEMORY.md`, fact state and
+  voice state from model output. The engine is now an inert compatibility
+  tombstone; even a stale `HERMES_DREAM_ENABLED=1` cannot reactivate it.
+- Separated permission to retain conversation content from permission to learn
+  from it. Both default off per pseudonymous user. Retention alone never grants
+  model interpretation, and learning consent without retained evidence has
+  nothing to process.
+- Added consolidation candidates limited to expiring fact, preference and
+  self-model hypotheses. Every cited item must be decryptable retained content
+  for the same subject; structural-only, erased, missing and cross-user evidence
+  is rejected.
+- Model output can create only an encrypted `proposed` memory. It cannot create
+  commitments, delete, supersede, activate or silently alter policy. Explicit
+  `/memory alive accept|reject|retract` review is the only activation path.
+- Candidate IDs and command operation IDs are semantic idempotency keys;
+  retries converge and changed reuse fails. Consent and memory projections can
+  be discarded and deterministically rebuilt from the journal.
+- This completes the safe consolidation primitive, not autonomous production
+  learning. Candidate generation is not scheduled and production remains
+  unchanged pending corpus evaluation and shadow qualification.
+- The complete Windows run exposed a separate packaging defect: Python's
+  `zoneinfo` has no system IANA database on ordinary Windows, while the plugin
+  did not declare `tzdata`. The plugin now declares it explicitly so Circadian
+  behavior survives a true fresh Windows install instead of depending on a
+  developer machine's incidental packages. The same clean-image run confirmed
+  that YAML parsing was also an undeclared runtime assumption, so `PyYAML` is
+  now part of the plugin dependency contract rather than only CI setup.

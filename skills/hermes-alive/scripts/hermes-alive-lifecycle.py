@@ -868,8 +868,13 @@ def configure(args: argparse.Namespace) -> int:
         "context_flow_max_age_seconds",
         args.context_flow_max_age_seconds,
     )
-    if args.dream_enabled is not None:
-        assign("dream_enabled", args.dream_enabled)
+    if args.dream_enabled:
+        raise LifecycleError(
+            "Legacy Dream was retired because it bypassed content consent and "
+            "reviewable memory; it cannot be enabled"
+        )
+    if args.dream_enabled is False:
+        assign("dream_enabled", False)
     assign("dream_interval_hours", args.dream_interval_hours)
     if args.weather_enabled is not None:
         assign("weather_enabled", args.weather_enabled)

@@ -64,6 +64,9 @@ run_and_require() {
 
 run_and_require run_alive_kernel_journal.py '^HERMES_ALIVE_KERNEL_JOURNAL_OK$'
 run_and_require run_alive_kernel_shadow.py '^HERMES_ALIVE_KERNEL_SHADOW_OK$'
+run_and_require run_alive_kernel_retention.py '^HERMES_ALIVE_KERNEL_RETENTION_OK$'
+run_and_require run_alive_kernel_consolidation.py '^HERMES_ALIVE_KERNEL_CONSOLIDATION_OK$'
+run_and_require run_legacy_dream_retirement.py '^HERMES_ALIVE_LEGACY_DREAM_RETIREMENT_OK$'
 run_and_require run_alive_kernel_memory.py '^HERMES_ALIVE_KERNEL_MEMORY_OK$'
 run_and_require run_circadian.py '^HERMES_ALIVE_CIRCADIAN_CORE_RESULT=PASS$'
 run_and_require run_circadian_shadow.py '^HERMES_ALIVE_CIRCADIAN_SHADOW_RESULT=PASS$'

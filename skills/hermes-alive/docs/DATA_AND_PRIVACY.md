@@ -10,7 +10,8 @@ Hermes Alive may persist:
 - proactive delivery and decision logs;
 - Discovery cache and content evidence;
 - topic reservation and delivery history;
-- dream diffs and memory-processing state;
+- encrypted, expiring typed-memory proposals and review state when separately
+  authorized (legacy Dream transcript processing is retired);
 - Circadian sleep/wake state plus shadow/live enforcement observability;
 - an optional confirmed location profile.
 
@@ -39,6 +40,9 @@ explicitly supplied.
   is owner-only (`0600`).
 - Logs and JSONL files are bounded or rotated.
 - Interest learning does not infer sensitive identity traits.
+- Fresh installs retain no conversation body and perform no model memory
+  consolidation. Content retention and model learning require two separate,
+  per-user Hermes-authorized choices.
 
 ## Topic-delivery privacy
 
