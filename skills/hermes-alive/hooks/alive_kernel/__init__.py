@@ -13,6 +13,15 @@ from .event_store import (
 )
 from .privacy import LocalIdentityProtector, structural_hook_payload
 from .shadow_bridge import ShadowKernelBridge, mirror_hook_event, shadow_enabled
+from .content_vault import (
+    ContentErasedError,
+    ContentIntegrityError,
+    ContentReference,
+    ContentUnavailableError,
+    ContentVault,
+    ContentVaultError,
+    ErasureResult,
+)
 from .memory import (
     MemoryAuthority,
     MemoryKind,
@@ -27,10 +36,17 @@ from .memory import (
 
 __all__ = [
     "AppendResult",
+    "ContentErasedError",
+    "ContentIntegrityError",
+    "ContentReference",
+    "ContentUnavailableError",
+    "ContentVault",
+    "ContentVaultError",
     "EventConflictError",
     "EventEnvelope",
     "EventIntegrityError",
     "EventValidationError",
+    "ErasureResult",
     "ExperienceJournal",
     "LocalIdentityProtector",
     "MemoryAuthority",

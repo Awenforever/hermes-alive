@@ -4,7 +4,7 @@ Status: active
 
 Last reviewed: 2026-10-09
 
-Current phase: Phase 1/2 — event adapters and typed memory projection
+Current phase: Phase 1/2 — event adapters, typed memory and erasable content
 
 Working branch: `feat/alive-kernel-3`
 
@@ -147,7 +147,9 @@ ingestion is harmless, and no secret-bearing payload crosses ingestion policy.
 - [x] Implement episodic, semantic, preference, commitment and self-model
   records with provenance, confidence, validity, sensitivity and supersession.
 - [ ] Retrieve by recency, relevance and importance without losing provenance.
-- [ ] Make correction, forgetting and privacy erasure propagate predictably.
+- [ ] Make correction, forgetting and privacy erasure propagate predictably
+  (encrypted content-vault primitive and resumable managed-backup purge pass;
+  memory projection integration and WSL proof remain).
 - [ ] Replace direct Dream mutation with reviewable memory proposals.
 
 Exit: every retrieved memory explains why it exists; contradictions and user
@@ -224,6 +226,7 @@ Track trends and distributions, not a single synthetic “alive score”.
 | H3 | Explainable dispositions outperform hand-authored pseudo-emotions in longitudinal coherence. | Blinded replay and live feedback show lower naturalness without safety gain. | Active |
 | H4 | Model deliberation plus deterministic authority gates gives better initiative than either rules or a model alone. | Shadow evaluation shows no useful gain or unacceptable variance/cost. | Active |
 | H5 | Other Hermes plugins can remain independent while publishing optional standard events. | Hermes lacks a stable event/capability boundary and adapters become private coupling. | Active |
+| H6 | A portable local content vault plus coordinated managed-backup retention can give an honest, useful forgetting boundary without claiming control over arbitrary external copies. | Recovery drills cannot reconcile deletion with useful backups, or operators routinely bypass the managed boundary. | Active |
 
 ## Decision and revision protocol
 
@@ -293,3 +296,26 @@ For each material change:
   ADR-0003 therefore proposes a durable metadata journal plus a separately
   erasable content vault. Production plaintext ingestion remains blocked until
   WAL, backup and interrupted-erasure tests prove the selected design.
+
+### 2026-10-10 — Erasable content boundary prototype
+
+- Inspected Hermes 0.21.3's real vault implementations before choosing a
+  design. The built-in Fernet login vault and interactive 1Password/Bitwarden
+  backends do not provide an arbitrary, headless content-erasure contract, so
+  Alive does not pretend they do.
+- Added an AES-GCM content vault that stores only authenticated ciphertext and
+  metadata, returns opaque journal-safe references, audits resolution, enforces
+  retention deadlines and records durable tombstones.
+- Erasure now survives interruption: live ciphertext deletion, WAL truncation,
+  compaction and affected managed-backup purge resume on next open. Unmanaged
+  disk images are explicitly outside the claim; this is an honest threat-model
+  boundary rather than a promise software cannot keep.
+- A Windows concurrency test found that simultaneous first-open WAL setup
+  could leak a failed SQLite handle. Initialization now retries the transient
+  lock and closes every failed handle. Thread/process first-use and concurrent
+  backup/erase races are covered. Repeated Windows runs, Linux host, the actual
+  Hermes NAS container, and the full Linux regression/matrix/stress suite
+  passed.
+- Production plaintext ingestion remains disabled. Next, memory proposals must
+  carry only content references/digests and replay must preserve an explicit
+  `content_unavailable_erased` result.
