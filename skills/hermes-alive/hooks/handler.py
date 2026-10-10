@@ -83,6 +83,10 @@ async def handle(event_type: str, context: dict):
         await _on_session_start(context)
     elif event_type == "agent:end":
         await _on_agent_end(context)
+    elif event_type in {"session:end", "session:reset", "agent:start", "agent:step"}:
+        # These official Hermes events feed only the shadow kernel for now.
+        # Legacy production behavior remains unchanged until shadow acceptance.
+        return
     else:
         logger.warning("Hermes Alive: unknown event type %s", event_type)
 

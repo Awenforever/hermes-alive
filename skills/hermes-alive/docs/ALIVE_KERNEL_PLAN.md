@@ -133,8 +133,11 @@ Exit: old behavior can be replayed and scored without sending messages.
 - [x] Add integrity hashes and monotonic consumer checkpoints.
 - [x] Add a first privacy boundary for structural lifecycle/session events;
   conversation content remains excluded until typed retention policy exists.
-- [ ] Add adapters for Hermes inbound, outbound, lifecycle and tool outcomes
-  (lifecycle/session hook adapter implemented; message/tool adapters pending).
+- [x] Add privacy-bounded structural adapters for official Hermes lifecycle,
+  inbound/outbound turn and tool-round hooks, including persistent causal turn
+  linkage and crash interruption facts (ADR-0013).
+- [ ] Add consent-gated erasable conversation content and authoritative typed
+  tool outcome receipts; never infer tool success by parsing result prose.
 - [x] Add opt-in shadow mirroring that cannot influence legacy decisions.
 
 Exit: restart/replay reconstructs the same ordered experience stream, duplicate
@@ -485,3 +488,23 @@ For each material change:
   selection policy would have performed better.
 - This closes the measurement primitive, not the Phase-4 exit gate: a real
   sanitized corpus and longitudinal shadow results are still required.
+
+### 2026-10-10 — Official Hermes structural event adapter
+
+- Verified the current Hermes hook contract from its running source before
+  expanding the adapter: lifecycle/session events plus agent start, step and
+  end are official; their contexts contain raw private content. The contract
+  was cross-checked against upstream `main` at `f925b017` as well as the running
+  Hermes Agent 0.21.3 image, rather than assuming legacy compatibility.
+- Added all official non-command lifecycle and agent events to the hook while
+  keeping the legacy watcher behavior unchanged. The shadow boundary stores
+  only local pseudonyms, bounded structural counts and content-presence flags.
+- Added persistent start/step/end causation and deterministic retry identity.
+  Concurrent duplicate starts collapse to one event, while the same text sent
+  again after completion becomes a new turn.
+- Gateway restart and unexpected turn replacement now append a durable
+  interruption fact before clearing activity state. Raw messages, assistant
+  responses, model/provider aliases, tool arguments and tool results remain
+  absent from SQLite/WAL evidence.
+- This does not yet claim semantic message ingestion or authoritative tool
+  outcomes; those remain gated on retention controls and native typed receipts.
