@@ -17,6 +17,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_content_vault.py
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_agenda.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_deliberation.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_deliberation_store.py"
+PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_cognition_cycle.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_outcomes.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_reflection.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_preference_learning.py"

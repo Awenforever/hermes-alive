@@ -180,6 +180,9 @@ corrections are represented rather than overwritten.
 - [x] Let the model deliberate within structured bounds; keep policy external.
   Frames, rationales, policy rejections and validated choices now have an
   encrypted, deterministic replay projection; provider execution remains off.
+- [x] Join candidate framing, active-agenda validation, exploration and a
+  durable selection in one crash-safe coordinator that always closes with
+  deterministic silence and has no model/channel/tool side effects (ADR-0020).
 - [ ] Run the new decision engine in shadow against production events.
 
 Exit: every proposed action has a stable reason and every rejection is
@@ -654,3 +657,15 @@ For each material change:
 - This safety correction precedes the unified cognition-cycle coordinator;
   connecting components before fixing identity boundaries would have amplified
   the defect across the full action chain.
+
+### 2026-10-11 — Integrated safe-silence cognition cycle
+
+- Added a deterministic coordinator joining candidate frames, active agenda
+  references, diversity annotations, the exploration gate and a durable
+  selection in one idempotent cycle (ADR-0020).
+- The coordinator deliberately selects silence even when an external action is
+  admissible. This proves crash recovery, replay and audit structure without
+  quietly turning integration work into production autonomy.
+- Same-semantics retries add no journal events. Changed reuse fails closed, raw
+  candidate content and diversity labels remain outside the structural SQLite
+  history, and projection rebuild reconstructs the same gate and selection.

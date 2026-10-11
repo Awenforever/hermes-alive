@@ -46,6 +46,15 @@ deliberation evidence and deliberation agenda references all require explicit
 subject/actor checks. Cross-subject negative tests are mandatory before a new
 component joins the cognition cycle.
 
+## Integration must not smuggle in execution authority
+
+The first cognition coordinator ends in deterministic safe silence by design.
+Do not add a provider call, sender, tool executor or “temporary fallback” to it.
+Future model selection must consume the durable frame through its own reviewed
+boundary; future action attempts must recheck current policy and context and
+produce their own receipts. A green integrated-cycle test proves persistence
+and replay, not permission to act.
+
 ## Plugin dependencies must respect the Hermes environment lock
 
 The supported Hermes runtime already provides `cryptography==50.0.0`. Alive's

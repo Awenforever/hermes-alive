@@ -87,6 +87,12 @@ from .consolidation_evaluation import (
     evaluate_consolidation_reviews,
     qualify_consolidation_report,
 )
+from .cognition_cycle import (
+    CognitionCycleCoordinator,
+    CognitionCycleError,
+    CognitionCycleResult,
+    CycleCandidate,
+)
 from .deliberation import (
     ActionAuthority,
     ActionCandidate,
@@ -199,6 +205,9 @@ __all__ = [
     "AppendResult",
     "AssessmentBasis",
     "CandidateRejection",
+    "CognitionCycleCoordinator",
+    "CognitionCycleError",
+    "CognitionCycleResult",
     "ContentErasedError",
     "ContentIntegrityError",
     "ContentReference",
@@ -206,6 +215,7 @@ __all__ = [
     "ContentUnavailableError",
     "ContentVault",
     "ContentVaultError",
+    "CycleCandidate",
     "ConsolidationCandidate",
     "ConsolidationCandidateReview",
     "ConsolidationCandidateRejection",

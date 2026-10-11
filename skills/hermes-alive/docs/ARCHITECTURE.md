@@ -67,6 +67,12 @@ through the same review-only consolidation service. It owns no provider key or
 fallback list. Raw prompts and responses are ephemeral; durable records contain
 only structural receipts, actual-model attribution and encrypted proposals.
 
+Its first integrated cognition coordinator is also unscheduled (ADR-0020). It
+persists candidate framing, subject-scoped agenda/evidence checks, exploration
+and a selection, but always selects structural safe silence. It performs no
+provider, channel or tool operation. Model choice and action execution remain
+separate future boundaries rather than hidden options on the coordinator.
+
 ## Decision ownership
 
 - The model owns wording and style inside structured constraints.
