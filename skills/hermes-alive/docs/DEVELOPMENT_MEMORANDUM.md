@@ -132,6 +132,25 @@ authenticate journal events before changing dispatch state. Batch size may
 bound lock duration but must never bound correctness. Recovery and corruption
 repair may erase this projection and replay it from sequence zero.
 
+## Discovery observations are not permission to speak
+
+Legacy Discovery mixed collection, ranking, preference mutation, deduplication
+and delivery. Never reproduce that coupling in the kernel. A collector may
+create encrypted evidence and an expiring opportunity only. Its score is a
+hint, not user value, urgency, route or execution authority. Source failure is
+health evidence and must not become an opportunity. Exact rediscovery is
+idempotent; a material update gets a new version and supersedes the prior
+opportunity.
+
+The legacy bridge is dual opt-in, bounded, external-source-only and one-way.
+Its output must never feed the legacy watcher, reserve a topic, call a model or
+send. Raw titles, summaries, URLs, source labels, authors and chat IDs must not
+enter the journal or rebuildable projection. Local filesystem discovery needs
+its own explicit consent/privacy design and is not silently included under the
+external-source migration. Regression proof is
+`tests/run_alive_kernel_discovery_opportunities.py`; the architectural contract
+is ADR-0030.
+
 ## Plugin dependencies must respect the Hermes environment lock
 
 The supported Hermes runtime already provides `cryptography==50.0.0`. Alive's

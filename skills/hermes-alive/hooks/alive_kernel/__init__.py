@@ -28,6 +28,18 @@ from .agenda import (
     AgendaValidationError,
 )
 from .events import EventEnvelope, EventValidationError, Sensitivity
+from .discovery_opportunities import (
+    DiscoveryCandidate,
+    DiscoveryIngestResult,
+    DiscoveryOpportunityError,
+    DiscoveryOpportunityIngestor,
+    DiscoveryProjectionRecord,
+    DiscoveryShadowReport,
+    candidate_from_legacy,
+    canonicalize_discovery_url,
+    discovery_shadow_enabled,
+    mirror_legacy_discovery_batch,
+)
 from .evaluation import (
     FactualLabels,
     MetricScore,
@@ -282,6 +294,12 @@ __all__ = [
     "DeliberationSynthesizer",
     "DeliberationValidationError",
     "DimensionAssessment",
+    "DiscoveryCandidate",
+    "DiscoveryIngestResult",
+    "DiscoveryOpportunityError",
+    "DiscoveryOpportunityIngestor",
+    "DiscoveryProjectionRecord",
+    "DiscoveryShadowReport",
     "DispatchLease",
     "DispatchExecution",
     "DispatchOutbox",
@@ -292,6 +310,10 @@ __all__ = [
     "EventEnvelope",
     "EventIntegrityError",
     "EventValidationError",
+    "candidate_from_legacy",
+    "canonicalize_discovery_url",
+    "discovery_shadow_enabled",
+    "mirror_legacy_discovery_batch",
     "ErasureResult",
     "FactualLabels",
     "CapabilityClaim",

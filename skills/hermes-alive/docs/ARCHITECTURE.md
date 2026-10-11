@@ -124,6 +124,15 @@ the authorizer and outbox bind and revalidate the exact snapshot and route.
 `PluginContext.inject_message()` on stable Hermes 0.21.6 proves only request
 acceptance, so it cannot activate the external-delivery bridge.
 
+External Discovery now has a separate shadow-kernel ingestion boundary
+(ADR-0030). Collectors may report bounded observations; the boundary records
+encrypted evidence and proposes an opportunity. It cannot compose, reserve,
+route or send. Exact rediscovery is idempotent, material updates supersede the
+prior opportunity, and source failures remain health facts. The legacy watcher
+may mirror its external batch only when both the general kernel shadow flag and
+the Discovery-specific shadow flag are enabled. The mirrored result is not read
+back into legacy policy or delivery.
+
 External authority also depends on the latest user-owned autonomy policy
 (ADR-0025). The default is no policy and therefore no proactive execution.
 Authorization receipts and outbox rows bind an exact policy event/revision;

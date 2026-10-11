@@ -477,6 +477,10 @@ class ProactivePlatformWatcher:
         )
         if discovery_context is not None:
             self._log_discovery(tick_id, discovery_context)
+            self._mirror_discovery_kernel_shadow(
+                chat_id=chat_id,
+                discovery_context=discovery_context,
+            )
 
         user_active_after_discovery = self._user_active_recently()
         self._log_activity_guard(
@@ -2645,6 +2649,40 @@ class ProactivePlatformWatcher:
         if engine.has_fresh():
             return engine.get_recent()
         return None
+
+    @staticmethod
+    def _mirror_discovery_kernel_shadow(
+        *,
+        chat_id: str,
+        discovery_context: dict[str, Any],
+    ) -> None:
+        """Observe legacy discovery without changing any watcher decision."""
+
+        try:
+            from alive_kernel.discovery_opportunities import (
+                discovery_shadow_enabled,
+                mirror_legacy_discovery_batch,
+            )
+
+            if not discovery_shadow_enabled():
+                return
+            report = mirror_legacy_discovery_batch(
+                _SHARED_DIR,
+                raw_subject=chat_id,
+                discovery_context=discovery_context,
+            )
+            logger.info(
+                "Alive discovery kernel shadow observed=%d deduplicated=%d "
+                "updated=%d rejected=%d source_failures=%d",
+                report.observed,
+                report.deduplicated,
+                report.updated,
+                report.rejected,
+                report.source_failures,
+            )
+        except Exception:
+            # The shadow observer cannot alter legacy compose/send behavior.
+            logger.exception("Alive discovery kernel shadow ingestion failed")
 
     def _voice_state(self) -> Any | None:
         engine = self._voice()

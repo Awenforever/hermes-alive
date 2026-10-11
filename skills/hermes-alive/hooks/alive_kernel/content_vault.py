@@ -316,6 +316,19 @@ class ContentVault:
                             handle.seek(0)
                             msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
 
+    @contextmanager
+    def exclusive_operation(self):
+        """Serialize a multi-step vault-backed kernel operation.
+
+        Callers must keep this boundary short and must not call another public
+        operation that acquires the same lock.  It exists for causal writes
+        that span the journal and encrypted vault, such as discovery version
+        supersession.
+        """
+
+        with self._exclusive_operation():
+            yield
+
     def _key(self) -> bytes:
         if not self.key_path.exists():
             key = os.urandom(32)

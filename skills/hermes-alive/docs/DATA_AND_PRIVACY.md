@@ -90,6 +90,12 @@ explicitly supplied.
   and user authority. Raw control commands are forbidden. Policy events carry
   an installation authenticator and contain no channel identifier or message
   content.
+- Discovery observation bodies (including title, URL, summary, source and
+  author metadata) live only in the encrypted vault. The journal and
+  rebuildable entity projection retain installation-keyed entity/version/source
+  fingerprints and structural references. A raw chat ID used to scope shadow
+  ingestion is pseudonymized before it enters the kernel. Source failures keep
+  only keyed source/error-class fingerprints and cannot create opportunities.
 
 ## Topic-delivery privacy
 

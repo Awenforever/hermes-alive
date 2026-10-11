@@ -2,9 +2,9 @@
 
 Status: active
 
-Last reviewed: 2026-10-11
+Last reviewed: 2026-10-12
 
-Current phase: Phase 3/4 integration — safe execution contracts and evaluation
+Current phase: Phase 5 — faculty migration in bounded shadow mode
 
 Working branch: `feat/alive-kernel-3`
 
@@ -245,7 +245,10 @@ factual error or user-control violations.
 
 ### Phase 5 — Faculty migration
 
-- [ ] Port Discovery as an opportunity generator.
+- [x] Port external Discovery through a typed opportunity-only ingestion
+  boundary with encrypted evidence, material-update supersession and a
+  dual-opt-in no-send shadow bridge (ADR-0030). Local filesystem discovery
+  remains deliberately outside this completed external-source slice.
 - [ ] Split user availability from optional character-like Circadian styling.
 - [ ] Port voice as presentation policy, not a truth source.
 - [ ] Replace heuristic mood with explainable dispositions.
