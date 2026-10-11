@@ -36,6 +36,7 @@ from alive_kernel import (  # noqa: E402
     SendTimeAuthorizer,
     SideEffect,
 )
+from alive_kernel_testkit import install_terminal_route  # noqa: E402
 
 
 def main() -> int:
@@ -130,7 +131,14 @@ def main() -> int:
             exploration_gate_event_id=cycle.exploration_event_id,
         )
         assert coordinator.deliberation.apply(selection).outcome == "validated"
-        authorizer = SendTimeAuthorizer(journal, content_vault=coordinator.vault)
+        route_binding_id = install_terminal_route(
+            journal, subject="user:test", content_vault=coordinator.vault
+        )
+        authorizer = SendTimeAuthorizer(
+            journal,
+            content_vault=coordinator.vault,
+            route_binding_id=route_binding_id,
+        )
         current = datetime.now(timezone.utc)
         missing_policy = authorizer.evaluate(
             selection_event_id=selection.event.event_id,
@@ -433,6 +441,17 @@ def main() -> int:
         )
         assert not erased_authority.authorized
         assert "agenda_content_unavailable" in erased_authority.reasons
+
+        authorizer.host.revoke_route(route_binding_id, observed_at=current)
+        revoked_route = authorizer.evaluate(
+            selection_event_id=selection.event.event_id,
+            subject="user:test",
+            capability="hermes.channel.send",
+            operation_id="authorization-route-revoked",
+            now=current,
+        )
+        assert not revoked_route.authorized
+        assert "route_binding_revoked" in revoked_route.reasons
 
         raw = (root / "kernel.sqlite3").read_bytes()
         wal = root / "kernel.sqlite3-wal"

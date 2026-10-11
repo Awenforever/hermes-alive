@@ -106,8 +106,15 @@ Execution content is also separate from routing (ADR-0027). The only current
 external schema is a bounded channel message with text and presentation format.
 It cannot name a platform, profile, recipient, chat, thread or adapter. Its
 installation-keyed canonical authenticator is bound into authorization and
-revalidated at attempt and dispatch boundaries. Hermes-owned, user-authorized
-route binding remains a future capability-bridge responsibility.
+revalidated at attempt and dispatch boundaries.
+
+Routing is a separate authority projection (ADR-0028). A signed host snapshot
+states the exact Hermes/plugin API contract and strongest receipt its public
+interface can prove. A user-authorized route stores platform/profile/chat only
+in the encrypted vault and exposes a keyed fingerprint to the journal. Both
+the authorizer and outbox bind and revalidate the exact snapshot and route.
+`PluginContext.inject_message()` on stable Hermes 0.21.6 proves only request
+acceptance, so it cannot activate the external-delivery bridge.
 
 External authority also depends on the latest user-owned autonomy policy
 (ADR-0025). The default is no policy and therefore no proactive execution.

@@ -62,6 +62,14 @@ from .event_store import (
     ExperienceJournal,
 )
 from .privacy import LocalIdentityProtector, structural_hook_payload
+from .host_capabilities import (
+    CapabilityClaim,
+    HostCapabilityError,
+    HostCapabilityProjection,
+    HostCapabilitySnapshot,
+    ReceiptLevel,
+    RouteBinding,
+)
 from .shadow_bridge import ShadowKernelBridge, mirror_hook_event, shadow_enabled
 from .content_vault import (
     ContentErasedError,
@@ -286,6 +294,10 @@ __all__ = [
     "EventValidationError",
     "ErasureResult",
     "FactualLabels",
+    "CapabilityClaim",
+    "HostCapabilityError",
+    "HostCapabilityProjection",
+    "HostCapabilitySnapshot",
     "ExperienceJournal",
     "ExplorationGateResult",
     "ExplorationMode",
@@ -349,6 +361,8 @@ __all__ = [
     "ReflectionScope",
     "ReflectionState",
     "ReflectionValidationError",
+    "ReceiptLevel",
+    "RouteBinding",
     "Sensitivity",
     "SendTimeAuthorizer",
     "SelectionProposal",

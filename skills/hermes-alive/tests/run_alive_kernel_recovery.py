@@ -51,6 +51,7 @@ from alive_kernel import (  # noqa: E402
     SideEffect,
     recover_kernel_state,
 )
+from alive_kernel_testkit import install_terminal_route  # noqa: E402
 
 
 def main() -> int:
@@ -65,6 +66,9 @@ def main() -> int:
             kernel / "content-vault", backup_root=kernel / "content-backups"
         )
         subject = "user:recovery"
+        route_binding_id = install_terminal_route(
+            journal, subject="user:causal-recovery", content_vault=vault
+        )
 
         retention = RetentionProjection(journal, content_vault=vault)
         retention_consent = retention.append_consent(
@@ -218,7 +222,7 @@ def main() -> int:
         )
         assert autonomy.apply(autonomy_event).outcome == "recorded"
         authorization = SendTimeAuthorizer(
-            journal, content_vault=vault
+            journal, content_vault=vault, route_binding_id=route_binding_id
         ).evaluate(
             selection_event_id=selection.event.event_id,
             subject=causal_subject,
@@ -522,7 +526,7 @@ def main() -> int:
         # attempt under the new policy revision becomes dispatchable.
         pause_now = datetime.now(timezone.utc)
         before_pause = SendTimeAuthorizer(
-            journal, content_vault=vault
+            journal, content_vault=vault, route_binding_id=route_binding_id
         ).evaluate(
             selection_event_id=selection.event.event_id,
             subject=causal_subject,
@@ -585,7 +589,7 @@ def main() -> int:
         assert outbox.acquire(worker_id="must-not-resurrect", now=pause_now) is None
         resume_now = datetime.now(timezone.utc)
         after_resume = SendTimeAuthorizer(
-            journal, content_vault=vault
+            journal, content_vault=vault, route_binding_id=route_binding_id
         ).evaluate(
             selection_event_id=selection.event.event_id,
             subject=causal_subject,
@@ -680,7 +684,7 @@ def main() -> int:
         # claimant must absorb the event and preserve uncertainty, not retry.
         gap_now = datetime.now(timezone.utc)
         gap_authorization = SendTimeAuthorizer(
-            journal, content_vault=vault
+            journal, content_vault=vault, route_binding_id=route_binding_id
         ).evaluate(
             selection_event_id=selection.event.event_id,
             subject=causal_subject,
@@ -711,6 +715,14 @@ def main() -> int:
             "idempotency_key": gap_lease.idempotency_key,
             "capability": gap_lease.capability,
             "policy_event_id": resumed.event.event_id,
+            "route_binding_id": route_binding_id,
+            "route_binding_event_id": gap_authorization.route_binding_id
+            and journal.get(gap_authorization.event_id).event.payload[
+                "route_binding_event_id"
+            ],
+            "host_snapshot_event_id": journal.get(
+                gap_authorization.event_id
+            ).event.payload["host_snapshot_event_id"],
             "lease_generation": gap_lease.generation,
             "external_result_observed": False,
         }
@@ -741,6 +753,46 @@ def main() -> int:
         assert outbox.counts() == {
             "acknowledged": 2,
             "revoked": 1,
+            "uncertain": 1,
+        }
+
+        # Route authority is live state too: revocation after authorization
+        # invalidates pending work before a worker can cross the start boundary.
+        route_revoke_now = datetime.now(timezone.utc)
+        route_authorizer = SendTimeAuthorizer(
+            journal, content_vault=vault, route_binding_id=route_binding_id
+        )
+        route_authorization = route_authorizer.evaluate(
+            selection_event_id=selection.event.event_id,
+            subject=causal_subject,
+            capability="hermes.channel.send",
+            operation_id="causal-recovery-route-revoke",
+            now=route_revoke_now,
+        )
+        assert route_authorization.authorized
+        route_attempt = outcomes.append_attempt(
+            authorization_event_id=route_authorization.event_id,
+            selection_event_id=selection.event.event_id,
+            candidate_id=candidate.candidate_id,
+            executor="hermes.channel.send",
+            idempotency_key="causal-recovery-route-revoke",
+            actor="system:test-executor",
+            subject=causal_subject,
+            sensitivity=Sensitivity.RESTRICTED,
+            attempt_id="attempt:causal-recovery-route-revoke",
+        )
+        assert outcomes.apply(route_attempt).outcome == "recorded"
+        assert outbox.reconcile(now=route_revoke_now) == 1
+        route_authorizer.host.revoke_route(
+            route_binding_id, observed_at=route_revoke_now
+        )
+        assert outbox.acquire(
+            worker_id="must-not-use-revoked-route",
+            now=route_revoke_now,
+        ) is None
+        assert outbox.counts() == {
+            "acknowledged": 2,
+            "revoked": 2,
             "uncertain": 1,
         }
 

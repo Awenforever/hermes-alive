@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from alive_kernel.action_contract import parse_action_contract
 from alive_kernel.autonomy_policy import AutonomyPolicyProjection
@@ -18,6 +18,64 @@ from alive_kernel.events import EventEnvelope
 from alive_kernel.privacy import LocalIdentityProtector
 from alive_kernel.exploration import ExplorationMode, ExplorationPolicy
 from alive_kernel.exploration_store import ExplorationProjection
+from alive_kernel.host_capabilities import HostCapabilityProjection, ReceiptLevel
+
+
+def install_terminal_route(
+    journal: ExperienceJournal,
+    *,
+    subject: str,
+    content_vault=None,
+) -> str:
+    """Install one explicit test-only route backed by a terminal receipt API."""
+
+    binding_id = f"fixture-route:{subject}"
+    host = HostCapabilityProjection(journal, content_vault=content_vault)
+    existing = host.get_binding(binding_id)
+    if existing is not None:
+        return binding_id
+    now = datetime.now(timezone.utc)
+    snapshot = host.latest_snapshot()
+    if snapshot is None:
+        snapshot = host.observe_snapshot(
+            snapshot_id="fixture-host-terminal-v1",
+            hermes_version="0.21.6",
+            plugin_api_version=1,
+            capabilities={
+                "hermes.channel.send": {
+                    "interface": "test.public.channel_send",
+                    "available": True,
+                    "public_api": True,
+                    "receipt_level": ReceiptLevel.EXTERNAL_DELIVERED.value,
+                }
+            },
+            observed_at=now,
+        )
+    authority = EventEnvelope(
+        event_id=f"fixture-route-authority:{subject}",
+        event_type="conversation.inbound",
+        source="test.fixture",
+        actor=subject,
+        subject=subject,
+        occurred_at=now,
+        observed_at=now,
+        payload={"authorizes_route_binding_id": binding_id},
+    )
+    journal.append(authority)
+    host.bind_route(
+        binding_id=binding_id,
+        subject=subject,
+        capability="hermes.channel.send",
+        snapshot_event_id=snapshot.event_id,
+        route={
+            "platform": "test",
+            "profile": "default",
+            "chat_id": f"test-chat:{subject}",
+        },
+        authority_event_id=authority.event_id,
+        observed_at=now,
+    )
+    return binding_id
 
 
 def install_exploration_gate(
@@ -92,6 +150,9 @@ def install_action_authorization(
         )
     ]
     contract = parse_action_contract(contract_document, capability=executor)
+    route_binding_id = install_terminal_route(journal, subject=subject)
+    route_binding = HostCapabilityProjection(journal).get_binding(route_binding_id)
+    assert route_binding is not None
     autonomy = AutonomyPolicyProjection(journal)
     policy = autonomy.current(subject)
     if policy is None:
@@ -119,6 +180,10 @@ def install_action_authorization(
         "gate_event_id": selection.event.payload["exploration_gate_event_id"],
         "agenda_item_id": None,
         "confirmation_event_id": None,
+        "route_binding_id": route_binding_id,
+        "route_binding_event_id": route_binding.event_id,
+        "host_snapshot_event_id": route_binding.snapshot_event_id,
+        "route_binding_authenticator": route_binding.binding_authenticator,
         "capability": executor,
         "action_contract_version": 1,
         "action_contract_binding": LocalIdentityProtector(

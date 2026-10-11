@@ -77,6 +77,11 @@ explicitly supplied.
   version, never message text or raw routing. The encrypted action document
   contains no destination; route identity must come from separately authorized
   Hermes configuration.
+- Route locators are encrypted in the content vault under their subject and
+  purpose. The journal retains only their content reference, keyed fingerprint,
+  exact user-authority event, host snapshot and binding authenticator. Route
+  erasure or revocation fails closed before dispatch; no raw platform chat ID
+  is admitted to the append-only journal.
 - Autonomy policy stores only structural risk/interruption bounds, its revision
   and user authority. Raw control commands are forbidden. Policy events carry
   an installation authenticator and contain no channel identifier or message

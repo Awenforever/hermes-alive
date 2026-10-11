@@ -105,6 +105,25 @@ acceptance is not evidence that an external message was delivered, and private
 gateway runner fields are not a distribution-safe substitute for a public
 host contract.
 
+ADR-0028 makes that host contract executable policy rather than documentation.
+Always distinguish `request_accepted`, `turn_completed`, and
+`external_delivered`. Only the last may authorize `hermes.channel.send` across
+the Alive outbox. The route must come from an exact user-authorized binding,
+remain encrypted at rest, and be bound to the latest authenticated host
+snapshot. A new host snapshot deliberately stales old routes; migration must
+ask the user to confirm or deterministically re-authorize them, never silently
+carry them forward. Route revocation after authorization must revoke pending or
+leased work, while a durable prior `dispatch.started` remains uncertain and is
+never retried automatically.
+
+The official stable Hermes `v0.21.6` contract at commit `f27cdbce` exposes
+`PluginContext.inject_message()`, but its own docstring says success means only
+that a host accepted scheduling. `BasePlatformAdapter.send()` and terminal
+delivery bookkeeping exist inside the gateway but are not a public plugin
+capability. Until that changes, keep the new live bridge disconnected. Do not
+resurrect `_gateway_runner_ref`, private adapter maps, or SHA-gated core patches
+to bypass this boundary.
+
 ## Plugin dependencies must respect the Hermes environment lock
 
 The supported Hermes runtime already provides `cryptography==50.0.0`. Alive's

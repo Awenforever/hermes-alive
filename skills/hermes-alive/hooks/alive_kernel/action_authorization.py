@@ -34,6 +34,7 @@ from .event_store import EventConflictError, ExperienceJournal, JournalRecord
 from .events import EventEnvelope, Sensitivity, _thaw_json
 from .exploration_store import ExplorationProjection
 from .privacy import LocalIdentityProtector
+from .host_capabilities import HostCapabilityProjection
 
 
 _ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$")
@@ -58,6 +59,7 @@ class ActionAuthorizationDecision:
     candidate_id: str
     capability: str
     valid_until: datetime | None
+    route_binding_id: str | None
 
 
 class SendTimeAuthorizer:
@@ -71,6 +73,7 @@ class SendTimeAuthorizer:
         journal: ExperienceJournal,
         *,
         content_vault: ContentVault | None = None,
+        route_binding_id: str | None = None,
     ) -> None:
         self.journal = journal
         self.deliberation = DeliberationProjection(
@@ -86,6 +89,12 @@ class SendTimeAuthorizer:
             journal.path.parent / "identity.key"
         )
         self.autonomy = AutonomyPolicyProjection(journal)
+        self.host = HostCapabilityProjection(
+            journal, content_vault=self.deliberation.content_vault
+        )
+        self.route_binding_id = (
+            str(route_binding_id).strip() if route_binding_id is not None else None
+        )
 
     @staticmethod
     def _utc(value: datetime | None) -> datetime:
@@ -135,6 +144,7 @@ class SendTimeAuthorizer:
         policy_event_id: str | None,
         policy_revision: int | None,
         confirmation_event_id: str | None,
+        route_binding_id: str | None,
         permit_ttl_seconds: float,
     ) -> ActionAuthorizationDecision | None:
         record = self.journal.get(f"action.authorization:{operation}")
@@ -155,6 +165,7 @@ class SendTimeAuthorizer:
             or payload.get("policy_event_id") != policy_event_id
             or payload.get("policy_revision") != policy_revision
             or payload.get("confirmation_event_id") != confirmation_event_id
+            or payload.get("route_binding_id") != route_binding_id
             or payload.get("permit_ttl_seconds") != permit_ttl_seconds
             or payload.get("action_contract_version") != 1
             or (
@@ -175,6 +186,20 @@ class SendTimeAuthorizer:
         if authorized and (parsed_until is None or parsed_until <= now):
             authorized = False
             reasons = (*reasons, "permit_expired")
+        if authorized and capability == "hermes.channel.send":
+            if route_binding_id is None:
+                authorized = False
+                reasons = (*reasons, "route_binding_required")
+            else:
+                _binding, route_reasons = self.host.execution_binding(
+                    route_binding_id,
+                    subject=subject,
+                    capability=capability,
+                    as_of=now,
+                )
+                if route_reasons:
+                    authorized = False
+                    reasons = (*reasons, *route_reasons)
         return ActionAuthorizationDecision(
             operation,
             event.event_id,
@@ -185,6 +210,7 @@ class SendTimeAuthorizer:
             str(payload.get("candidate_id") or ""),
             capability,
             parsed_until,
+            route_binding_id,
         )
 
     def evaluate(
@@ -195,12 +221,18 @@ class SendTimeAuthorizer:
         capability: str,
         operation_id: str | None = None,
         confirmation_event_id: str | None = None,
+        route_binding_id: str | None = None,
         now: datetime | None = None,
         permit_ttl: timedelta = timedelta(seconds=30),
     ) -> ActionAuthorizationDecision:
         operation = str(operation_id or uuid4()).strip()
         owner = str(subject).strip()
         capability = str(capability).strip()
+        route_binding_id = (
+            str(route_binding_id).strip()
+            if route_binding_id is not None
+            else self.route_binding_id
+        )
         if not _ID_RE.fullmatch(operation) or not _ID_RE.fullmatch(owner):
             raise ActionAuthorizationError("invalid authorization identity")
         if not _EVENT_ID_RE.fullmatch(str(selection_event_id).strip()):
@@ -210,6 +242,10 @@ class SendTimeAuthorizer:
             confirmation_event_id = str(confirmation_event_id).strip()
             if not _EVENT_ID_RE.fullmatch(confirmation_event_id):
                 raise ActionAuthorizationError("invalid confirmation event identity")
+        if route_binding_id is not None:
+            route_binding_id = str(route_binding_id).strip()
+            if not _ID_RE.fullmatch(route_binding_id):
+                raise ActionAuthorizationError("invalid route binding identity")
         if capability not in _CAPABILITIES:
             raise ActionAuthorizationError("unknown Hermes capability")
         current = self._utc(now)
@@ -250,6 +286,7 @@ class SendTimeAuthorizer:
             policy_event_id=policy_event_id,
             policy_revision=policy_revision,
             confirmation_event_id=confirmation_event_id,
+            route_binding_id=route_binding_id,
             permit_ttl_seconds=permit_ttl_seconds,
         )
         if existing is not None:
@@ -264,6 +301,24 @@ class SendTimeAuthorizer:
         candidate = None
         stored = None
         action_contract_binding: str | None = None
+        route_binding_event_id: str | None = None
+        host_snapshot_event_id: str | None = None
+        route_binding_authenticator: str | None = None
+        if capability == "hermes.channel.send":
+            if route_binding_id is None:
+                reasons.append("route_binding_required")
+            else:
+                route_binding, route_reasons = self.host.execution_binding(
+                    route_binding_id,
+                    subject=owner,
+                    capability=capability,
+                    as_of=current,
+                )
+                reasons.extend(route_reasons)
+                if route_binding is not None:
+                    route_binding_event_id = route_binding.event_id
+                    host_snapshot_event_id = route_binding.snapshot_event_id
+                    route_binding_authenticator = route_binding.binding_authenticator
         if selection_record is None or selection_record.event.event_type != "deliberation.selected":
             reasons.append("selection_unavailable")
         else:
@@ -401,6 +456,10 @@ class SendTimeAuthorizer:
             "gate_event_id": gate_event_id,
             "agenda_item_id": getattr(candidate, "agenda_item_id", None),
             "confirmation_event_id": confirmation_event_id,
+            "route_binding_id": route_binding_id,
+            "route_binding_event_id": route_binding_event_id,
+            "host_snapshot_event_id": host_snapshot_event_id,
+            "route_binding_authenticator": route_binding_authenticator,
             "capability": capability,
             "action_contract_version": 1,
             "action_contract_binding": action_contract_binding,
@@ -444,4 +503,5 @@ class SendTimeAuthorizer:
             candidate_id,
             capability,
             valid_until,
+            route_binding_id,
         )

@@ -203,8 +203,11 @@ corrections are represented rather than overwritten.
 - [x] Replace arbitrary candidate JSON at the execution boundary with a
   versioned, destination-free action contract. Bind it cryptographically into
   authority, attempt validation and dispatch (ADR-0027).
-- [ ] Bind dispatch to a user-authorized snapshot of actual Hermes host
-  capabilities and route identity; host acceptance is not delivery evidence.
+- [x] Bind authorization and dispatch to an authenticated snapshot of actual
+  Hermes host capabilities plus a separately encrypted, user-authorized route.
+  Request acceptance is not delivery evidence, so the live bridge remains
+  disconnected while the stable public plugin API lacks terminal delivery
+  receipts (ADR-0028).
 - [ ] Replace per-acquisition full-history evidence scans with a rebuildable,
   checkpointed projection without reintroducing a correctness cap.
 - [ ] Run the new decision engine in shadow against production events.
@@ -302,6 +305,24 @@ For each material change:
 8. do not equate code presence with runtime correctness.
 
 ## Change log
+
+### 2026-10-11 — Host capability and route authority boundary
+
+- Audited official Hermes `v0.21.6` at `f27cdbce`: the public plugin injection
+  API schedules a turn but explicitly does not prove completion; adapter
+  `SendResult` and the final-delivery ledger remain internal to the gateway.
+- Added authenticated, versioned host capability snapshots with explicit
+  receipt semantics. A private API or request-accepted-only interface cannot
+  authorize proactive external delivery.
+- Added encrypted route bindings requiring exact user authority. Journal state
+  retains only structural references and a keyed route fingerprint; route
+  plaintext stays in the erasable vault.
+- Bound send-time authorization and dispatch start to the exact route and host
+  snapshot. Host upgrades, route revocation, content erasure and receipt-level
+  downgrade fail closed before external start.
+- Kept production `v0.21.3` and the legacy watcher untouched. The new live
+  bridge remains deliberately absent until a supported terminal-receipt API
+  exists.
 
 ### 2026-10-09 — Kernel exploration begins
 

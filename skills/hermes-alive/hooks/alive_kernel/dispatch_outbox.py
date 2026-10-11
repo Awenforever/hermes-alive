@@ -28,6 +28,7 @@ from .event_store import EventConflictError, ExperienceJournal, JournalRecord
 from .events import EventEnvelope, Sensitivity, _thaw_json
 from .privacy import LocalIdentityProtector
 from .outcomes import OutcomeKind, OutcomeProjection
+from .host_capabilities import HostCapabilityProjection, RouteBinding
 
 
 class DispatchOutboxError(ValueError):
@@ -53,6 +54,7 @@ class DispatchExecution:
     lease: DispatchLease
     start_event_id: str
     content: object
+    route: object
 
 
 class DispatchOutbox:
@@ -83,7 +85,39 @@ class DispatchOutbox:
         )
         self.protector = LocalIdentityProtector(self.path.parent / "identity.key")
         self.autonomy = AutonomyPolicyProjection(journal)
+        self.host = HostCapabilityProjection(journal, content_vault=self.vault)
         self._initialize()
+
+    def _authorization_route(
+        self,
+        authorization: JournalRecord | None,
+        *,
+        subject: str,
+        capability: str,
+        now: datetime,
+    ) -> tuple[RouteBinding | None, tuple[str, ...]]:
+        """Revalidate the exact route and host snapshot bound into a permit."""
+
+        if authorization is None:
+            return None, ("authorization_unavailable",)
+        payload = authorization.event.payload
+        binding_id = str(payload.get("route_binding_id") or "")
+        binding, reasons = self.host.execution_binding(
+            binding_id,
+            subject=subject,
+            capability=capability,
+            as_of=now,
+        )
+        if binding is None:
+            return None, reasons
+        mismatches: list[str] = []
+        if payload.get("route_binding_event_id") != binding.event_id:
+            mismatches.append("route_binding_event_mismatch")
+        if payload.get("host_snapshot_event_id") != binding.snapshot_event_id:
+            mismatches.append("host_snapshot_event_mismatch")
+        if payload.get("route_binding_authenticator") != binding.binding_authenticator:
+            mismatches.append("route_binding_authenticator_mismatch")
+        return (binding if not mismatches else None), tuple(mismatches)
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=10.0, isolation_level=None)
@@ -210,6 +244,12 @@ class DispatchOutbox:
         sensitivity: Sensitivity,
         generation: int | None = None,
     ) -> bool:
+        authorization = (
+            self.journal.get(str(attempt.event.payload.get("authorization_event_id") or ""))
+            if attempt is not None
+            else None
+        )
+        authorization_payload = authorization.event.payload if authorization is not None else {}
         return bool(
             record is not None
             and payload is not None
@@ -226,6 +266,12 @@ class DispatchOutbox:
             and payload.get("idempotency_key") == idempotency_key
             and payload.get("capability") == capability
             and payload.get("policy_event_id") == policy_event_id
+            and payload.get("route_binding_id")
+            == authorization_payload.get("route_binding_id")
+            and payload.get("route_binding_event_id")
+            == authorization_payload.get("route_binding_event_id")
+            and payload.get("host_snapshot_event_id")
+            == authorization_payload.get("host_snapshot_event_id")
             and isinstance(payload.get("lease_generation"), int)
             and int(payload["lease_generation"]) >= 1
             and record.event.event_id
@@ -485,6 +531,13 @@ class DispatchOutbox:
                                 ),
                             )
                         )
+                    route_binding, _route_reasons = self._authorization_route(
+                        authorization,
+                        subject=str(row["subject"]),
+                        capability=str(row["executor"]),
+                        now=current,
+                    )
+                    contract_valid = contract_valid and route_binding is not None
                     dispatch_id = self._dispatch_id(str(row["attempt_id"]))
                     attempt_id = str(row["attempt_id"])
                     attempt_event = self.journal.get(str(row["event_id"]))
@@ -670,6 +723,7 @@ class DispatchOutbox:
         # A start event is the source of truth during the crash gap before the
         # operational row can be updated. Absorb it before considering reclaim.
         self.reconcile(now=current)
+        self.refresh_authority(now=current)
         worker = self.protector.pseudonym("dispatch_worker", worker_id)
         if worker is None:
             raise DispatchOutboxError("worker identity is required")
@@ -765,7 +819,7 @@ class DispatchOutbox:
         )
 
     def refresh_authority(self, *, now: datetime | None = None) -> int:
-        """Revoke queued or leased work whose durable policy is no longer current."""
+        """Revoke work whose policy, route, or host delivery contract changed."""
 
         current = self._utc(now)
         with closing(self._connect()) as connection:
@@ -786,6 +840,31 @@ class DispatchOutbox:
                     (current.isoformat(),),
                 )
                 changed = int(connection.execute("SELECT changes()").fetchone()[0])
+                rows = connection.execute(
+                    """
+                    SELECT * FROM dispatch_outbox_v3
+                    WHERE state IN ('pending', 'leased')
+                    """
+                ).fetchall()
+                for row in rows:
+                    authorization = self.journal.get(str(row["authorization_event_id"]))
+                    binding, _reasons = self._authorization_route(
+                        authorization,
+                        subject=str(row["subject"]),
+                        capability=str(row["capability"]),
+                        now=current,
+                    )
+                    if binding is None:
+                        connection.execute(
+                            """
+                            UPDATE dispatch_outbox_v3
+                            SET state='revoked', lease_owner=NULL,
+                                lease_token_digest=NULL, lease_until=NULL, updated_at=?
+                            WHERE dispatch_id=? AND state IN ('pending', 'leased')
+                            """,
+                            (current.isoformat(), row["dispatch_id"]),
+                        )
+                        changed += int(connection.execute("SELECT changes()").fetchone()[0])
                 connection.execute("COMMIT")
                 return changed
             except Exception:
@@ -861,12 +940,26 @@ class DispatchOutbox:
             )
         ):
             raise DispatchOutboxError("dispatch action contract was not authorized")
+        route_binding, route_reasons = self._authorization_route(
+            authorization,
+            subject=str(row["subject"]),
+            capability=str(row["capability"]),
+            now=current,
+        )
+        if route_binding is None:
+            raise DispatchOutboxError(
+                "dispatch route is not authorized: " + ",".join(route_reasons)
+            )
+        route = self.host.resolve_route(route_binding)
         start_payload: dict[str, object] = {
             "dispatch_id": str(row["dispatch_id"]),
             "attempt_id": str(row["attempt_id"]),
             "idempotency_key": str(row["idempotency_key"]),
             "capability": str(row["capability"]),
             "policy_event_id": str(row["policy_event_id"]),
+            "route_binding_id": route_binding.binding_id,
+            "route_binding_event_id": route_binding.event_id,
+            "host_snapshot_event_id": route_binding.snapshot_event_id,
             "lease_generation": int(row["lease_generation"]),
             "external_result_observed": False,
         }
@@ -919,6 +1012,12 @@ class DispatchOutbox:
                 "SELECT * FROM autonomy_policies_v1 WHERE subject=?",
                 (lease.subject,),
             ).fetchone()
+            current_binding, _current_route_reasons = self._authorization_route(
+                authorization,
+                subject=lease.subject,
+                capability=lease.capability,
+                now=current,
+            )
             if (
                 current_row is None
                 or current_row["state"] != "leased"
@@ -930,6 +1029,7 @@ class DispatchOutbox:
                 or not bool(current_policy["enabled"])
                 or current_policy["policy_event_id"]
                 != current_row["policy_event_id"]
+                or current_binding is None
             ):
                 connection.execute("ROLLBACK")
                 raise DispatchOutboxError(
@@ -944,7 +1044,9 @@ class DispatchOutbox:
                 (start_event.event_id, current.isoformat(), lease.dispatch_id),
             )
             connection.execute("COMMIT")
-        return DispatchExecution(lease, start_event.event_id, contract.to_document())
+        return DispatchExecution(
+            lease, start_event.event_id, contract.to_document(), route
+        )
 
     def release(
         self,
