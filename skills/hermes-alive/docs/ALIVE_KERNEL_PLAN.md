@@ -202,6 +202,11 @@ inspectable; replay is deterministic outside explicitly recorded model calls.
 - [x] Add time-separated factual replay evaluation that rejects future
   evidence, preserves unknown feedback and forbids unsupported counterfactual
   policy claims (ADR-0012).
+- [x] Define complete blinded-review metrics and a minimum qualification gate
+  for memory consolidation: false-memory classes, durable-claim recall,
+  citation accuracy, safe silence, duplication and review burden remain
+  separate measures (ADR-0019). The checked-in corpus is synthetic machinery
+  proof, not longitudinal product evidence.
 
 Exit: learning improves held-out replay metrics without increasing interruption,
 factual error or user-control violations.
@@ -622,3 +627,17 @@ For each material change:
 - The callable remains unscheduled and cannot affect production behavior. The
   next evidence gate is a sanitized historical replay corpus with
   longitudinal usefulness, false-memory and review-burden metrics.
+
+### 2026-10-11 — Honest consolidation evaluation gate
+
+- Added complete blinded-review accounting instead of treating strict JSON as
+  a quality signal. Every candidate and every zero-candidate case must be
+  reviewed; incomplete cohorts are rejected.
+- Durable claims have explicit case-local IDs. An acceptable candidate must
+  match one ID and a claim cannot be counted twice, so recall cannot be entered
+  as an unsupported aggregate number.
+- Precision, recall, citation accuracy, sensitive/authority failures,
+  duplication, safe silence and review burden are reported independently.
+- A ten-case multilingual synthetic seed exercises the evaluator without
+  containing historical user data. It explicitly does not close the Phase-0
+  sanitized historical corpus or longitudinal evidence gates.

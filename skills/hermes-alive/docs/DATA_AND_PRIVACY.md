@@ -48,6 +48,11 @@ explicitly supplied.
   written to the journal, logs or receipts. Receipts retain evidence IDs,
   actual-model attribution, bounded counts and error classes; accepted parser
   output enters only the encrypted review-proposal path.
+- The checked-in consolidation replay seed is synthetic and manually marked as
+  privacy reviewed. Historical conversation excerpts must not be committed as
+  a test corpus through automatic redaction alone; any future historical corpus
+  requires an explicit human privacy review and a separately controlled
+  storage decision.
 
 ## Topic-delivery privacy
 

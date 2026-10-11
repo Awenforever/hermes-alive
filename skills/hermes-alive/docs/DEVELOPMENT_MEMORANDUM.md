@@ -29,6 +29,13 @@ Regression proof lives in
 `tests/run_alive_kernel_consolidation_synthesis.py`; the architectural contract
 is ADR-0018.
 
+Schema validity is not semantic quality. Consolidation evaluation must use the
+complete blinded-review contract in ADR-0019. In particular, do not report
+precision without missed durable claims, do not report recall from a hand-entered
+aggregate, do not merge sensitive and ordinary unsupported errors, and do not
+hide how many review decisions the user would have to make. The synthetic seed
+only tests the evaluator; it is never release evidence.
+
 ## Plugin dependencies must respect the Hermes environment lock
 
 The supported Hermes runtime already provides `cryptography==50.0.0`. Alive's
