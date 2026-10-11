@@ -457,18 +457,45 @@ class AgendaProjection:
             return self._decision(
                 connection, event, "rejected", f"invalid_proposal:{type(exc).__name__}", None
             )
+        source_records = [self.journal.get(source) for source in sources]
+        sources_within_subject = all(
+            record is not None and record.event.subject in {None, subject}
+            for record in source_records
+        )
+        authority_valid = sources_within_subject
+        if authority is AgendaAuthority.USER_EXPLICIT:
+            authority_valid = authority_valid and event.actor == subject and any(
+                record is not None
+                and record.event.event_type == "conversation.inbound"
+                and record.event.actor == subject
+                and record.event.subject == subject
+                for record in source_records
+            )
+        elif authority is AgendaAuthority.SYSTEM_MIGRATION:
+            authority_valid = (
+                authority_valid
+                and event.actor.startswith("system:")
+                and any(
+                    record is not None
+                    and record.event.event_type == "system.migration"
+                    for record in source_records
+                )
+            )
         if (
             event.subject != subject
             or event.sensitivity is not sensitivity
             or content.sensitivity is not sensitivity
             or not sources
-            or not all(self.journal.get(source) for source in sources)
             or not math.isfinite(confidence)
             or not 0.0 <= confidence <= 1.0
             or not math.isfinite(priority)
             or not 0.0 <= priority <= 1.0
         ):
             return self._decision(connection, event, "rejected", "proposal_boundary_mismatch", None)
+        if not authority_valid:
+            return self._decision(
+                connection, event, "rejected", "proposal_authority_invalid", None
+            )
         try:
             self.content_vault.resolve_json(
                 content.content_id,

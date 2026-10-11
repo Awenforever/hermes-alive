@@ -337,7 +337,33 @@ class DeliberationProjection:
                     candidate.dimensions, name
                 ).evidence_event_ids
             }
-            evidence_ok = all(self.journal.get(value) is not None for value in evidence_ids)
+            evidence_records = [self.journal.get(value) for value in evidence_ids]
+            evidence_ok = all(
+                record is not None and record.event.subject in {None, event.subject}
+                for record in evidence_records
+            )
+            agenda_schema = connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='agenda_items_v1'"
+            ).fetchone()
+            agenda_ok = True
+            for candidate in frame.candidates:
+                if candidate.agenda_item_id is None:
+                    continue
+                row = (
+                    connection.execute(
+                        "SELECT subject, state FROM agenda_items_v1 WHERE item_id=?",
+                        (candidate.agenda_item_id,),
+                    ).fetchone()
+                    if agenda_schema is not None
+                    else None
+                )
+                if (
+                    row is None
+                    or row["subject"] != event.subject
+                    or row["state"] != "active"
+                ):
+                    agenda_ok = False
+                    break
             contents_ok = True
             for candidate in frame.candidates:
                 if candidate.content_id is None:
@@ -354,6 +380,7 @@ class DeliberationProjection:
                 and [item.candidate_id for item in frame.candidates]
                 == list(event.payload["candidate_ids"])
                 and evidence_ok
+                and agenda_ok
                 and contents_ok
             )
         except (

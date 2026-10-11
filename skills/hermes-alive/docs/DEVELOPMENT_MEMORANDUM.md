@@ -36,6 +36,16 @@ aggregate, do not merge sensitive and ordinary unsupported errors, and do not
 hide how many review decisions the user would have to make. The synthetic seed
 only tests the evaluator; it is never release evidence.
 
+## Event existence is not subject authority
+
+Any kernel projection that cites another event or durable object must prove the
+reference belongs to the same subject (or is deliberately subject-neutral).
+Never treat a syntactically valid event ID, `USER_EXPLICIT` enum value or real
+agenda item as sufficient authorization. Agenda proposals, agenda transitions,
+deliberation evidence and deliberation agenda references all require explicit
+subject/actor checks. Cross-subject negative tests are mandatory before a new
+component joins the cognition cycle.
+
 ## Plugin dependencies must respect the Hermes environment lock
 
 The supported Hermes runtime already provides `cryptography==50.0.0`. Alive's

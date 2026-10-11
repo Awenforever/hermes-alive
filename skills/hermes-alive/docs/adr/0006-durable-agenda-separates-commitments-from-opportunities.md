@@ -33,6 +33,13 @@ deterministic. Authority-bearing transitions cite a durable source event;
 user-explicit authority is accepted only from a matching inbound user event,
 not from a caller-provided label alone.
 
+Proposal admission applies the same rule, not only later transitions. Every
+source event must belong to the agenda subject or be explicitly subject-neutral.
+`USER_EXPLICIT` additionally requires the proposal actor and at least one
+inbound authority event to be that exact subject. `SYSTEM_MIGRATION` requires a
+system actor and an actual migration event. Existence of an arbitrary event is
+never sufficient authority.
+
 ## Consequences
 
 - A model cannot silently manufacture a promise on the user's behalf.

@@ -22,18 +22,26 @@ from alive_kernel.deliberation import (  # noqa: E402
     SideEffect,
 )
 from alive_kernel.deliberation_store import DeliberationProjection  # noqa: E402
+from alive_kernel.agenda import (  # noqa: E402
+    AgendaAuthority,
+    AgendaItemKind,
+    AgendaProjection,
+    AgendaProposal,
+)
 from alive_kernel.event_store import ExperienceJournal  # noqa: E402
 from alive_kernel.events import Sensitivity  # noqa: E402
 from alive_kernel_testkit import install_exploration_gate  # noqa: E402
 from alive_kernel.events import EventEnvelope  # noqa: E402
 
 
-def dimensions(*, confidence: float, risk: float) -> DecisionDimensions:
+def dimensions(
+    *, confidence: float, risk: float, evidence_id: str = "event:evidence"
+) -> DecisionDimensions:
     def value(number: float, reason: str) -> DimensionAssessment:
         return DimensionAssessment(
             number,
             AssessmentBasis.MODEL_JUDGMENT,
-            ("event:evidence",),
+            (evidence_id,),
             reason,
         )
 
@@ -51,6 +59,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="alive-kernel-deliberation-") as directory:
         journal = ExperienceJournal(Path(directory) / "kernel.sqlite3")
         projection = DeliberationProjection(journal)
+        agenda = AgendaProjection(journal, content_vault=projection.content_vault)
         evidence = EventEnvelope(
             event_id="event:evidence",
             event_type="discovery.observed",
@@ -60,6 +69,18 @@ def main() -> int:
             payload={"fixture": True},
         )
         journal.append(evidence)
+        agenda_item = AgendaProposal(
+            kind=AgendaItemKind.OPPORTUNITY,
+            subject="user:test",
+            details={"summary": "grounded active opportunity"},
+            authority=AgendaAuthority.DIRECT_OBSERVATION,
+            source_event_ids=(evidence.event_id,),
+            confidence=0.9,
+            item_id="agenda:active-test",
+        )
+        assert agenda.apply(
+            agenda.append_proposal(agenda_item, actor="system:discovery")
+        ).outcome == "active"
         safe = ActionCandidate(
             action_kind=ActionKind.SHARE,
             side_effect=SideEffect.COMMUNICATION,
@@ -168,6 +189,97 @@ def main() -> int:
         rejected = projection.apply(rejected_record)
         assert rejected.outcome == "rejected"
         assert rejected.reason == "policy_rejected_candidate"
+
+        agenda_candidate = ActionCandidate(
+            action_kind=ActionKind.SHARE,
+            side_effect=SideEffect.COMMUNICATION,
+            authority=ActionAuthority.USER_DELEGATED,
+            dimensions=dimensions(confidence=0.9, risk=0.1),
+            agenda_item_id=agenda_item.item_id,
+            content_id="candidate-content:active-agenda",
+            candidate_id="candidate:active-agenda",
+        )
+        agenda_ok_record, _agenda_ok_frame = projection.append_frame(
+            (agenda_candidate,),
+            PolicyContext(can_interrupt=True),
+            actor="system:alive",
+            subject="user:test",
+            frame_id="frame:active-agenda",
+            candidate_contents={
+                "candidate-content:active-agenda": {"message": "grounded agenda action"}
+            },
+        )
+        assert projection.apply(agenda_ok_record).outcome == "recorded"
+
+        foreign_evidence = EventEnvelope(
+            event_id="event:foreign-evidence",
+            event_type="discovery.observed",
+            source="test.fixture",
+            actor="system:test",
+            subject="user:other",
+            payload={"fixture": True},
+        )
+        journal.append(foreign_evidence)
+        foreign_agenda = AgendaProposal(
+            kind=AgendaItemKind.OPPORTUNITY,
+            subject="user:other",
+            details={"summary": "another user's opportunity"},
+            authority=AgendaAuthority.DIRECT_OBSERVATION,
+            source_event_ids=(foreign_evidence.event_id,),
+            confidence=0.9,
+            item_id="agenda:foreign",
+        )
+        assert agenda.apply(
+            agenda.append_proposal(foreign_agenda, actor="system:discovery")
+        ).outcome == "active"
+        cross_subject = ActionCandidate(
+            action_kind=ActionKind.SHARE,
+            side_effect=SideEffect.COMMUNICATION,
+            authority=ActionAuthority.USER_DELEGATED,
+            dimensions=dimensions(
+                confidence=0.9,
+                risk=0.1,
+                evidence_id=foreign_evidence.event_id,
+            ),
+            content_id="candidate-content:cross-subject",
+            candidate_id="candidate:cross-subject",
+        )
+        cross_record, _cross_frame = projection.append_frame(
+            (cross_subject,),
+            PolicyContext(can_interrupt=True),
+            actor="system:alive",
+            subject="user:test",
+            frame_id="frame:cross-subject",
+            candidate_contents={
+                "candidate-content:cross-subject": {"message": "must be rejected"}
+            },
+        )
+        cross_decision = projection.apply(cross_record)
+        assert cross_decision.outcome == "rejected"
+        assert cross_decision.reason == "frame_boundary_mismatch"
+
+        foreign_agenda_candidate = ActionCandidate(
+            action_kind=ActionKind.SHARE,
+            side_effect=SideEffect.COMMUNICATION,
+            authority=ActionAuthority.USER_DELEGATED,
+            dimensions=dimensions(confidence=0.9, risk=0.1),
+            agenda_item_id=foreign_agenda.item_id,
+            content_id="candidate-content:foreign-agenda",
+            candidate_id="candidate:foreign-agenda",
+        )
+        agenda_record, _agenda_frame = projection.append_frame(
+            (foreign_agenda_candidate,),
+            PolicyContext(can_interrupt=True),
+            actor="system:alive",
+            subject="user:test",
+            frame_id="frame:foreign-agenda",
+            candidate_contents={
+                "candidate-content:foreign-agenda": {"message": "must be rejected"}
+            },
+        )
+        agenda_decision = projection.apply(agenda_record)
+        assert agenda_decision.outcome == "rejected"
+        assert agenda_decision.reason == "frame_boundary_mismatch"
 
         before_rebuild = projection.inspect(frame.frame_id, clearance=Sensitivity.PRIVATE)
         decisions = projection.rebuild(batch_size=2)

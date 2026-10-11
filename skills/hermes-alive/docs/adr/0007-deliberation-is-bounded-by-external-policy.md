@@ -31,6 +31,12 @@ structured selection with a rationale. A second deterministic check rejects an
 unknown, filtered or mutated ID. Silence can always be selected and is the
 default when no actionable candidate survives or model output is invalid.
 
+Evidence and agenda references are also subject-scoped. A frame may cite only
+evidence belonging to its subject or a genuinely subject-neutral system event.
+An `agenda_item_id`, when present, must resolve to an active item owned by the
+same subject. A real but foreign agenda item is rejected just like a missing
+one; identity boundaries are not left to model judgment.
+
 ## Consequences
 
 - Fluent model text cannot grant permission or reduce measured risk.

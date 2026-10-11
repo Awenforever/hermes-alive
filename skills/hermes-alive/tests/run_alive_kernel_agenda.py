@@ -59,6 +59,42 @@ def main() -> int:
         retry = agenda.append_proposal(explicit, actor="user:test")
         assert retry.event.event_id == decision.event_id
 
+        forged_actor = AgendaProposal(
+            kind=AgendaItemKind.COMMITMENT,
+            subject="user:test",
+            details={"summary": "forged explicit authority"},
+            authority=AgendaAuthority.USER_EXPLICIT,
+            source_event_ids=(explicit_source.event_id,),
+            confidence=1.0,
+            item_id="agenda:forged-actor",
+        )
+        forged_actor_decision = agenda.apply(
+            agenda.append_proposal(forged_actor, actor="model:test")
+        )
+        assert forged_actor_decision.reason == "proposal_authority_invalid"
+
+        other_source = EventEnvelope(
+            event_type="conversation.inbound",
+            source="test.fixture",
+            actor="user:other",
+            subject="user:other",
+            payload={"label": "cross-subject source"},
+        )
+        journal.append(other_source)
+        cross_subject = AgendaProposal(
+            kind=AgendaItemKind.OPPORTUNITY,
+            subject="user:test",
+            details={"summary": "must not cross users"},
+            authority=AgendaAuthority.DIRECT_OBSERVATION,
+            source_event_ids=(other_source.event_id,),
+            confidence=0.8,
+            item_id="agenda:cross-subject",
+        )
+        cross_subject_decision = agenda.apply(
+            agenda.append_proposal(cross_subject, actor="system:discovery")
+        )
+        assert cross_subject_decision.reason == "proposal_authority_invalid"
+
         model_source = source("model commitment")
         model = AgendaProposal(
             kind=AgendaItemKind.COMMITMENT,

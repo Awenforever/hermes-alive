@@ -641,3 +641,16 @@ For each material change:
 - A ten-case multilingual synthetic seed exercises the evaluator without
   containing historical user data. It explicitly does not close the Phase-0
   sanitized historical corpus or longitudinal evidence gates.
+
+### 2026-10-11 — Subject authority boundary audit
+
+- Pre-coordinator review found that agenda proposal sources were checked for
+  existence but not subject ownership, and a caller-provided
+  `USER_EXPLICIT` label could activate a commitment without proving the caller
+  was that user. Proposal admission now proves both source scope and authority.
+- Durable deliberation frames now reject foreign-subject evidence and reject
+  missing, inactive or foreign agenda references. A valid active agenda item
+  for the same subject is covered by an integration contract.
+- This safety correction precedes the unified cognition-cycle coordinator;
+  connecting components before fixing identity boundaries would have amplified
+  the defect across the full action chain.
