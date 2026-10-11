@@ -82,7 +82,11 @@ def main() -> int:
             actor="system:alive",
             subject="user:test",
             frame_id="frame:reflection-test",
-            candidate_contents={candidate.content_id: {"message": "test"}},
+            candidate_contents={candidate.content_id: {
+                "schema_version": 1,
+                "capability": "hermes.channel.send",
+                "operation": {"text": "test", "format": "plain"},
+            }},
         )
         deliberation.apply(frame_event)
         gate_event_id = install_exploration_gate(
@@ -104,14 +108,14 @@ def main() -> int:
             selection_event_id=selection_event.event.event_id,
             candidate_id=candidate.candidate_id,
             subject="user:test",
-            executor="test.channel",
+            executor="hermes.channel.send",
             fixture_name="reflection",
         )
         attempt_event = outcomes.append_attempt(
             authorization_event_id=authorization_event_id,
             selection_event_id=selection_event.event.event_id,
             candidate_id=candidate.candidate_id,
-            executor="test.channel",
+            executor="hermes.channel.send",
             idempotency_key="delivery:reflection-test",
             actor="system:test",
             subject="user:test",

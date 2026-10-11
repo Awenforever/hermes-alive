@@ -177,7 +177,14 @@ def main() -> int:
             candidates=(
                 CycleCandidate(
                     candidate,
-                    {"message": "encrypted causal recovery candidate"},
+                    {
+                        "schema_version": 1,
+                        "capability": "hermes.channel.send",
+                        "operation": {
+                            "text": "encrypted causal recovery candidate",
+                            "format": "markdown",
+                        },
+                    },
                     "recovery topic",
                     "recovery source",
                 ),
@@ -367,7 +374,12 @@ def main() -> int:
             now=first_lease.lease_until,
         )
         assert execution.content == {
-            "message": "encrypted causal recovery candidate"
+            "schema_version": 1,
+            "capability": "hermes.channel.send",
+            "operation": {
+                "text": "encrypted causal recovery candidate",
+                "format": "markdown",
+            },
         }
         result_payload = {
             "dispatch_id": third_lease.dispatch_id,
@@ -604,7 +616,12 @@ def main() -> int:
             now=execution_now,
         )
         assert resumed_execution.content == {
-            "message": "encrypted causal recovery candidate"
+            "schema_version": 1,
+            "capability": "hermes.channel.send",
+            "operation": {
+                "text": "encrypted causal recovery candidate",
+                "format": "markdown",
+            },
         }
         lost_started = sqlite3.connect(journal.path)
         try:

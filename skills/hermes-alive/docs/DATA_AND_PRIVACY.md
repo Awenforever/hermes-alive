@@ -73,6 +73,10 @@ explicitly supplied.
 - Dispatch-start events contain structural IDs, policy identity, capability,
   idempotency identity and lease generation only. The execution grant holds
   plaintext in process memory; neither start nor uncertain state journals it.
+- Action permits persist an installation-keyed authenticator and schema
+  version, never message text or raw routing. The encrypted action document
+  contains no destination; route identity must come from separately authorized
+  Hermes configuration.
 - Autonomy policy stores only structural risk/interruption bounds, its revision
   and user authority. Raw control commands are forbidden. Policy events carry
   an installation authenticator and contain no channel identifier or message

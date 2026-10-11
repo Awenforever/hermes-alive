@@ -67,7 +67,11 @@ def main() -> int:
         framed, frame = deliberation.append_frame(
             (candidate,), PolicyContext(can_interrupt=True), actor="system:alive",
             subject="user:test", frame_id="frame:preference-test",
-            candidate_contents={candidate.content_id: {"message": "test"}},
+            candidate_contents={candidate.content_id: {
+                "schema_version": 1,
+                "capability": "hermes.channel.send",
+                "operation": {"text": "test", "format": "plain"},
+            }},
         )
         deliberation.apply(framed)
         gate_event_id = install_exploration_gate(
@@ -86,13 +90,13 @@ def main() -> int:
             selection_event_id=selected.event.event_id,
             candidate_id=candidate.candidate_id,
             subject="user:test",
-            executor="test.channel",
+            executor="hermes.channel.send",
             fixture_name="preference",
         )
         attempted = outcomes.append_attempt(
             authorization_event_id=authorization_event_id,
             selection_event_id=selected.event.event_id,
-            candidate_id=candidate.candidate_id, executor="test.channel",
+            candidate_id=candidate.candidate_id, executor="hermes.channel.send",
             idempotency_key="delivery:preference-test", actor="system:test",
             subject="user:test", attempt_id="attempt:preference-test",
         )

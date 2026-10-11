@@ -102,7 +102,14 @@ def main() -> int:
             candidates=(
                 CycleCandidate(
                     candidate,
-                    {"message": "RAW_AUTHORIZATION_CONTENT_SENTINEL"},
+                    {
+                        "schema_version": 1,
+                        "capability": "hermes.channel.send",
+                        "operation": {
+                            "text": "RAW_AUTHORIZATION_CONTENT_SENTINEL",
+                            "format": "markdown",
+                        },
+                    },
                     "authorization topic",
                     "authorization source",
                 ),
@@ -285,7 +292,15 @@ def main() -> int:
             candidates=(
                 CycleCandidate(
                     observed_candidate,
-                    {"message": "observed proposal"},
+                    {
+                        "schema_version": 1,
+                        "capability": "hermes.channel.send",
+                        "operation": {
+                            "text": "observed proposal",
+                            "format": "plain",
+                        },
+                        "chat_id": "model-selected-destination",
+                    },
                     "observed topic",
                     "observed source",
                 ),
@@ -315,6 +330,7 @@ def main() -> int:
         )
         assert not unproven.authorized
         assert "user_delegation_unproven" in unproven.reasons
+        assert "action_contract_invalid" in unproven.reasons
 
         critical_candidate = ActionCandidate(
             action_kind=ActionKind.SHARE,
@@ -330,7 +346,14 @@ def main() -> int:
             candidates=(
                 CycleCandidate(
                     critical_candidate,
-                    {"message": "unproven critical claim"},
+                    {
+                        "schema_version": 1,
+                        "capability": "hermes.channel.send",
+                        "operation": {
+                            "text": "unproven critical claim",
+                            "format": "plain",
+                        },
+                    },
                     "critical topic",
                     "critical source",
                 ),

@@ -62,7 +62,11 @@ def main() -> int:
         first_event, first_frame = deliberation.append_frame(
             (first,), PolicyContext(can_interrupt=True), actor="system:alive",
             subject="user:test", frame_id="frame:exploration-first",
-            candidate_contents={first.content_id: {"message": "first"}},
+            candidate_contents={first.content_id: {
+                "schema_version": 1,
+                "capability": "hermes.channel.send",
+                "operation": {"text": "first", "format": "plain"},
+            }},
         )
         deliberation.apply(first_event)
         first_annotation_event, first_annotation = exploration.append_annotation(
@@ -94,13 +98,13 @@ def main() -> int:
             selection_event_id=selected.event.event_id,
             candidate_id=first.candidate_id,
             subject="user:test",
-            executor="test.channel",
+            executor="hermes.channel.send",
             fixture_name="exploration-store",
         )
         attempted = outcomes.append_attempt(
             authorization_event_id=authorization_event_id,
             selection_event_id=selected.event.event_id,
-            candidate_id=first.candidate_id, executor="test.channel",
+            candidate_id=first.candidate_id, executor="hermes.channel.send",
             idempotency_key="delivery:exploration-first", actor="system:test",
             subject="user:test", attempt_id="attempt:exploration-first",
         )
@@ -123,7 +127,11 @@ def main() -> int:
         second_event, second_frame = deliberation.append_frame(
             (second,), PolicyContext(can_interrupt=True), actor="system:alive",
             subject="user:test", frame_id="frame:exploration-second",
-            candidate_contents={second.content_id: {"message": "second"}},
+            candidate_contents={second.content_id: {
+                "schema_version": 1,
+                "capability": "hermes.channel.send",
+                "operation": {"text": "second", "format": "plain"},
+            }},
         )
         deliberation.apply(second_event)
         second_annotation_event, _annotation = exploration.append_annotation(

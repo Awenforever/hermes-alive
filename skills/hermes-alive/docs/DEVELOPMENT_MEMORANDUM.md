@@ -96,6 +96,15 @@ bind the start-event ID and lease generation. When migrating v2 state, map old
 leases to uncertainty; preserving liveness is not worth risking duplicate
 external action.
 
+Do not let model-authored content smuggle transport authority. ADR-0027 makes
+action documents strict and destination-free, binds their keyed authenticator to
+the permit, and revalidates them at every later boundary. A platform, profile,
+recipient, chat, thread, adapter or tool name belongs to a separately
+user-authorized Hermes capability binding. `PluginContext.inject_message()`
+acceptance is not evidence that an external message was delivered, and private
+gateway runner fields are not a distribution-safe substitute for a public
+host contract.
+
 ## Plugin dependencies must respect the Hermes environment lock
 
 The supported Hermes runtime already provides `cryptography==50.0.0`. Alive's

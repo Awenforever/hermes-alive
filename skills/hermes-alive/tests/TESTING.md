@@ -17,6 +17,7 @@ python3 tests/run_alive_kernel_consolidation_evaluation.py
 python3 tests/run_alive_kernel_recovery.py
 python3 tests/run_alive_kernel_cognition_cycle.py
 python3 tests/run_alive_kernel_deliberation_synthesis.py
+python3 tests/run_alive_kernel_action_contract.py
 python3 tests/run_alive_kernel_action_authorization.py
 python3 tests/run_alive_kernel_autonomy_policy.py
 python3 tests/run_alive_kernel_dispatch_migration.py

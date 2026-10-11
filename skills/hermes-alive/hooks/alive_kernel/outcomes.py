@@ -11,6 +11,7 @@ import sqlite3
 from typing import Any, Iterable
 from uuid import uuid4
 
+from .action_contract import ActionContractError, parse_action_contract
 from .autonomy_policy import AutonomyPolicyProjection
 from .content_vault import (
     ContentErasedError,
@@ -531,6 +532,47 @@ class OutcomeProjection:
         if candidate is None or candidate.action_kind is ActionKind.SILENCE:
             return self._decision(
                 connection, event, "rejected", "candidate_not_executable", attempt_id or None, None
+            )
+        try:
+            contract_document = self.content_vault.resolve_json(
+                str(candidate.content_id),
+                expected_subject=str(selection["subject"]),
+                expected_purpose="deliberation.candidate",
+                expected_sensitivity=Sensitivity(selection["frame_sensitivity"]),
+            )
+            contract = parse_action_contract(
+                contract_document,
+                capability=str(payload.get("executor") or ""),
+            )
+        except (
+            ActionContractError,
+            ContentErasedError,
+            ContentIntegrityError,
+            ContentUnavailableError,
+        ):
+            return self._decision(
+                connection,
+                event,
+                "rejected",
+                "action_contract_invalid",
+                attempt_id or None,
+                None,
+            )
+        if (
+            authorization.event.payload.get("action_contract_version") != 1
+            or not self.receipt_protector.verify_json(
+                "action.contract.v1",
+                contract.to_document(),
+                authorization.event.payload.get("action_contract_binding"),
+            )
+        ):
+            return self._decision(
+                connection,
+                event,
+                "rejected",
+                "action_contract_not_authorized",
+                attempt_id or None,
+                None,
             )
         if candidate.agenda_item_id is not None:
             agenda = connection.execute(

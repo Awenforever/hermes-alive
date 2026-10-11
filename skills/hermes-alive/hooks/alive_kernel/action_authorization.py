@@ -8,6 +8,7 @@ import re
 from typing import Iterable
 from uuid import uuid4
 
+from .action_contract import ActionContractError, parse_action_contract
 from .autonomy_policy import AutonomyPolicyProjection
 from .agenda import (
     AgendaAuthority,
@@ -155,6 +156,14 @@ class SendTimeAuthorizer:
             or payload.get("policy_revision") != policy_revision
             or payload.get("confirmation_event_id") != confirmation_event_id
             or payload.get("permit_ttl_seconds") != permit_ttl_seconds
+            or payload.get("action_contract_version") != 1
+            or (
+                payload.get("outcome") == "authorized"
+                and not re.fullmatch(
+                    r"[0-9a-f]{64}",
+                    str(payload.get("action_contract_binding") or ""),
+                )
+            )
         ):
             raise ActionAuthorizationError(
                 "authorization operation ID was reused with different semantics"
@@ -253,6 +262,8 @@ class SendTimeAuthorizer:
         gate_event_id = ""
         sensitivity = Sensitivity.PRIVATE
         candidate = None
+        stored = None
+        action_contract_binding: str | None = None
         if selection_record is None or selection_record.event.event_type != "deliberation.selected":
             reasons.append("selection_unavailable")
         else:
@@ -300,6 +311,19 @@ class SendTimeAuthorizer:
                 reasons.append("silence_not_executable")
             if self._required_capability(candidate.side_effect) != capability:
                 reasons.append("capability_mismatch")
+            content_document = dict(stored.candidate_contents).get(
+                str(candidate.content_id)
+            ) if stored is not None and candidate.content_id is not None else None
+            try:
+                contract = parse_action_contract(
+                    content_document,
+                    capability=capability,
+                )
+                action_contract_binding = self.receipt_protector.authenticate_json(
+                    "action.contract.v1", contract.to_document()
+                )
+            except ActionContractError:
+                reasons.append("action_contract_invalid")
             if gate_event_id != self.exploration.latest_gate_event_id(frame_id):
                 reasons.append("exploration_gate_stale")
             agenda_record = None
@@ -378,6 +402,8 @@ class SendTimeAuthorizer:
             "agenda_item_id": getattr(candidate, "agenda_item_id", None),
             "confirmation_event_id": confirmation_event_id,
             "capability": capability,
+            "action_contract_version": 1,
+            "action_contract_binding": action_contract_binding,
             "outcome": "authorized" if authorized else "denied",
             "reasons": reasons,
             "policy": policy_payload,

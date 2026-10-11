@@ -115,7 +115,14 @@ def main() -> int:
             subject="user:test",
             frame_id="frame:outcome-test",
             candidate_contents={
-                candidate.content_id: {"message": "Grounded proactive message."}
+                candidate.content_id: {
+                    "schema_version": 1,
+                    "capability": "hermes.channel.send",
+                    "operation": {
+                        "text": "Grounded proactive message.",
+                        "format": "markdown",
+                    },
+                }
             },
         )
         deliberation.apply(frame_record)
@@ -141,7 +148,7 @@ def main() -> int:
             selection_event_id=selection_record.event.event_id,
             candidate_id=candidate.candidate_id,
             subject="user:test",
-            executor="hermes.channel",
+            executor="hermes.channel.send",
             fixture_name="outcomes",
         )
         authentic = journal.get(authorization_event_id)
@@ -167,7 +174,7 @@ def main() -> int:
             authorization_event_id=forged_authorization.event_id,
             selection_event_id=selection_record.event.event_id,
             candidate_id=candidate.candidate_id,
-            executor="hermes.channel",
+            executor="hermes.channel.send",
             idempotency_key="delivery:forged-authorization",
             actor="system:executor",
             subject="user:test",
@@ -182,7 +189,7 @@ def main() -> int:
             authorization_event_id="action.authorization:missing",
             selection_event_id=selection_record.event.event_id,
             candidate_id=candidate.candidate_id,
-            executor="hermes.channel",
+            executor="hermes.channel.send",
             idempotency_key="delivery:missing-authorization",
             actor="system:executor",
             subject="user:test",
@@ -211,7 +218,7 @@ def main() -> int:
             authorization_event_id=authorization_event_id,
             selection_event_id=selection_record.event.event_id,
             candidate_id=candidate.candidate_id,
-            executor="hermes.channel",
+            executor="hermes.channel.send",
             idempotency_key="delivery:outcome-test",
             actor="system:executor",
             subject="user:test",
@@ -223,7 +230,7 @@ def main() -> int:
             authorization_event_id=authorization_event_id,
             selection_event_id=selection_record.event.event_id,
             candidate_id=candidate.candidate_id,
-            executor="hermes.channel",
+            executor="hermes.channel.send",
             idempotency_key="delivery:outcome-test",
             actor="system:executor",
             subject="user:test",

@@ -15,8 +15,14 @@ from pathlib import Path
 import secrets
 import sqlite3
 
+from .action_contract import ActionContractError, parse_action_contract
 from .autonomy_policy import AutonomyPolicyProjection
-from .content_vault import ContentVault
+from .content_vault import (
+    ContentErasedError,
+    ContentIntegrityError,
+    ContentUnavailableError,
+    ContentVault,
+)
 from .deliberation import deserialize_frame
 from .event_store import EventConflictError, ExperienceJournal, JournalRecord
 from .events import EventEnvelope, Sensitivity, _thaw_json
@@ -448,6 +454,37 @@ class DispatchOutbox:
                     )
                     if candidate is None or candidate.content_id is None:
                         continue
+                    contract_valid = True
+                    try:
+                        contract_document = self.vault.resolve_json(
+                            candidate.content_id,
+                            expected_subject=str(row["subject"]),
+                            expected_purpose="deliberation.candidate",
+                            expected_sensitivity=Sensitivity(row["sensitivity"]),
+                        )
+                        contract = parse_action_contract(
+                            contract_document,
+                            capability=str(row["executor"]),
+                        )
+                    except (
+                        ActionContractError,
+                        ContentErasedError,
+                        ContentIntegrityError,
+                        ContentUnavailableError,
+                    ):
+                        contract_valid = False
+                    else:
+                        contract_valid = bool(
+                            authorization.event.payload.get("action_contract_version")
+                            == 1
+                            and self.protector.verify_json(
+                                "action.contract.v1",
+                                contract.to_document(),
+                                authorization.event.payload.get(
+                                    "action_contract_binding"
+                                ),
+                            )
+                        )
                     dispatch_id = self._dispatch_id(str(row["attempt_id"]))
                     attempt_id = str(row["attempt_id"])
                     attempt_event = self.journal.get(str(row["event_id"]))
@@ -492,6 +529,8 @@ class DispatchOutbox:
                         state = "acknowledged"
                     elif valid_start:
                         state = "uncertain"
+                    elif not contract_valid:
+                        state = "revoked"
                     else:
                         state = (
                             "expired"
@@ -793,12 +832,35 @@ class DispatchOutbox:
             or policy["policy_event_id"] != row["policy_event_id"]
         ):
             raise DispatchOutboxError("dispatch lease is invalid or expired")
-        content = self.vault.resolve_json(
-            row["content_id"],
-            expected_subject=row["subject"],
-            expected_purpose="deliberation.candidate",
-            expected_sensitivity=Sensitivity(row["sensitivity"]),
-        )
+        try:
+            content_document = self.vault.resolve_json(
+                row["content_id"],
+                expected_subject=row["subject"],
+                expected_purpose="deliberation.candidate",
+                expected_sensitivity=Sensitivity(row["sensitivity"]),
+            )
+            contract = parse_action_contract(
+                content_document,
+                capability=str(row["capability"]),
+            )
+        except (
+            ActionContractError,
+            ContentErasedError,
+            ContentIntegrityError,
+            ContentUnavailableError,
+        ) as exc:
+            raise DispatchOutboxError("dispatch action contract is invalid") from exc
+        authorization = self.journal.get(str(row["authorization_event_id"]))
+        if (
+            authorization is None
+            or authorization.event.payload.get("action_contract_version") != 1
+            or not self.protector.verify_json(
+                "action.contract.v1",
+                contract.to_document(),
+                authorization.event.payload.get("action_contract_binding"),
+            )
+        ):
+            raise DispatchOutboxError("dispatch action contract was not authorized")
         start_payload: dict[str, object] = {
             "dispatch_id": str(row["dispatch_id"]),
             "attempt_id": str(row["attempt_id"]),
@@ -882,7 +944,7 @@ class DispatchOutbox:
                 (start_event.event_id, current.isoformat(), lease.dispatch_id),
             )
             connection.execute("COMMIT")
-        return DispatchExecution(lease, start_event.event_id, content)
+        return DispatchExecution(lease, start_event.event_id, contract.to_document())
 
     def release(
         self,

@@ -20,6 +20,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_dispatch_migrati
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_deliberation_store.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_cognition_cycle.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_deliberation_synthesis.py"
+PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_action_contract.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_action_authorization.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_autonomy_policy.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_outcomes.py"

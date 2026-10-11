@@ -9,6 +9,7 @@ from .action_authorization import (
     ActionAuthorizationError,
     SendTimeAuthorizer,
 )
+from .action_contract import ActionContract, ActionContractError, parse_action_contract
 from .autonomy_policy import (
     AutonomyPolicy,
     AutonomyPolicyDecision,
@@ -214,6 +215,8 @@ from .reflection import (
 __all__ = [
     "ActionAuthorizationDecision",
     "ActionAuthorizationError",
+    "ActionContract",
+    "ActionContractError",
     "AutonomyPolicy",
     "AutonomyPolicyDecision",
     "AutonomyPolicyError",
@@ -361,6 +364,7 @@ __all__ = [
     "apply_exploration_gate",
     "assess_reported_outcome",
     "build_frame",
+    "parse_action_contract",
     "build_factual_episodes",
     "compare_reports",
     "deserialize_frame",

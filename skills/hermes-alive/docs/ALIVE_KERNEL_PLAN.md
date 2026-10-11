@@ -4,7 +4,7 @@ Status: active
 
 Last reviewed: 2026-10-11
 
-Current phase: Phase 4 — outcome learning and longitudinal evaluation
+Current phase: Phase 3/4 integration — safe execution contracts and evaluation
 
 Working branch: `feat/alive-kernel-3`
 
@@ -200,6 +200,13 @@ corrections are represented rather than overwritten.
   at the adapter boundary can neither duplicate nor falsely claim an action.
   Terminal results bind the exact start generation, and v2 leases migrate
   conservatively to uncertainty (ADR-0026).
+- [x] Replace arbitrary candidate JSON at the execution boundary with a
+  versioned, destination-free action contract. Bind it cryptographically into
+  authority, attempt validation and dispatch (ADR-0027).
+- [ ] Bind dispatch to a user-authorized snapshot of actual Hermes host
+  capabilities and route identity; host acceptance is not delivery evidence.
+- [ ] Replace per-acquisition full-history evidence scans with a rebuildable,
+  checkpointed projection without reintroducing a correctness cap.
 - [ ] Run the new decision engine in shadow against production events.
 
 Exit: every proposed action has a stable reason and every rejection is
@@ -758,3 +765,17 @@ For each material change:
   and loses its worker/token fields rather than risking duplicate execution.
 - The live Hermes capability bridge remains disconnected pending its own
   contract and provider/channel substitution tests.
+
+### 2026-10-11 — Typed action contract and upstream capability audit
+
+- Audited current upstream Hermes main rather than designing against the old
+  production image. Public plugin injection proves request acceptance only;
+  direct runner/adapter access is not a supported plugin boundary.
+- Added a strict `hermes.channel.send` v1 document containing only bounded text
+  and `plain|markdown` presentation. Any route, recipient, profile, thread,
+  adapter or unknown field fails closed.
+- Send-time authorization now binds an installation-keyed canonical action
+  authenticator. Attempt and dispatch boundaries independently revalidate it
+  before plaintext can cross.
+- Deliberately left tool execution, internal review and live delivery
+  disconnected until each has a real schema and trustworthy host receipt.

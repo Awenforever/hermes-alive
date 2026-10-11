@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from alive_kernel.action_contract import parse_action_contract
 from alive_kernel.autonomy_policy import AutonomyPolicyProjection
 from alive_kernel.deliberation import (
     ActionKind,
@@ -78,6 +79,19 @@ def install_action_authorization(
 
     selection = journal.get(selection_event_id)
     assert selection is not None
+    deliberation = DeliberationProjection(journal)
+    stored = deliberation.inspect(
+        str(selection.event.payload["frame_id"]),
+        clearance=selection.event.sensitivity,
+    )
+    contract_document = dict(stored.candidate_contents)[
+        next(
+            str(candidate.content_id)
+            for candidate in stored.frame.candidates
+            if candidate.candidate_id == candidate_id
+        )
+    ]
+    contract = parse_action_contract(contract_document, capability=executor)
     autonomy = AutonomyPolicyProjection(journal)
     policy = autonomy.current(subject)
     if policy is None:
@@ -106,6 +120,10 @@ def install_action_authorization(
         "agenda_item_id": None,
         "confirmation_event_id": None,
         "capability": executor,
+        "action_contract_version": 1,
+        "action_contract_binding": LocalIdentityProtector(
+            journal.path.parent / "identity.key"
+        ).authenticate_json("action.contract.v1", contract.to_document()),
         "outcome": "authorized",
         "reasons": [],
         "policy": {},

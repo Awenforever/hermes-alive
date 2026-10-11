@@ -102,6 +102,13 @@ worker after that point produces `uncertain`, never automatic retry. Terminal
 facts bind the exact start event and lease generation, so late evidence can
 resolve uncertainty without erasing the causal gap.
 
+Execution content is also separate from routing (ADR-0027). The only current
+external schema is a bounded channel message with text and presentation format.
+It cannot name a platform, profile, recipient, chat, thread or adapter. Its
+installation-keyed canonical authenticator is bound into authorization and
+revalidated at attempt and dispatch boundaries. Hermes-owned, user-authorized
+route binding remains a future capability-bridge responsibility.
+
 External authority also depends on the latest user-owned autonomy policy
 (ADR-0025). The default is no policy and therefore no proactive execution.
 Authorization receipts and outbox rows bind an exact policy event/revision;
