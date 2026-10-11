@@ -3,6 +3,7 @@
 - Status: accepted for kernel shadow development
 - Date: 2026-10-10
 - Depends on: ADR-0001, ADR-0007
+- Amended by: ADR-0023 (attempts require authenticated live authorization)
 
 ## Context
 

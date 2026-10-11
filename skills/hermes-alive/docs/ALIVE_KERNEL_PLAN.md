@@ -187,6 +187,9 @@ corrections are represented rather than overwritten.
 - [x] Separate selected intent from send-time authority. Short-lived structural
   permits now recheck latest state, current policy, active user authority,
   evidence and the exact Hermes capability without executing (ADR-0022).
+- [x] Require every durable action attempt to consume an unexpired matching
+  authorization receipt, with latest-state rechecks and dependency-ordered
+  crash recovery (ADR-0023). No executor is connected.
 - [ ] Run the new decision engine in shadow against production events.
 
 Exit: every proposed action has a stable reason and every rejection is
@@ -698,3 +701,13 @@ For each material change:
   and an unrelated inbound message cannot be treated as confirmation.
 - Authorized receipts expire within 60 seconds and are not revived by an
   idempotent retry. No production sender consumes these receipts yet.
+
+### 2026-10-11 — Authorized attempts and causal recovery
+
+- Removed the supported direct path from validated selection to action attempt;
+  attempts now consume an exact, live ADR-0022 receipt (ADR-0023).
+- Attempt projection independently rejects missing, expired, capability-
+  mismatched and superseded authorization before any executor can act.
+- Split recovery into deliberation-frame, exploration, deliberation-selection
+  and outcome phases so empty projections reconstruct causal state in the same
+  order as online admission.

@@ -85,6 +85,11 @@ active user authority, current policy, evidence lifetime and the requested
 Hermes capability. Its short-lived receipt is not execution and no production
 adapter consumes it while the kernel remains in shadow.
 
+An action attempt must consume that exact unexpired receipt (ADR-0023). The
+outcome projection rechecks causal order and latest state before recording the
+attempt. Startup replay projects frames before exploration, then selections,
+then outcomes; this order is part of correctness, not an optimization.
+
 ## Decision ownership
 
 - The model owns wording and style inside structured constraints.

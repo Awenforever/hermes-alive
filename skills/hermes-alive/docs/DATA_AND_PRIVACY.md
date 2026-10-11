@@ -61,6 +61,11 @@ explicitly supplied.
 - Send-time authorization stores structural IDs, policy values, reason classes
   and permit expiry only. Candidate and agenda bodies remain in the encrypted
   vault. A receipt expires rather than extending authority on retry.
+- Action attempts retain the structural authorization event ID, capability and
+  idempotency key, never the candidate body or transport payload.
+- Authorization receipts are authenticated with the installation-local
+  identity key. The key is never journaled and must travel inside the managed,
+  access-controlled kernel backup boundary.
 
 ## Topic-delivery privacy
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from contextlib import closing
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from enum import StrEnum
 from pathlib import Path
 import sqlite3
@@ -20,7 +20,8 @@ from .content_vault import (
 )
 from .deliberation import ActionKind, deserialize_frame
 from .event_store import EventConflictError, ExperienceJournal, JournalRecord
-from .events import EventEnvelope, Sensitivity
+from .events import EventEnvelope, Sensitivity, _thaw_json
+from .privacy import LocalIdentityProtector
 
 
 class OutcomeValidationError(ValueError):
@@ -48,6 +49,7 @@ class OutcomeContentStatus(StrEnum):
 @dataclass(frozen=True, slots=True)
 class ActionAttemptRecord:
     attempt_id: str
+    authorization_event_id: str
     selection_event_id: str
     frame_id: str
     candidate_id: str
@@ -107,6 +109,9 @@ class OutcomeProjection:
             self.path.parent / f"{self.path.stem}-content-vault",
             backup_root=self.path.parent / f"{self.path.stem}-content-backups",
         )
+        self.receipt_protector = LocalIdentityProtector(
+            self.path.parent / "identity.key"
+        )
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
@@ -158,6 +163,14 @@ class OutcomeProjection:
                 COMMIT;
                 """
             )
+            columns = {
+                str(row["name"])
+                for row in connection.execute("PRAGMA table_info(action_attempts_v1)")
+            }
+            if "authorization_event_id" not in columns:
+                connection.execute(
+                    "ALTER TABLE action_attempts_v1 ADD COLUMN authorization_event_id TEXT"
+                )
 
     def _append_idempotent(self, event: EventEnvelope) -> JournalRecord:
         def compatible(existing: JournalRecord) -> JournalRecord:
@@ -198,6 +211,7 @@ class OutcomeProjection:
     def append_attempt(
         self,
         *,
+        authorization_event_id: str,
         selection_event_id: str,
         candidate_id: str,
         executor: str,
@@ -210,7 +224,14 @@ class OutcomeProjection:
         attempt_id = str(attempt_id or uuid4()).strip()
         if not all(
             str(value).strip()
-            for value in (attempt_id, selection_event_id, candidate_id, executor, idempotency_key)
+            for value in (
+                attempt_id,
+                authorization_event_id,
+                selection_event_id,
+                candidate_id,
+                executor,
+                idempotency_key,
+            )
         ):
             raise OutcomeValidationError("attempt fields are required")
         event = EventEnvelope(
@@ -219,10 +240,11 @@ class OutcomeProjection:
             source="alive.outcomes",
             actor=actor,
             subject=subject,
-            causation_id=selection_event_id,
+            causation_id=authorization_event_id,
             sensitivity=Sensitivity(sensitivity),
             payload={
                 "attempt_id": attempt_id,
+                "authorization_event_id": authorization_event_id,
                 "selection_event_id": selection_event_id,
                 "candidate_id": candidate_id,
                 "executor": executor,
@@ -334,8 +356,65 @@ class OutcomeProjection:
     ) -> OutcomeProjectionDecision:
         payload = event.payload
         attempt_id = str(payload.get("attempt_id") or "")
+        authorization_event_id = str(payload.get("authorization_event_id") or "")
         selection_event_id = str(payload.get("selection_event_id") or "")
         candidate_id = str(payload.get("candidate_id") or "")
+        authorization = self.journal.get(authorization_event_id)
+        authorization_payload = (
+            _thaw_json(authorization.event.payload) if authorization is not None else {}
+        )
+        authenticator = authorization_payload.pop("integrity_authenticator", None)
+        receipt_authenticated = self.receipt_protector.verify_json(
+            "action.authorization.v1", authorization_payload, authenticator
+        )
+        valid_until = None
+        if authorization is not None:
+            try:
+                parsed_until = datetime.fromisoformat(
+                    str(authorization.event.payload.get("valid_until") or "")
+                )
+                valid_until = (
+                    parsed_until.astimezone(timezone.utc)
+                    if parsed_until.tzinfo is not None
+                    and parsed_until.utcoffset() is not None
+                    else None
+                )
+            except ValueError:
+                valid_until = None
+        if (
+            authorization is None
+            or not receipt_authenticated
+            or authorization.event.event_type != "action.authorization_evaluated"
+            or authorization.event.source != "alive.authorization"
+            or authorization.event.actor != "system:alive-authorizer"
+            or authorization.event.payload.get("outcome") != "authorized"
+            or tuple(authorization.event.payload.get("reasons", ()))
+            or authorization.event.payload.get("executes_action") is not False
+            or authorization.event.payload.get("selection_event_id")
+            != selection_event_id
+            or authorization.event.payload.get("candidate_id") != candidate_id
+            or authorization.event.payload.get("capability")
+            != str(payload.get("executor") or "")
+            or authorization.event.subject != event.subject
+            or authorization.event.sensitivity is not event.sensitivity
+            or authorization.sequence >= self.journal.get(event.event_id).sequence
+            or valid_until is None
+            or authorization.event.expires_at != valid_until
+            or not timedelta(0)
+            < valid_until - authorization.event.observed_at
+            <= timedelta(seconds=60)
+            or event.observed_at < authorization.event.observed_at
+            or event.observed_at >= valid_until
+            or event.causation_id != authorization_event_id
+        ):
+            return self._decision(
+                connection,
+                event,
+                "rejected",
+                "authorization_invalid_or_expired",
+                attempt_id or None,
+                None,
+            )
         selection = connection.execute(
             """
             SELECT s.*, f.subject, f.content_id AS frame_content_id,
@@ -350,9 +429,40 @@ class OutcomeProjection:
             return self._decision(
                 connection, event, "rejected", "selection_not_validated", attempt_id or None, None
             )
+        latest_selection = connection.execute(
+            """
+            SELECT event_id FROM deliberation_selections_v1
+            WHERE frame_id=? AND outcome='validated'
+            ORDER BY rowid DESC LIMIT 1
+            """,
+            (selection["frame_id"],),
+        ).fetchone()
+        latest_gate = connection.execute(
+            """
+            SELECT event_id FROM exploration_evaluations_v1
+            WHERE frame_id=? ORDER BY rowid DESC LIMIT 1
+            """,
+            (selection["frame_id"],),
+        ).fetchone()
+        if (
+            latest_selection is None
+            or latest_selection["event_id"] != selection_event_id
+            or latest_gate is None
+            or latest_gate["event_id"] != selection["exploration_gate_event_id"]
+            or authorization.event.payload.get("frame_id") != selection["frame_id"]
+            or authorization.event.payload.get("gate_event_id")
+            != selection["exploration_gate_event_id"]
+        ):
+            return self._decision(
+                connection,
+                event,
+                "rejected",
+                "authorization_state_superseded",
+                attempt_id or None,
+                None,
+            )
         if (
             candidate_id != selection["candidate_id"]
-            or event.causation_id != selection_event_id
             or event.subject != selection["subject"]
             or event.sensitivity.value != selection["frame_sensitivity"]
         ):
@@ -373,6 +483,25 @@ class OutcomeProjection:
             return self._decision(
                 connection, event, "rejected", "candidate_not_executable", attempt_id or None, None
             )
+        if candidate.agenda_item_id is not None:
+            agenda = connection.execute(
+                "SELECT state, subject, sensitivity FROM agenda_items_v1 WHERE item_id=?",
+                (candidate.agenda_item_id,),
+            ).fetchone()
+            if (
+                agenda is None
+                or agenda["state"] != "active"
+                or agenda["subject"] != event.subject
+                or agenda["sensitivity"] != event.sensitivity.value
+            ):
+                return self._decision(
+                    connection,
+                    event,
+                    "rejected",
+                    "authorization_agenda_superseded",
+                    attempt_id or None,
+                    None,
+                )
         existing_key = connection.execute(
             "SELECT attempt_id FROM action_attempts_v1 WHERE idempotency_key=?",
             (str(payload.get("idempotency_key") or ""),),
@@ -398,7 +527,13 @@ class OutcomeProjection:
                 connection, event, "rejected", "attempt_payload_invalid", attempt_id or None, None
             )
         connection.execute(
-            "INSERT INTO action_attempts_v1 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            """
+            INSERT INTO action_attempts_v1(
+                attempt_id, event_id, selection_event_id, frame_id, candidate_id,
+                subject, executor, idempotency_key, sensitivity, attempted_at,
+                authorization_event_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
             (
                 attempt_id,
                 event.event_id,
@@ -410,6 +545,7 @@ class OutcomeProjection:
                 idempotency_key,
                 event.sensitivity.value,
                 event.observed_at.isoformat(),
+                authorization_event_id,
             ),
         )
         return self._decision(
@@ -555,6 +691,7 @@ class OutcomeProjection:
             return [
                 ActionAttemptRecord(
                     row["attempt_id"],
+                    row["authorization_event_id"],
                     row["selection_event_id"],
                     row["frame_id"],
                     row["candidate_id"],

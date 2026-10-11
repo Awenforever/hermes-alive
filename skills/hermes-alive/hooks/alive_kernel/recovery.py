@@ -109,27 +109,38 @@ class KernelRecoverySupervisor:
             pending = retention.resume_pending_erasures()
             expired = vault.erase_expired(now=started)
             target = journal.last_sequence()
+            deliberation = DeliberationProjection(journal, content_vault=vault)
+            exploration = ExplorationProjection(journal, content_vault=vault)
 
             ordered = (
                 ("retention", retention),
                 ("consolidation-consent", ConsolidationPolicyProjection(journal)),
                 ("memory", MemoryProjection(journal, content_vault=vault)),
                 ("agenda", AgendaProjection(journal, content_vault=vault)),
-                ("deliberation", DeliberationProjection(journal, content_vault=vault)),
+                ("deliberation-frames", deliberation),
+                ("exploration", exploration),
+                ("deliberation", deliberation),
                 ("outcomes", OutcomeProjection(journal, content_vault=vault)),
                 ("reflection", ReflectionProjection(journal, content_vault=vault)),
                 (
                     "preference-learning",
                     PreferenceLearningProjection(journal, content_vault=vault),
                 ),
-                ("exploration", ExplorationProjection(journal, content_vault=vault)),
             )
             reports = tuple(
                 self._catch_up(
                     journal,
                     name=name,
-                    checkpoint=projection.CHECKPOINT,
-                    project=projection.project_new,
+                    checkpoint=(
+                        projection.FRAME_CHECKPOINT
+                        if name == "deliberation-frames"
+                        else projection.CHECKPOINT
+                    ),
+                    project=(
+                        projection.project_frames_new
+                        if name == "deliberation-frames"
+                        else projection.project_new
+                    ),
                     target_sequence=target,
                     batch_size=batch_size,
                 )

@@ -28,7 +28,10 @@ from alive_kernel.preference_learning import (  # noqa: E402
 from alive_kernel.reflection import (  # noqa: E402
     ReflectionProjection, ReflectionProposal, ReflectionReview, ReflectionScope
 )
-from alive_kernel_testkit import install_exploration_gate  # noqa: E402
+from alive_kernel_testkit import (  # noqa: E402
+    install_action_authorization,
+    install_exploration_gate,
+)
 
 
 def main() -> int:
@@ -78,7 +81,16 @@ def main() -> int:
             exploration_gate_event_id=gate_event_id,
         )
         deliberation.apply(selected)
+        authorization_event_id = install_action_authorization(
+            journal,
+            selection_event_id=selected.event.event_id,
+            candidate_id=candidate.candidate_id,
+            subject="user:test",
+            executor="test.channel",
+            fixture_name="preference",
+        )
         attempted = outcomes.append_attempt(
+            authorization_event_id=authorization_event_id,
             selection_event_id=selected.event.event_id,
             candidate_id=candidate.candidate_id, executor="test.channel",
             idempotency_key="delivery:preference-test", actor="system:test",

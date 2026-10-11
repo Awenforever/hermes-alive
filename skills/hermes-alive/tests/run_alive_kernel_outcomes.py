@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sqlite3
 import sys
 import tempfile
 
@@ -30,14 +31,41 @@ from alive_kernel.outcomes import (  # noqa: E402
     OutcomeKind,
     OutcomeProjection,
 )
-from alive_kernel_testkit import install_exploration_gate  # noqa: E402
+from alive_kernel_testkit import (  # noqa: E402
+    install_action_authorization,
+    install_exploration_gate,
+)
 
 
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="alive-kernel-outcomes-") as directory:
         journal = ExperienceJournal(Path(directory) / "kernel.sqlite3")
         deliberation = DeliberationProjection(journal)
+        legacy = sqlite3.connect(journal.path)
+        try:
+            legacy.execute(
+                """
+                CREATE TABLE action_attempts_v1 (
+                    attempt_id TEXT PRIMARY KEY, event_id TEXT NOT NULL UNIQUE,
+                    selection_event_id TEXT NOT NULL, frame_id TEXT NOT NULL,
+                    candidate_id TEXT NOT NULL, subject TEXT NOT NULL,
+                    executor TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE,
+                    sensitivity TEXT NOT NULL, attempted_at TEXT NOT NULL
+                )
+                """
+            )
+            legacy.commit()
+        finally:
+            legacy.close()
         outcomes = OutcomeProjection(journal)
+        migrated = sqlite3.connect(journal.path)
+        try:
+            assert "authorization_event_id" in {
+                row[1]
+                for row in migrated.execute("PRAGMA table_info(action_attempts_v1)")
+            }
+        finally:
+            migrated.close()
         evidence = EventEnvelope(
             event_id="evidence:outcome-test",
             event_type="discovery.observed",
@@ -108,8 +136,79 @@ def main() -> int:
             exploration_gate_event_id=gate_event_id,
         )
         assert deliberation.apply(selection_record).outcome == "validated"
+        authorization_event_id = install_action_authorization(
+            journal,
+            selection_event_id=selection_record.event.event_id,
+            candidate_id=candidate.candidate_id,
+            subject="user:test",
+            executor="hermes.channel",
+            fixture_name="outcomes",
+        )
+        authentic = journal.get(authorization_event_id)
+        assert authentic is not None
+        forged_payload = dict(authentic.event.payload)
+        forged_payload.pop("integrity_authenticator")
+        forged_payload["operation_id"] = "fixture:forged-authorization"
+        forged_authorization = EventEnvelope(
+            event_id="action.authorization:fixture:forged-authorization",
+            event_type="action.authorization_evaluated",
+            source="alive.authorization",
+            actor="system:alive-authorizer",
+            subject="user:test",
+            causation_id=selection_record.event.event_id,
+            occurred_at=authentic.event.occurred_at,
+            observed_at=authentic.event.observed_at,
+            expires_at=authentic.event.expires_at,
+            sensitivity=authentic.event.sensitivity,
+            payload=forged_payload,
+        )
+        journal.append(forged_authorization)
+        forged_attempt = outcomes.append_attempt(
+            authorization_event_id=forged_authorization.event_id,
+            selection_event_id=selection_record.event.event_id,
+            candidate_id=candidate.candidate_id,
+            executor="hermes.channel",
+            idempotency_key="delivery:forged-authorization",
+            actor="system:executor",
+            subject="user:test",
+            attempt_id="attempt:forged-authorization",
+        )
+        assert (
+            outcomes.apply(forged_attempt).reason
+            == "authorization_invalid_or_expired"
+        )
+
+        missing_authorization = outcomes.append_attempt(
+            authorization_event_id="action.authorization:missing",
+            selection_event_id=selection_record.event.event_id,
+            candidate_id=candidate.candidate_id,
+            executor="hermes.channel",
+            idempotency_key="delivery:missing-authorization",
+            actor="system:executor",
+            subject="user:test",
+            attempt_id="attempt:missing-authorization",
+        )
+        assert (
+            outcomes.apply(missing_authorization).reason
+            == "authorization_invalid_or_expired"
+        )
+        mismatched_capability = outcomes.append_attempt(
+            authorization_event_id=authorization_event_id,
+            selection_event_id=selection_record.event.event_id,
+            candidate_id=candidate.candidate_id,
+            executor="hermes.tool.execute",
+            idempotency_key="delivery:mismatched-capability",
+            actor="system:executor",
+            subject="user:test",
+            attempt_id="attempt:mismatched-capability",
+        )
+        assert (
+            outcomes.apply(mismatched_capability).reason
+            == "authorization_invalid_or_expired"
+        )
 
         attempt_record = outcomes.append_attempt(
+            authorization_event_id=authorization_event_id,
             selection_event_id=selection_record.event.event_id,
             candidate_id=candidate.candidate_id,
             executor="hermes.channel",
@@ -121,6 +220,7 @@ def main() -> int:
         assert outcomes.apply(attempt_record).outcome == "recorded"
         snapshot_before_outcomes = journal.last_sequence()
         retry = outcomes.append_attempt(
+            authorization_event_id=authorization_event_id,
             selection_event_id=selection_record.event.event_id,
             candidate_id=candidate.candidate_id,
             executor="hermes.channel",

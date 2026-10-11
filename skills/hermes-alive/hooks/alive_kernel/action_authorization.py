@@ -31,6 +31,7 @@ from .deliberation_store import DeliberationProjection
 from .event_store import EventConflictError, ExperienceJournal, JournalRecord
 from .events import EventEnvelope, Sensitivity, _thaw_json
 from .exploration_store import ExplorationProjection
+from .privacy import LocalIdentityProtector
 
 
 _ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$")
@@ -78,6 +79,9 @@ class SendTimeAuthorizer:
         )
         self.agenda = AgendaProjection(
             journal, content_vault=self.deliberation.content_vault
+        )
+        self.receipt_protector = LocalIdentityProtector(
+            journal.path.parent / "identity.key"
         )
 
     @staticmethod
@@ -132,13 +136,17 @@ class SendTimeAuthorizer:
         if record is None:
             return None
         event = record.event
-        payload = event.payload
+        payload = _thaw_json(event.payload)
+        authenticator = payload.pop("integrity_authenticator", None)
         if (
             event.event_type != "action.authorization_evaluated"
+            or not self.receipt_protector.verify_json(
+                "action.authorization.v1", payload, authenticator
+            )
             or event.subject != subject
             or payload.get("selection_event_id") != selection_event_id
             or payload.get("capability") != capability
-            or _thaw_json(payload.get("policy")) != policy
+            or payload.get("policy") != policy
             or payload.get("confirmation_event_id") != confirmation_event_id
             or payload.get("permit_ttl_seconds") != permit_ttl_seconds
         ):
@@ -354,6 +362,9 @@ class SendTimeAuthorizer:
             "valid_until": valid_until.isoformat() if valid_until else None,
             "executes_action": False,
         }
+        payload["integrity_authenticator"] = self.receipt_protector.authenticate_json(
+            "action.authorization.v1", payload
+        )
         event = EventEnvelope(
             event_id=f"action.authorization:{operation}",
             event_type="action.authorization_evaluated",

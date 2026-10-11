@@ -56,6 +56,7 @@ class DeliberationProjection:
     """Stores deliberation facts without executing the selected action."""
 
     CHECKPOINT = "alive-deliberation-v1"
+    FRAME_CHECKPOINT = "alive-deliberation-frames-v1"
 
     def __init__(
         self, journal: ExperienceJournal, *, content_vault: ContentVault | None = None
@@ -532,6 +533,23 @@ class DeliberationProjection:
                 break
         return decisions
 
+    def project_frames_new(
+        self, *, limit: int = 1000
+    ) -> list[DeliberationAuditDecision]:
+        """Pre-project frames so exploration can replay before selections."""
+
+        decisions: list[DeliberationAuditDecision] = []
+        start = self.journal.checkpoint(self.FRAME_CHECKPOINT)
+        for index, record in enumerate(
+            self.journal.iter_replay(after_sequence=start), start=1
+        ):
+            if record.event.event_type == "deliberation.framed":
+                decisions.append(self.apply(record))
+            self.journal.advance_checkpoint(self.FRAME_CHECKPOINT, record.sequence)
+            if index >= limit:
+                break
+        return decisions
+
     def rebuild(self, *, batch_size: int = 1000) -> list[DeliberationAuditDecision]:
         with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -540,6 +558,10 @@ class DeliberationProjection:
             connection.execute("DELETE FROM deliberation_frames_v1")
             connection.execute(
                 "DELETE FROM consumer_checkpoints WHERE consumer_name=?", (self.CHECKPOINT,)
+            )
+            connection.execute(
+                "DELETE FROM consumer_checkpoints WHERE consumer_name=?",
+                (self.FRAME_CHECKPOINT,),
             )
             connection.execute("COMMIT")
         decisions: list[DeliberationAuditDecision] = []

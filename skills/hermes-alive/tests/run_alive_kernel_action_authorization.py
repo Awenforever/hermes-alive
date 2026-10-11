@@ -29,6 +29,7 @@ from alive_kernel import (  # noqa: E402
     EventEnvelope,
     ExperienceJournal,
     ExplorationPolicy,
+    OutcomeProjection,
     PolicyContext,
     SelectionProposal,
     SendTimeAuthorizer,
@@ -164,6 +165,45 @@ def main() -> int:
             assert "different semantics" in str(exc)
         else:
             raise AssertionError("authorization operation changed semantics")
+
+        outcomes = OutcomeProjection(journal, content_vault=coordinator.vault)
+        expired_attempt_event = EventEnvelope(
+            event_id="action.attempt:authorization-expired",
+            event_type="action.attempted",
+            source="alive.outcomes",
+            actor="system:test-executor",
+            subject="user:test",
+            causation_id=allowed.event_id,
+            occurred_at=allowed.valid_until,
+            observed_at=allowed.valid_until,
+            payload={
+                "attempt_id": "authorization-expired",
+                "authorization_event_id": allowed.event_id,
+                "selection_event_id": selection.event.event_id,
+                "candidate_id": candidate.candidate_id,
+                "executor": "hermes.channel.send",
+                "idempotency_key": "authorization-expired",
+            },
+        )
+        expired_attempt = journal.append(expired_attempt_event)
+        assert (
+            outcomes.apply(expired_attempt).reason
+            == "authorization_invalid_or_expired"
+        )
+        attempt = outcomes.append_attempt(
+            authorization_event_id=allowed.event_id,
+            selection_event_id=selection.event.event_id,
+            candidate_id=candidate.candidate_id,
+            executor="hermes.channel.send",
+            idempotency_key="authorization-valid-attempt",
+            actor="system:test-executor",
+            subject="user:test",
+            attempt_id="authorization-valid-attempt",
+        )
+        assert outcomes.apply(attempt).outcome == "recorded"
+        stored_attempt = outcomes.attempts(clearance="private")[-1]
+        assert stored_attempt.authorization_event_id == allowed.event_id
+        assert journal.read(event_type="delivery.succeeded") == []
 
         capability_denied = authorizer.evaluate(
             selection_event_id=selection.event.event_id,

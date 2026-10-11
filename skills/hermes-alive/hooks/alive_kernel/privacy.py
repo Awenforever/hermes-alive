@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import os
 from pathlib import Path
 import re
@@ -75,6 +76,29 @@ class LocalIdentityProtector:
             hashlib.sha256,
         ).hexdigest()[:32]
         return f"{namespace}:{digest}"
+
+    def authenticate_json(self, namespace: str, value: Any) -> str:
+        """Authenticate one canonical JSON value without exposing the key."""
+
+        canonical = json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+        return hmac.new(
+            self._key,
+            f"{namespace}\0{canonical}".encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+
+    def verify_json(self, namespace: str, value: Any, authenticator: Any) -> bool:
+        supplied = str(authenticator or "").strip().lower()
+        if not re.fullmatch(r"[0-9a-f]{64}", supplied):
+            return False
+        expected = self.authenticate_json(namespace, value)
+        return hmac.compare_digest(expected, supplied)
 
 
 def _find_value(context: Mapping[str, Any], names: tuple[str, ...]) -> Any:

@@ -68,6 +68,13 @@ as valid, and idempotent lookup must never revive it. Keep `system_critical`
 and migrated delegation fail-closed until typed authority provenance exists;
 critical gateway notices remain a Hermes-core responsibility.
 
+Never restore a direct `selection -> action.attempted` path. ADR-0023 requires
+consumption of an exact live authorization receipt and rechecks latest state.
+Recovery order is causal: agenda, frames, exploration, selections, outcomes.
+Changing that order can silently turn valid online history into rejected replay.
+Do not accept an authorization receipt by field shape alone; verify its local
+HMAC and preserve `kernel/identity.key` during managed migration.
+
 ## Plugin dependencies must respect the Hermes environment lock
 
 The supported Hermes runtime already provides `cryptography==50.0.0`. Alive's

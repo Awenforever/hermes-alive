@@ -20,6 +20,7 @@ from alive_kernel.exploration import (  # noqa: E402
     ExplorationMode, ExplorationPolicy, exploration_rejection_map,
 )
 from alive_kernel.exploration_store import ExplorationProjection  # noqa: E402
+from alive_kernel_testkit import install_action_authorization  # noqa: E402
 
 
 def main() -> int:
@@ -88,7 +89,16 @@ def main() -> int:
             exploration_gate_event_id=first_gate_event.event.event_id,
         )
         deliberation.apply(selected)
+        authorization_event_id = install_action_authorization(
+            journal,
+            selection_event_id=selected.event.event_id,
+            candidate_id=first.candidate_id,
+            subject="user:test",
+            executor="test.channel",
+            fixture_name="exploration-store",
+        )
         attempted = outcomes.append_attempt(
+            authorization_event_id=authorization_event_id,
             selection_event_id=selected.event.event_id,
             candidate_id=first.candidate_id, executor="test.channel",
             idempotency_key="delivery:exploration-first", actor="system:test",
