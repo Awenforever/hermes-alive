@@ -79,6 +79,12 @@ admissible candidates, records actual response-model attribution and persists
 an encrypted rationale. Its output is a validated intent, not an action
 attempt; it has no sender or tool-execution dependency.
 
+Validated intent crosses a second, deterministic send-time boundary before it
+can ever become an attempt (ADR-0022). That boundary rechecks latest state,
+active user authority, current policy, evidence lifetime and the requested
+Hermes capability. Its short-lived receipt is not execution and no production
+adapter consumes it while the kernel remains in shadow.
+
 ## Decision ownership
 
 - The model owns wording and style inside structured constraints.

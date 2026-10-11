@@ -71,6 +71,7 @@ run_and_require run_alive_kernel_consolidation_evaluation.py '^HERMES_ALIVE_KERN
 run_and_require run_alive_kernel_recovery.py '^HERMES_ALIVE_KERNEL_RECOVERY_OK$'
 run_and_require run_alive_kernel_cognition_cycle.py '^HERMES_ALIVE_KERNEL_COGNITION_CYCLE_OK$'
 run_and_require run_alive_kernel_deliberation_synthesis.py '^HERMES_ALIVE_KERNEL_DELIBERATION_SYNTHESIS_OK$'
+run_and_require run_alive_kernel_action_authorization.py '^HERMES_ALIVE_KERNEL_ACTION_AUTHORIZATION_OK$'
 run_and_require run_legacy_dream_retirement.py '^HERMES_ALIVE_LEGACY_DREAM_RETIREMENT_OK$'
 run_and_require run_alive_kernel_memory.py '^HERMES_ALIVE_KERNEL_MEMORY_OK$'
 run_and_require run_circadian.py '^HERMES_ALIVE_CIRCADIAN_CORE_RESULT=PASS$'

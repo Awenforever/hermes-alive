@@ -4,6 +4,11 @@ The package is deliberately not imported by the production watcher yet.  Phase
 1 develops the durable history boundary in shadow before it can affect sends.
 """
 
+from .action_authorization import (
+    ActionAuthorizationDecision,
+    ActionAuthorizationError,
+    SendTimeAuthorizer,
+)
 from .agenda import (
     AgendaAuthority,
     AgendaContentStatus,
@@ -195,6 +200,8 @@ from .reflection import (
 )
 
 __all__ = [
+    "ActionAuthorizationDecision",
+    "ActionAuthorizationError",
     "ActionAuthority",
     "ActionCandidate",
     "ActionKind",
@@ -320,6 +327,7 @@ __all__ = [
     "ReflectionState",
     "ReflectionValidationError",
     "Sensitivity",
+    "SendTimeAuthorizer",
     "SelectionProposal",
     "SideEffect",
     "ShadowKernelBridge",

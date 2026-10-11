@@ -184,6 +184,9 @@ corrections are represented rather than overwritten.
 - [x] Join candidate framing, active-agenda validation, exploration and a
   durable selection in one crash-safe coordinator that always closes with
   deterministic silence and has no model/channel/tool side effects (ADR-0020).
+- [x] Separate selected intent from send-time authority. Short-lived structural
+  permits now recheck latest state, current policy, active user authority,
+  evidence and the exact Hermes capability without executing (ADR-0022).
 - [ ] Run the new decision engine in shadow against production events.
 
 Exit: every proposed action has a stable reason and every rejection is
@@ -683,3 +686,15 @@ For each material change:
 - A validated model choice still creates no action attempt and performs no
   channel/tool side effect. Replay and production shadow evidence remain
   required before it may be invoked automatically.
+
+### 2026-10-11 — Short-lived send-time authority
+
+- Added a non-executing authorizer between validated model intent and any
+  future action attempt (ADR-0022).
+- The boundary rechecks the latest selection and exploration gate, active
+  agenda, current interruption/risk policy, evidence lifetime, subject,
+  sensitivity and exact Hermes capability.
+- Tightened authority provenance: an observed opportunity is not delegation,
+  and an unrelated inbound message cannot be treated as confirmation.
+- Authorized receipts expire within 60 seconds and are not revived by an
+  idempotent retry. No production sender consumes these receipts yet.

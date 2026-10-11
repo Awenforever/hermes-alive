@@ -615,3 +615,17 @@ class DeliberationProjection:
                 selection_row["outcome"],
                 selection_row["reason"],
             )
+
+    def latest_selection_event_id(self, frame_id: str) -> str | None:
+        """Return the latest successfully validated selection for a frame."""
+
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                """
+                SELECT event_id FROM deliberation_selections_v1
+                WHERE frame_id=? AND outcome='validated'
+                ORDER BY rowid DESC LIMIT 1
+                """,
+                (frame_id,),
+            ).fetchone()
+            return None if row is None else str(row["event_id"])

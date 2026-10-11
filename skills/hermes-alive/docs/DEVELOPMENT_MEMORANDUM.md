@@ -61,6 +61,13 @@ deliver content or run a tool. Rejected candidates must be removed before the
 prompt, not merely described as forbidden to the model. Actual response model
 identity is mandatory and raw provider failure bodies are never receipts.
 
+Do not collapse selection and execution. ADR-0022 requires a fresh, short-lived
+authorization receipt. Direct observation is not user delegation; generic
+inbound activity is not confirmation. No sender may treat an expired receipt
+as valid, and idempotent lookup must never revive it. Keep `system_critical`
+and migrated delegation fail-closed until typed authority provenance exists;
+critical gateway notices remain a Hermes-core responsibility.
+
 ## Plugin dependencies must respect the Hermes environment lock
 
 The supported Hermes runtime already provides `cryptography==50.0.0`. Alive's

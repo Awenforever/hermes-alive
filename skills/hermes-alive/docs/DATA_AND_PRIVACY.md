@@ -58,6 +58,9 @@ explicitly supplied.
   Prompts and raw responses are not journaled. Candidate bodies and rationale
   remain encrypted; structural receipts retain actual-model and selected-ID
   provenance without provider error text.
+- Send-time authorization stores structural IDs, policy values, reason classes
+  and permit expiry only. Candidate and agenda bodies remain in the encrypted
+  vault. A receipt expires rather than extending authority on retry.
 
 ## Topic-delivery privacy
 
