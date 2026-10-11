@@ -8,6 +8,7 @@ import re
 from typing import Iterable
 from uuid import uuid4
 
+from .autonomy_policy import AutonomyPolicyProjection
 from .agenda import (
     AgendaAuthority,
     AgendaContentStatus,
@@ -83,6 +84,7 @@ class SendTimeAuthorizer:
         self.receipt_protector = LocalIdentityProtector(
             journal.path.parent / "identity.key"
         )
+        self.autonomy = AutonomyPolicyProjection(journal)
 
     @staticmethod
     def _utc(value: datetime | None) -> datetime:
@@ -129,6 +131,8 @@ class SendTimeAuthorizer:
         capability: str,
         now: datetime,
         policy: dict[str, object],
+        policy_event_id: str | None,
+        policy_revision: int | None,
         confirmation_event_id: str | None,
         permit_ttl_seconds: float,
     ) -> ActionAuthorizationDecision | None:
@@ -147,6 +151,8 @@ class SendTimeAuthorizer:
             or payload.get("selection_event_id") != selection_event_id
             or payload.get("capability") != capability
             or payload.get("policy") != policy
+            or payload.get("policy_event_id") != policy_event_id
+            or payload.get("policy_revision") != policy_revision
             or payload.get("confirmation_event_id") != confirmation_event_id
             or payload.get("permit_ttl_seconds") != permit_ttl_seconds
         ):
@@ -178,7 +184,6 @@ class SendTimeAuthorizer:
         selection_event_id: str,
         subject: str,
         capability: str,
-        current_policy: PolicyContext,
         operation_id: str | None = None,
         confirmation_event_id: str | None = None,
         now: datetime | None = None,
@@ -201,6 +206,22 @@ class SendTimeAuthorizer:
         current = self._utc(now)
         if not timedelta(0) < permit_ttl <= self.MAX_PERMIT_TTL:
             raise ActionAuthorizationError("permit TTL must be between zero and 60 seconds")
+        durable_policy = self.autonomy.current(owner)
+        if durable_policy is None:
+            current_policy = PolicyContext(
+                can_interrupt=False,
+                allowed_side_effects=frozenset({SideEffect.NONE}),
+            )
+            policy_event_id = None
+            policy_revision = None
+            initial_reasons = ["autonomy_policy_missing"]
+        else:
+            current_policy = durable_policy.context
+            policy_event_id = durable_policy.event_id
+            policy_revision = durable_policy.revision
+            initial_reasons = [] if durable_policy.enabled else ["autonomy_disabled"]
+            if durable_policy.updated_at > current:
+                initial_reasons.append("autonomy_policy_from_future")
         policy_payload = {
             "can_interrupt": current_policy.can_interrupt,
             "minimum_confidence": current_policy.minimum_confidence,
@@ -217,13 +238,15 @@ class SendTimeAuthorizer:
             capability=capability,
             now=current,
             policy=policy_payload,
+            policy_event_id=policy_event_id,
+            policy_revision=policy_revision,
             confirmation_event_id=confirmation_event_id,
             permit_ttl_seconds=permit_ttl_seconds,
         )
         if existing is not None:
             return existing
 
-        reasons: list[str] = []
+        reasons: list[str] = list(initial_reasons)
         selection_record = self.journal.get(selection_event_id)
         frame_id = ""
         candidate_id = ""
@@ -358,6 +381,8 @@ class SendTimeAuthorizer:
             "outcome": "authorized" if authorized else "denied",
             "reasons": reasons,
             "policy": policy_payload,
+            "policy_event_id": policy_event_id,
+            "policy_revision": policy_revision,
             "permit_ttl_seconds": permit_ttl_seconds,
             "valid_until": valid_until.isoformat() if valid_until else None,
             "executes_action": False,

@@ -81,6 +81,13 @@ persist raw lease tokens or worker IDs. During reconstruction, authenticated
 terminal evidence wins over a missing outbox row: restore acknowledged and
 reconcile the outcome; never resend.
 
+Never authorize from a `PolicyContext` supplied by a caller. ADR-0025 makes
+the latest authenticated, user-owned autonomy policy the authority source.
+Authorization and dispatch must bind its exact event and revision. A pause or
+policy replacement revokes queued work, and resume must require fresh intent;
+do not resurrect an old row. Historical policy replay must not directly mutate
+the outbox because older events would revoke future work during reconstruction.
+
 ## Plugin dependencies must respect the Hermes environment lock
 
 The supported Hermes runtime already provides `cryptography==50.0.0`. Alive's

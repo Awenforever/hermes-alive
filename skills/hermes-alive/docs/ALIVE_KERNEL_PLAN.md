@@ -193,6 +193,11 @@ corrections are represented rather than overwritten.
 - [x] Materialize authorized attempts into a deadline-bounded leased outbox;
   prove concurrent claim exclusion, stale-token rejection, crash recovery,
   authenticated result reconciliation and no-redelivery recovery (ADR-0024).
+- [x] Replace caller-supplied execution policy with user-owned, revisioned,
+  replayable autonomy state; bind authorization and dispatch to its exact
+  version so pause and policy changes revoke queued work (ADR-0025).
+- [ ] Distinguish leased, externally started and uncertain dispatch so a crash
+  at the adapter boundary can neither duplicate nor falsely claim an action.
 - [ ] Run the new decision engine in shadow against production events.
 
 Exit: every proposed action has a stable reason and every rejection is
@@ -725,3 +730,16 @@ For each material change:
 - Authenticated terminal result events close the row and reconcile into normal
   outcome evidence. Losing the outbox after a successful transport cannot
   cause redelivery because reconstruction recognizes the signed result first.
+
+### 2026-10-11 — Durable user autonomy policy
+
+- Replaced ephemeral caller policy at authorization time with an authenticated,
+  user-owned and revisioned projection (ADR-0025). No policy means disabled.
+- Authorization, attempt admission and dispatch now retain the exact policy
+  event. A newer policy or pause revokes pending and leased work; resuming never
+  resurrects it.
+- Concurrent same-revision updates select the earliest authenticated journal
+  event, making online projection agree with deterministic replay.
+- Review exposed the next required boundary: once a transport call begins, a
+  pause cannot honestly recall it. Live adapters remain forbidden until a
+  durable started/uncertain protocol closes that crash window.

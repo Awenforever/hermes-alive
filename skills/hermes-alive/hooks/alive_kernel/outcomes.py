@@ -11,6 +11,7 @@ import sqlite3
 from typing import Any, Iterable
 from uuid import uuid4
 
+from .autonomy_policy import AutonomyPolicyProjection
 from .content_vault import (
     ContentErasedError,
     ContentIntegrityError,
@@ -112,6 +113,7 @@ class OutcomeProjection:
         self.receipt_protector = LocalIdentityProtector(
             self.path.parent / "identity.key"
         )
+        self.autonomy = AutonomyPolicyProjection(journal)
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
@@ -367,6 +369,38 @@ class OutcomeProjection:
         receipt_authenticated = self.receipt_protector.verify_json(
             "action.authorization.v1", authorization_payload, authenticator
         )
+        policy_event_id = str(authorization_payload.get("policy_event_id") or "")
+        policy_event = self.journal.get(policy_event_id)
+        policy_payload = (
+            _thaw_json(policy_event.event.payload) if policy_event is not None else {}
+        )
+        policy_authenticator = policy_payload.pop("integrity_authenticator", None)
+        policy_authenticated = self.receipt_protector.verify_json(
+            "autonomy.policy.v1", policy_payload, policy_authenticator
+        )
+        policy_decision = connection.execute(
+            "SELECT outcome FROM autonomy_policy_decisions_v1 WHERE event_id=?",
+            (policy_event_id,),
+        ).fetchone()
+        policy_superseded_before_attempt = False
+        if policy_event is not None:
+            for later in self.journal.iter_replay(after_sequence=policy_event.sequence):
+                if later.sequence >= self.journal.get(event.event_id).sequence:
+                    break
+                if (
+                    later.event.event_type == "autonomy.policy_changed"
+                    and later.event.subject == event.subject
+                ):
+                    later_decision = connection.execute(
+                        """
+                        SELECT outcome FROM autonomy_policy_decisions_v1
+                        WHERE event_id=?
+                        """,
+                        (later.event.event_id,),
+                    ).fetchone()
+                    if later_decision is not None and later_decision["outcome"] == "recorded":
+                        policy_superseded_before_attempt = True
+                        break
         valid_until = None
         if authorization is not None:
             try:
@@ -390,6 +424,21 @@ class OutcomeProjection:
             or authorization.event.payload.get("outcome") != "authorized"
             or tuple(authorization.event.payload.get("reasons", ()))
             or authorization.event.payload.get("executes_action") is not False
+            or policy_event is None
+            or not policy_authenticated
+            or policy_decision is None
+            or policy_decision["outcome"] != "recorded"
+            or policy_event.event.event_type != "autonomy.policy_changed"
+            or policy_event.event.source != "hermes.command.alive"
+            or policy_event.event.actor != event.subject
+            or policy_event.event.subject != event.subject
+            or policy_event.event.sensitivity is not Sensitivity.PRIVATE
+            or policy_payload.get("enabled") is not True
+            or policy_payload.get("revision")
+            != authorization_payload.get("policy_revision")
+            or policy_event.sequence >= authorization.sequence
+            or policy_event.event.observed_at > authorization.event.observed_at
+            or policy_superseded_before_attempt
             or authorization.event.payload.get("selection_event_id")
             != selection_event_id
             or authorization.event.payload.get("candidate_id") != candidate_id

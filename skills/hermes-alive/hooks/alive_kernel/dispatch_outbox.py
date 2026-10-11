@@ -16,6 +16,7 @@ import secrets
 import sqlite3
 
 from .content_vault import ContentVault
+from .autonomy_policy import AutonomyPolicyProjection
 from .deliberation import deserialize_frame
 from .event_store import ExperienceJournal, JournalRecord
 from .events import Sensitivity, _thaw_json
@@ -68,6 +69,7 @@ class DispatchOutbox:
             backup_root=self.path.parent / "content-backups",
         )
         self.protector = LocalIdentityProtector(self.path.parent / "identity.key")
+        self.autonomy = AutonomyPolicyProjection(journal)
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
@@ -82,10 +84,11 @@ class DispatchOutbox:
             connection.executescript(
                 """
                 BEGIN IMMEDIATE;
-                CREATE TABLE IF NOT EXISTS dispatch_outbox_v1 (
+                CREATE TABLE IF NOT EXISTS dispatch_outbox_v2 (
                     dispatch_id TEXT PRIMARY KEY,
                     attempt_id TEXT NOT NULL UNIQUE,
                     authorization_event_id TEXT NOT NULL,
+                    policy_event_id TEXT NOT NULL,
                     capability TEXT NOT NULL,
                     idempotency_key TEXT NOT NULL UNIQUE,
                     subject TEXT NOT NULL,
@@ -101,12 +104,14 @@ class DispatchOutbox:
                     result_event_id TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
-                    CHECK(state IN ('pending', 'leased', 'expired', 'acknowledged')),
+                    CHECK(state IN (
+                        'pending', 'leased', 'expired', 'revoked', 'acknowledged'
+                    )),
                     FOREIGN KEY(attempt_id) REFERENCES action_attempts_v1(attempt_id)
                         ON DELETE CASCADE
                 );
-                CREATE INDEX IF NOT EXISTS idx_dispatch_ready_v1
-                    ON dispatch_outbox_v1(state, available_at, execute_by);
+                CREATE INDEX IF NOT EXISTS idx_dispatch_ready_v2
+                    ON dispatch_outbox_v2(state, available_at, execute_by);
                 COMMIT;
                 """
             )
@@ -207,7 +212,7 @@ class DispatchOutbox:
                     JOIN deliberation_selections_v1 s
                       ON s.event_id=a.selection_event_id AND s.outcome='validated'
                     JOIN deliberation_frames_v1 f ON f.frame_id=a.frame_id
-                    LEFT JOIN dispatch_outbox_v1 d ON d.attempt_id=a.attempt_id
+                    LEFT JOIN dispatch_outbox_v2 d ON d.attempt_id=a.attempt_id
                     WHERE d.attempt_id IS NULL
                       AND NOT EXISTS (
                         SELECT 1 FROM action_outcomes_v1 o
@@ -226,6 +231,9 @@ class DispatchOutbox:
                     if authorization is None:
                         continue
                     valid_until = authorization.event.payload.get("valid_until")
+                    policy_event_id = str(
+                        authorization.event.payload.get("policy_event_id") or ""
+                    )
                     try:
                         execute_by = datetime.fromisoformat(str(valid_until))
                     except (TypeError, ValueError):
@@ -268,25 +276,37 @@ class DispatchOutbox:
                             sensitivity=Sensitivity(row["sensitivity"]),
                         ):
                             result_event_id = result_record.event.event_id
+                    current_policy = self.autonomy.current(str(row["subject"]))
+                    policy_current = bool(
+                        current_policy is not None
+                        and current_policy.enabled
+                        and current_policy.event_id == policy_event_id
+                    )
                     if result_event_id is not None:
                         state = "acknowledged"
                     else:
-                        state = "pending" if execute_by > current else "expired"
+                        state = (
+                            "expired"
+                            if execute_by <= current
+                            else "pending" if policy_current else "revoked"
+                        )
                     connection.execute(
                         """
-                        INSERT OR IGNORE INTO dispatch_outbox_v1(
+                        INSERT OR IGNORE INTO dispatch_outbox_v2(
                             dispatch_id, attempt_id, authorization_event_id,
+                            policy_event_id,
                             capability, idempotency_key, subject, content_id,
                             sensitivity, state, execute_by, available_at,
                             lease_owner, lease_token_digest, lease_until,
                             lease_generation, result_event_id, created_at, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL,
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL,
                                   NULL, 0, ?, ?, ?)
                         """,
                         (
                             dispatch_id,
                             row["attempt_id"],
                             row["authorization_event_id"],
+                            policy_event_id,
                             row["executor"],
                             row["idempotency_key"],
                             row["subject"],
@@ -329,16 +349,30 @@ class DispatchOutbox:
             try:
                 connection.execute(
                     """
-                    UPDATE dispatch_outbox_v1
+                    UPDATE dispatch_outbox_v2
                     SET state='expired', lease_owner=NULL,
                         lease_token_digest=NULL, lease_until=NULL, updated_at=?
                     WHERE state IN ('pending', 'leased') AND execute_by<=?
                     """,
                     (current.isoformat(), current.isoformat()),
                 )
+                connection.execute(
+                    """
+                    UPDATE dispatch_outbox_v2 AS d
+                    SET state='revoked', lease_owner=NULL,
+                        lease_token_digest=NULL, lease_until=NULL, updated_at=?
+                    WHERE state IN ('pending', 'leased')
+                      AND NOT EXISTS (
+                        SELECT 1 FROM autonomy_policies_v1 p
+                        WHERE p.subject=d.subject AND p.enabled=1
+                          AND p.policy_event_id=d.policy_event_id
+                      )
+                    """,
+                    (current.isoformat(),),
+                )
                 row = connection.execute(
                     """
-                    SELECT * FROM dispatch_outbox_v1
+                    SELECT * FROM dispatch_outbox_v2
                     WHERE execute_by>?
                       AND ((state='pending' AND available_at<=?)
                            OR (state='leased' AND lease_until<=?))
@@ -354,7 +388,7 @@ class DispatchOutbox:
                 lease_until = min(current + lease_ttl, execute_by)
                 connection.execute(
                     """
-                    UPDATE dispatch_outbox_v1
+                    UPDATE dispatch_outbox_v2
                     SET state='leased', lease_owner=?, lease_token_digest=?,
                         lease_until=?, lease_generation=lease_generation+1,
                         updated_at=?
@@ -387,6 +421,35 @@ class DispatchOutbox:
             token,
         )
 
+    def refresh_authority(self, *, now: datetime | None = None) -> int:
+        """Revoke queued or leased work whose durable policy is no longer current."""
+
+        current = self._utc(now)
+        with closing(self._connect()) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                connection.execute(
+                    """
+                    UPDATE dispatch_outbox_v2 AS d
+                    SET state='revoked', lease_owner=NULL,
+                        lease_token_digest=NULL, lease_until=NULL, updated_at=?
+                    WHERE state IN ('pending', 'leased')
+                      AND NOT EXISTS (
+                        SELECT 1 FROM autonomy_policies_v1 p
+                        WHERE p.subject=d.subject AND p.enabled=1
+                          AND p.policy_event_id=d.policy_event_id
+                      )
+                    """,
+                    (current.isoformat(),),
+                )
+                changed = int(connection.execute("SELECT changes()").fetchone()[0])
+                connection.execute("COMMIT")
+                return changed
+            except Exception:
+                if connection.in_transaction:
+                    connection.execute("ROLLBACK")
+                raise
+
     def load_content(
         self,
         lease: DispatchLease,
@@ -395,13 +458,22 @@ class DispatchOutbox:
         now: datetime | None = None,
     ) -> object:
         current = self._utc(now)
+        self.refresh_authority(now=current)
         allowed = list(Sensitivity)[: list(Sensitivity).index(Sensitivity(clearance)) + 1]
         digest = self.protector.pseudonym("dispatch_lease", lease.token)
         with closing(self._connect()) as connection:
             row = connection.execute(
-                "SELECT * FROM dispatch_outbox_v1 WHERE dispatch_id=?",
+                "SELECT * FROM dispatch_outbox_v2 WHERE dispatch_id=?",
                 (lease.dispatch_id,),
             ).fetchone()
+            policy = (
+                connection.execute(
+                    "SELECT * FROM autonomy_policies_v1 WHERE subject=?",
+                    (row["subject"],),
+                ).fetchone()
+                if row is not None
+                else None
+            )
         if (
             row is None
             or row["state"] != "leased"
@@ -410,6 +482,9 @@ class DispatchOutbox:
             or datetime.fromisoformat(row["lease_until"]) <= current
             or datetime.fromisoformat(row["execute_by"]) <= current
             or Sensitivity(row["sensitivity"]) not in allowed
+            or policy is None
+            or not bool(policy["enabled"])
+            or policy["policy_event_id"] != row["policy_event_id"]
         ):
             raise DispatchOutboxError("dispatch lease is invalid or expired")
         return self.vault.resolve_json(
@@ -427,13 +502,14 @@ class DispatchOutbox:
         now: datetime | None = None,
     ) -> str:
         current = self._utc(now)
+        self.refresh_authority(now=current)
         if not timedelta(0) <= retry_after <= timedelta(seconds=30):
             raise DispatchOutboxError("retry delay must be between zero and 30 seconds")
         digest = self.protector.pseudonym("dispatch_lease", lease.token)
         with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
-                "SELECT * FROM dispatch_outbox_v1 WHERE dispatch_id=?",
+                "SELECT * FROM dispatch_outbox_v2 WHERE dispatch_id=?",
                 (lease.dispatch_id,),
             ).fetchone()
             if (
@@ -452,7 +528,7 @@ class DispatchOutbox:
             )
             connection.execute(
                 """
-                UPDATE dispatch_outbox_v1
+                UPDATE dispatch_outbox_v2
                 SET state=?, available_at=?, lease_owner=NULL,
                     lease_token_digest=NULL, lease_until=NULL, updated_at=?
                 WHERE dispatch_id=?
@@ -492,7 +568,7 @@ class DispatchOutbox:
         with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
-                "SELECT * FROM dispatch_outbox_v1 WHERE dispatch_id=?",
+                "SELECT * FROM dispatch_outbox_v2 WHERE dispatch_id=?",
                 (lease.dispatch_id,),
             ).fetchone()
             if (
@@ -507,7 +583,7 @@ class DispatchOutbox:
                 raise DispatchOutboxError("dispatch lease expired before acknowledgement")
             connection.execute(
                 """
-                UPDATE dispatch_outbox_v1
+                UPDATE dispatch_outbox_v2
                 SET state='acknowledged', result_event_id=?, lease_owner=NULL,
                     lease_token_digest=NULL, lease_until=NULL, updated_at=?
                 WHERE dispatch_id=?
@@ -519,7 +595,7 @@ class DispatchOutbox:
     def counts(self) -> dict[str, int]:
         with closing(self._connect()) as connection:
             rows = connection.execute(
-                "SELECT state, COUNT(*) AS count FROM dispatch_outbox_v1 GROUP BY state"
+                "SELECT state, COUNT(*) AS count FROM dispatch_outbox_v2 GROUP BY state"
             )
             return {str(row["state"]): int(row["count"]) for row in rows}
 
@@ -531,7 +607,7 @@ class DispatchOutbox:
         with closing(self._connect()) as connection:
             rows = connection.execute(
                 """
-                SELECT d.* FROM dispatch_outbox_v1 d
+                SELECT d.* FROM dispatch_outbox_v2 d
                 LEFT JOIN action_outcomes_v1 o
                   ON o.attempt_id=d.attempt_id
                  AND o.source_event_id=d.result_event_id

@@ -70,6 +70,10 @@ explicitly supplied.
   keyed token digests only. Raw worker identities, lease tokens and candidate
   plaintext are never persisted. Terminal result events are locally
   authenticated structural facts without transport payloads.
+- Autonomy policy stores only structural risk/interruption bounds, its revision
+  and user authority. Raw control commands are forbidden. Policy events carry
+  an installation authenticator and contain no channel identifier or message
+  content.
 
 ## Topic-delivery privacy
 

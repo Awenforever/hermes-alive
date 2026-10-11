@@ -22,6 +22,7 @@ from alive_kernel import (  # noqa: E402
     AgendaProposal,
     AgendaState,
     AssessmentBasis,
+    AutonomyPolicyProjection,
     CognitionCycleCoordinator,
     CycleCandidate,
     DecisionDimensions,
@@ -124,11 +125,30 @@ def main() -> int:
         assert coordinator.deliberation.apply(selection).outcome == "validated"
         authorizer = SendTimeAuthorizer(journal, content_vault=coordinator.vault)
         current = datetime.now(timezone.utc)
+        missing_policy = authorizer.evaluate(
+            selection_event_id=selection.event.event_id,
+            subject="user:test",
+            capability="hermes.channel.send",
+            operation_id="authorization-policy-missing",
+            now=current,
+        )
+        assert not missing_policy.authorized
+        assert "autonomy_policy_missing" in missing_policy.reasons
+        autonomy = AutonomyPolicyProjection(journal)
+        active_policy = autonomy.append_update(
+            subject="user:test",
+            actor="user:test",
+            expected_revision=0,
+            enabled=True,
+            context=PolicyContext(can_interrupt=True),
+            operation_id="authorization-policy-active",
+        )
+        assert autonomy.apply(active_policy).outcome == "recorded"
+        current = datetime.now(timezone.utc)
         allowed = authorizer.evaluate(
             selection_event_id=selection.event.event_id,
             subject="user:test",
             capability="hermes.channel.send",
-            current_policy=PolicyContext(can_interrupt=True),
             operation_id="authorization-allowed",
             now=current,
         )
@@ -139,7 +159,6 @@ def main() -> int:
             selection_event_id=selection.event.event_id,
             subject="user:test",
             capability="hermes.channel.send",
-            current_policy=PolicyContext(can_interrupt=True),
             operation_id="authorization-allowed",
             now=current,
         ) == allowed
@@ -147,25 +166,10 @@ def main() -> int:
             selection_event_id=selection.event.event_id,
             subject="user:test",
             capability="hermes.channel.send",
-            current_policy=PolicyContext(can_interrupt=True),
             operation_id="authorization-allowed",
             now=allowed.valid_until,
         )
         assert not expired.authorized and "permit_expired" in expired.reasons
-        try:
-            authorizer.evaluate(
-                selection_event_id=selection.event.event_id,
-                subject="user:test",
-                capability="hermes.channel.send",
-                current_policy=PolicyContext(can_interrupt=False),
-                operation_id="authorization-allowed",
-                now=current,
-            )
-        except ActionAuthorizationError as exc:
-            assert "different semantics" in str(exc)
-        else:
-            raise AssertionError("authorization operation changed semantics")
-
         outcomes = OutcomeProjection(journal, content_vault=coordinator.vault)
         expired_attempt_event = EventEnvelope(
             event_id="action.attempt:authorization-expired",
@@ -209,22 +213,50 @@ def main() -> int:
             selection_event_id=selection.event.event_id,
             subject="user:test",
             capability="hermes.tool.execute",
-            current_policy=PolicyContext(can_interrupt=True),
             operation_id="authorization-wrong-capability",
             now=current,
         )
         assert not capability_denied.authorized
         assert "capability_mismatch" in capability_denied.reasons
+        quiet_policy = autonomy.append_update(
+            subject="user:test",
+            actor="user:test",
+            expected_revision=1,
+            enabled=True,
+            context=PolicyContext(can_interrupt=False),
+            operation_id="authorization-policy-quiet",
+        )
+        assert autonomy.apply(quiet_policy).outcome == "recorded"
+        try:
+            authorizer.evaluate(
+                selection_event_id=selection.event.event_id,
+                subject="user:test",
+                capability="hermes.channel.send",
+                operation_id="authorization-allowed",
+                now=current,
+            )
+        except ActionAuthorizationError as exc:
+            assert "different semantics" in str(exc)
+        else:
+            raise AssertionError("authorization operation changed semantics")
         quiet_denied = authorizer.evaluate(
             selection_event_id=selection.event.event_id,
             subject="user:test",
             capability="hermes.channel.send",
-            current_policy=PolicyContext(can_interrupt=False),
             operation_id="authorization-quiet-window",
             now=current,
         )
         assert not quiet_denied.authorized
         assert "current_policy_rejected" in quiet_denied.reasons
+        resumed_policy = autonomy.append_update(
+            subject="user:test",
+            actor="user:test",
+            expected_revision=2,
+            enabled=True,
+            context=PolicyContext(can_interrupt=True),
+            operation_id="authorization-policy-resumed",
+        )
+        assert autonomy.apply(resumed_policy).outcome == "recorded"
 
         observed_proposal = AgendaProposal(
             kind=AgendaItemKind.OPPORTUNITY,
@@ -278,7 +310,6 @@ def main() -> int:
             selection_event_id=observed_selection.event.event_id,
             subject="user:test",
             capability="hermes.channel.send",
-            current_policy=PolicyContext(can_interrupt=True),
             operation_id="authorization-unproven-delegation",
             now=current,
         )
@@ -324,7 +355,6 @@ def main() -> int:
             selection_event_id=critical_selection.event.event_id,
             subject="user:test",
             capability="hermes.channel.send",
-            current_policy=PolicyContext(can_interrupt=True),
             operation_id="authorization-unproven-critical",
             now=current,
         )
@@ -345,7 +375,6 @@ def main() -> int:
             selection_event_id=selection.event.event_id,
             subject="user:test",
             capability="hermes.channel.send",
-            current_policy=PolicyContext(can_interrupt=True),
             operation_id="authorization-closed-agenda",
             now=current,
         )
@@ -364,7 +393,6 @@ def main() -> int:
             selection_event_id=selection.event.event_id,
             subject="user:test",
             capability="hermes.channel.send",
-            current_policy=PolicyContext(can_interrupt=True),
             operation_id="authorization-stale-gate",
             now=current,
         )
@@ -377,7 +405,6 @@ def main() -> int:
             selection_event_id=observed_selection.event.event_id,
             subject="user:test",
             capability="hermes.channel.send",
-            current_policy=PolicyContext(can_interrupt=True),
             operation_id="authorization-erased-authority",
             now=current,
         )

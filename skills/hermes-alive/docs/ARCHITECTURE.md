@@ -96,6 +96,11 @@ resolved from the vault only under a live token. Authenticated Hermes terminal
 events close dispatch and are reconciled into outcome evidence; recovery checks
 those events before ever restoring a row as pending.
 
+External authority also depends on the latest user-owned autonomy policy
+(ADR-0025). The default is no policy and therefore no proactive execution.
+Authorization receipts and outbox rows bind an exact policy event/revision;
+pause or later policy changes revoke queued work without reviving it on resume.
+
 ## Decision ownership
 
 - The model owns wording and style inside structured constraints.

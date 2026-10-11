@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from alive_kernel.deliberation import ActionKind, DeliberationFrame
+from alive_kernel.autonomy_policy import AutonomyPolicyProjection
+from alive_kernel.deliberation import (
+    ActionKind,
+    DeliberationFrame,
+    PolicyContext,
+    SideEffect,
+)
 from alive_kernel.deliberation_store import DeliberationProjection
 from alive_kernel.event_store import ExperienceJournal
 from alive_kernel.events import EventEnvelope
@@ -72,7 +78,25 @@ def install_action_authorization(
 
     selection = journal.get(selection_event_id)
     assert selection is not None
-    valid_until = selection.event.observed_at + timedelta(seconds=60)
+    autonomy = AutonomyPolicyProjection(journal)
+    policy = autonomy.current(subject)
+    if policy is None:
+        policy_event = autonomy.append_update(
+            subject=subject,
+            actor=subject,
+            expected_revision=0,
+            enabled=True,
+            context=PolicyContext(
+                can_interrupt=True,
+                allowed_side_effects=frozenset(SideEffect),
+            ),
+            operation_id=f"fixture:{fixture_name}",
+        )
+        assert autonomy.apply(policy_event).outcome == "recorded"
+        policy = autonomy.current(subject)
+    assert policy is not None and policy.enabled
+    authorization_time = max(selection.event.observed_at, policy.updated_at)
+    valid_until = authorization_time + timedelta(seconds=60)
     payload = {
         "operation_id": f"fixture:{fixture_name}",
         "selection_event_id": selection_event_id,
@@ -85,6 +109,8 @@ def install_action_authorization(
         "outcome": "authorized",
         "reasons": [],
         "policy": {},
+        "policy_event_id": policy.event_id,
+        "policy_revision": policy.revision,
         "permit_ttl_seconds": 60.0,
         "valid_until": valid_until.isoformat(),
         "executes_action": False,
@@ -99,8 +125,8 @@ def install_action_authorization(
         actor="system:alive-authorizer",
         subject=subject,
         causation_id=selection_event_id,
-        occurred_at=selection.event.observed_at,
-        observed_at=selection.event.observed_at,
+        occurred_at=authorization_time,
+        observed_at=authorization_time,
         expires_at=valid_until,
         sensitivity=selection.event.sensitivity,
         payload=payload,

@@ -22,6 +22,7 @@ from alive_kernel import (  # noqa: E402
     AgendaProjection,
     AgendaProposal,
     AssessmentBasis,
+    AutonomyPolicyProjection,
     CognitionCycleCoordinator,
     ConsolidationPolicyProjection,
     ContentErasedError,
@@ -199,13 +200,22 @@ def main() -> int:
             exploration_gate_event_id=cycle.exploration_event_id,
         )
         assert coordinator.deliberation.apply(selection).outcome == "validated"
+        autonomy = AutonomyPolicyProjection(journal)
+        autonomy_event = autonomy.append_update(
+            subject=causal_subject,
+            actor=causal_subject,
+            expected_revision=0,
+            enabled=True,
+            context=PolicyContext(can_interrupt=True),
+            operation_id="causal-recovery",
+        )
+        assert autonomy.apply(autonomy_event).outcome == "recorded"
         authorization = SendTimeAuthorizer(
             journal, content_vault=vault
         ).evaluate(
             selection_event_id=selection.event.event_id,
             subject=causal_subject,
             capability="hermes.channel.send",
-            current_policy=PolicyContext(can_interrupt=True),
             operation_id="causal-recovery",
         )
         assert authorization.authorized
@@ -233,6 +243,8 @@ def main() -> int:
                 DELETE FROM action_outcomes_v1;
                 DELETE FROM action_attempts_v1;
                 DELETE FROM outcome_projection_decisions_v1;
+                DELETE FROM autonomy_policies_v1;
+                DELETE FROM autonomy_policy_decisions_v1;
                 DELETE FROM deliberation_selections_v1;
                 DELETE FROM exploration_evaluations_v1;
                 DELETE FROM exploration_annotations_v1;
@@ -245,7 +257,8 @@ def main() -> int:
                 DELETE FROM agenda_items_v1;
                 DELETE FROM consumer_checkpoints
                 WHERE consumer_name IN (
-                  'alive-agenda-v1', 'alive-deliberation-frames-v1',
+                  'alive-autonomy-policy-v1', 'alive-agenda-v1',
+                  'alive-deliberation-frames-v1',
                   'alive-deliberation-v1', 'alive-exploration-v1',
                   'alive-outcomes-v1'
                 );
@@ -276,6 +289,7 @@ def main() -> int:
         assert report.target_sequence <= report.final_sequence
         assert {item.name for item in report.projections} == {
             "retention",
+            "autonomy-policy",
             "consolidation-consent",
             "memory",
             "agenda",
@@ -292,6 +306,8 @@ def main() -> int:
         )
         assert RetentionProjection(journal, content_vault=vault).policy(subject) is not None
         assert ConsolidationPolicyProjection(journal).policy(subject) is not None
+        recovered_policy = AutonomyPolicyProjection(journal).current(causal_subject)
+        assert recovered_policy is not None and recovered_policy.enabled
         recovered = MemoryProjection(journal, content_vault=vault).get(
             proposal.proposal_id, clearance=Sensitivity.RESTRICTED
         )
@@ -434,7 +450,7 @@ def main() -> int:
         # prevent a duplicate dispatch during reconstruction.
         lost_outbox = sqlite3.connect(journal.path)
         try:
-            lost_outbox.execute("DELETE FROM dispatch_outbox_v1")
+            lost_outbox.execute("DELETE FROM dispatch_outbox_v2")
             lost_outbox.commit()
         finally:
             lost_outbox.close()
@@ -484,6 +500,107 @@ def main() -> int:
             for item in settled.projections
         )
 
+        # A user pause revokes pending and leased work immediately. Resuming
+        # does not resurrect the old authorization; only a newly authorized
+        # attempt under the new policy revision becomes dispatchable.
+        pause_now = datetime.now(timezone.utc)
+        before_pause = SendTimeAuthorizer(
+            journal, content_vault=vault
+        ).evaluate(
+            selection_event_id=selection.event.event_id,
+            subject=causal_subject,
+            capability="hermes.channel.send",
+            operation_id="causal-recovery-before-pause",
+            now=pause_now,
+        )
+        assert before_pause.authorized
+        pause_attempt = outcomes.append_attempt(
+            authorization_event_id=before_pause.event_id,
+            selection_event_id=selection.event.event_id,
+            candidate_id=candidate.candidate_id,
+            executor="hermes.channel.send",
+            idempotency_key="causal-recovery-before-pause",
+            actor="system:test-executor",
+            subject=causal_subject,
+            sensitivity=Sensitivity.RESTRICTED,
+            attempt_id="attempt:causal-recovery-before-pause",
+        )
+        assert outcomes.apply(pause_attempt).outcome == "recorded"
+        assert outbox.reconcile(now=pause_now) == 1
+        paused_lease = outbox.acquire(worker_id="pause-worker", now=pause_now)
+        assert paused_lease is not None
+        paused = autonomy.append_update(
+            subject=causal_subject,
+            actor=causal_subject,
+            expected_revision=1,
+            enabled=False,
+            context=PolicyContext(can_interrupt=False),
+            operation_id="causal-recovery-pause",
+        )
+        assert autonomy.apply(paused).outcome == "recorded"
+        assert outbox.acquire(worker_id="paused-worker", now=pause_now) is None
+        assert outbox.counts() == {"acknowledged": 1, "revoked": 1}
+        try:
+            outbox.load_content(
+                paused_lease,
+                clearance=Sensitivity.RESTRICTED,
+                now=pause_now,
+            )
+        except DispatchOutboxError:
+            pass
+        else:
+            raise AssertionError("paused autonomy left a lease readable")
+        try:
+            outbox.release(paused_lease, now=pause_now)
+        except DispatchOutboxError:
+            pass
+        else:
+            raise AssertionError("paused autonomy allowed a lease to be requeued")
+        resumed = autonomy.append_update(
+            subject=causal_subject,
+            actor=causal_subject,
+            expected_revision=2,
+            enabled=True,
+            context=PolicyContext(can_interrupt=True),
+            operation_id="causal-recovery-resume",
+        )
+        assert autonomy.apply(resumed).outcome == "recorded"
+        assert outbox.acquire(worker_id="must-not-resurrect", now=pause_now) is None
+        resume_now = datetime.now(timezone.utc)
+        after_resume = SendTimeAuthorizer(
+            journal, content_vault=vault
+        ).evaluate(
+            selection_event_id=selection.event.event_id,
+            subject=causal_subject,
+            capability="hermes.channel.send",
+            operation_id="causal-recovery-after-resume",
+            now=resume_now,
+        )
+        assert after_resume.authorized
+        resumed_attempt = outcomes.append_attempt(
+            authorization_event_id=after_resume.event_id,
+            selection_event_id=selection.event.event_id,
+            candidate_id=candidate.candidate_id,
+            executor="hermes.channel.send",
+            idempotency_key="causal-recovery-after-resume",
+            actor="system:test-executor",
+            subject=causal_subject,
+            sensitivity=Sensitivity.RESTRICTED,
+            attempt_id="attempt:causal-recovery-after-resume",
+        )
+        assert outcomes.apply(resumed_attempt).outcome == "recorded"
+        assert outbox.reconcile(now=resume_now) == 1
+        resumed_lease = outbox.acquire(worker_id="resumed-worker", now=resume_now)
+        assert resumed_lease is not None
+        assert outbox.release(
+            resumed_lease, retry_after=timedelta(seconds=30), now=resume_now
+        ) == "expired"
+        assert outbox.counts() == {
+            "acknowledged": 1,
+            "expired": 1,
+            "revoked": 1,
+        }
+
         database = (kernel / "experience.sqlite3").read_bytes()
         wal = kernel / "experience.sqlite3-wal"
         if wal.exists():
@@ -494,6 +611,8 @@ def main() -> int:
         assert first_lease.token.encode("utf-8") not in database
         assert second_lease.token.encode("utf-8") not in database
         assert third_lease.token.encode("utf-8") not in database
+        assert paused_lease.token.encode("utf-8") not in database
+        assert resumed_lease.token.encode("utf-8") not in database
         assert journal.get(retention_consent.event.event_id) is not None
         assert journal.get(learning_consent.event.event_id) is not None
 
