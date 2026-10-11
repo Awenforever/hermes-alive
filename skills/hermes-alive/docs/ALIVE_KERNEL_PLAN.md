@@ -208,8 +208,10 @@ corrections are represented rather than overwritten.
   Request acceptance is not delivery evidence, so the live bridge remains
   disconnected while the stable public plugin API lacks terminal delivery
   receipts (ADR-0028).
-- [ ] Replace per-acquisition full-history evidence scans with a rebuildable,
-  checkpointed projection without reintroducing a correctness cap.
+- [x] Replace per-acquisition full-history evidence scans with a rebuildable,
+  transactionally checkpointed projection. Batch size bounds transaction cost,
+  never history correctness; journal facts are re-authenticated on use
+  (ADR-0029).
 - [ ] Run the new decision engine in shadow against production events.
 
 Exit: every proposed action has a stable reason and every rejection is
@@ -305,6 +307,19 @@ For each material change:
 8. do not equate code presence with runtime correctness.
 
 ## Change log
+
+### 2026-10-12 — Incremental dispatch evidence projection
+
+- Removed the full-journal reverse scans from every outbox reconciliation and
+  acquisition path.
+- Added an atomic checkpoint plus a minimal index of authenticated start/result
+  event identities. Projection runs to a captured watermark in bounded batches
+  rather than applying a correctness-breaking look-back limit.
+- Added concurrent projector, invalid-authenticator, incremental catch-up and
+  discard-and-rebuild tests. Derived rows are installation-authenticated and a
+  startup count/HMAC audit rebuilds logical corruption before leasing. Startup
+  recovery reports evidence checkpoint progress before materializing dispatch
+  state.
 
 ### 2026-10-11 — Host capability and route authority boundary
 

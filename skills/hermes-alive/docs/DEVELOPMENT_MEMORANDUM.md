@@ -124,6 +124,14 @@ capability. Until that changes, keep the new live bridge disconnected. Do not
 resurrect `_gateway_runner_ref`, private adapter maps, or SHA-gated core patches
 to bypass this boundary.
 
+Do not restore full-history scans to dispatch acquisition and do not replace
+them with a fixed look-back window. ADR-0029's evidence index is disposable,
+not authoritative: advance facts and checkpoint atomically, run every call to
+its captured watermark even when that takes multiple batches, and re-read and
+authenticate journal events before changing dispatch state. Batch size may
+bound lock duration but must never bound correctness. Recovery and corruption
+repair may erase this projection and replay it from sequence zero.
+
 ## Plugin dependencies must respect the Hermes environment lock
 
 The supported Hermes runtime already provides `cryptography==50.0.0`. Alive's

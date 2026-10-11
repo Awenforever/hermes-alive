@@ -161,6 +161,26 @@ class DispatchOutbox:
                 );
                 CREATE INDEX IF NOT EXISTS idx_dispatch_ready_v3
                     ON dispatch_outbox_v3(state, available_at, execute_by);
+                CREATE TABLE IF NOT EXISTS dispatch_evidence_projection_v1 (
+                    singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+                    checkpoint_sequence INTEGER NOT NULL,
+                    evidence_count INTEGER NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                INSERT OR IGNORE INTO dispatch_evidence_projection_v1
+                    (singleton, checkpoint_sequence, evidence_count, updated_at)
+                VALUES (1, 0, 0, '1970-01-01T00:00:00+00:00');
+                CREATE TABLE IF NOT EXISTS dispatch_evidence_events_v1 (
+                    sequence INTEGER PRIMARY KEY,
+                    event_id TEXT NOT NULL UNIQUE,
+                    event_type TEXT NOT NULL,
+                    attempt_id TEXT NOT NULL,
+                    row_authenticator TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_dispatch_evidence_attempt_v1
+                    ON dispatch_evidence_events_v1(
+                        attempt_id, event_type, sequence DESC
+                    );
                 COMMIT;
                 """
             )
@@ -196,6 +216,245 @@ class DispatchOutbox:
                     """
                 )
                 connection.execute("COMMIT")
+        if not self.validate_evidence_projection():
+            self.rebuild_evidence_projection()
+
+    def validate_evidence_projection(self) -> bool:
+        """Startup structural/HMAC audit; callers may rebuild on false."""
+
+        try:
+            with closing(self._connect()) as connection:
+                meta = connection.execute(
+                    """
+                    SELECT checkpoint_sequence, evidence_count
+                    FROM dispatch_evidence_projection_v1 WHERE singleton=1
+                    """
+                ).fetchone()
+                rows = connection.execute(
+                    """
+                    SELECT sequence, event_id, event_type, attempt_id,
+                           row_authenticator
+                    FROM dispatch_evidence_events_v1 ORDER BY sequence
+                    """
+                ).fetchall()
+            if (
+                meta is None
+                or int(meta["checkpoint_sequence"]) > self.journal.last_sequence()
+                or int(meta["evidence_count"]) != len(rows)
+            ):
+                return False
+            return all(
+                self.protector.verify_json(
+                    "dispatch.evidence.row.v1",
+                    {
+                        "sequence": int(row["sequence"]),
+                        "event_id": str(row["event_id"]),
+                        "event_type": str(row["event_type"]),
+                        "attempt_id": str(row["attempt_id"]),
+                    },
+                    row["row_authenticator"],
+                )
+                for row in rows
+            )
+        except (KeyError, TypeError, ValueError, sqlite3.DatabaseError):
+            return False
+
+    def evidence_checkpoint(self) -> int:
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                """
+                SELECT checkpoint_sequence
+                FROM dispatch_evidence_projection_v1 WHERE singleton=1
+                """
+            ).fetchone()
+            return int(row["checkpoint_sequence"])
+
+    def evidence_count(self) -> int:
+        with closing(self._connect()) as connection:
+            return int(
+                connection.execute(
+                    "SELECT COUNT(*) AS value FROM dispatch_evidence_events_v1"
+                ).fetchone()["value"]
+            )
+
+    def project_evidence(self, *, batch_size: int = 500) -> int:
+        """Advance a rebuildable evidence index to one captured journal watermark.
+
+        Each batch and its checkpoint commit atomically.  ``batch_size`` bounds
+        transaction size, never total correctness: the loop continues until it
+        reaches the watermark that existed when projection began.
+        """
+
+        if not 1 <= batch_size <= 10_000:
+            raise DispatchOutboxError(
+                "evidence projection batch size must be between 1 and 10000"
+            )
+        watermark = self.journal.last_sequence()
+        indexed = 0
+        while True:
+            checkpoint = self.evidence_checkpoint()
+            if checkpoint >= watermark:
+                return indexed
+            records: list[JournalRecord] = []
+            for record in self.journal.iter_replay(
+                after_sequence=checkpoint,
+                batch_size=batch_size,
+            ):
+                if record.sequence > watermark:
+                    break
+                records.append(record)
+                if len(records) >= batch_size:
+                    break
+            if not records:
+                raise DispatchOutboxError(
+                    "dispatch evidence projection could not reach its watermark"
+                )
+            candidates: list[tuple[int, str, str, str, str]] = []
+            for record in records:
+                if record.event.event_type == "dispatch.started":
+                    payload = self._authenticated_start_payload(record)
+                elif record.event.event_type in self.RESULT_KINDS:
+                    payload = self._authenticated_result_payload(record)
+                else:
+                    continue
+                attempt_id = str((payload or {}).get("attempt_id") or "").strip()
+                if attempt_id:
+                    row_document = {
+                        "sequence": record.sequence,
+                        "event_id": record.event.event_id,
+                        "event_type": record.event.event_type,
+                        "attempt_id": attempt_id,
+                    }
+                    candidates.append(
+                        (
+                            record.sequence,
+                            record.event.event_id,
+                            record.event.event_type,
+                            attempt_id,
+                            self.protector.authenticate_json(
+                                "dispatch.evidence.row.v1", row_document
+                            ),
+                        )
+                    )
+            last_sequence = records[-1].sequence
+            with closing(self._connect()) as connection:
+                connection.execute("BEGIN IMMEDIATE")
+                try:
+                    current = int(
+                        connection.execute(
+                            """
+                            SELECT checkpoint_sequence
+                            FROM dispatch_evidence_projection_v1
+                            WHERE singleton=1
+                            """
+                        ).fetchone()["checkpoint_sequence"]
+                    )
+                    if current != checkpoint:
+                        connection.execute("ROLLBACK")
+                        continue
+                    before_count = int(
+                        connection.execute(
+                            "SELECT COUNT(*) AS value FROM dispatch_evidence_events_v1"
+                        ).fetchone()["value"]
+                    )
+                    connection.executemany(
+                        """
+                        INSERT OR IGNORE INTO dispatch_evidence_events_v1(
+                            sequence, event_id, event_type, attempt_id,
+                            row_authenticator
+                        ) VALUES (?, ?, ?, ?, ?)
+                        """,
+                        candidates,
+                    )
+                    after_count = int(
+                        connection.execute(
+                            "SELECT COUNT(*) AS value FROM dispatch_evidence_events_v1"
+                        ).fetchone()["value"]
+                    )
+                    indexed += after_count - before_count
+                    connection.execute(
+                        """
+                        UPDATE dispatch_evidence_projection_v1
+                        SET checkpoint_sequence=?, evidence_count=?, updated_at=?
+                        WHERE singleton=1
+                        """,
+                        (
+                            last_sequence,
+                            after_count,
+                            datetime.now(timezone.utc).isoformat(),
+                        ),
+                    )
+                    connection.execute("COMMIT")
+                except Exception:
+                    if connection.in_transaction:
+                        connection.execute("ROLLBACK")
+                    raise
+
+    def rebuild_evidence_projection(self, *, batch_size: int = 500) -> int:
+        """Discard the derived index and replay it from the durable journal."""
+
+        with closing(self._connect()) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                connection.execute("DELETE FROM dispatch_evidence_events_v1")
+                connection.execute(
+                    """
+                    UPDATE dispatch_evidence_projection_v1
+                    SET checkpoint_sequence=0, evidence_count=0, updated_at=?
+                    WHERE singleton=1
+                    """,
+                    (datetime.now(timezone.utc).isoformat(),),
+                )
+                connection.execute("COMMIT")
+            except Exception:
+                if connection.in_transaction:
+                    connection.execute("ROLLBACK")
+                raise
+        return self.project_evidence(batch_size=batch_size)
+
+    def _evidence_candidates(
+        self,
+        attempt_id: str,
+        *,
+        event_types: tuple[str, ...],
+    ) -> list[tuple[JournalRecord, dict[str, object]]]:
+        if not event_types:
+            raise DispatchOutboxError("at least one evidence event type is required")
+        placeholders = ",".join("?" for _ in event_types)
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                """
+                SELECT sequence, event_id, event_type, attempt_id,
+                       row_authenticator
+                FROM dispatch_evidence_events_v1
+                WHERE attempt_id=? AND event_type IN ("""
+                + placeholders
+                + ") ORDER BY sequence DESC",
+                (attempt_id, *event_types),
+            ).fetchall()
+        candidates: list[tuple[JournalRecord, dict[str, object]]] = []
+        for row in rows:
+            row_document = {
+                "sequence": int(row["sequence"]),
+                "event_id": str(row["event_id"]),
+                "event_type": str(row["event_type"]),
+                "attempt_id": str(row["attempt_id"]),
+            }
+            if not self.protector.verify_json(
+                "dispatch.evidence.row.v1",
+                row_document,
+                row["row_authenticator"],
+            ):
+                raise DispatchOutboxError("dispatch evidence projection is corrupt")
+            record = self.journal.get(str(row["event_id"]))
+            payload = (
+                self._authenticated_start_payload(record)
+                if record is not None and record.event.event_type == "dispatch.started"
+                else self._authenticated_result_payload(record)
+            )
+            if record is not None and payload is not None:
+                candidates.append((record, payload))
+        return candidates
 
     @staticmethod
     def _utc(value: datetime | None) -> datetime:
@@ -414,35 +673,7 @@ class DispatchOutbox:
             raise DispatchOutboxError("reconcile limit must be between 1 and 10000")
         current = self._utc(now)
         inserted = 0
-        observed_results: dict[
-            str, list[tuple[JournalRecord, dict[str, object]]]
-        ] = {}
-        observed_starts: dict[
-            str, list[tuple[JournalRecord, dict[str, object]]]
-        ] = {}
-        for record in self.journal.iter_reverse(
-            event_types=(
-                "delivery.succeeded",
-                "delivery.failed",
-                "task.completed",
-                "task.failed",
-            ),
-        ):
-            payload = self._authenticated_result_payload(record)
-            if payload is None:
-                continue
-            attempt_id = str(payload.get("attempt_id") or "")
-            if attempt_id:
-                observed_results.setdefault(attempt_id, []).append((record, payload))
-        for record in self.journal.iter_reverse(
-            event_types=("dispatch.started",),
-        ):
-            payload = self._authenticated_start_payload(record)
-            if payload is None:
-                continue
-            attempt_id = str(payload.get("attempt_id") or "")
-            if attempt_id:
-                observed_starts.setdefault(attempt_id, []).append((record, payload))
+        self.project_evidence()
         with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
@@ -541,9 +772,15 @@ class DispatchOutbox:
                     dispatch_id = self._dispatch_id(str(row["attempt_id"]))
                     attempt_id = str(row["attempt_id"])
                     attempt_event = self.journal.get(str(row["event_id"]))
+                    observed_starts = self._evidence_candidates(
+                        attempt_id, event_types=("dispatch.started",)
+                    )
+                    observed_results = self._evidence_candidates(
+                        attempt_id, event_types=tuple(self.RESULT_KINDS)
+                    )
                     start_record, _start_payload, start_generation = (
                         self._select_start_evidence(
-                            observed_starts.get(attempt_id, []),
+                            observed_starts,
                             attempt_event,
                             dispatch_id=dispatch_id,
                             attempt_id=attempt_id,
@@ -555,7 +792,7 @@ class DispatchOutbox:
                         )
                     )
                     result_record = self._select_result_evidence(
-                        observed_results.get(attempt_id, []),
+                        observed_results,
                         attempt_event,
                         start_record,
                         dispatch_id=dispatch_id,
@@ -633,9 +870,15 @@ class DispatchOutbox:
                 for row in active_rows:
                     attempt_id = str(row["attempt_id"])
                     attempt_event = self.journal.get(f"action.attempt:{attempt_id}")
+                    observed_starts = self._evidence_candidates(
+                        attempt_id, event_types=("dispatch.started",)
+                    )
+                    observed_results = self._evidence_candidates(
+                        attempt_id, event_types=tuple(self.RESULT_KINDS)
+                    )
                     start_record, _start_payload, generation = (
                         self._select_start_evidence(
-                            observed_starts.get(attempt_id, []),
+                            observed_starts,
                             attempt_event,
                             dispatch_id=str(row["dispatch_id"]),
                             attempt_id=attempt_id,
@@ -647,7 +890,7 @@ class DispatchOutbox:
                         )
                     )
                     result_record = self._select_result_evidence(
-                        observed_results.get(attempt_id, []),
+                        observed_results,
                         attempt_event,
                         start_record,
                         dispatch_id=str(row["dispatch_id"]),

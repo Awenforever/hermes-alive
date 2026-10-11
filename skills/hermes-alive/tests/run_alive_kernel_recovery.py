@@ -297,6 +297,8 @@ def main() -> int:
         assert report.erasures_resumed == 1
         assert report.dispatches_reconciled == 1
         assert report.dispatch_outcomes_reconciled == 0
+        assert report.dispatch_evidence_checkpoint_after >= report.target_sequence
+        assert report.dispatch_evidence_indexed >= 0
         assert report.target_sequence <= report.final_sequence
         assert {item.name for item in report.projections} == {
             "retention",
@@ -510,6 +512,10 @@ def main() -> int:
         assert caught_up is not None
         assert caught_up.dispatches_reconciled == 0
         assert caught_up.dispatch_outcomes_reconciled == 0
+        assert (
+            caught_up.dispatch_evidence_checkpoint_after
+            >= caught_up.target_sequence
+        )
         assert all(
             item.checkpoint_after >= caught_up.target_sequence
             for item in caught_up.projections

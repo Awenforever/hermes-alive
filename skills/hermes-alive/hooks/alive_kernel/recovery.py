@@ -40,6 +40,9 @@ class KernelRecoveryReport:
     projections: tuple[ProjectionRecoveryReport, ...]
     erasures_resumed: int
     expired_content_erased: int
+    dispatch_evidence_checkpoint_before: int
+    dispatch_evidence_checkpoint_after: int
+    dispatch_evidence_indexed: int
     dispatches_reconciled: int
     dispatch_outcomes_reconciled: int
     started_at: datetime
@@ -152,6 +155,9 @@ class KernelRecoverySupervisor:
                 for name, projection in ordered
             )
             outbox = DispatchOutbox(journal, content_vault=vault)
+            evidence_before = outbox.evidence_checkpoint()
+            evidence_indexed = outbox.project_evidence(batch_size=batch_size)
+            evidence_after = outbox.evidence_checkpoint()
             dispatches = outbox.reconcile(now=started, recovering=True)
             dispatch_outcomes = outbox.reconcile_outcomes()
             completed = datetime.now(timezone.utc)
@@ -161,6 +167,9 @@ class KernelRecoverySupervisor:
                 projections=reports,
                 erasures_resumed=pending,
                 expired_content_erased=expired.newly_erased,
+                dispatch_evidence_checkpoint_before=evidence_before,
+                dispatch_evidence_checkpoint_after=evidence_after,
+                dispatch_evidence_indexed=evidence_indexed,
                 dispatches_reconciled=dispatches,
                 dispatch_outcomes_reconciled=dispatch_outcomes,
                 started_at=started,

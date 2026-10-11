@@ -73,6 +73,10 @@ explicitly supplied.
 - Dispatch-start events contain structural IDs, policy identity, capability,
   idempotency identity and lease generation only. The execution grant holds
   plaintext in process memory; neither start nor uncertain state journals it.
+- The rebuildable dispatch-evidence projection duplicates only journal
+  sequence, event ID/type and attempt ID. It contains no payload, message,
+  route, worker, lease token or external recipient and never replaces journal
+  integrity/authenticator checks.
 - Action permits persist an installation-keyed authenticator and schema
   version, never message text or raw routing. The encrypted action document
   contains no destination; route identity must come from separately authorized
