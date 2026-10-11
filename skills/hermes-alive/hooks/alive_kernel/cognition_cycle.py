@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 import re
 from typing import Any, Iterable
 
@@ -16,7 +17,7 @@ from .deliberation import (
 )
 from .deliberation_store import DeliberationProjection
 from .event_store import ExperienceJournal
-from .events import Sensitivity
+from .events import Sensitivity, _freeze_json, _thaw_json
 from .exploration import ExplorationGateResult, ExplorationMode, ExplorationPolicy
 from .exploration_store import ExplorationProjection
 
@@ -36,11 +37,30 @@ class CycleCandidate:
     source_label: str
     mode: ExplorationMode = ExplorationMode.EXPLOIT
 
+    MAX_CONTENT_CHARS = 4_000
+
     def __post_init__(self) -> None:
         if self.action.action_kind is ActionKind.SILENCE:
             raise CognitionCycleError("cycle input must not supply its own silence candidate")
         if not str(self.action.content_id or "").strip():
             raise CognitionCycleError("cycle candidate requires erasable content")
+        try:
+            normalized = json.loads(
+                json.dumps(
+                    self.content,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                )
+            )
+        except (TypeError, ValueError) as exc:
+            raise CognitionCycleError("cycle content must be finite JSON") from exc
+        if len(
+            json.dumps(normalized, ensure_ascii=False, separators=(",", ":"))
+        ) > self.MAX_CONTENT_CHARS:
+            raise CognitionCycleError("cycle candidate content is too large")
+        object.__setattr__(self, "content", _freeze_json(normalized))
         topic = str(self.topic).strip()
         source = str(self.source_label).strip()
         if not topic or not source:
@@ -64,6 +84,7 @@ class CognitionCycleCoordinator:
     """Persist a complete internal cycle without authorizing external action."""
 
     MAX_CANDIDATES = 32
+    MAX_TOTAL_CONTENT_CHARS = 16_000
     SAFE_SILENCE_MODEL = "system/alive-safe-silence"
 
     def __init__(
@@ -115,6 +136,18 @@ class CognitionCycleCoordinator:
         content_ids = [str(item.action.content_id) for item in values]
         if len(content_ids) != len(set(content_ids)):
             raise CognitionCycleError("cycle content IDs must be unique")
+        total_content = sum(
+            len(
+                json.dumps(
+                    _thaw_json(item.content),
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+            )
+            for item in values
+        )
+        if total_content > self.MAX_TOTAL_CONTENT_CHARS:
+            raise CognitionCycleError("cycle candidate content exceeds the total boundary")
         sensitivity = Sensitivity(sensitivity)
         frame_id = self._identifier("cycle-frame", cycle)
         actor = "system:alive-coordinator"
@@ -129,7 +162,8 @@ class CognitionCycleCoordinator:
                 causation_id=causation_id,
                 correlation_id=correlation_id,
                 candidate_contents={
-                    str(item.action.content_id): item.content for item in values
+                    str(item.action.content_id): _thaw_json(item.content)
+                    for item in values
                 },
             )
         except ContentIntegrityError as exc:

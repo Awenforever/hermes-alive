@@ -53,6 +53,11 @@ explicitly supplied.
   a test corpus through automatic redaction alone; any future historical corpus
   requires an explicit human privacy review and a separately controlled
   storage decision.
+- Model deliberation sends only candidates already admitted by deterministic
+  policy and the exploration gate through Hermes' configured model route.
+  Prompts and raw responses are not journaled. Candidate bodies and rationale
+  remain encrypted; structural receipts retain actual-model and selected-ID
+  provenance without provider error text.
 
 ## Topic-delivery privacy
 

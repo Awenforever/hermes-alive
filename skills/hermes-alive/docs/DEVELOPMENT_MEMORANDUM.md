@@ -55,6 +55,12 @@ boundary; future action attempts must recheck current policy and context and
 produce their own receipts. A green integrated-cycle test proves persistence
 and replay, not permission to act.
 
+The model-selection boundary now exists under ADR-0021. Keep it non-executing:
+it may persist a validated intent but must never create an action attempt,
+deliver content or run a tool. Rejected candidates must be removed before the
+prompt, not merely described as forbidden to the model. Actual response model
+identity is mandatory and raw provider failure bodies are never receipts.
+
 ## Plugin dependencies must respect the Hermes environment lock
 
 The supported Hermes runtime already provides `cryptography==50.0.0`. Alive's

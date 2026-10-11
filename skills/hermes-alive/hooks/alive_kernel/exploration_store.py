@@ -496,6 +496,22 @@ class ExplorationProjection:
                 history_event_ids=tuple(json.loads(row["history_json"])),
             )
 
+    def latest_gate_event_id(self, frame_id: str) -> str | None:
+        """Return the exact latest successfully projected gate for a frame."""
+
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                """
+                SELECT e.event_id
+                FROM exploration_evaluations_v1 e
+                JOIN exploration_decisions_v1 d ON d.event_id=e.event_id
+                WHERE e.frame_id=? AND d.outcome='recorded'
+                ORDER BY e.rowid DESC LIMIT 1
+                """,
+                (frame_id,),
+            ).fetchone()
+            return None if row is None else str(row["event_id"])
+
     def project_new(self, *, limit: int = 1000) -> list[ExplorationProjectionDecision]:
         decisions: list[ExplorationProjectionDecision] = []
         start = self.journal.checkpoint(self.CHECKPOINT)

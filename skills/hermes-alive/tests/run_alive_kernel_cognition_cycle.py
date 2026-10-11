@@ -92,13 +92,16 @@ def main() -> int:
             content_id="cycle-content:test",
             candidate_id="candidate:cycle",
         )
+        mutable_content = {"message": "RAW_CYCLE_CONTENT_SENTINEL"}
         cycle_candidate = CycleCandidate(
             action,
-            {"message": "RAW_CYCLE_CONTENT_SENTINEL"},
+            mutable_content,
             "private topic sentinel",
             "private source sentinel",
             ExplorationMode.EXPLORE,
         )
+        mutable_content["message"] = "changed after candidate construction"
+        assert cycle_candidate.content["message"] == "RAW_CYCLE_CONTENT_SENTINEL"
         before = journal.last_sequence()
         result = coordinator.plan_safe_silence(
             cycle_id="cycle-test",

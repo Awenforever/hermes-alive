@@ -179,7 +179,8 @@ corrections are represented rather than overwritten.
   risk and authority separately without an opaque weighted score (ADR-0007).
 - [x] Let the model deliberate within structured bounds; keep policy external.
   Frames, rationales, policy rejections and validated choices now have an
-  encrypted, deterministic replay projection; provider execution remains off.
+  encrypted, deterministic replay projection. A provider-neutral Hermes-routed
+  selector now exists behind an unscheduled, non-executing boundary (ADR-0021).
 - [x] Join candidate framing, active-agenda validation, exploration and a
   durable selection in one crash-safe coordinator that always closes with
   deterministic silence and has no model/channel/tool side effects (ADR-0020).
@@ -669,3 +670,16 @@ For each material change:
 - Same-semantics retries add no journal events. Changed reuse fails closed, raw
   candidate content and diversity labels remain outside the structural SQLite
   history, and projection rebuild reconstructs the same gate and selection.
+
+### 2026-10-11 — Gated provider-neutral intent selection
+
+- Added an unscheduled selector that consumes only candidates admitted by both
+  deterministic policy and the replayed exploration gate (ADR-0021).
+- Provider choice and fallback remain Hermes responsibilities; receipts record
+  the actual responding model, not the requested alias.
+- Invalid JSON and forbidden IDs are contained before durable selection. Raw
+  prompts, responses, rationales and provider errors do not enter the
+  structural journal.
+- A validated model choice still creates no action attempt and performs no
+  channel/tool side effect. Replay and production shadow evidence remain
+  required before it may be invoked automatically.

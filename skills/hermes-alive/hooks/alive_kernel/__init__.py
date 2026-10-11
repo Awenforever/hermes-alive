@@ -118,6 +118,12 @@ from .deliberation_store import (
     DeliberationProjection,
     StoredDeliberation,
 )
+from .deliberation_synthesis import (
+    DeliberationSynthesisError,
+    DeliberationSynthesisResult,
+    DeliberationSynthesizer,
+    run_with_hermes as run_deliberation_with_hermes,
+)
 from .memory import (
     ContentStatus,
     MemoryAuthority,
@@ -237,6 +243,9 @@ __all__ = [
     "DeliberationAuditDecision",
     "DeliberationFrame",
     "DeliberationProjection",
+    "DeliberationSynthesisError",
+    "DeliberationSynthesisResult",
+    "DeliberationSynthesizer",
     "DeliberationValidationError",
     "DimensionAssessment",
     "DiversityAnnotation",
@@ -338,6 +347,7 @@ __all__ = [
     "recover_kernel_state",
     "record_post_tool_call",
     "run_consolidation_with_hermes",
+    "run_deliberation_with_hermes",
     "serialize_frame",
     "shadow_enabled",
     "silence_candidate",

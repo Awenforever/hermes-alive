@@ -16,6 +16,7 @@ python3 tests/run_alive_kernel_consolidation_synthesis.py
 python3 tests/run_alive_kernel_consolidation_evaluation.py
 python3 tests/run_alive_kernel_recovery.py
 python3 tests/run_alive_kernel_cognition_cycle.py
+python3 tests/run_alive_kernel_deliberation_synthesis.py
 python3 tests/run_legacy_dream_retirement.py
 python3 tests/run_circadian_shadow.py
 python3 tests/run_circadian_intent_bridge.py

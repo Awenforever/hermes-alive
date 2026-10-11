@@ -73,6 +73,12 @@ and a selection, but always selects structural safe silence. It performs no
 provider, channel or tool operation. Model choice and action execution remain
 separate future boundaries rather than hidden options on the coordinator.
 
+An unscheduled model selector may consume a completed frame after the
+exploration gate (ADR-0021). It calls Hermes' auxiliary route, exposes only
+admissible candidates, records actual response-model attribution and persists
+an encrypted rationale. Its output is a validated intent, not an action
+attempt; it has no sender or tool-execution dependency.
+
 ## Decision ownership
 
 - The model owns wording and style inside structured constraints.
