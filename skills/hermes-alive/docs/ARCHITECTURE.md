@@ -90,6 +90,12 @@ outcome projection rechecks causal order and latest state before recording the
 attempt. Startup replay projects frames before exploration, then selections,
 then outcomes; this order is part of correctness, not an optimization.
 
+Authorized attempts enter a leased SQLite dispatch outbox (ADR-0024). Workers
+receive a short random lease token, never standing authority. Plaintext is
+resolved from the vault only under a live token. Authenticated Hermes terminal
+events close dispatch and are reconciled into outcome evidence; recovery checks
+those events before ever restoring a row as pending.
+
 ## Decision ownership
 
 - The model owns wording and style inside structured constraints.

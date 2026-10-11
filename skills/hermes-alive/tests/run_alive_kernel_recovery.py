@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import sqlite3
 import sys
@@ -28,6 +29,8 @@ from alive_kernel import (  # noqa: E402
     CycleCandidate,
     DecisionDimensions,
     DimensionAssessment,
+    DispatchOutbox,
+    DispatchOutboxError,
     EventEnvelope,
     ExperienceJournal,
     KernelRecoverySupervisor,
@@ -268,6 +271,8 @@ def main() -> int:
         report = KernelRecoverySupervisor(shared).recover(batch_size=1)
         assert report is not None
         assert report.erasures_resumed == 1
+        assert report.dispatches_reconciled == 1
+        assert report.dispatch_outcomes_reconciled == 0
         assert report.target_sequence <= report.final_sequence
         assert {item.name for item in report.projections} == {
             "retention",
@@ -296,6 +301,143 @@ def main() -> int:
         ).attempts(clearance=Sensitivity.RESTRICTED)
         assert len(recovered_attempts) == 1
         assert recovered_attempts[0].authorization_event_id == authorization.event_id
+
+        outbox = DispatchOutbox(journal, content_vault=vault)
+        assert outbox.counts() == {"pending": 1}
+        lease_now = report.completed_at
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            leases = list(
+                pool.map(
+                    lambda index: outbox.acquire(
+                        worker_id=f"worker-{index}", now=lease_now
+                    ),
+                    range(8),
+                )
+            )
+        claimed = [value for value in leases if value is not None]
+        assert len(claimed) == 1
+        first_lease = claimed[0]
+        assert outbox.load_content(
+            first_lease,
+            clearance=Sensitivity.RESTRICTED,
+            now=lease_now,
+        ) == {"message": "encrypted causal recovery candidate"}
+        assert "worker-" not in journal.path.read_bytes().decode(
+            "utf-8", errors="ignore"
+        )
+
+        # A crashed owner loses the row after lease expiry; its token cannot
+        # read or mutate the replacement lease.
+        second_lease = outbox.acquire(
+            worker_id="recovery-worker",
+            now=first_lease.lease_until,
+        )
+        assert second_lease is not None
+        assert second_lease.generation == first_lease.generation + 1
+        try:
+            outbox.load_content(
+                first_lease,
+                clearance=Sensitivity.RESTRICTED,
+                now=first_lease.lease_until,
+            )
+        except DispatchOutboxError:
+            pass
+        else:
+            raise AssertionError("stale dispatch lease retained access")
+        assert outbox.release(second_lease, now=first_lease.lease_until) == "pending"
+        third_lease = outbox.acquire(
+            worker_id="result-worker",
+            now=first_lease.lease_until,
+        )
+        assert third_lease is not None
+        result_payload = {
+            "dispatch_id": third_lease.dispatch_id,
+            "attempt_id": third_lease.attempt_id,
+            "idempotency_key": third_lease.idempotency_key,
+            "capability": third_lease.capability,
+            "outcome": "delivery_succeeded",
+        }
+        forged_result = EventEnvelope(
+            event_id="delivery:causal-recovery-forged",
+            event_type="delivery.succeeded",
+            source="test.channel",
+            actor="system:test-channel",
+            subject=causal_subject,
+            occurred_at=first_lease.lease_until,
+            observed_at=first_lease.lease_until,
+            sensitivity=Sensitivity.RESTRICTED,
+            payload=result_payload,
+        )
+        journal.append(forged_result)
+        try:
+            outbox.acknowledge(
+                third_lease,
+                result_event_id=forged_result.event_id,
+                now=first_lease.lease_until,
+            )
+        except DispatchOutboxError:
+            pass
+        else:
+            raise AssertionError("unauthenticated dispatch result was accepted")
+        inconsistent_payload = dict(result_payload)
+        inconsistent_payload["outcome"] = "task_completed"
+        inconsistent_payload["integrity_authenticator"] = (
+            outbox.protector.authenticate_json(
+                "dispatch.result.v1", inconsistent_payload
+            )
+        )
+        inconsistent_result = EventEnvelope(
+            event_id="delivery:causal-recovery-inconsistent",
+            event_type="delivery.succeeded",
+            source="test.channel",
+            actor="system:test-channel",
+            subject=causal_subject,
+            occurred_at=first_lease.lease_until,
+            observed_at=first_lease.lease_until,
+            sensitivity=Sensitivity.RESTRICTED,
+            payload=inconsistent_payload,
+        )
+        journal.append(inconsistent_result)
+        try:
+            outbox.acknowledge(
+                third_lease,
+                result_event_id=inconsistent_result.event_id,
+                now=first_lease.lease_until,
+            )
+        except DispatchOutboxError:
+            pass
+        else:
+            raise AssertionError("inconsistent signed dispatch result was accepted")
+        result_payload["integrity_authenticator"] = outbox.protector.authenticate_json(
+            "dispatch.result.v1", result_payload
+        )
+        result_event = EventEnvelope(
+            event_id="delivery:causal-recovery",
+            event_type="delivery.succeeded",
+            source="test.channel",
+            actor="system:test-channel",
+            subject=causal_subject,
+            occurred_at=first_lease.lease_until,
+            observed_at=first_lease.lease_until,
+            sensitivity=Sensitivity.RESTRICTED,
+            payload=result_payload,
+        )
+        journal.append(result_event)
+        outbox.acknowledge(
+            third_lease,
+            result_event_id=result_event.event_id,
+            now=first_lease.lease_until,
+        )
+        assert outbox.counts() == {"acknowledged": 1}
+        # Lose the operational outbox after transport success but before the
+        # outcome projection is written. The signed result in the journal must
+        # prevent a duplicate dispatch during reconstruction.
+        lost_outbox = sqlite3.connect(journal.path)
+        try:
+            lost_outbox.execute("DELETE FROM dispatch_outbox_v1")
+            lost_outbox.commit()
+        finally:
+            lost_outbox.close()
         try:
             vault.resolve_json(doomed.content_id)
         except ContentErasedError:
@@ -306,7 +448,41 @@ def main() -> int:
         again = KernelRecoverySupervisor(shared).recover(batch_size=1)
         assert again is not None
         assert again.erasures_resumed == 0
-        assert all(item.decisions == 0 and item.batches == 0 for item in again.projections)
+        assert again.dispatches_reconciled == 1
+        assert again.dispatch_outcomes_reconciled == 1
+        observed = OutcomeProjection(
+            journal, content_vault=vault
+        ).outcomes(
+            "attempt:causal-recovery", clearance=Sensitivity.RESTRICTED
+        )
+        assert len(observed) == 1
+        assert observed[0].kind.value == "delivery_succeeded"
+        assert DispatchOutbox(journal, content_vault=vault).counts() == {
+            "acknowledged": 1
+        }
+        assert DispatchOutbox(journal, content_vault=vault).acquire(
+            worker_id="must-not-redeliver",
+            now=first_lease.lease_until,
+        ) is None
+        assert outbox.reconcile_outcomes() == 0
+        assert all(
+            item.checkpoint_after >= again.target_sequence
+            for item in again.projections
+        )
+        caught_up = KernelRecoverySupervisor(shared).recover(batch_size=1)
+        assert caught_up is not None
+        assert caught_up.dispatches_reconciled == 0
+        assert caught_up.dispatch_outcomes_reconciled == 0
+        assert all(
+            item.checkpoint_after >= caught_up.target_sequence
+            for item in caught_up.projections
+        )
+        settled = KernelRecoverySupervisor(shared).recover(batch_size=1)
+        assert settled is not None
+        assert all(
+            item.decisions == 0 and item.batches == 0
+            for item in settled.projections
+        )
 
         database = (kernel / "experience.sqlite3").read_bytes()
         wal = kernel / "experience.sqlite3-wal"
@@ -314,6 +490,10 @@ def main() -> int:
             database += wal.read_bytes()
         assert b"encrypted recovery candidate" not in database
         assert b"erase after restart sentinel" not in database
+        assert b"worker-" not in database
+        assert first_lease.token.encode("utf-8") not in database
+        assert second_lease.token.encode("utf-8") not in database
+        assert third_lease.token.encode("utf-8") not in database
         assert journal.get(retention_consent.event.event_id) is not None
         assert journal.get(learning_consent.event.event_id) is not None
 
@@ -323,6 +503,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-    CycleCandidate,
-    DecisionDimensions,
-    DimensionAssessment,

@@ -1,0 +1,581 @@
+"""Crash-safe dispatch leasing over authorized action attempts.
+
+This module never calls a Hermes channel or tool.  It is an operational outbox
+that lets a future adapter claim one still-live attempt without duplicating or
+persisting plaintext candidate content.
+"""
+
+from __future__ import annotations
+
+from contextlib import closing
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+import hashlib
+from pathlib import Path
+import secrets
+import sqlite3
+
+from .content_vault import ContentVault
+from .deliberation import deserialize_frame
+from .event_store import ExperienceJournal, JournalRecord
+from .events import Sensitivity, _thaw_json
+from .privacy import LocalIdentityProtector
+from .outcomes import OutcomeKind, OutcomeProjection
+
+
+class DispatchOutboxError(ValueError):
+    """A dispatch operation crossed its lease or authority boundary."""
+
+
+@dataclass(frozen=True, slots=True)
+class DispatchLease:
+    dispatch_id: str
+    attempt_id: str
+    capability: str
+    idempotency_key: str
+    subject: str
+    sensitivity: Sensitivity
+    execute_by: datetime
+    lease_until: datetime
+    generation: int
+    token: str
+
+
+class DispatchOutbox:
+    """SQLite outbox with expiring, token-bound, single-owner leases."""
+
+    MAX_LEASE_TTL = timedelta(seconds=30)
+    RESULT_KINDS = {
+        "delivery.succeeded": OutcomeKind.DELIVERY_SUCCEEDED,
+        "delivery.failed": OutcomeKind.DELIVERY_FAILED,
+        "task.completed": OutcomeKind.TASK_COMPLETED,
+        "task.failed": OutcomeKind.TASK_FAILED,
+    }
+    RESULT_OUTCOMES = {
+        event_type: kind.value for event_type, kind in RESULT_KINDS.items()
+    }
+
+    def __init__(
+        self,
+        journal: ExperienceJournal,
+        *,
+        content_vault: ContentVault | None = None,
+    ) -> None:
+        self.journal = journal
+        self.path = Path(journal.path)
+        self.vault = content_vault or ContentVault(
+            self.path.parent / "content-vault",
+            backup_root=self.path.parent / "content-backups",
+        )
+        self.protector = LocalIdentityProtector(self.path.parent / "identity.key")
+        self._initialize()
+
+    def _connect(self) -> sqlite3.Connection:
+        connection = sqlite3.connect(self.path, timeout=10.0, isolation_level=None)
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys=ON")
+        connection.execute("PRAGMA busy_timeout=10000")
+        return connection
+
+    def _initialize(self) -> None:
+        with closing(self._connect()) as connection:
+            connection.executescript(
+                """
+                BEGIN IMMEDIATE;
+                CREATE TABLE IF NOT EXISTS dispatch_outbox_v1 (
+                    dispatch_id TEXT PRIMARY KEY,
+                    attempt_id TEXT NOT NULL UNIQUE,
+                    authorization_event_id TEXT NOT NULL,
+                    capability TEXT NOT NULL,
+                    idempotency_key TEXT NOT NULL UNIQUE,
+                    subject TEXT NOT NULL,
+                    content_id TEXT NOT NULL,
+                    sensitivity TEXT NOT NULL,
+                    state TEXT NOT NULL,
+                    execute_by TEXT NOT NULL,
+                    available_at TEXT NOT NULL,
+                    lease_owner TEXT,
+                    lease_token_digest TEXT,
+                    lease_until TEXT,
+                    lease_generation INTEGER NOT NULL DEFAULT 0,
+                    result_event_id TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    CHECK(state IN ('pending', 'leased', 'expired', 'acknowledged')),
+                    FOREIGN KEY(attempt_id) REFERENCES action_attempts_v1(attempt_id)
+                        ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS idx_dispatch_ready_v1
+                    ON dispatch_outbox_v1(state, available_at, execute_by);
+                COMMIT;
+                """
+            )
+
+    @staticmethod
+    def _utc(value: datetime | None) -> datetime:
+        current = value or datetime.now(timezone.utc)
+        if current.tzinfo is None or current.utcoffset() is None:
+            raise DispatchOutboxError("dispatch time must be timezone-aware")
+        return current.astimezone(timezone.utc)
+
+    @staticmethod
+    def _dispatch_id(attempt_id: str) -> str:
+        digest = hashlib.sha256(attempt_id.encode("utf-8")).hexdigest()[:40]
+        return f"dispatch:{digest}"
+
+    def _authenticated_result_payload(
+        self, result: JournalRecord | None
+    ) -> dict[str, object] | None:
+        if result is None:
+            return None
+        payload = _thaw_json(result.event.payload)
+        authenticator = payload.pop("integrity_authenticator", None)
+        if not self.protector.verify_json(
+            "dispatch.result.v1", payload, authenticator
+        ):
+            return None
+        return payload
+
+    def _valid_result_evidence(
+        self,
+        result: JournalRecord | None,
+        payload: dict[str, object] | None,
+        attempt: JournalRecord | None,
+        *,
+        dispatch_id: str,
+        attempt_id: str,
+        idempotency_key: str,
+        capability: str,
+        subject: str,
+        sensitivity: Sensitivity,
+        observed_by: datetime | None = None,
+    ) -> bool:
+        expected_types = (
+            {"delivery.succeeded", "delivery.failed"}
+            if capability == "hermes.channel.send"
+            else {"task.completed", "task.failed"}
+        )
+        return bool(
+            result is not None
+            and payload is not None
+            and attempt is not None
+            and result.sequence > attempt.sequence
+            and result.event.event_type in expected_types
+            and result.event.subject == subject
+            and result.event.sensitivity == sensitivity
+            and result.event.observed_at >= attempt.event.observed_at
+            and (observed_by is None or result.event.observed_at <= observed_by)
+            and payload.get("dispatch_id") == dispatch_id
+            and payload.get("attempt_id") == attempt_id
+            and payload.get("idempotency_key") == idempotency_key
+            and payload.get("capability") == capability
+            and payload.get("outcome")
+            == self.RESULT_OUTCOMES.get(result.event.event_type)
+        )
+
+    def reconcile(self, *, now: datetime | None = None, limit: int = 1000) -> int:
+        """Materialize missing jobs from recorded attempts without plaintext."""
+
+        if not 1 <= limit <= 10_000:
+            raise DispatchOutboxError("reconcile limit must be between 1 and 10000")
+        current = self._utc(now)
+        inserted = 0
+        observed_results: dict[str, tuple[JournalRecord, dict[str, object]]] = {}
+        for record in self.journal.iter_reverse(
+            event_types=(
+                "delivery.succeeded",
+                "delivery.failed",
+                "task.completed",
+                "task.failed",
+            ),
+            max_records=10_000,
+        ):
+            payload = self._authenticated_result_payload(record)
+            if payload is None:
+                continue
+            attempt_id = str(payload.get("attempt_id") or "")
+            if attempt_id and attempt_id not in observed_results:
+                observed_results[attempt_id] = (record, payload)
+        with closing(self._connect()) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                rows = connection.execute(
+                    """
+                    SELECT a.*, s.content_id AS selection_content_id,
+                           f.content_id AS frame_content_id
+                    FROM action_attempts_v1 a
+                    JOIN deliberation_selections_v1 s
+                      ON s.event_id=a.selection_event_id AND s.outcome='validated'
+                    JOIN deliberation_frames_v1 f ON f.frame_id=a.frame_id
+                    LEFT JOIN dispatch_outbox_v1 d ON d.attempt_id=a.attempt_id
+                    WHERE d.attempt_id IS NULL
+                      AND NOT EXISTS (
+                        SELECT 1 FROM action_outcomes_v1 o
+                        WHERE o.attempt_id=a.attempt_id
+                          AND o.kind IN (
+                            'delivery_succeeded', 'delivery_failed',
+                            'task_completed', 'task_failed'
+                          )
+                      )
+                    ORDER BY a.rowid LIMIT ?
+                    """,
+                    (limit,),
+                ).fetchall()
+                for row in rows:
+                    authorization = self.journal.get(row["authorization_event_id"])
+                    if authorization is None:
+                        continue
+                    valid_until = authorization.event.payload.get("valid_until")
+                    try:
+                        execute_by = datetime.fromisoformat(str(valid_until))
+                    except (TypeError, ValueError):
+                        continue
+                    if execute_by.tzinfo is None or execute_by.utcoffset() is None:
+                        continue
+                    execute_by = execute_by.astimezone(timezone.utc)
+                    frame_document = self.vault.resolve_json(
+                        row["frame_content_id"],
+                        expected_subject=row["subject"],
+                        expected_purpose="deliberation.frame",
+                        expected_sensitivity=Sensitivity(row["sensitivity"]),
+                    )
+                    frame, _context = deserialize_frame(frame_document)
+                    candidate = next(
+                        (
+                            item
+                            for item in frame.candidates
+                            if item.candidate_id == row["candidate_id"]
+                        ),
+                        None,
+                    )
+                    if candidate is None or candidate.content_id is None:
+                        continue
+                    dispatch_id = self._dispatch_id(str(row["attempt_id"]))
+                    observed = observed_results.get(str(row["attempt_id"]))
+                    attempt_event = self.journal.get(str(row["event_id"]))
+                    result_event_id = None
+                    if observed is not None and attempt_event is not None:
+                        result_record, result_payload = observed
+                        if self._valid_result_evidence(
+                            result_record,
+                            result_payload,
+                            attempt_event,
+                            dispatch_id=dispatch_id,
+                            attempt_id=str(row["attempt_id"]),
+                            idempotency_key=str(row["idempotency_key"]),
+                            capability=str(row["executor"]),
+                            subject=str(row["subject"]),
+                            sensitivity=Sensitivity(row["sensitivity"]),
+                        ):
+                            result_event_id = result_record.event.event_id
+                    if result_event_id is not None:
+                        state = "acknowledged"
+                    else:
+                        state = "pending" if execute_by > current else "expired"
+                    connection.execute(
+                        """
+                        INSERT OR IGNORE INTO dispatch_outbox_v1(
+                            dispatch_id, attempt_id, authorization_event_id,
+                            capability, idempotency_key, subject, content_id,
+                            sensitivity, state, execute_by, available_at,
+                            lease_owner, lease_token_digest, lease_until,
+                            lease_generation, result_event_id, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL,
+                                  NULL, 0, ?, ?, ?)
+                        """,
+                        (
+                            dispatch_id,
+                            row["attempt_id"],
+                            row["authorization_event_id"],
+                            row["executor"],
+                            row["idempotency_key"],
+                            row["subject"],
+                            candidate.content_id,
+                            row["sensitivity"],
+                            state,
+                            execute_by.isoformat(),
+                            current.isoformat(),
+                            result_event_id,
+                            current.isoformat(),
+                            current.isoformat(),
+                        ),
+                    )
+                    inserted += int(connection.execute("SELECT changes()").fetchone()[0])
+                connection.execute("COMMIT")
+            except Exception:
+                if connection.in_transaction:
+                    connection.execute("ROLLBACK")
+                raise
+        return inserted
+
+    def acquire(
+        self,
+        *,
+        worker_id: str,
+        now: datetime | None = None,
+        lease_ttl: timedelta = timedelta(seconds=10),
+    ) -> DispatchLease | None:
+        current = self._utc(now)
+        worker = self.protector.pseudonym("dispatch_worker", worker_id)
+        if worker is None:
+            raise DispatchOutboxError("worker identity is required")
+        if not timedelta(0) < lease_ttl <= self.MAX_LEASE_TTL:
+            raise DispatchOutboxError("lease TTL must be between zero and 30 seconds")
+        token = secrets.token_urlsafe(32)
+        token_digest = self.protector.pseudonym("dispatch_lease", token)
+        assert token_digest is not None
+        with closing(self._connect()) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                connection.execute(
+                    """
+                    UPDATE dispatch_outbox_v1
+                    SET state='expired', lease_owner=NULL,
+                        lease_token_digest=NULL, lease_until=NULL, updated_at=?
+                    WHERE state IN ('pending', 'leased') AND execute_by<=?
+                    """,
+                    (current.isoformat(), current.isoformat()),
+                )
+                row = connection.execute(
+                    """
+                    SELECT * FROM dispatch_outbox_v1
+                    WHERE execute_by>?
+                      AND ((state='pending' AND available_at<=?)
+                           OR (state='leased' AND lease_until<=?))
+                    ORDER BY available_at, created_at, dispatch_id
+                    LIMIT 1
+                    """,
+                    (current.isoformat(), current.isoformat(), current.isoformat()),
+                ).fetchone()
+                if row is None:
+                    connection.execute("COMMIT")
+                    return None
+                execute_by = datetime.fromisoformat(row["execute_by"])
+                lease_until = min(current + lease_ttl, execute_by)
+                connection.execute(
+                    """
+                    UPDATE dispatch_outbox_v1
+                    SET state='leased', lease_owner=?, lease_token_digest=?,
+                        lease_until=?, lease_generation=lease_generation+1,
+                        updated_at=?
+                    WHERE dispatch_id=?
+                    """,
+                    (
+                        worker,
+                        token_digest,
+                        lease_until.isoformat(),
+                        current.isoformat(),
+                        row["dispatch_id"],
+                    ),
+                )
+                generation = int(row["lease_generation"]) + 1
+                connection.execute("COMMIT")
+            except Exception:
+                if connection.in_transaction:
+                    connection.execute("ROLLBACK")
+                raise
+        return DispatchLease(
+            str(row["dispatch_id"]),
+            str(row["attempt_id"]),
+            str(row["capability"]),
+            str(row["idempotency_key"]),
+            str(row["subject"]),
+            Sensitivity(row["sensitivity"]),
+            execute_by,
+            lease_until,
+            generation,
+            token,
+        )
+
+    def load_content(
+        self,
+        lease: DispatchLease,
+        *,
+        clearance: Sensitivity,
+        now: datetime | None = None,
+    ) -> object:
+        current = self._utc(now)
+        allowed = list(Sensitivity)[: list(Sensitivity).index(Sensitivity(clearance)) + 1]
+        digest = self.protector.pseudonym("dispatch_lease", lease.token)
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                "SELECT * FROM dispatch_outbox_v1 WHERE dispatch_id=?",
+                (lease.dispatch_id,),
+            ).fetchone()
+        if (
+            row is None
+            or row["state"] != "leased"
+            or row["lease_token_digest"] != digest
+            or int(row["lease_generation"]) != lease.generation
+            or datetime.fromisoformat(row["lease_until"]) <= current
+            or datetime.fromisoformat(row["execute_by"]) <= current
+            or Sensitivity(row["sensitivity"]) not in allowed
+        ):
+            raise DispatchOutboxError("dispatch lease is invalid or expired")
+        return self.vault.resolve_json(
+            row["content_id"],
+            expected_subject=row["subject"],
+            expected_purpose="deliberation.candidate",
+            expected_sensitivity=Sensitivity(row["sensitivity"]),
+        )
+
+    def release(
+        self,
+        lease: DispatchLease,
+        *,
+        retry_after: timedelta = timedelta(0),
+        now: datetime | None = None,
+    ) -> str:
+        current = self._utc(now)
+        if not timedelta(0) <= retry_after <= timedelta(seconds=30):
+            raise DispatchOutboxError("retry delay must be between zero and 30 seconds")
+        digest = self.protector.pseudonym("dispatch_lease", lease.token)
+        with closing(self._connect()) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT * FROM dispatch_outbox_v1 WHERE dispatch_id=?",
+                (lease.dispatch_id,),
+            ).fetchone()
+            if (
+                row is None
+                or row["state"] != "leased"
+                or row["lease_token_digest"] != digest
+                or int(row["lease_generation"]) != lease.generation
+            ):
+                connection.execute("ROLLBACK")
+                raise DispatchOutboxError("dispatch lease is not owned by the caller")
+            available = current + retry_after
+            state = (
+                "expired"
+                if datetime.fromisoformat(row["execute_by"]) <= available
+                else "pending"
+            )
+            connection.execute(
+                """
+                UPDATE dispatch_outbox_v1
+                SET state=?, available_at=?, lease_owner=NULL,
+                    lease_token_digest=NULL, lease_until=NULL, updated_at=?
+                WHERE dispatch_id=?
+                """,
+                (state, available.isoformat(), current.isoformat(), lease.dispatch_id),
+            )
+            connection.execute("COMMIT")
+        return state
+
+    def acknowledge(
+        self,
+        lease: DispatchLease,
+        *,
+        result_event_id: str,
+        now: datetime | None = None,
+    ) -> None:
+        """Close a live lease only against an observed Hermes result event."""
+
+        current = self._utc(now)
+        result = self.journal.get(str(result_event_id).strip())
+        attempt = self.journal.get(f"action.attempt:{lease.attempt_id}")
+        digest = self.protector.pseudonym("dispatch_lease", lease.token)
+        result_payload = self._authenticated_result_payload(result)
+        if not self._valid_result_evidence(
+            result,
+            result_payload,
+            attempt,
+            dispatch_id=lease.dispatch_id,
+            attempt_id=lease.attempt_id,
+            idempotency_key=lease.idempotency_key,
+            capability=lease.capability,
+            subject=lease.subject,
+            sensitivity=lease.sensitivity,
+            observed_by=current,
+        ):
+            raise DispatchOutboxError("dispatch result evidence is invalid")
+        with closing(self._connect()) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT * FROM dispatch_outbox_v1 WHERE dispatch_id=?",
+                (lease.dispatch_id,),
+            ).fetchone()
+            if (
+                row is None
+                or row["state"] != "leased"
+                or row["lease_token_digest"] != digest
+                or int(row["lease_generation"]) != lease.generation
+                or datetime.fromisoformat(row["lease_until"]) <= current
+                or datetime.fromisoformat(row["execute_by"]) <= current
+            ):
+                connection.execute("ROLLBACK")
+                raise DispatchOutboxError("dispatch lease expired before acknowledgement")
+            connection.execute(
+                """
+                UPDATE dispatch_outbox_v1
+                SET state='acknowledged', result_event_id=?, lease_owner=NULL,
+                    lease_token_digest=NULL, lease_until=NULL, updated_at=?
+                WHERE dispatch_id=?
+                """,
+                (result.event.event_id, current.isoformat(), lease.dispatch_id),
+            )
+            connection.execute("COMMIT")
+
+    def counts(self) -> dict[str, int]:
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                "SELECT state, COUNT(*) AS count FROM dispatch_outbox_v1 GROUP BY state"
+            )
+            return {str(row["state"]): int(row["count"]) for row in rows}
+
+    def reconcile_outcomes(self, *, limit: int = 1000) -> int:
+        """Project acknowledged transport facts after an acknowledgement crash gap."""
+
+        if not 1 <= limit <= 10_000:
+            raise DispatchOutboxError("outcome reconcile limit is invalid")
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                """
+                SELECT d.* FROM dispatch_outbox_v1 d
+                LEFT JOIN action_outcomes_v1 o
+                  ON o.attempt_id=d.attempt_id
+                 AND o.source_event_id=d.result_event_id
+                WHERE d.state='acknowledged' AND d.result_event_id IS NOT NULL
+                  AND o.outcome_id IS NULL
+                ORDER BY d.updated_at, d.dispatch_id LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        projection = OutcomeProjection(self.journal, content_vault=self.vault)
+        recorded = 0
+        for row in rows:
+            result = self.journal.get(str(row["result_event_id"]))
+            payload = self._authenticated_result_payload(result)
+            attempt = self.journal.get(f"action.attempt:{row['attempt_id']}")
+            if not self._valid_result_evidence(
+                result,
+                payload,
+                attempt,
+                dispatch_id=str(row["dispatch_id"]),
+                attempt_id=str(row["attempt_id"]),
+                idempotency_key=str(row["idempotency_key"]),
+                capability=str(row["capability"]),
+                subject=str(row["subject"]),
+                sensitivity=Sensitivity(row["sensitivity"]),
+            ):
+                continue
+            outcome_id = "dispatch-result:" + hashlib.sha256(
+                result.event.event_id.encode("utf-8")
+            ).hexdigest()[:40]
+            event = projection.append_outcome(
+                attempt_id=str(row["attempt_id"]),
+                kind=self.RESULT_KINDS[result.event.event_type],
+                source_event_id=result.event.event_id,
+                details={
+                    "dispatch_id": str(row["dispatch_id"]),
+                    "capability": str(row["capability"]),
+                    "transport_payload_stored": False,
+                },
+                actor=result.event.actor,
+                subject=str(row["subject"]),
+                sensitivity=Sensitivity(row["sensitivity"]),
+                outcome_id=outcome_id,
+            )
+            if projection.apply(event).outcome == "recorded":
+                recorded += 1
+        return recorded

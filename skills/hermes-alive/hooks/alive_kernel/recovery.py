@@ -13,6 +13,7 @@ from .agenda import AgendaProjection
 from .consolidation import ConsolidationPolicyProjection
 from .content_vault import ContentVault
 from .deliberation_store import DeliberationProjection
+from .dispatch_outbox import DispatchOutbox
 from .event_store import ExperienceJournal
 from .exploration_store import ExplorationProjection
 from .memory import MemoryProjection
@@ -38,6 +39,8 @@ class KernelRecoveryReport:
     projections: tuple[ProjectionRecoveryReport, ...]
     erasures_resumed: int
     expired_content_erased: int
+    dispatches_reconciled: int
+    dispatch_outcomes_reconciled: int
     started_at: datetime
     completed_at: datetime
 
@@ -146,6 +149,9 @@ class KernelRecoverySupervisor:
                 )
                 for name, projection in ordered
             )
+            outbox = DispatchOutbox(journal, content_vault=vault)
+            dispatches = outbox.reconcile(now=started)
+            dispatch_outcomes = outbox.reconcile_outcomes()
             completed = datetime.now(timezone.utc)
             return KernelRecoveryReport(
                 target_sequence=target,
@@ -153,6 +159,8 @@ class KernelRecoverySupervisor:
                 projections=reports,
                 erasures_resumed=pending,
                 expired_content_erased=expired.newly_erased,
+                dispatches_reconciled=dispatches,
+                dispatch_outcomes_reconciled=dispatch_outcomes,
                 started_at=started,
                 completed_at=completed,
             )

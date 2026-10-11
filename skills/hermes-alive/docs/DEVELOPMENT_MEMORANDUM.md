@@ -75,6 +75,12 @@ Changing that order can silently turn valid online history into rejected replay.
 Do not accept an authorization receipt by field shape alone; verify its local
 HMAC and preserve `kernel/identity.key` during managed migration.
 
+Dispatch is an ADR-0024 outbox, not a direct function call. Preserve the
+authorization deadline, lease generation and transport idempotency key. Never
+persist raw lease tokens or worker IDs. During reconstruction, authenticated
+terminal evidence wins over a missing outbox row: restore acknowledged and
+reconcile the outcome; never resend.
+
 ## Plugin dependencies must respect the Hermes environment lock
 
 The supported Hermes runtime already provides `cryptography==50.0.0`. Alive's

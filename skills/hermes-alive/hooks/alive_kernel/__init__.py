@@ -129,6 +129,11 @@ from .deliberation_synthesis import (
     DeliberationSynthesizer,
     run_with_hermes as run_deliberation_with_hermes,
 )
+from .dispatch_outbox import (
+    DispatchLease,
+    DispatchOutbox,
+    DispatchOutboxError,
+)
 from .memory import (
     ContentStatus,
     MemoryAuthority,
@@ -255,6 +260,9 @@ __all__ = [
     "DeliberationSynthesizer",
     "DeliberationValidationError",
     "DimensionAssessment",
+    "DispatchLease",
+    "DispatchOutbox",
+    "DispatchOutboxError",
     "DiversityAnnotation",
     "DiversityTagger",
     "EventConflictError",

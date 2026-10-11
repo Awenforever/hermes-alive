@@ -66,6 +66,10 @@ explicitly supplied.
 - Authorization receipts are authenticated with the installation-local
   identity key. The key is never journaled and must travel inside the managed,
   access-controlled kernel backup boundary.
+- Dispatch rows contain content references, pseudonymous lease owners and
+  keyed token digests only. Raw worker identities, lease tokens and candidate
+  plaintext are never persisted. Terminal result events are locally
+  authenticated structural facts without transport payloads.
 
 ## Topic-delivery privacy
 

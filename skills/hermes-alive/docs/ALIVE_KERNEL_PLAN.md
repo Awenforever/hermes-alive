@@ -190,6 +190,9 @@ corrections are represented rather than overwritten.
 - [x] Require every durable action attempt to consume an unexpired matching
   authorization receipt, with latest-state rechecks and dependency-ordered
   crash recovery (ADR-0023). No executor is connected.
+- [x] Materialize authorized attempts into a deadline-bounded leased outbox;
+  prove concurrent claim exclusion, stale-token rejection, crash recovery,
+  authenticated result reconciliation and no-redelivery recovery (ADR-0024).
 - [ ] Run the new decision engine in shadow against production events.
 
 Exit: every proposed action has a stable reason and every rejection is
@@ -711,3 +714,14 @@ For each material change:
 - Split recovery into deliberation-frame, exploration, deliberation-selection
   and outcome phases so empty projections reconstruct causal state in the same
   order as online admission.
+
+### 2026-10-11 — Leased dispatch outbox
+
+- Added a persistent outbox derived from authorized attempts (ADR-0024).
+- Claims are transactional, generation-bound and short-lived; only the current
+  holder can decrypt candidate content, release or acknowledge the row.
+- Worker identity is pseudonymous and raw lease tokens never enter SQLite,
+  journal events or logs.
+- Authenticated terminal result events close the row and reconcile into normal
+  outcome evidence. Losing the outbox after a successful transport cannot
+  cause redelivery because reconstruction recognizes the signed result first.
