@@ -88,6 +88,14 @@ policy replacement revokes queued work, and resume must require fresh intent;
 do not resurrect an old row. Historical policy replay must not directly mutate
 the outbox because older events would revoke future work during reconstruction.
 
+Do not equate a lease with an external attempt. ADR-0026 makes
+`dispatch.started` the conservative point of no assumed return. Before start,
+a lease may expire or be released. After start, missing evidence is
+`uncertain` and must never be auto-requeued. Any terminal adapter event must
+bind the start-event ID and lease generation. When migrating v2 state, map old
+leases to uncertainty; preserving liveness is not worth risking duplicate
+external action.
+
 ## Plugin dependencies must respect the Hermes environment lock
 
 The supported Hermes runtime already provides `cryptography==50.0.0`. Alive's

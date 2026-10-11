@@ -35,12 +35,15 @@ as `acknowledged`, never `pending`; the missing outcome is then rebuilt. This
 closes the crash window between transport success, outbox acknowledgement and
 outcome projection.
 
+ADR-0026 refines this lifecycle by adding a durable `dispatch.started` boundary
+and an `uncertain` state. A lease is retryable only before that boundary.
+
 ## Consequences
 
 - Concurrent workers cannot claim the same dispatch generation.
 - Worker IDs and raw lease tokens are not persisted.
-- A crash before result evidence permits bounded retry with the same transport
-  idempotency key; a crash after evidence cannot redeliver.
+- A crash before external-start evidence permits bounded retry. A crash after
+  start but before a result becomes uncertain and cannot automatically redeliver.
 - Backpressure that exceeds the authorization deadline expires the dispatch
   instead of sending stale intent.
 - No Hermes channel/tool adapter is connected yet. This outbox proves lifecycle

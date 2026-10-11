@@ -70,6 +70,9 @@ explicitly supplied.
   keyed token digests only. Raw worker identities, lease tokens and candidate
   plaintext are never persisted. Terminal result events are locally
   authenticated structural facts without transport payloads.
+- Dispatch-start events contain structural IDs, policy identity, capability,
+  idempotency identity and lease generation only. The execution grant holds
+  plaintext in process memory; neither start nor uncertain state journals it.
 - Autonomy policy stores only structural risk/interruption bounds, its revision
   and user authority. Raw control commands are forbidden. Policy events carry
   an installation authenticator and contain no channel identifier or message

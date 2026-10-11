@@ -136,6 +136,7 @@ from .deliberation_synthesis import (
     run_with_hermes as run_deliberation_with_hermes,
 )
 from .dispatch_outbox import (
+    DispatchExecution,
     DispatchLease,
     DispatchOutbox,
     DispatchOutboxError,
@@ -271,6 +272,7 @@ __all__ = [
     "DeliberationValidationError",
     "DimensionAssessment",
     "DispatchLease",
+    "DispatchExecution",
     "DispatchOutbox",
     "DispatchOutboxError",
     "DiversityAnnotation",

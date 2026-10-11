@@ -152,7 +152,7 @@ class KernelRecoverySupervisor:
                 for name, projection in ordered
             )
             outbox = DispatchOutbox(journal, content_vault=vault)
-            dispatches = outbox.reconcile(now=started)
+            dispatches = outbox.reconcile(now=started, recovering=True)
             dispatch_outcomes = outbox.reconcile_outcomes()
             completed = datetime.now(timezone.utc)
             return KernelRecoveryReport(

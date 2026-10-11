@@ -96,6 +96,12 @@ resolved from the vault only under a live token. Authenticated Hermes terminal
 events close dispatch and are reconciled into outcome evidence; recovery checks
 those events before ever restoring a row as pending.
 
+Leasing and execution are separate (ADR-0026). `begin_execution` records an
+authenticated start fact before returning plaintext to an adapter. A lost
+worker after that point produces `uncertain`, never automatic retry. Terminal
+facts bind the exact start event and lease generation, so late evidence can
+resolve uncertainty without erasing the causal gap.
+
 External authority also depends on the latest user-owned autonomy policy
 (ADR-0025). The default is no policy and therefore no proactive execution.
 Authorization receipts and outbox rows bind an exact policy event/revision;

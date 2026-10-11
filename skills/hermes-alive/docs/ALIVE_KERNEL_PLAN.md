@@ -196,8 +196,10 @@ corrections are represented rather than overwritten.
 - [x] Replace caller-supplied execution policy with user-owned, revisioned,
   replayable autonomy state; bind authorization and dispatch to its exact
   version so pause and policy changes revoke queued work (ADR-0025).
-- [ ] Distinguish leased, externally started and uncertain dispatch so a crash
+- [x] Distinguish leased, externally started and uncertain dispatch so a crash
   at the adapter boundary can neither duplicate nor falsely claim an action.
+  Terminal results bind the exact start generation, and v2 leases migrate
+  conservatively to uncertainty (ADR-0026).
 - [ ] Run the new decision engine in shadow against production events.
 
 Exit: every proposed action has a stable reason and every rejection is
@@ -743,3 +745,16 @@ For each material change:
 - Review exposed the next required boundary: once a transport call begins, a
   pause cannot honestly recall it. Live adapters remain forbidden until a
   durable started/uncertain protocol closes that crash window.
+
+### 2026-10-11 — Durable external-start boundary
+
+- Added explicit `started` and `uncertain` dispatch states (ADR-0026).
+- Candidate plaintext now crosses toward an adapter only through a one-shot
+  execution grant after an authenticated structural start event is durable.
+- Recovery and table-loss reconstruction never turn started work back into
+  pending work. A valid late result bound to the start event and lease
+  generation resolves uncertainty and projects the factual outcome.
+- Added a conservative v2-to-v3 migration: an old leased row becomes uncertain
+  and loses its worker/token fields rather than risking duplicate execution.
+- The live Hermes capability bridge remains disconnected pending its own
+  contract and provider/channel substitution tests.

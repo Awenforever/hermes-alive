@@ -333,11 +333,6 @@ def main() -> int:
         claimed = [value for value in leases if value is not None]
         assert len(claimed) == 1
         first_lease = claimed[0]
-        assert outbox.load_content(
-            first_lease,
-            clearance=Sensitivity.RESTRICTED,
-            now=lease_now,
-        ) == {"message": "encrypted causal recovery candidate"}
         assert "worker-" not in journal.path.read_bytes().decode(
             "utf-8", errors="ignore"
         )
@@ -351,7 +346,7 @@ def main() -> int:
         assert second_lease is not None
         assert second_lease.generation == first_lease.generation + 1
         try:
-            outbox.load_content(
+            outbox.begin_execution(
                 first_lease,
                 clearance=Sensitivity.RESTRICTED,
                 now=first_lease.lease_until,
@@ -366,11 +361,21 @@ def main() -> int:
             now=first_lease.lease_until,
         )
         assert third_lease is not None
+        execution = outbox.begin_execution(
+            third_lease,
+            clearance=Sensitivity.RESTRICTED,
+            now=first_lease.lease_until,
+        )
+        assert execution.content == {
+            "message": "encrypted causal recovery candidate"
+        }
         result_payload = {
             "dispatch_id": third_lease.dispatch_id,
             "attempt_id": third_lease.attempt_id,
             "idempotency_key": third_lease.idempotency_key,
             "capability": third_lease.capability,
+            "start_event_id": execution.start_event_id,
+            "lease_generation": third_lease.generation,
             "outcome": "delivery_succeeded",
         }
         forged_result = EventEnvelope(
@@ -450,7 +455,7 @@ def main() -> int:
         # prevent a duplicate dispatch during reconstruction.
         lost_outbox = sqlite3.connect(journal.path)
         try:
-            lost_outbox.execute("DELETE FROM dispatch_outbox_v2")
+            lost_outbox.execute("DELETE FROM dispatch_outbox_v3")
             lost_outbox.commit()
         finally:
             lost_outbox.close()
@@ -541,7 +546,7 @@ def main() -> int:
         assert outbox.acquire(worker_id="paused-worker", now=pause_now) is None
         assert outbox.counts() == {"acknowledged": 1, "revoked": 1}
         try:
-            outbox.load_content(
+            outbox.begin_execution(
                 paused_lease,
                 clearance=Sensitivity.RESTRICTED,
                 now=pause_now,
@@ -592,13 +597,134 @@ def main() -> int:
         assert outbox.reconcile(now=resume_now) == 1
         resumed_lease = outbox.acquire(worker_id="resumed-worker", now=resume_now)
         assert resumed_lease is not None
-        assert outbox.release(
-            resumed_lease, retry_after=timedelta(seconds=30), now=resume_now
-        ) == "expired"
+        execution_now = datetime.now(timezone.utc)
+        resumed_execution = outbox.begin_execution(
+            resumed_lease,
+            clearance=Sensitivity.RESTRICTED,
+            now=execution_now,
+        )
+        assert resumed_execution.content == {
+            "message": "encrypted causal recovery candidate"
+        }
+        lost_started = sqlite3.connect(journal.path)
+        try:
+            lost_started.execute(
+                "DELETE FROM dispatch_outbox_v3 WHERE dispatch_id=?",
+                (resumed_lease.dispatch_id,),
+            )
+            lost_started.commit()
+        finally:
+            lost_started.close()
+        assert outbox.reconcile(now=execution_now) == 1
         assert outbox.counts() == {
             "acknowledged": 1,
-            "expired": 1,
             "revoked": 1,
+            "uncertain": 1,
+        }
+        assert outbox.acquire(
+            worker_id="must-not-repeat-uncertain",
+            now=resumed_lease.lease_until,
+        ) is None
+        late_result_payload = {
+            "dispatch_id": resumed_lease.dispatch_id,
+            "attempt_id": resumed_lease.attempt_id,
+            "idempotency_key": resumed_lease.idempotency_key,
+            "capability": resumed_lease.capability,
+            "start_event_id": resumed_execution.start_event_id,
+            "lease_generation": resumed_lease.generation,
+            "outcome": "delivery_succeeded",
+        }
+        late_result_payload["integrity_authenticator"] = (
+            outbox.protector.authenticate_json(
+                "dispatch.result.v1", late_result_payload
+            )
+        )
+        late_result = EventEnvelope(
+            event_id="delivery:causal-recovery-after-resume",
+            event_type="delivery.succeeded",
+            source="test.channel",
+            actor="system:test-channel",
+            subject=causal_subject,
+            occurred_at=resumed_lease.lease_until,
+            observed_at=resumed_lease.lease_until,
+            sensitivity=Sensitivity.RESTRICTED,
+            payload=late_result_payload,
+        )
+        journal.append(late_result)
+        assert outbox.reconcile(now=resumed_lease.lease_until) == 0
+        assert outbox.reconcile_outcomes() == 1
+        assert outbox.counts() == {
+            "acknowledged": 2,
+            "revoked": 1,
+        }
+
+        # Exact crash gap: the durable start event exists, but the process dies
+        # before changing the operational row from leased to started. A later
+        # claimant must absorb the event and preserve uncertainty, not retry.
+        gap_now = datetime.now(timezone.utc)
+        gap_authorization = SendTimeAuthorizer(
+            journal, content_vault=vault
+        ).evaluate(
+            selection_event_id=selection.event.event_id,
+            subject=causal_subject,
+            capability="hermes.channel.send",
+            operation_id="causal-recovery-start-gap",
+            now=gap_now,
+        )
+        assert gap_authorization.authorized
+        gap_attempt = outcomes.append_attempt(
+            authorization_event_id=gap_authorization.event_id,
+            selection_event_id=selection.event.event_id,
+            candidate_id=candidate.candidate_id,
+            executor="hermes.channel.send",
+            idempotency_key="causal-recovery-start-gap",
+            actor="system:test-executor",
+            subject=causal_subject,
+            sensitivity=Sensitivity.RESTRICTED,
+            attempt_id="attempt:causal-recovery-start-gap",
+        )
+        assert outcomes.apply(gap_attempt).outcome == "recorded"
+        gap_claim_time = datetime.now(timezone.utc)
+        assert outbox.reconcile(now=gap_claim_time) == 1
+        gap_lease = outbox.acquire(worker_id="gap-worker", now=gap_claim_time)
+        assert gap_lease is not None
+        gap_start_payload = {
+            "dispatch_id": gap_lease.dispatch_id,
+            "attempt_id": gap_lease.attempt_id,
+            "idempotency_key": gap_lease.idempotency_key,
+            "capability": gap_lease.capability,
+            "policy_event_id": resumed.event.event_id,
+            "lease_generation": gap_lease.generation,
+            "external_result_observed": False,
+        }
+        gap_start_payload["integrity_authenticator"] = (
+            outbox.protector.authenticate_json(
+                "dispatch.start.v1", gap_start_payload
+            )
+        )
+        gap_start = EventEnvelope(
+            event_id=outbox._start_event_id(
+                gap_lease.dispatch_id, gap_lease.generation
+            ),
+            event_type="dispatch.started",
+            source="alive.dispatch",
+            actor="system:alive-dispatch",
+            subject=causal_subject,
+            causation_id=f"action.attempt:{gap_lease.attempt_id}",
+            occurred_at=gap_claim_time,
+            observed_at=gap_claim_time,
+            sensitivity=Sensitivity.RESTRICTED,
+            payload=gap_start_payload,
+        )
+        journal.append(gap_start)
+        assert outbox.acquire(
+            worker_id="must-not-cross-start-gap",
+            now=gap_lease.lease_until,
+        ) is None
+        assert outbox.counts() == {
+            "acknowledged": 2,
+            "revoked": 1,
+            "uncertain": 1,
         }
 
         database = (kernel / "experience.sqlite3").read_bytes()
@@ -613,6 +739,7 @@ def main() -> int:
         assert third_lease.token.encode("utf-8") not in database
         assert paused_lease.token.encode("utf-8") not in database
         assert resumed_lease.token.encode("utf-8") not in database
+        assert gap_lease.token.encode("utf-8") not in database
         assert journal.get(retention_consent.event.event_id) is not None
         assert journal.get(learning_consent.event.event_id) is not None
 
