@@ -249,7 +249,12 @@ factual error or user-control violations.
   boundary with encrypted evidence, material-update supersession and a
   dual-opt-in no-send shadow bridge (ADR-0030). Local filesystem discovery
   remains deliberately outside this completed external-source slice.
-- [ ] Split user availability from optional character-like Circadian styling.
+- [ ] Split user availability from optional character-like Circadian styling:
+  - [x] add a replayable, fail-closed availability projection where direct
+    activity can block but absence cannot grant permission (ADR-0031);
+  - [x] add a dual-opt-in one-way shadow bridge from the legacy activity guard;
+  - [ ] remove Circadian phase as live interruption authority after shadow
+    comparison and retain it, if useful, only as presentation rhythm.
 - [ ] Port voice as presentation policy, not a truth source.
 - [ ] Replace heuristic mood with explainable dispositions.
 - [ ] Retire the monolithic watcher after parity and rollback drills.

@@ -10,6 +10,7 @@ from typing import Any, Callable
 from safe_io import file_lock
 
 from .agenda import AgendaProjection
+from .availability import AvailabilityProjection
 from .autonomy_policy import AutonomyPolicyProjection
 from .consolidation import ConsolidationPolicyProjection
 from .content_vault import ContentVault
@@ -125,6 +126,7 @@ class KernelRecoverySupervisor:
                 ("consolidation-consent", ConsolidationPolicyProjection(journal)),
                 ("memory", MemoryProjection(journal, content_vault=vault)),
                 ("agenda", AgendaProjection(journal, content_vault=vault)),
+                ("availability", AvailabilityProjection(journal)),
                 ("deliberation-frames", deliberation),
                 ("exploration", exploration),
                 ("deliberation", deliberation),

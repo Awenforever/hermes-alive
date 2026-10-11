@@ -138,6 +138,7 @@ class ProactivePlatformWatcher:
         self._proactive_quality_governor: Any | None = None
         self._last_activity_snapshot: dict[str, Any] = {}
         self._last_delivery_gate_reason = ""
+        self._active_delivery_subject: str | None = None
         self._last_log_rotation_check = 0.0
         self.watcher_id = f"{os.getpid()}-{uuid.uuid4().hex[:8]}"
         self.started_at = datetime.now().astimezone().isoformat()
@@ -194,6 +195,7 @@ class ProactivePlatformWatcher:
         if adapter is None or not chat_id:
             self._log("skip", tick_id=tick_id, reason="adapter_or_chat_id_unavailable")
             return False
+        self._active_delivery_subject = chat_id
 
         delivery_ready, delivery_reason, delivery_pending = self._delivery_preflight(
             adapter, chat_id
@@ -1480,6 +1482,47 @@ class ProactivePlatformWatcher:
             tick_id=tick_id,
             activity_guard=safe_fields,
         )
+        self._mirror_availability_kernel_shadow(
+            tick_id=tick_id,
+            stage=stage,
+            user_active=user_active,
+            snapshot=safe_fields,
+        )
+
+    def _mirror_availability_kernel_shadow(
+        self,
+        *,
+        tick_id: str,
+        stage: str,
+        user_active: bool,
+        snapshot: dict[str, Any],
+    ) -> None:
+        """Mirror timing evidence without granting send authority."""
+
+        try:
+            from alive_kernel.availability import (
+                availability_shadow_enabled,
+                mirror_legacy_activity_guard,
+            )
+
+            if not availability_shadow_enabled() or not self._active_delivery_subject:
+                return
+            decision = mirror_legacy_activity_guard(
+                _SHARED_DIR,
+                raw_subject=self._active_delivery_subject,
+                tick_id=tick_id,
+                stage=stage,
+                user_active=user_active,
+                snapshot=snapshot,
+            )
+            logger.debug(
+                "Alive availability shadow outcome=%s reason=%s stage=%s",
+                decision.outcome,
+                decision.reason,
+                stage,
+            )
+        except Exception:
+            logger.exception("Alive availability shadow ingestion failed")
 
     def _evaluate_interruption_policy(
         self,

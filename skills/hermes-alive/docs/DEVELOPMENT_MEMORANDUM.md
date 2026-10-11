@@ -151,6 +151,23 @@ external-source migration. Regression proof is
 `tests/run_alive_kernel_discovery_opportunities.py`; the architectural contract
 is ADR-0030.
 
+## User availability and character rhythm are different ontologies
+
+Session leases, queue integrity and recent interaction are user-context facts.
+Alive's sleep phase, sleep debt, “drowsiness” and “forced awake” state are an
+optional character/presentation model. Never place them in the same authority
+chain. An assistant being awake does not mean the user welcomes interruption;
+an assistant being asleep does not prove the user is unavailable.
+
+Direct activity may block, but lack of activity must remain unknown. Explicit
+availability is still not action authority, and a newer active-session fact
+must override it for timing. Missing, corrupt or unauthenticated availability
+state fails to unknown. Hard exemptions, user autonomy policy and send permits
+remain later independent boundaries. The legacy Circadian live gate is a
+migration debt, not the target design. Regression proof lives in
+`tests/run_alive_kernel_availability.py`; the architectural contract is
+ADR-0031.
+
 ## Plugin dependencies must respect the Hermes environment lock
 
 The supported Hermes runtime already provides `cryptography==50.0.0`. Alive's

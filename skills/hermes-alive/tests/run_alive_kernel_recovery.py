@@ -306,6 +306,7 @@ def main() -> int:
             "consolidation-consent",
             "memory",
             "agenda",
+            "availability",
             "deliberation-frames",
             "deliberation",
             "outcomes",

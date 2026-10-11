@@ -96,6 +96,10 @@ explicitly supplied.
   fingerprints and structural references. A raw chat ID used to scope shadow
   ingestion is pseudonymized before it enters the kernel. Source failures keep
   only keyed source/error-class fingerprints and cannot create opportunities.
+- Availability events contain pseudonymous subjects, bounded reason codes,
+  stance, evidence basis and expiry only. They contain no message text, raw chat
+  identifier, schedule body or Circadian phase. Projection corruption fails to
+  `unknown`; inactivity is never persisted as permission to contact the user.
 
 ## Topic-delivery privacy
 

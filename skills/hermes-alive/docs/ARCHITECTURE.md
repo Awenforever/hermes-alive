@@ -133,6 +133,16 @@ may mirror its external batch only when both the general kernel shadow flag and
 the Discovery-specific shadow flag are enabled. The mirrored result is not read
 back into legacy policy or delivery.
 
+User availability is now a separate shadow-kernel projection (ADR-0031). It
+accepts authenticated, expiring direct-activity, explicit-user or system-policy
+signals and evaluates them independently of Circadian state. Direct activity
+may block; inactivity remains unknown. Even explicit availability is context
+evidence and never grants an action permit. A separate dual opt-in bridge can
+mirror the legacy activity guard for comparison, but the current watcher does
+not consume the projection yet. Circadian remains a legacy live gate until
+shadow evaluation supports removing its authority and retaining, at most, its
+optional presentation rhythm.
+
 External authority also depends on the latest user-owned autonomy policy
 (ADR-0025). The default is no policy and therefore no proactive execution.
 Authorization receipts and outbox rows bind an exact policy event/revision;

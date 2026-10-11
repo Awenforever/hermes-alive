@@ -10,6 +10,18 @@ from .action_authorization import (
     SendTimeAuthorizer,
 )
 from .action_contract import ActionContract, ActionContractError, parse_action_contract
+from .availability import (
+    AvailabilityAssessment,
+    AvailabilityBasis,
+    AvailabilityDecision,
+    AvailabilityError,
+    AvailabilityProjection,
+    AvailabilitySignal,
+    AvailabilityStance,
+    AvailabilityState,
+    availability_shadow_enabled,
+    mirror_legacy_activity_guard,
+)
 from .autonomy_policy import (
     AutonomyPolicy,
     AutonomyPolicyDecision,
@@ -241,6 +253,14 @@ __all__ = [
     "AutonomyPolicyDecision",
     "AutonomyPolicyError",
     "AutonomyPolicyProjection",
+    "AvailabilityAssessment",
+    "AvailabilityBasis",
+    "AvailabilityDecision",
+    "AvailabilityError",
+    "AvailabilityProjection",
+    "AvailabilitySignal",
+    "AvailabilityStance",
+    "AvailabilityState",
     "ActionAuthority",
     "ActionCandidate",
     "ActionKind",
@@ -314,6 +334,8 @@ __all__ = [
     "canonicalize_discovery_url",
     "discovery_shadow_enabled",
     "mirror_legacy_discovery_batch",
+    "availability_shadow_enabled",
+    "mirror_legacy_activity_guard",
     "ErasureResult",
     "FactualLabels",
     "CapabilityClaim",
