@@ -2,6 +2,7 @@
 """Causality, evidence, ambiguity, privacy, and replay outcome contracts."""
 
 from __future__ import annotations
+from contextlib import closing
 
 from pathlib import Path
 import sqlite3
@@ -291,6 +292,21 @@ def main() -> int:
                 actor="user:test", subject="user:test", outcome_id=f"unrelated:{kind.value}",
             )
             assert outcomes.apply(wrongly_attributed).reason == "user_outcome_not_attributed"
+        # Emulate a row admitted by the pre-0041 implementation. Reading it
+        # must recheck the immutable evidence, not trust the old projection.
+        legacy_event = wrongly_attributed.event
+        with closing(outcomes._connect()) as connection:
+            connection.execute(
+                "INSERT INTO action_outcomes_v1 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (legacy_event.payload["outcome_id"], legacy_event.event_id,
+                 "attempt:outcome-test", legacy_event.payload["kind"], "user:test",
+                 unrelated.event_id, legacy_event.payload["content"]["content_id"],
+                 legacy_event.sensitivity.value, legacy_event.observed_at.isoformat()),
+            )
+        assert not outcomes.user_attribution_valid(wrongly_attributed)
+        assert journal.get(legacy_event.event_id) is not None
+        assert all(item.outcome_id != legacy_event.payload["outcome_id"] for item in
+                   outcomes.outcomes("attempt:outcome-test", clearance=Sensitivity.PRIVATE))
         unproven_feedback = outcomes.append_outcome(
             attempt_id="attempt:outcome-test", kind=OutcomeKind.EXPLICIT_FEEDBACK,
             source_event_id=reply.event_id, details={"signal": "model guessed this was helpful"},

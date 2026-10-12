@@ -814,6 +814,40 @@ class OutcomeProjection:
                 for row in rows
             ]
 
+    def user_attribution_valid(self, record: JournalRecord) -> bool:
+        """Recheck user attribution without trusting a materialized outcome row.
+
+        Non-user outcomes are outside this check, not certified transport facts.
+        This never deletes journal evidence or grants action authority.
+        """
+        event = record.event
+        if event.event_type != "outcome.recorded":
+            return False
+        try:
+            kind = OutcomeKind(event.payload["kind"])
+        except (KeyError, ValueError):
+            return False
+        if kind not in {
+            OutcomeKind.USER_REPLIED, OutcomeKind.USER_CORRECTED,
+            OutcomeKind.USER_DISMISSED, OutcomeKind.EXPLICIT_FEEDBACK,
+        }:
+            return True
+        attempt = self.journal.get(f"action.attempt:{event.payload.get('attempt_id', '')}")
+        source = self.journal.get(str(event.payload.get("source_event_id") or ""))
+        return bool(
+            attempt is not None and source is not None
+            and attempt.event.event_type == "action.attempted"
+            and source.event.event_type == "conversation.inbound"
+            and record.sequence > source.sequence > attempt.sequence
+            and event.subject == source.event.subject == attempt.event.subject
+            and event.actor == source.event.actor
+            and event.causation_id == source.event.event_id
+            and source.event.causation_id == attempt.event.event_id
+            and attempt.event.observed_at <= source.event.observed_at <= event.observed_at
+            and (kind is OutcomeKind.USER_REPLIED
+                 or source.event.payload.get("user_outcome_kind") == kind.value)
+        )
+
     def outcomes(
         self, attempt_id: str, *, clearance: Sensitivity
     ) -> list[OutcomeRecord]:
@@ -829,6 +863,25 @@ class OutcomeProjection:
             ).fetchall()
             records: list[OutcomeRecord] = []
             for row in rows:
+                original = self.journal.get(row["event_id"])
+                if original is None or not self.user_attribution_valid(original):
+                    continue
+                try:
+                    reference = ContentReference.from_event_payload(original.event.payload["content"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if (
+                    original.event.payload.get("outcome_id") != row["outcome_id"]
+                    or original.event.payload.get("attempt_id") != row["attempt_id"]
+                    or original.event.payload.get("source_event_id") != row["source_event_id"]
+                    or original.event.payload.get("kind") != row["kind"]
+                    or original.event.subject != row["subject"]
+                    or reference.content_id != row["content_id"]
+                    or original.event.sensitivity.value != row["sensitivity"]
+                    or reference.sensitivity is not original.event.sensitivity
+                    or original.event.observed_at.isoformat() != row["observed_at"]
+                ):
+                    continue
                 sensitivity = Sensitivity(row["sensitivity"])
                 try:
                     details = self.content_vault.resolve_json(

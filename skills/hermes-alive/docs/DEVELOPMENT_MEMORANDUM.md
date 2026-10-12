@@ -47,6 +47,13 @@ operation. Model-authored outcome details cannot manufacture user intent.
 Admission fixes do not retroactively sanitize cached outcomes or learned
 projections: audit and revalidate those before activating the new kernel.
 
+## A historical green projection is not current evidence
+
+New admission checks do not sanitize rows admitted by older code. Revalidate
+their journal bindings on read and preserve invalid history rather than
+deleting it. Cover direct SQL consumers as well as public projection readers;
+reflection/preference caches can otherwise bypass the improved outcome API.
+
 ## Model synthesis must never become Dream again
 
 The semantic need is real, but the old coupling is forbidden. Conversation

@@ -216,6 +216,11 @@ metadata for feedback/correction/dismissal (ADR-0041). Same-user traffic and
 model-authored details are insufficient. Previously materialized outcome and
 learned projections still require revalidation before live activation.
 
+The outcome API now revalidates legacy user attribution and cache-to-journal
+bindings on every read (ADR-0042), excluding invalid rows without erasing their
+history. Direct reflection/preference SQL consumers remain a separate open
+hardening item; this API change alone does not qualify the learning loop.
+
 External authority also depends on the latest user-owned autonomy policy
 (ADR-0025). The default is no policy and therefore no proactive execution.
 Authorization receipts and outbox rows bind an exact policy event/revision;

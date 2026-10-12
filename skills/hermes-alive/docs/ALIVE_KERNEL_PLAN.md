@@ -1026,3 +1026,13 @@ For each material change:
 - ADR-0041 records the defect and regression proof without overclaiming:
   cached legacy outcomes, dependent learned state and transport/task attribution
   still need revalidation before live use. Production remains unchanged.
+
+### 2026-10-12 — Cached outcome reads revalidated
+
+- Outcome reads now bind materialized row identifiers to the original journal
+  event and recheck current user-attribution rules. Invalid legacy rows are
+  excluded without deleting historical evidence (ADR-0042).
+- A regression injects an old-style misattributed cache row and proves it is
+  absent from current reads while its journal event remains intact.
+- Direct reflection/preference SQL reads remain a confirmed bypass requiring
+  the next hardening step; this is not full learning-loop qualification.
