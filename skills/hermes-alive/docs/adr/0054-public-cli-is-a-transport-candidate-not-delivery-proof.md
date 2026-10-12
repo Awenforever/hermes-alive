@@ -56,3 +56,42 @@ executed. These are separate evidence scopes, not a latest-runtime claim.
 Production remains on the legacy implementation. No live bridge is activated
 by these source tests. Do not weaken the authorization or receipt gates merely
 to make an interface test pass.
+
+## Actual SDK probe, 2026-10-12
+
+`run_host_transport_registry_probe.py` now invokes the real public
+`PluginContext.dispatch_tool` against the real registry in the preserved
+`f925b01` snapshot. Before and after importing the official send helper,
+`send_message` is absent and dispatch returns `Unknown tool: send_message`.
+No tool handler is registered or patched by the probe.
+
+The same child exercises the public `register_send_subparser` and `cmd_send`
+path with `send --list --json`; the credential-free profile reports no
+platforms and exits successfully. This establishes command-parser/handler
+availability, not delivery capability or full CLI-bootstrap readiness.
+The CLI bootstrap is deliberately not invoked: it includes interrupted-pull
+recovery that can mutate the source checkout.
+
+The child receives an environment allowlist rather than inherited provider,
+proxy or production profile settings. It uses a disposable home, disables user
+site packages and disallows socket construction and process launch using audit
+hooks. Negative checks prove both barriers refuse before OS effects. Source
+digests identify the actual SDK, registry, helper and CLI files exercised.
+The only extra local dependency was `ruamel.yaml` in the test-only venv;
+no production dependency or configuration was changed.
+
+Scope is a fresh manager and actual helper import, not a fully discovered
+gateway/plugin deployment. A third-party profile could register a same-named
+tool; that would be a different capability requiring explicit qualification.
+Both this SDK probe and the seven CLI-emitter cases were subsequently repeated
+against a separately materialized `3f2abce` worktree and passed. The four
+exercised source digests are identical across these two revisions. The first
+new-worktree attempt lacked `hermes_cli`/`tools` because it inherited a sparse
+gateway-only checkout; expanding only the new worktree fixed the test input,
+not the Hermes API. The old snapshot remained at `f925b01` with its original
+sparse configuration. No upstream source files were edited.
+
+This qualifies the bounded current-upstream source/SDK path on native Windows,
+not a complete PM-installed Hermes, full bootstrap or gateway/plugin discovery.
+Controlled platform transport, profile credentials and live receipt semantics
+remain unqualified.

@@ -1263,3 +1263,29 @@ For each material change:
 - Next: loaded-registry probe and controlled CLI transport qualification, then
   genuine context/shadow replay and human usefulness calibration. Phase 0,
   Phase 5 and full Phase 6 remain incomplete; source tests do not replace them.
+
+### 2026-10-12 — Actual public SDK and command-handler probe
+
+- Added an opt-in fresh-process probe with a disposable home and environment
+  allowlist. It calls the actual upstream PluginContext and registry rather
+  than reconstructing their methods or registering a test send tool.
+- Actual `f925b01` SDK dispatch reports unknown `send_message` both before
+  and after importing the official send helper. The public send parser and
+  list handler run successfully with an empty platform directory. This is
+  fresh-manager/helper-import evidence, not full gateway discovery or delivery.
+- Negative checks confirm socket creation and child process launch are
+  refused before OS effects. All four exercised source digests are reported;
+  no credentials, real sends, gateway startup or production mutation occurred.
+- Initial local failure was missing `ruamel.yaml`, not an API failure. Added
+  that dependency only to the test venv and reran successfully. Do not convert
+  missing dependency diagnostics into false interface availability claims.
+- Existing public CLI transport remains the next integration candidate.
+  Full bootstrap, current upstream runtime, authorized-route dispatch,
+  delivery acknowledgement and genuine useful behavior still need evidence.
+- Repeated the actual SDK/list-handler probe and seven emitter cases against
+  a separate current `3f2abce` worktree: all passed, with the same four source
+  digests as `f925b01`. An initial incomplete sparse worktree caused missing
+  imports; materialized the new checkout without editing upstream code or
+  changing the old snapshot. This closes a bounded current-source/native
+  Windows SDK check, not a complete current Hermes installation or gateway
+  execution gate. No production changes or external sends occurred.
