@@ -225,8 +225,11 @@ inspectable; replay is deterministic outside explicitly recorded model calls.
   reads, including source expiry (ADR-0042/0043).
 - [x] Bind generic delivery/task admission and cached/dependent evidence reads
   to canonical signed dispatch chains (ADR-0044/0045).
+- [x] Revalidate factual evaluation labels, sequence/clock snapshots, user
+  benefit versus operational completion and prediction evidence scope/lifetime
+  (ADR-0046..0049; synthetic shadow proof, not human qualification).
 - [ ] Audit remaining projection integrity, duplicate result observations and
-  host-clock/evaluation cutoff behavior before activation.
+  operational host-clock reconciliation behavior before activation.
 
 - [x] Link action attempts and evidence-backed delivery, reply, correction,
   feedback and downstream task outcomes to validated selections (ADR-0008).
@@ -301,6 +304,10 @@ and a one-command rollback.
 ### Phase 6 — Production qualification
 
 - [ ] Fresh install, upgrade, uninstall/reinstall and data migration matrices.
+  - [ ] Confirm runtime interpreter dependency preparation, including the
+    `tzdata>=2025.2` warning observed in the isolated production image on
+    2026-10-12. Declared dependencies and a successful hook load are not proof
+    of a correct from-zero installation.
 - [ ] Linux, Windows, WSL and Docker/NAS lifecycle verification.
 - [ ] Provider and channel substitution tests owned by Hermes capabilities.
 - [ ] Crash, duplicate event, partial send and corrupt-state fault injection.
@@ -1106,3 +1113,18 @@ For each material change:
 - Reports bind comparison to identical label/evidence snapshots, not just
   equal attempt IDs and label counts. Broader cache integrity, duplicates,
   human/live calibration and production activation remain incomplete.
+
+### 2026-10-12 — Prediction evidence privacy and plan review
+
+- Evaluator now enforces owner scope, clearance and expiry at generation;
+  only genuinely unscoped PUBLIC context can cross user scope (ADR-0049).
+- Re-read the North Star and phase gates: contract tests are not product
+  qualification. Phase 0 sanitized historical corpus/longitudinal metrics,
+  Phase 5 human-calibrated faculty replay and Phase 6 lifecycle/live gates
+  remain explicitly incomplete.
+- Run the entire local kernel regression set before collecting additional
+  replay evidence; distinguish missing-runtime skips from passed checks.
+- Windows full kernel set: 35 passed, one missing-runtime skip, zero failed.
+  The skipped official HookRegistry/PluginManager test passed separately in
+  isolated NAS/Linux Docker, as did current evaluation/outcome regressions.
+  The dependency warning is retained as an unclosed Phase 6 installation item.

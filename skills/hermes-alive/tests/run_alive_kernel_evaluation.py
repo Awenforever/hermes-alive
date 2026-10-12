@@ -149,6 +149,20 @@ def main() -> int:
             payload={"fixture": True},
         )
         journal.append(boundary)
+        for event_id, subject, sensitivity, expiry in (
+            ("evidence:foreign", "user:other", Sensitivity.PRIVATE, None),
+            ("evidence:foreign-public", "user:other", Sensitivity.PUBLIC, None),
+            ("evidence:restricted", "user:test", Sensitivity.RESTRICTED, None),
+            ("evidence:global", None, Sensitivity.PUBLIC, None),
+            ("evidence:unscoped-private", None, Sensitivity.PRIVATE, None),
+            ("evidence:expired", "user:test", Sensitivity.PRIVATE,
+             datetime(2026, 10, 10, 8, 0, tzinfo=timezone.utc)),
+        ):
+            journal.append(EventEnvelope(
+                event_id=event_id, event_type="context.observed", source="test.fixture",
+                actor="system:test", subject=subject, sensitivity=sensitivity,
+                observed_at=prior.observed_at, expires_at=expiry, payload={"fixture": True},
+            ))
         projection = OutcomeProjection(journal)
         attempts = [admitted_attempt(journal, projection, suffix) for suffix in ("a", "b")]
         attempted_at = attempts[0].event.observed_at
@@ -216,6 +230,27 @@ def main() -> int:
         assert new.task_completed == 0 and new.task_failed == 0
         assert new.task_unknown == 2
         assert new.user_control_violation.labelled == 1
+        for evidence_id, reason in (
+            ("evidence:foreign", "privacy scope"),
+            ("evidence:foreign-public", "privacy scope"),
+            ("evidence:restricted", "privacy clearance"),
+            ("evidence:unscoped-private", "privacy scope"),
+            ("evidence:expired", "expired"),
+        ):
+            submission = StrategySubmission("private-evidence", 2, (
+                ReplayPrediction("attempt-a", attempted_at, (evidence_id,), .9),
+            ))
+            try:
+                evaluate(journal, episodes, submission, holdout_after_sequence=2)
+            except ReplayEvaluationError as error:
+                assert reason in str(error)
+            else:
+                raise AssertionError(f"inadmissible evidence accepted: {evidence_id}")
+        public_submission = StrategySubmission("public-evidence", 2, (
+            ReplayPrediction("attempt-a", attempted_at, ("evidence:global",), .9),
+        ))
+        public_report = evaluate(journal, episodes, public_submission, holdout_after_sequence=2)
+        assert public_report.useful.labelled == 1
         for altered in (
             replace(episodes[0], labels=replace(episodes[0].labels, useful=False)),
             replace(episodes[0], frame_id="frame-forged"),

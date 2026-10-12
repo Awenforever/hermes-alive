@@ -350,10 +350,20 @@ def evaluate_submission(
             evidence = journal.get(event_id)
             if evidence is None:
                 raise ReplayEvaluationError("prediction cites missing evidence")
+            if list(Sensitivity).index(evidence.event.sensitivity) > list(Sensitivity).index(
+                Sensitivity(clearance)
+            ):
+                raise ReplayEvaluationError("prediction evidence exceeds privacy clearance")
+            if evidence.event.subject != attempt_event.event.subject and not (
+                evidence.event.subject is None and evidence.event.sensitivity is Sensitivity.PUBLIC
+            ):
+                raise ReplayEvaluationError("prediction evidence belongs to another privacy scope")
             if evidence.sequence >= episode.attempt_sequence:
                 raise ReplayEvaluationError("prediction cites future or same-attempt evidence")
             if evidence.event.observed_at > prediction.generated_at:
                 raise ReplayEvaluationError("prediction cites evidence observed after generation")
+            if evidence.event.expires_at is not None and evidence.event.expires_at <= prediction.generated_at:
+                raise ReplayEvaluationError("prediction cites evidence expired at generation")
         predictions.append((episode, prediction))
 
     delivery = [episode.labels.delivery_succeeded for episode, _ in predictions]
