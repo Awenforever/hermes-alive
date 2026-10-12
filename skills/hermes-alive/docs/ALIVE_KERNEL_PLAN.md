@@ -1404,3 +1404,25 @@ For each material change:
   checks. Retain semantic shadow, human calibration and longitudinal usefulness
   gates: successful transport alone cannot make an attentive continuous assistant.
 - Production unchanged; no external delivery or transport activation.
+
+### 2026-10-12 — Current-source real installed-runtime job started
+
+- Rechecked available environments: no ready managed test generation could be
+  safely reused. Started one disposable NAS/Linux Docker admission/lifecycle job
+  from exact Git archives (`fb11b19` Alive and audited `3f2abce` Hermes), with
+  matching local/remote hashes. No production mount, credentials or gateway run.
+- Confirmed the named container actually running; base dependency preparation is
+  still in progress. No installation/lifecycle pass is claimed. Retained a live
+  log follower so a lost foreground handle does not discard job evidence.
+- `INSTALL_ADMISSION_CURRENT_3F2ABCE_20261012.md` records container, owned scratch, handles,
+  evidence rules and incomplete gates. Resume the same job after revalidation;
+  do not duplicate installation on an observation timeout or missing SSH handle.
+- Production running with unchanged start time. Broader console-entry, semantic
+  behavior, human usefulness and migration/rollout acceptance remain incomplete.
+
+- Subsequent terminal evidence: base tooling completed, but runner argument
+  parsing failed before admission due to a trailing CR from the native SSH
+  script boundary. Foreground exit 1 and completed log follower were collected;
+  original container is absent. Corrected line-ending transfer passed a small
+  network-disabled probe. No plugin failure/pass is inferred. Preserve original
+  log; next corrected attempt should use a reusable test-only tooling image.
