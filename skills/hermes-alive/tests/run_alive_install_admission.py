@@ -19,6 +19,8 @@ import tempfile
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--hermes-root", type=Path)
+    parser.add_argument("--baseline-package", type=Path,
+                        help="Optional complete published baseline checkout for a real revision upgrade")
     parser.add_argument("--allow-dependency-install", action="store_true")
     args = parser.parse_args()
     if args.hermes_root is None or not args.allow_dependency_install:
@@ -33,6 +35,14 @@ def main() -> int:
         profile = root / "profile"
         package = root / "package"
         shutil.copytree(source, package, ignore=shutil.ignore_patterns(".git", "__pycache__"))
+        baseline_package = None
+        if args.baseline_package is not None:
+            baseline_source = args.baseline_package.resolve(strict=True)
+            if not (baseline_source / "plugin.yaml").is_file():
+                raise ValueError("complete baseline package is required")
+            baseline_package = root / "baseline-package"
+            shutil.copytree(baseline_source, baseline_package,
+                            ignore=shutil.ignore_patterns(".git", "__pycache__"))
         env = dict(os.environ, HERMES_HOME=str(profile), PYTHONPATH=str(core),
                    PYTHONDONTWRITEBYTECODE="1", HERMES_PROACTIVE_PLATFORM_ENABLED="false")
         # Fail rather than accidentally using a caller's old image checkout.
@@ -59,15 +69,17 @@ def main() -> int:
         location = run([sys.executable, "-B", "-c",
                         "import hermes_cli; print(hermes_cli.__file__)"])
         assert str(core / "hermes_cli") in location
-        for command in (
-            ["git", "init", "--quiet"], ["git", "add", "."],
-            ["git", "-c", "user.name=Alive admission fixture", "-c",
-             "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "fixture"],
-        ):
-            run(command, cwd=package)
+        for checkout in (package,) if baseline_package is None else (baseline_package, package):
+            for command in (
+                ["git", "init", "--quiet"], ["git", "add", "."],
+                ["git", "-c", "user.name=Alive admission fixture", "-c",
+                 "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "fixture"],
+            ):
+                run(command, cwd=checkout)
         cli = [sys.executable, "-B", "-m", "hermes_cli.main"]
+        initial_package = baseline_package or package
         try:
-            run(cli + ["plugins", "install", package.as_uri(), "--force", "--yes-deps", "--enable"])
+            run(cli + ["plugins", "install", initial_package.as_uri(), "--force", "--yes-deps", "--enable"])
         except RuntimeError:
             assert not (profile / "hooks" / "hermes-alive").exists()
             print("HERMES_ALIVE_INSTALL_ADMISSION_FAILED_CLOSED_OK", flush=True)
@@ -85,6 +97,43 @@ def main() -> int:
             assert not (profile / "hooks" / "hermes-alive").exists()
             print("HERMES_ALIVE_INSTALL_ADMISSION_NOT_READY_NO_RUNTIME_WRITE", flush=True)
             raise
+        preserved = {}
+        if baseline_package is not None:
+            run(cli + ["alive", "install-runtime"])
+            shared = profile / "plugin-data" / "hermes-alive" / "runtime"
+            # These are synthetic existing-user values, not distribution defaults.
+            seeds = {
+                "config/hermes-alive.json": json.dumps({"schema_version": 1, "values": {
+                    "enabled": False, "timezone": "Europe/Paris", "quiet_start": "22:17",
+                    "quiet_end": "07:43", "emoji_policy": "contextual"}}),
+                "state/alive_state.json": json.dumps({"schema_version": 2,
+                    "ignored_proactive_count": 3, "recent_openers": ["synthetic retained opener"]}),
+                "voice_state.json": json.dumps({"synthetic_retained_voice": True}),
+                "context_queue.json": json.dumps([]),
+                "sources.yaml": "synthetic_user_source_preference: retained\n",
+            }
+            for relative, text in seeds.items():
+                path = shared / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(text, encoding="utf-8")
+                preserved[path] = path.read_bytes()
+            profile_env = profile / ".env"
+            profile_env.write_text("ADMISSION_SYNTHETIC_AUTH_MARKER=not-a-real-credential\n",
+                                   encoding="utf-8")
+            preserved[profile_env] = profile_env.read_bytes()
+            run(cli + ["plugins", "install", package.as_uri(), "--force", "--yes-deps", "--enable"])
+            run(cli + ["alive", "install-runtime"])
+            assert all(path.read_bytes() == value for path, value in preserved.items())
+            upgraded = json.loads(run(cli + ["alive", "status"]))
+            assert upgraded["ok"] is True and upgraded["hermes_home"] == str(profile)
+            assert upgraded["hook_installed"] is True and upgraded["enabled"] is False
+            # Old package contents must really have been replaced, not just retained
+            # while the runner imported its own new source.
+            new_kernel = profile / "skills" / "hermes-alive" / "hooks" / "alive_kernel"
+            assert (new_kernel / "event_store.py").read_bytes() == (
+                package / "skills" / "hermes-alive" / "hooks" / "alive_kernel" / "event_store.py"
+            ).read_bytes()
+            print("HERMES_ALIVE_BASELINE_REVISION_UPGRADE_OK", flush=True)
         sentinel = profile / "plugin-data" / "hermes-alive" / "runtime" / "admission-fixture.json"
         sentinel.parent.mkdir(parents=True, exist_ok=True)
         sentinel.write_text('{"synthetic_user_state":true}\n', encoding="utf-8")
@@ -108,11 +157,29 @@ def main() -> int:
             assert sentinel.read_bytes() == expected
             assert (profile / "hooks" / "hermes-alive" / "handler.py").is_file()
             durable("create" if index == 0 else "check")
+        if baseline_package is not None:
+            # A dormant-data rollback drill: baseline code cannot interpret the
+            # new kernel, but must retain it for a subsequent admitted upgrade.
+            run(cli + ["plugins", "install", baseline_package.as_uri(), "--force", "--yes-deps", "--enable"])
+            run(cli + ["alive", "install-runtime"])
+            old_hooks = profile / "skills" / "hermes-alive" / "hooks"
+            assert (old_hooks / "alive_state.py").read_bytes() == (
+                baseline_package / "skills" / "hermes-alive" / "hooks" / "alive_state.py"
+            ).read_bytes()
+            assert not (old_hooks / "alive_kernel").exists()
+            assert all(path.read_bytes() == value for path, value in preserved.items())
+            rolled_back = json.loads(run(cli + ["alive", "status"]))
+            assert rolled_back["ok"] is True and rolled_back["enabled"] is False
+            run(cli + ["plugins", "install", package.as_uri(), "--force", "--yes-deps", "--enable"])
+            run(cli + ["alive", "install-runtime"])
+            durable("check")
+            print("HERMES_ALIVE_DORMANT_ROLLBACK_REUPGRADE_OK", flush=True)
         # Same-revision package refresh is deliberately not called an upgrade
         # from an earlier release. It still must not discard installed state.
         run(cli + ["plugins", "install", package.as_uri(), "--force", "--yes-deps", "--enable"])
         run(cli + ["alive", "install-runtime"])
         durable("check")
+        assert all(path.read_bytes() == value for path, value in preserved.items())
         state = json.loads(run(cli + ["alive", "status"]))
         assert state["hook_installed"] is True
         assert state["enabled"] is False
@@ -127,6 +194,7 @@ def main() -> int:
         assert sentinel.read_bytes() == expected
         assert (profile / "hooks" / "hermes-alive" / "handler.py").is_file()
         durable("check")
+        assert all(path.read_bytes() == value for path, value in preserved.items())
     print("HERMES_ALIVE_INSTALL_ADMISSION_OK")
     return 0
 

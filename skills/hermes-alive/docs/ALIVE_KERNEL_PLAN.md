@@ -318,6 +318,10 @@ and a one-command rollback.
       journal, checkpoints, keys and encrypted content. This is a bounded pass,
       not today's latest commit, published GitHub transport, earlier-release
       upgrade or full platform qualification. See `INSTALL_ADMISSION_20261012.md`.
+  - [x] Bounded public-baseline revision upgrade and dormant rollback/re-upgrade
+    on the inspected official source snapshot, preserving synthetic legacy
+    configuration and encrypted kernel state (`UPGRADE_ROLLBACK_20261012.md`).
+    This does not close the full matrix or prove live authorization continuity.
 - [ ] Linux, Windows, WSL and Docker/NAS lifecycle verification.
 - [ ] Provider and channel substitution tests owned by Hermes capabilities.
 - [ ] Crash, duplicate event, partial send and corrupt-state fault injection.
@@ -1196,3 +1200,20 @@ For each material change:
   distribution, earlier-release upgrade, native Windows/WSL, authorization
   migrations and rollback still require direct evidence. Phase 0/5 corpus,
   human calibration and live usefulness remain incomplete. Production unchanged.
+
+### 2026-10-12 — Public baseline revision upgrade and dormant rollback
+
+- Verified GitHub main equals the exact pre-kernel `aaf6126` baseline. Extended
+  the opt-in real installer runner to install that complete tree before target
+  replacement; rejected incomplete baselines before invoking installation.
+- Real NAS/Linux run passed baseline-to-target replacement, legacy fixture
+  preservation, dormant target-to-baseline-to-target rollback, cryptographic
+  state recovery and final package/runtime removal-reinstall. No gateway ran.
+- Recorded the distinction between source revision and semantic-version
+  upgrades, synthetic file retention and usable credentials, and dormant
+  rollback and live/crash recovery. The broader qualification gates stay open.
+- Production metadata inspection found historical legacy logs but no new-kernel
+  event database. It remains the legacy implementation; no claim of production
+  new-kernel learning or shadow decision parity is justified. Next behavior
+  work must obtain privacy-bounded history and actual shadow evidence, not
+  extrapolate product usefulness from install/fault tests.

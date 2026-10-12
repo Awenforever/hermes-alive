@@ -88,6 +88,21 @@ def main() -> int:
         assert "fixture transport interrupted" in output.getvalue()
         assert "fixture install in progress" in output.getvalue()
         assert not any(command[-1] == "install-runtime" for command in calls)
+
+        invalid_baseline = Path(directory) / "incomplete-baseline"
+        invalid_baseline.mkdir()
+        with patch.object(sys, "argv", [str(path), "--hermes-root", str(core),
+                                       "--baseline-package", str(invalid_baseline),
+                                       "--allow-dependency-install"]), \
+             patch.object(runner.shutil, "copytree"), \
+             patch.object(runner.subprocess, "run") as commands:
+            try:
+                runner.main()
+            except ValueError as error:
+                assert "complete baseline package" in str(error)
+            else:
+                raise AssertionError("incomplete upgrade baseline was accepted")
+            commands.assert_not_called()
     print("HERMES_ALIVE_INSTALL_ADMISSION_CONTRACT_OK")
     return 0
 

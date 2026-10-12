@@ -65,6 +65,11 @@ misreported as preserved state. Runner timeout diagnostics retain captured
 evidence and stop before runtime installation. See
 `../INSTALL_ADMISSION_20261012.md` for the exact scope and remaining gates.
 
+The subsequent optional-baseline run also passed public-main revision upgrade
+and dormant rollback/re-upgrade, preserving legacy fixture files and encrypted
+kernel state. See `../UPGRADE_ROLLBACK_20261012.md`. This does not qualify a live
+rollback or every historical/authorization migration.
+
 The source snapshot is not a claim about today's newest upstream commit.
 The initial tzdata warning came from bare PluginManager loading, which does
 not exercise dependency preparation; it was not proof of a missing declaration
