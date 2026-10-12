@@ -12,6 +12,7 @@ import tempfile
 
 HOOKS = Path(__file__).resolve().parents[1] / "hooks"
 sys.path.insert(0, str(HOOKS))
+from alive_kernel.dispatch_verifier import DispatchEvidenceVerifier
 
 from alive_kernel import (  # noqa: E402
     ActionAuthority,
@@ -468,6 +469,9 @@ def main() -> int:
             third_lease,
             result_event_id=result_event.event_id,
             now=first_lease.lease_until,
+        )
+        assert DispatchEvidenceVerifier(journal, outbox.protector).verify(
+            journal.get(result_event.event_id), journal.get(f"action.attempt:{third_lease.attempt_id}")
         )
         assert outbox.counts() == {"acknowledged": 1}
         # Lose the operational outbox after transport success but before the

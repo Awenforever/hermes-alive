@@ -224,6 +224,12 @@ and preference estimates (ADR-0043). Estimates also bind cached signal weights
 and identities to journal events and exclude expired source reflections.
 Generic transport evidence and longitudinal learning quality remain unqualified.
 
+A read-only dispatch evidence facade reuses the canonical start/result
+predicates without constructing an executor or its operational schema
+(ADR-0044). It binds policy to authorization and verifies exact signed receipt
+chains, including observation cutoffs and strict lease generations. Integrating
+it into generic outcome/dependent reads remains required before activation.
+
 External authority also depends on the latest user-owned autonomy policy
 (ADR-0025). The default is no policy and therefore no proactive execution.
 Authorization receipts and outbox rows bind an exact policy event/revision;

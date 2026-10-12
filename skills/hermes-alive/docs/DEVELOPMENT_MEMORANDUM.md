@@ -60,6 +60,14 @@ connection. Revalidate accepted/active caches as well as new admissions.
 Signal weights must match the journal, and reflected influence ends when the
 source reflection expires, even if the signal itself remains unexpired.
 
+## Receipt checks must not construct an executor
+
+Reusing canonical dispatch predicates is preferable to another receipt schema.
+Expose only read-only verification for learning consumers, with no queue setup
+or action methods. Bind policy to original authorization and reject booleans
+as lease generations. A verifier existing is not proof that outcome admission
+or cached/dependent reads actually call it; test those integrations separately.
+
 ## Model synthesis must never become Dream again
 
 The semantic need is real, but the old coupling is forbidden. Conversation

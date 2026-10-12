@@ -1050,3 +1050,14 @@ For each material change:
   or history deletion. Altered cached weight is separately excluded.
 - ADR-0043 retains open transport/task evidence and long-term usefulness
   qualification; production remains unchanged.
+
+### 2026-10-12 — Read-only canonical dispatch verifier
+
+- Audit confirmed generic non-user outcome projection lacks complete receipt
+  verification. Transport/task attribution remains an activation blocker.
+- Added a read-only facade over the canonical outbox evidence predicates;
+  no queue/schema initialization or action API is exposed (ADR-0044).
+- Verified exact signed bindings, observation cutoff, strict generation typing
+  and compatibility with the existing authenticated crash-recovery fixture.
+- Outcome admission/read and dependent non-user evidence integration is the
+  required next step, not claimed complete by the verifier's existence.
