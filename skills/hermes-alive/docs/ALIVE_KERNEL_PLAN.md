@@ -261,7 +261,13 @@ factual error or user-control violations.
   - [x] add a dual-opt-in one-way legacy voice shadow bridge;
   - [ ] add semantic-fidelity evaluation, user inspect/correct controls and
     replace the legacy live voice consumer only after shadow qualification.
-- [ ] Replace heuristic mood with explainable dispositions.
+- [ ] Replace heuristic mood with explainable dispositions:
+  - [x] define authenticated post-selection expression cues that retain each
+    independent dimension's evidence and grant no decision authority
+    (ADR-0033);
+  - [ ] add a semantic-fidelity renderer and shadow comparator;
+  - [ ] remove legacy mood, relationship and `social_urge` influence only
+    after replay and canary qualification.
 - [ ] Retire the monolithic watcher after parity and rollback drills.
 
 Exit: legacy runtime can be disabled with feature parity, improved evaluation
@@ -339,6 +345,21 @@ For each material change:
   from capability and safety, while warning that implicit personalization can
   change safety and utility. This strengthens the requirement for explicit
   provenance and independent semantic-fidelity evaluation.
+
+### 2026-10-12 — Explainable post-selection disposition
+
+- Audited the legacy proactive disposition and confirmed it blends synthetic
+  mood, relationship stage, social urge, non-response and personality into an
+  opaque willingness score before the send decision.
+- Reframed disposition as expression after a selection is independently
+  validated (ADR-0033). Risk, interruption cost, urgency and grounded novelty
+  produce separate evidence-carrying cues; there is no blended mood score.
+- Silence and non-communication actions produce no renderable disposition.
+  Every snapshot denies emotion/relationship claims, action authority,
+  selection mutation and semantic change.
+- Consumers must re-authenticate and recompute the snapshot from the latest
+  validated selection. The new path is unscheduled and not connected to the
+  production watcher.
 
 ### 2026-10-12 — Incremental dispatch evidence projection
 

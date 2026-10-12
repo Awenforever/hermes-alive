@@ -37,6 +37,7 @@ comparison/rollback evidence and as the active safeguard when Circadian is
 | `proactive_disposition.py` | Personality-informed willingness/restraint without a normal fixed unanswered switch. |
 | `voice_engine.py` | Legacy live voice/profile adaptation; retained during shadow migration only. |
 | `alive_kernel/presentation.py` | Replayable explicit presentation preferences and advisory-only inferred style. |
+| `alive_kernel/disposition.py` | Post-selection, evidence-carrying expression cues with no action authority. |
 | `interest_learning.py` | Attributed, reversible interest updates. |
 | `discovery.py` | Collection, ranking, cached-candidate rotation, and validated content references. |
 | `topic_dedup.py` | Persistent URL/topic reservation, delivery history, material-update fingerprints, and privacy-safe hashes. |
@@ -152,6 +153,15 @@ fact or relationship, change message semantics, authorize an action or select
 a route. Projection corruption returns neutral style until replay repair. A
 dual-opt-in bridge mirrors only pseudonymous numeric legacy dimensions; the
 legacy watcher never reads the projection back into composition.
+
+Disposition is downstream of validated intent (ADR-0033). It interprets
+individual risk, interruption-cost, urgency, novelty and confidence dimensions
+as independent expression cues, preserving their evidence IDs instead of
+blending a mood score. Silence and non-communication selections have no
+renderable disposition. A consumer must prove the exact latest validated
+selection, authenticate the snapshot and deterministically recompute the cues.
+The snapshot cannot change selection, semantics, routing or authority and is
+not connected to the production watcher.
 
 External authority also depends on the latest user-owned autonomy policy
 (ADR-0025). The default is no policy and therefore no proactive execution.

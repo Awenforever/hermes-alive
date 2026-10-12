@@ -174,6 +174,15 @@ from .dispatch_outbox import (
     DispatchOutbox,
     DispatchOutboxError,
 )
+from .disposition import (
+    DispositionBasis,
+    DispositionCue,
+    DispositionError,
+    DispositionRecorder,
+    DispositionSnapshot,
+    ExpressionStance,
+    derive_disposition,
+)
 from .memory import (
     ContentStatus,
     MemoryAuthority,
@@ -336,6 +345,11 @@ __all__ = [
     "DispatchExecution",
     "DispatchOutbox",
     "DispatchOutboxError",
+    "DispositionBasis",
+    "DispositionCue",
+    "DispositionError",
+    "DispositionRecorder",
+    "DispositionSnapshot",
     "DiversityAnnotation",
     "DiversityTagger",
     "EventConflictError",
@@ -363,6 +377,7 @@ __all__ = [
     "ExplorationRejection",
     "ExplorationValidationError",
     "ExposureRecord",
+    "ExpressionStance",
     "LocalIdentityProtector",
     "KernelRecoveryError",
     "KernelRecoveryReport",
@@ -446,6 +461,7 @@ __all__ = [
     "build_factual_episodes",
     "compare_reports",
     "deserialize_frame",
+    "derive_disposition",
     "mirror_hook_event",
     "mirror_legacy_voice",
     "evaluate_submission",

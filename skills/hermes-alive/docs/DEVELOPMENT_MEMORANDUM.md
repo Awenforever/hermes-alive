@@ -186,6 +186,22 @@ inspection/correction controls. Regression proof lives in
 `tests/run_alive_kernel_presentation.py`; the architectural contract is
 ADR-0032.
 
+## Disposition comes after intent, never before it
+
+Do not replace old mood arithmetic with a newer weighted “aliveness” or
+personality score. `energy`, `boredom`, `annoyance`, `affection`, ignored counts,
+relationship stage and `social_urge` are not evidence that an action should
+exist. In particular, silence is not an emotional injury.
+
+An explainable disposition may annotate only an already validated selection.
+Every cue must map to one independently audited decision dimension and retain
+its evidence IDs. It cannot admit a candidate, change a selection, grant a
+permit, pick a route or rewrite facts. Silence and non-communication actions
+have no expression stance. Consumers re-authenticate and recompute rather than
+trusting stored labels. Regression proof lives in
+`tests/run_alive_kernel_disposition.py`; the architectural contract is
+ADR-0033.
+
 ## Plugin dependencies must respect the Hermes environment lock
 
 The supported Hermes runtime already provides `cryptography==50.0.0`. Alive's
