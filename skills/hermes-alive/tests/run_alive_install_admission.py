@@ -22,6 +22,8 @@ def main() -> int:
     parser.add_argument("--baseline-package", type=Path,
                         help="Optional complete published baseline checkout for a real revision upgrade")
     parser.add_argument("--allow-dependency-install", action="store_true")
+    parser.add_argument("--verify-installed-hooks", action="store_true",
+                        help="Dispatch real hooks from the admitted installed package before teardown")
     args = parser.parse_args()
     if args.hermes_root is None or not args.allow_dependency_install:
         print("HERMES_ALIVE_INSTALL_ADMISSION_SKIPPED=requires_disposable_runtime_and_explicit_consent")
@@ -195,6 +197,13 @@ def main() -> int:
         assert (profile / "hooks" / "hermes-alive" / "handler.py").is_file()
         durable("check")
         assert all(path.read_bytes() == value for path, value in preserved.items())
+        if args.verify_installed_hooks:
+            installed_test = (profile / "plugins" / "hermes-alive" / "skills"
+                              / "hermes-alive" / "tests"
+                              / "run_alive_kernel_official_hook_contract.py")
+            receipt = run(managed + [str(installed_test), "--installed-profile", str(profile)])
+            assert "HERMES_ALIVE_ADMITTED_HOOK_CONTRACT_OK" in receipt.splitlines()
+            durable("check")
     print("HERMES_ALIVE_INSTALL_ADMISSION_OK")
     return 0
 

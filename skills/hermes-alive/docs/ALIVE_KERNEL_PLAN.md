@@ -1476,3 +1476,25 @@ For each material change:
   and replace the profile override seam with fresh-process profile discovery.
   Do not equate source/core-only tests with installed-user behavior. Semantic
   corpus/human usefulness, console entry and production migration gates stay open.
+
+### 2026-10-13 — Publicly admitted installed-hook qualification
+
+- Removed the HookRegistry path override. Fresh-process profile selection now
+  precedes imports; an unavailable Hermes runtime may skip only the source-only
+  fixture. Missing runtime/dependencies in installed-profile mode fail instead.
+- Extended the opt-in admission runner to execute the actual installed package's
+  hook test using Hermes' committed plugin-enabled interpreter. It neither copies
+  another hook/plugin into that profile nor rewrites its admitted configuration.
+- Immutable input Git tree `863e8198b0c018ccd0d3bddb5756b0b478e3d63b`, exact
+  audited core `3f2abce7f468cf194bb7f9ff9c6a033b075d834c`. Disposable NAS/Linux
+  container `alive-admitted-hooks-20261013-r1` exited zero and emitted both
+  `HERMES_ALIVE_ADMITTED_HOOK_CONTRACT_OK` and
+  `HERMES_ALIVE_INSTALL_ADMISSION_OK`. Hook dispatch, native tool observer,
+  expected journal records and raw-content exclusion passed after public package
+  admission and uninstall/reinstall. Original encrypted state still decrypted
+  after hook execution; retained log/evidence is in the current admission record.
+- This closes the copied-package/path-override gap for the bounded installed
+  hook contract, not live gateway/model/console behavior. Shared hook-test state
+  remains synthetic and disposable; no production provider, profile or sends.
+  Longitudinal agenda usefulness, human semantic calibration, independent review,
+  real authorization migration and production canary gates remain open.

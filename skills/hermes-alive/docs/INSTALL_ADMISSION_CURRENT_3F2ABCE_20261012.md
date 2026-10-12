@@ -108,6 +108,42 @@ historical `/tmp/alive*` directories based on their names.
   or silently use the carrier interpreter on continuation. Stopped containers
   remain available for exit-code verification until explicit owned cleanup.
 
+## 2026-10-13 — Admitted installed hook, without path overrides
+
+- Updated qualification inputs: immutable Git tree
+  `863e8198b0c018ccd0d3bddb5756b0b478e3d63b`; archive
+  `alive-admitted-hooks-20261013.tar`, local/remote SHA256
+  `7f21904dc113dedc7b963f917b6426f6939d36a40cc58f8eac175e8a8a8d764c`.
+  Extracted once into the same owned scratch's `source-hooks-863e8198`.
+  Original archives/source/core were not overwritten. Same audited core/base.
+- Container `alive-admitted-hooks-20261013-r1` started
+  `2026-10-12T18:17:15.907408583Z`, finished
+  `2026-10-12T18:20:39.482710295Z`; running false, terminal exit zero.
+  Log follower 52490 collected terminal; retained `admitted-hooks-r1.log`.
+  Its SHA256 is
+  `b4edfead78a097dd7fa30cde6a90e9892c9415d24357eeed0a032de55e872c2e`.
+- Ran admission with `--verify-installed-hooks`. Public local-Git installation,
+  loaded CLI, runtime idempotence, package refresh, uninstall/removal/reinstall,
+  encrypted durable fixture preservation all passed. Then invoked the test file
+  **inside the admitted installed package** using committed plugin-enabled
+  generation `d9a1f439ded64673b073d7174ffaaa93`, not source or carrier Python.
+- Fresh process selects the actual admitted profile before HookRegistry imports.
+  No `HOOKS_DIR` override, hook/package copy or configuration rewrite in this
+  installed-profile branch. Required PyYAML/tzdata versions are explicitly
+  checked. Registry loading, events, command handling, PluginManager native tool
+  observer, expected journal records and private fixture-content exclusion pass.
+  Both `HERMES_ALIVE_ADMITTED_HOOK_CONTRACT_OK` and
+  `HERMES_ALIVE_INSTALL_ADMISSION_OK` are in the terminal log; the durable
+  encrypted state check also passes after hook execution.
+- Installed mode with no Hermes runtime now raises rather than silently skips;
+  the independent Windows test interpreter confirmed terminal exit 1 for this
+  negative case. Source-only mode still explicitly skips an absent runtime.
+- Scope: synthetic hook events and separate disposable shared state, not live
+  gateway scheduling, provider inference, generated console entry or actual
+  external delivery. Test container used host networking for Hermes-managed
+  dependency admission; network isolation of this entire lifecycle is not claimed.
+  Production remains unchanged; no production mount or credentials were used.
+
 ## Remaining scope
 
 Generated installed console entry, real external receipts, live authorization

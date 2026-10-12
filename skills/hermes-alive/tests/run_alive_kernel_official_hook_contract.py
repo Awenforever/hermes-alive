@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import argparse
 import asyncio
+import importlib.util
 import os
 from pathlib import Path
 import shutil
@@ -18,9 +20,13 @@ EXPECTED_EVENTS = {
 
 
 def main() -> int:
-    try:
-        from gateway.hooks import HookRegistry
-    except ImportError:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--installed-profile", type=Path,
+                        help="Disposable, publicly admitted profile; never a production profile")
+    args = parser.parse_args()
+    if importlib.util.find_spec("gateway") is None:
+        if args.installed_profile is not None:
+            raise RuntimeError("installed profile requires a real Hermes runtime")
         print("HERMES_ALIVE_OFFICIAL_HOOK_CONTRACT_SKIPPED=no_hermes_runtime")
         return 0
 
@@ -28,29 +34,43 @@ def main() -> int:
     repo_root = skill_root.parents[1]
     with tempfile.TemporaryDirectory(prefix="alive-official-hook-") as directory:
         root = Path(directory)
-        hermes_home = root / "hermes-home"
+        hermes_home = (root / "hermes-home" if args.installed_profile is None
+                       else args.installed_profile.resolve(strict=True))
         installed_hook = hermes_home / "hooks" / "hermes-alive"
-        shutil.copytree(skill_root / "hooks", installed_hook)
+        installed_plugin = hermes_home / "plugins" / "hermes-alive"
+        if args.installed_profile is None:
+            shutil.copytree(skill_root / "hooks", installed_hook)
+        else:
+            # The admission runner owns this disposable profile and invokes this
+            # very installed test file using its committed managed interpreter.
+            assert Path(os.environ["HERMES_HOME"]).resolve() == hermes_home
+            assert repo_root == installed_plugin.resolve(strict=True)
+            assert (installed_hook / "handler.py").is_file()
+            from importlib.metadata import version
+            from packaging.specifiers import SpecifierSet
+            assert version("PyYAML") in SpecifierSet(">=6.0.3,<7")
+            assert version("tzdata") in SpecifierSet(">=2025.2")
         shared = root / "runtime"
         os.environ["HERMES_HOME"] = str(hermes_home)
         os.environ["HERMES_ALIVE_SHARED_DIR"] = str(shared)
         os.environ["HERMES_ALIVE_KERNEL_SHADOW_ENABLED"] = "true"
         os.environ["HERMES_PROACTIVE_PLATFORM_ENABLED"] = "false"
         os.environ["HERMES_BUNDLED_PLUGINS"] = str(hermes_home / "empty-bundled")
-        (hermes_home / "config.yaml").write_text(
-            "plugins:\n  enabled: [hermes-alive]\n", encoding="utf-8"
-        )
+        if args.installed_profile is None:
+            (hermes_home / "config.yaml").write_text(
+                "plugins:\n  enabled: [hermes-alive]\n", encoding="utf-8"
+            )
 
-        # gateway.hooks may have been imported before HERMES_HOME was changed;
-        # its supported test/runtime override is the module-level HOOKS_DIR.
-        import gateway.hooks as hooks_module
-        hooks_module.HOOKS_DIR = hermes_home / "hooks"
+        # Import after profile selection, exactly as a fresh host process does.
+        # Missing dependencies are failures, not an absent-runtime skip.
+        from gateway.hooks import HookRegistry
 
         registry = HookRegistry()
         registry.discover_and_load()
         loaded = registry.loaded_hooks
         assert len(loaded) == 1
         assert set(loaded[0]["events"]) == EXPECTED_EVENTS
+        assert Path(loaded[0]["path"]).resolve() == installed_hook.resolve()
 
         context = {
             "platform": "weixin",
@@ -85,13 +105,13 @@ def main() -> int:
         # Discover the package through Hermes' real plugin manager and dispatch
         # its native post_tool_call observer. Copy only distributable material,
         # never the working tree metadata.
-        installed_plugin = hermes_home / "plugins" / "hermes-alive"
-        installed_plugin.mkdir(parents=True)
-        for name in ("__init__.py", "plugin_cli.py", "tool_receipt_bridge.py", "plugin.yaml"):
-            shutil.copy2(repo_root / name, installed_plugin / name)
-        shutil.copytree(
-            skill_root, installed_plugin / "skills" / "hermes-alive"
-        )
+        if args.installed_profile is None:
+            installed_plugin.mkdir(parents=True)
+            for name in ("__init__.py", "plugin_cli.py", "tool_receipt_bridge.py", "plugin.yaml"):
+                shutil.copy2(repo_root / name, installed_plugin / name)
+            shutil.copytree(
+                skill_root, installed_plugin / "skills" / "hermes-alive"
+            )
         from hermes_cli.plugins import PluginManager
         manager = PluginManager()
         manager.discover_and_load()
@@ -136,6 +156,8 @@ def main() -> int:
         assert b"official private error" not in database
 
     print("HERMES_ALIVE_OFFICIAL_HOOK_CONTRACT_OK")
+    if args.installed_profile is not None:
+        print("HERMES_ALIVE_ADMITTED_HOOK_CONTRACT_OK")
     return 0
 
 
