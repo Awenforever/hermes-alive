@@ -1457,3 +1457,22 @@ For each material change:
   admission record. Production remains unchanged. Next reuse the prepared
   runtime for real hook/cognition qualification and the actual console entry;
   do not return to repeated cold carrier/source-handler tests.
+
+### 2026-10-13 — Current runtime hook and cognition evidence
+
+- Reused the completed core environment without dependency download in a
+  network-disabled container `alive-hook-20261013-r1`. Terminal exit zero,
+  finished `2026-10-12T18:05:23.415119768Z`; retained `hook-r1.log` in the owned
+  admission scratch. No production profile, provider or gateway was involved.
+- Actual current HookRegistry/PluginManager load/dispatch contract passed,
+  producing expected shadow journal records without raw fixture message/tool
+  content. Separate cognition-cycle and shadow integration contracts also pass.
+- Scope remains bounded: hook fixture copies a package instead of using public
+  admission and overrides the documented test HOOKS_DIR seam. It reports missing
+  declared PyYAML/tzdata in the core-only generation. That warning is retained,
+  not hidden or solved by pip. This is loader-contract evidence, not a fully
+  admitted profile/end-to-end gateway/real model/longitudinal pass.
+- Next run hook/cognition checks within a publicly admitted plugin generation
+  and replace the profile override seam with fresh-process profile discovery.
+  Do not equate source/core-only tests with installed-user behavior. Semantic
+  corpus/human usefulness, console entry and production migration gates stay open.
