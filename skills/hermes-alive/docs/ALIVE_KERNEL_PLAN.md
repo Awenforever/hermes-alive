@@ -1282,6 +1282,7 @@ For each material change:
 - Existing public CLI transport remains the next integration candidate.
   Full bootstrap, current upstream runtime, authorized-route dispatch,
   delivery acknowledgement and genuine useful behavior still need evidence.
+
 - Repeated the actual SDK/list-handler probe and seven emitter cases against
   a separate current `3f2abce` worktree: all passed, with the same four source
   digests as `f925b01`. An initial incomplete sparse worktree caused missing
@@ -1307,3 +1308,23 @@ For each material change:
 - Next integration work must connect the qualified public command semantics
   to authorized attempts and ambiguous receipts, then obtain actual channel
   and usefulness evidence. Full bootstrap/PM/live/canary gates stay open.
+
+### 2026-10-12 — Process observation integration without false outcomes
+
+- Implemented typed CLI report classification and authenticated-start-bound
+  `DispatchOutbox.record_cli_observation`. Reports retain only structural
+  status/exit metadata and a keyed fingerprint, never raw errors, IDs or bodies.
+- Success/error/partial/skip are explicitly reported claims. None automatically
+  becomes delivery, task completion, benefit or an acknowledged outbox entry.
+  Unknown future fields cannot manufacture external-delivery proof.
+- Actual six-case current-upstream local command results pass through the
+  classifier. Synthetic authorized recovery fixtures separately prove foreign
+  tokens cannot record, replay is idempotent, divergent evidence conflicts,
+  raw response markers are absent and observations cannot acknowledge dispatch.
+- The 36 kernel-script sweep completed with 35 passes, one missing-Hermes
+  official-hook skip and zero failures. Additional classifier/recovery checks
+  passed after adding divergent-evidence and claimed-proof regressions.
+  This is not a production or live-usefulness pass.
+- ADR-0055 preserves the gaps: qualified process launch, actual channel receipts,
+  late/uncertain forensic recovery and the end-to-end live executor remain open.
+  Production remains untouched and the live sender remains disconnected.

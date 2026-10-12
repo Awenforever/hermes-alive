@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from dataclasses import replace
+from unittest.mock import patch
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import sqlite3
@@ -13,6 +15,7 @@ import tempfile
 HOOKS = Path(__file__).resolve().parents[1] / "hooks"
 sys.path.insert(0, str(HOOKS))
 from alive_kernel.dispatch_verifier import DispatchEvidenceVerifier
+from alive_kernel.event_store import EventConflictError
 
 from alive_kernel import (  # noqa: E402
     ActionAuthority,
@@ -391,6 +394,7 @@ def main() -> int:
             },
         }
         result_payload = {
+            # Terminal receipt construction below is separate from a CLI report.
             "dispatch_id": third_lease.dispatch_id,
             "attempt_id": third_lease.attempt_id,
             "idempotency_key": third_lease.idempotency_key,
@@ -399,6 +403,68 @@ def main() -> int:
             "lease_generation": third_lease.generation,
             "outcome": "delivery_succeeded",
         }
+        cli_stdout = '{"success":true,"message_id":"PRIVATE_CLI_REPORT_MARKER"}'
+        cli_observation = outbox.record_cli_observation(
+            execution, stdout=cli_stdout, exit_code=0, now=first_lease.lease_until)
+        assert cli_observation.event.event_type == "transport.cli.observed"
+        assert cli_observation.event.payload["report_kind"] == "success_reported"
+        assert cli_observation.event.payload["external_delivery_proven"] is False
+        assert outbox.counts() == {"started": 1}
+        assert outbox.record_cli_observation(
+            execution, stdout=cli_stdout, exit_code=0, now=first_lease.lease_until
+        ).event.event_id == cli_observation.event.event_id
+        assert b"PRIVATE_CLI_REPORT_MARKER" not in journal.path.read_bytes()
+        real_get = journal.get
+        for altered in (
+            replace(cli_observation.event, source="different.producer"),
+            replace(cli_observation.event, payload={**dict(cli_observation.event.payload),
+                                                    "external_delivery_proven": 0}),
+        ):
+            # Inject journal-read damage, not a real provider or transport.
+            def damaged_read(event_id):
+                if event_id == cli_observation.event.event_id:
+                    return replace(cli_observation, event=altered)
+                return real_get(event_id)
+            with patch.object(journal, "get", side_effect=damaged_read):
+                try:
+                    outbox.record_cli_observation(
+                        execution, stdout=cli_stdout, exit_code=0,
+                        now=first_lease.lease_until)
+                except EventConflictError:
+                    pass
+                else:
+                    raise AssertionError("replay accepted different producer or scalar type")
+        try:
+            outbox.record_cli_observation(
+                execution, stdout='{"success":false}', exit_code=1,
+                now=first_lease.lease_until)
+        except EventConflictError:
+            pass
+        else:
+            raise AssertionError("different process evidence overwrote the observation")
+        try:
+            outbox.record_cli_observation(
+                execution, stdout=cli_stdout + "\n", exit_code=0,
+                now=first_lease.lease_until)
+        except EventConflictError:
+            pass
+        else:
+            raise AssertionError("raw-report fingerprint silently stripped whitespace")
+        try:
+            outbox.record_cli_observation(
+                replace(execution, lease=replace(execution.lease, token="wrong-token")),
+                stdout=cli_stdout, exit_code=0, now=first_lease.lease_until)
+        except DispatchOutboxError:
+            pass
+        else:
+            raise AssertionError("foreign lease recorded a CLI observation")
+        try:
+            outbox.acknowledge(third_lease, result_event_id=cli_observation.event.event_id,
+                               now=first_lease.lease_until)
+        except DispatchOutboxError:
+            pass
+        else:
+            raise AssertionError("process report was promoted to terminal receipt")
         forged_result = EventEnvelope(
             event_id="delivery:causal-recovery-forged",
             event_type="delivery.succeeded",

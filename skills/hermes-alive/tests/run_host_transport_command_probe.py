@@ -15,6 +15,9 @@ import subprocess
 import sys
 import tempfile
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "hooks"))
+from alive_kernel.transport_receipts import classify_cli_report
+
 CHILD = r'''
 import argparse, io, json, os, pathlib, re, shlex, sys
 from contextlib import redirect_stdout, redirect_stderr
@@ -154,6 +157,11 @@ def run(core: Path) -> list[dict]:
             for effect in effects:
                 assert effect["chat_id"] == "fixture-chat"
                 assert effect["message"] == "synthetic integration body"
+            report = classify_cli_report(json.dumps(payload), result["exit_code"])
+            expected = {"success": "success_reported", "partial": "partial_reported",
+                        "skip": "skip_reported"}.get(mode, "error_reported")
+            assert report.kind.value == expected, result
+            result["kernel_cli_report"] = report.to_document()
             results.append(result)
     return results
 

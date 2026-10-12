@@ -1291,6 +1291,73 @@ class DispatchOutbox:
             lease, start_event.event_id, contract.to_document(), route
         )
 
+    def record_cli_observation(
+        self, execution: DispatchExecution, *, stdout: str,
+        exit_code: int | None, now: datetime | None = None,
+    ) -> JournalRecord:
+        """Record a process report for an authenticated start, never acknowledge it.
+
+        This is local provenance of an observation, not a host delivery receipt.
+        Incomplete/error/skip reports cannot close the lease or train outcomes.
+        """
+        from .transport_receipts import classify_cli_report
+
+        report = classify_cli_report(stdout, exit_code)
+        current = self._utc(now)
+        lease = execution.lease
+        if lease.capability != "hermes.channel.send":
+            raise DispatchOutboxError("CLI send report requires a channel-send attempt")
+        start = self.journal.get(execution.start_event_id)
+        attempt = self.journal.get(f"action.attempt:{lease.attempt_id}")
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                "SELECT * FROM dispatch_outbox_v3 WHERE dispatch_id=?",
+                (lease.dispatch_id,),
+            ).fetchone()
+        if (row is None or row["state"] != "started"
+                or row["started_event_id"] != execution.start_event_id
+                or row["lease_generation"] != lease.generation
+                or row["lease_token_digest"] != self.protector.pseudonym("dispatch_lease", lease.token)
+                or not self._valid_start_evidence(
+                    start, self._authenticated_start_payload(start), attempt,
+                    dispatch_id=lease.dispatch_id, attempt_id=lease.attempt_id,
+                    idempotency_key=lease.idempotency_key, capability=lease.capability,
+                    policy_event_id=str(row["policy_event_id"]), subject=lease.subject,
+                    sensitivity=lease.sensitivity, generation=lease.generation)
+                or current < start.event.observed_at):
+            raise DispatchOutboxError("CLI observation does not own an authenticated start")
+        payload = {**report.to_document(), "dispatch_id": lease.dispatch_id,
+                   "attempt_id": lease.attempt_id, "start_event_id": execution.start_event_id,
+                   "lease_generation": lease.generation,
+                   "stdout_fingerprint": self.protector.authenticate_json(
+                       "cli_report.stdout.v1", stdout)}
+        payload["integrity_authenticator"] = self.protector.authenticate_json(
+            "transport.cli.observation.v1", payload)
+        event_id = execution.start_event_id + ":cli-observation"
+        existing = self.journal.get(event_id)
+        if existing is not None:
+            replay_namespace = "transport.cli.observation.replay.v1"
+            exact_payload = self.protector.authenticate_json(
+                replay_namespace, _thaw_json(existing.event.payload))
+            expected_payload = self.protector.authenticate_json(replay_namespace, payload)
+            if (exact_payload != expected_payload
+                    or existing.event.event_type != "transport.cli.observed"
+                    or existing.event.source != "alive.dispatch.cli.observation"
+                    or existing.event.actor != "system:alive-dispatch"
+                    or existing.event.subject != lease.subject
+                    or existing.event.sensitivity != lease.sensitivity
+                    or existing.event.causation_id != execution.start_event_id
+                    or existing.event.observed_at < start.event.observed_at):
+                raise EventConflictError("CLI observation already has different evidence")
+            return existing
+        return self.journal.append(EventEnvelope(
+            event_id=event_id, event_type="transport.cli.observed",
+            source="alive.dispatch.cli.observation", actor="system:alive-dispatch",
+            subject=lease.subject, sensitivity=lease.sensitivity,
+            causation_id=execution.start_event_id, observed_at=current, occurred_at=current,
+            payload=payload,
+        ))
+
     def release(
         self,
         lease: DispatchLease,
