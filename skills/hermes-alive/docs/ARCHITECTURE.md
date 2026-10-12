@@ -191,6 +191,13 @@ reruns semantic assessment, checks current expiry and proves that the bound
 selection is still latest. Meaning/candidate erasure, superseding intent,
 tampering or expiry leaves history intact but invalidates current use.
 
+Owner-scoped `/memory alive message` and `withdraw-message` controls expose
+meaning provenance and permanently withdraw future use (ADR-0038). Each
+meaning resolution checks the authenticated withdrawal event, invalidating
+dependent render/review receipts without rewriting history. This is not
+platform recall or content erasure; correction/replacement and live activation
+remain separate work.
+
 External authority also depends on the latest user-owned autonomy policy
 (ADR-0025). The default is no policy and therefore no proactive execution.
 Authorization receipts and outbox rows bind an exact policy event/revision;

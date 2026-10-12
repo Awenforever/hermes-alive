@@ -24,6 +24,7 @@ from .retention import (
     RetentionProjection,
     RetentionValidationError,
 )
+from .semantic_rendering import MeaningStore
 
 
 USAGE = (
@@ -35,6 +36,8 @@ USAGE = (
     "- `/memory alive proposals`（查看待审记忆）\n"
     "- `/memory alive accept <id>` 或 `/memory alive reject <id>`\n"
     "- `/memory alive retract <id>`（撤回已接受记忆）\n"
+    "- `/memory alive message <meaning-event-id>`（查看主动消息依据）\n"
+    "- `/memory alive withdraw-message <meaning-event-id>`（撤回待用消息内容）\n"
     "- `/memory alive forget`（擦除该用户的 Alive 加密内容）"
 )
 
@@ -198,6 +201,29 @@ def handle_memory_command(
                     message = "已停止 Alive 生成新的模型记忆提案；既有待审或已接受记忆不变。"
         elif action == "proposals":
             message = _proposals_message(memory, subject)
+        elif action in {"message", "withdraw-message"}:
+            if len(tokens) != 3:
+                message = USAGE
+            else:
+                meanings = MeaningStore(
+                    projection.journal, content_vault=projection.content_vault,
+                    protector=protector,
+                )
+                if action == "withdraw-message":
+                    meanings.retract(tokens[2], subject=subject, actor=subject)
+                    message = (
+                        "已撤回该消息内容，相关表达与审阅结果不再可用。"
+                        "已经送达的消息不会因此从接收端删除。"
+                    )
+                else:
+                    document = meanings.inspect_for_user(tokens[2], subject=subject)
+                    lines = [f"Alive 消息依据：`{tokens[2]}`",
+                             f"有效期至：`{document.expires_at.isoformat()}`"]
+                    for atom in document.atoms:
+                        lines.append(f"\n{atom.kind.value}：{atom.text}")
+                        lines.append("依据事件：" + ", ".join(atom.evidence_event_ids))
+                    lines.append("\n这些是定义的消息内容及其引用，引用本身不证明事实正确。")
+                    message = "\n".join(lines)
         elif action in {"accept", "reject", "retract"}:
             if len(tokens) != 3:
                 message = USAGE

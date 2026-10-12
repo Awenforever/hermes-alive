@@ -7,6 +7,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_semantic_renderi
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_semantic_review.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_semantic_review_store.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_semantic_replay_reporting.py"
+PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_semantic_user_controls.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_retention.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_consolidation.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_alive_kernel_consolidation_synthesis.py"

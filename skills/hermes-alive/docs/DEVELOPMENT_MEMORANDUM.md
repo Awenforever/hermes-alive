@@ -3,6 +3,20 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## Withdrawal must invalidate derived receipts
+
+A once-valid semantic review cannot survive the owner's withdrawal of its
+meaning. Checking only during creation is insufficient: every meaning,
+render and review read must recheck current withdrawal, including after a
+restart. Authenticate the withdrawal, verify owner identity before decrypting,
+and make retries idempotent. Do not promise deletion of delivered messages or
+recall of in-flight provider requests. Keep forget/erasure as a separate control.
+
+In async receipt tests, start a new clock phase after asynchronous execution;
+fixed offsets from process start can falsely put later selections in the
+future on slower filesystems. Never weaken production causal validation to
+make those tests pass.
+
 ## Model synthesis must never become Dream again
 
 The semantic need is real, but the old coupling is forbidden. Conversation

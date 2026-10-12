@@ -958,3 +958,27 @@ For each material change:
   before plaintext can cross.
 - Deliberately left tool execution, internal review and live delivery
   disconnected until each has a real schema and trustworthy host receipt.
+
+### 2026-10-12 — Private fallback preference clarified
+
+- User-selected fallback for this installation is official DeepSeek
+  (`provider=deepseek`, `model=deepseek-flash`), not `ustc/qwen3.6-chat`.
+- Read-only production inspection confirmed this is already the configured
+  `fallback_providers` route; no production configuration change or restart
+  was necessary. Credential presence was checked without exposing its value.
+- This is a private deployment preference, not a public installation default.
+  Public model selection continues to inherit Hermes configuration.
+- Provider redundancy does not establish independent semantic review when
+  both routes use the same actual model family. Availability and review
+  independence remain separate acceptance requirements.
+
+### 2026-10-12 — Inspect and withdraw semantic content
+
+- Added owner-scoped message inspection and durable withdrawal to `/memory
+  alive`. Withdrawal invalidates deterministic renders, model candidates and
+  review receipts on their next read, including after reopening the store.
+- ADR-0038 separates withdrawal from encrypted-content erasure and platform
+  recall. Previously delivered messages cannot be removed by this control.
+- Focused tests exercise ownership, idempotency and downstream invalidation.
+  Correction/replacement and discoverable identifiers remain pending; this is
+  not a claim that all user-control or production gates have passed.

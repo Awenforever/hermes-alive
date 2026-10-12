@@ -344,6 +344,10 @@ def main() -> int:
         superseding = select(
             "selection:review-store-2", "new intent invalidates prior receipts"
         )
+        # Async comparison duration is unbounded relative to the initial clock.
+        # Anchor this phase after its real selection instead of inventing reads
+        # before that selection on slower Windows/container filesystems.
+        now = max(datetime.now(timezone.utc), superseding.event.observed_at)
         assert store.resolve_model_candidate(
             model_candidate.event_id, as_of=now + timedelta(seconds=3)
         ) is None
@@ -381,6 +385,29 @@ def main() -> int:
         assert store.verify_review(
             fresh_review_record, as_of=now + timedelta(seconds=6)
         ) is None
+
+        withdrawal_candidate = store.record_model_candidate(
+            selection_event_id=superseding.event.event_id,
+            meaning_event_id=meaning_record.event.event_id,
+            subject=subject, text=text,
+            renderer_execution_id="execution:renderer-withdrawal",
+            renderer_model="provider-a/renderer",
+            renderer_independence_domain="provider-a/family-a",
+            observed_at=now + timedelta(seconds=7),
+        )
+        withdrawal_receipt = store.record_review(
+            candidate_event_id=withdrawal_candidate.event_id,
+            review=review_for(withdrawal_candidate, "review:withdrawal", "execution:reviewer-withdrawal"),
+            actor="model:reviewer", observed_at=now + timedelta(seconds=8),
+        )
+        withdrawal_record = journal.get(withdrawal_receipt.event_id)
+        assert withdrawal_record is not None
+        assert store.verify_review(withdrawal_record, as_of=now + timedelta(seconds=9)) is not None
+        meanings.retract(meaning_record.event.event_id, subject=subject, actor=subject)
+        assert store.resolve_model_candidate(
+            withdrawal_candidate.event_id, as_of=now + timedelta(seconds=9)
+        ) is None
+        assert store.verify_review(withdrawal_record, as_of=now + timedelta(seconds=9)) is None
 
         journal_text = journal.path.read_bytes().decode("utf-8", errors="ignore")
         assert text not in journal_text

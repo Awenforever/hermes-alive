@@ -259,6 +259,33 @@ def main() -> int:
         assert deliberation.apply(superseding_selection).outcome == "validated"
         assert not store.verify_render(render_record)
 
+        fresh_render = store.render_selected(
+            selection_event_id=superseding_selection.event.event_id,
+            meaning_event_id=meaning_record.event.event_id,
+            subject=subject, observed_at=now + timedelta(seconds=3),
+        )
+        fresh_record = journal.get(fresh_render.event_id)
+        assert fresh_record is not None and store.verify_render(fresh_record)
+        try:
+            store.retract(meaning_record.event.event_id,
+                          subject="user:other", actor="user:other")
+        except SemanticRenderingError:
+            pass
+        else:
+            raise AssertionError("another user withdrew private meaning")
+        withdrawal = store.retract(meaning_record.event.event_id, subject=subject, actor=subject)
+        assert store.retract(
+            meaning_record.event.event_id, subject=subject, actor=subject
+        ).event.event_id == withdrawal.event.event_id
+        assert not store.verify_render(fresh_record)
+        reopened = MeaningStore(journal, content_vault=deliberation.content_vault)
+        try:
+            reopened.resolve(meaning_record.event.event_id)
+        except SemanticRenderingError as exc:
+            assert "withdrawn" in str(exc)
+        else:
+            raise AssertionError("restart revived withdrawn meaning")
+
         journal_text = journal.path.read_bytes().decode("utf-8", errors="ignore")
         for private_value in (
             "研究组确认本周只发布一个候选结果",

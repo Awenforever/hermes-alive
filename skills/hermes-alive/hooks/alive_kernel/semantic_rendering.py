@@ -415,6 +415,13 @@ class MeaningStore:
             raise SemanticRenderingError("meaning event is unavailable")
         event = record.event
         payload = event.payload
+        withdrawal = self.journal.get(
+            f"message.meaning_retracted:{payload.get('message_id', '')}"
+        )
+        if withdrawal is not None:
+            if not self._valid_withdrawal(withdrawal, record):
+                raise SemanticRenderingError("meaning withdrawal integrity is invalid")
+            raise SemanticRenderingError("meaning was withdrawn by its user")
         try:
             supplied = str(payload["integrity_authenticator"])
             content = ContentReference.from_event_payload(payload["content"])
@@ -460,6 +467,83 @@ class MeaningStore:
         ):
             raise SemanticRenderingError("meaning event and encrypted document diverged")
         return document
+
+    def _valid_withdrawal(
+        self, withdrawal: JournalRecord, meaning: JournalRecord
+    ) -> bool:
+        event, source = withdrawal.event, meaning.event
+        payload = event.payload
+        try:
+            return bool(
+                event.event_type == "message.meaning_retracted"
+                and event.source == "alive.semantic-control"
+                and event.subject == source.subject
+                and event.actor == source.subject
+                and event.causation_id == source.event_id
+                and payload.get("meaning_event_id") == source.event_id
+                and payload.get("subject") == source.subject
+                and payload.get("reason") == "explicit_user_withdrawal"
+                and event.expires_at is None
+                and withdrawal.sequence > meaning.sequence
+                and self.protector.verify_json(
+                    "message.meaning_retracted.v1",
+                    self._authentication_document("message.meaning_retracted.v1", payload),
+                    str(payload["integrity_authenticator"]),
+                )
+            )
+        except (KeyError, TypeError, ValueError):
+            return False
+
+    def retract(
+        self, meaning_event_id: str, *, subject: str, actor: str
+    ) -> JournalRecord:
+        """Withdraw this user's meaning and invalidate all dependent receipts.
+
+        The host command boundary supplies the authenticated subject/actor;
+        model proposals cannot call this as authority for another user.
+        Withdrawal is durable and idempotent, and does not erase history.
+        """
+        source = self.journal.get(meaning_event_id)
+        if (
+            source is None or source.event.event_type != "message.meaning_defined"
+            or source.event.subject != subject or actor != subject
+        ):
+            raise SemanticRenderingError("meaning is unavailable for this user")
+        event_id = f"message.meaning_retracted:{source.event.payload.get('message_id', '')}"
+        existing = self.journal.get(event_id)
+        if existing is not None:
+            if not self._valid_withdrawal(existing, source):
+                raise SemanticRenderingError("meaning withdrawal integrity is invalid")
+            return existing
+        self.resolve(meaning_event_id)
+        payload = {
+            "meaning_event_id": meaning_event_id, "subject": subject,
+            "reason": "explicit_user_withdrawal",
+        }
+        payload["integrity_authenticator"] = self.protector.authenticate_json(
+            "message.meaning_retracted.v1",
+            self._authentication_document("message.meaning_retracted.v1", payload),
+        )
+        event = EventEnvelope(
+            event_id=event_id, event_type="message.meaning_retracted",
+            source="alive.semantic-control", actor=actor, subject=subject,
+            causation_id=meaning_event_id, sensitivity=source.event.sensitivity,
+            payload=payload,
+        )
+        try:
+            appended = self.journal.append(event)
+            return JournalRecord(appended.sequence, appended.event)
+        except EventConflictError:
+            existing = self.journal.get(event_id)
+            if existing is None or not self._valid_withdrawal(existing, source):
+                raise SemanticRenderingError("conflicting meaning withdrawal")
+            return existing
+
+    def inspect_for_user(self, meaning_event_id: str, *, subject: str) -> MeaningDocument:
+        source = self.journal.get(meaning_event_id)
+        if source is None or source.event.subject != subject:
+            raise SemanticRenderingError("meaning is unavailable for this user")
+        return self.resolve(meaning_event_id)
 
     def candidate_reference(self, meaning_event_id: str) -> dict[str, Any]:
         """Strict candidate content shape used by deliberation."""
