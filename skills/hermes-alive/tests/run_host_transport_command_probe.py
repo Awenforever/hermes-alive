@@ -23,6 +23,7 @@ import argparse, io, json, os, pathlib, re, shlex, sys
 from contextlib import redirect_stdout, redirect_stderr
 core, profile, mode = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3]
 sys.path.insert(0, str(core))
+sys.path.insert(0, sys.argv[4])  # Explicit test-package hooks, not caller PYTHONPATH.
 def no_external_effects(event, args):
     if event == 'subprocess.Popen':
         executable, command, cwd, env = args
@@ -87,10 +88,36 @@ register_send_subparser(parser.add_subparsers())
 if mode == 'skip':
     os.environ['HERMES_CRON_AUTO_DELIVER_PLATFORM'] = 'alivefixture'
     os.environ['HERMES_CRON_AUTO_DELIVER_CHAT_ID'] = 'fixture-chat'
-target = 'alivefixture:other-chat' if mode == 'wrong_route' else 'alivefixture:fixture-chat'
-args = parser.parse_args(['send', '--to', target,
-                          '--json', 'synthetic integration body'])
+from alive_kernel.cli_send_contract import CliSendContractError, compile_text_cli_plan
+from gateway.platforms.base import BasePlatformAdapter
+from tools.send_message_targets import resolve_send_target
+chat = 'other-chat' if mode == 'wrong_route' else 'fixture-chat'
+document = {'schema_version': 1, 'capability': 'hermes.channel.send',
+            'operation': {'text': 'synthetic integration body', 'format': 'markdown'}}
+route = {'platform': 'alivefixture', 'profile': 'fixture', 'chat_id': chat, 'thread_id': None}
+# Characterize actual host interpretation before proving preflight rejection.
+media_example = 'MEDIA:' + str(profile / 'synthetic-attachment.pdf')
+assert BasePlatformAdapter.extract_media(media_example)[0]
+for controlled_text in (media_example, '[[as_document]]body', '[[audio_as_voice]]body'):
+    unsafe_document = {**document, 'operation': {'text': controlled_text, 'format': 'markdown'}}
+    try:
+        compile_text_cli_plan(
+            unsafe_document, route, profile_id='fixture', hermes_home=profile,
+            resolve_target=resolve_send_target, extract_media=BasePlatformAdapter.extract_media,
+            observe_profile_home=get_hermes_home)
+    except CliSendContractError:
+        pass
+    else:
+        raise AssertionError('text compilation accepted a real host media directive')
+assert not (profile / 'fixture-deliveries.jsonl').exists()
+plan = compile_text_cli_plan(
+    document, route, profile_id='fixture', hermes_home=profile,
+    resolve_target=resolve_send_target, extract_media=BasePlatformAdapter.extract_media,
+    observe_profile_home=get_hermes_home)
+args = parser.parse_args(plan.arguments)
 output, errors = io.StringIO(), io.StringIO()
+original_stdin = sys.stdin
+sys.stdin = io.StringIO(plan.stdin_text)
 with redirect_stdout(output), redirect_stderr(errors):
     try:
         args.func(args)
@@ -98,6 +125,7 @@ with redirect_stdout(output), redirect_stderr(errors):
         code = stopped.code
     else:
         raise AssertionError('command did not return an exit code')
+sys.stdin = original_stdin
 payload = json.loads(output.getvalue())
 if payload.get('error'):
     print(errors.getvalue(), file=sys.stderr)
@@ -133,7 +161,9 @@ def run(core: Path) -> list[dict]:
                        HERMES_BUNDLED_PLUGINS=str(profile / "empty-bundled"),
                        HERMES_PROACTIVE_PLATFORM_ENABLED="false")
             child = subprocess.run([sys.executable, "-B", "-c", CHILD, str(core),
-                                    str(profile), mode], cwd=profile, env=env,
+                                    str(profile), mode,
+                                    str((Path(__file__).resolve().parents[1] / "hooks"))],
+                                   cwd=profile, env=env,
                                    capture_output=True, text=True, encoding="utf-8",
                                    errors="replace", timeout=90)
             if child.returncode:

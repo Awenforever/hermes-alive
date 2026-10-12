@@ -56,6 +56,13 @@ reading, task completion or usefulness. All cases explicitly retain
 
 ## Remaining qualification
 
+The command probe now compiles its text action through the actual host profile
+getter, destination resolver and media parser, then supplies the unchanged body
+through stdin. Negative preflight checks verify actual host attachment controls
+are refused before fixture delivery. Six cases passed again with this path.
+This closes a text-plan integration check only; it does not prove an authorized
+process launch. ADR-0056 records the media/format limits and required follow-up.
+
 The full CLI bootstrap, PM-managed runtime, real external channel and its
 acknowledgement contract, Alive's authorized outbox bridge, crash recovery,
 human usefulness and longitudinal behavior remain open. Production remains

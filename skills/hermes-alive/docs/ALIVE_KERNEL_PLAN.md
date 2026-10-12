@@ -1328,3 +1328,23 @@ For each material change:
 - ADR-0055 preserves the gaps: qualified process launch, actual channel receipts,
   late/uncertain forensic recovery and the end-to-end live executor remain open.
   Production remains untouched and the live sender remains disconnected.
+
+### 2026-10-12 — Text transport authority boundary
+
+- Current public CLI media parsing can turn a text body into an attachment
+  request. Added an explicit text-plan compiler rather than trusting generated
+  body syntax or a one-time absence of extracted files (ADR-0056).
+- Profile ownership, exact destination resolution and unchanged text parsing
+  are required. Body travels through stdin; plain-mode forcing is unsupported
+  by this backend and rejected, not silently reinterpreted. Media support
+  remains an explicit future capability, not implicitly granted file access.
+- Unit checks passed. Actual current-source host callbacks and command handler
+  also passed all six local-platform scenarios with compiled plans, including
+  preflight rejection of host media controls before any fixture delivery.
+- No matching test process remained from the interrupted run; collected new
+  terminal evidence rather than assuming its prior result. These are isolated
+  fixtures, not real delivery, full bootstrap or PM-installed qualification.
+- Next: bind this plan to a fresh authenticated start in a qualified executor,
+  preserving uncertainty across crashes and obtaining real channel receipts.
+  Semantic shadow/human usefulness and longitudinal acceptance remain open.
+  Production remains unchanged; no live sender was activated.
