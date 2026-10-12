@@ -55,12 +55,20 @@ def main() -> int:
         assert canonicalize_discovery_url(
             "https://Example.COM/x?utm_medium=noise&z=2&a=1#frag"
         ) == "https://example.com/x?a=1&z=2"
-        try:
-            canonicalize_discovery_url("file:///etc/passwd")
-        except DiscoveryOpportunityError:
-            pass
-        else:
-            raise AssertionError("non-network URL crossed discovery boundary")
+        # URL validation never reads these resources. Synthetic destinations
+        # test the scheme boundary without suggesting access to a host secret.
+        for non_web_url in (
+            "file:///synthetic/non-web-resource",
+            "ftp://example.invalid/resource",
+            "ssh://example.invalid/resource",
+            "data:text/plain,synthetic",
+        ):
+            try:
+                canonicalize_discovery_url(non_web_url)
+            except DiscoveryOpportunityError:
+                pass
+            else:
+                raise AssertionError("non-web URL crossed discovery boundary")
 
         first = ingestor.ingest(candidate("First title", observed_at=now), subject="user:test")
         assert first.observation_created is True

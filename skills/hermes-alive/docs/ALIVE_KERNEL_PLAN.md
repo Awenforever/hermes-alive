@@ -308,6 +308,10 @@ and a one-command rollback.
     `tzdata>=2025.2` warning observed in the isolated production image on
     2026-10-12. Declared dependencies and a successful hook load are not proof
     of a correct from-zero installation.
+    - ADR-0050: the contract already declares/requests dependencies. Real
+      current-source admission reached core dependency transport failure;
+      installed-but-disabled output must not be counted as success. Full
+      lifecycle qualification remains pending, not an Alive-specific pip fix.
 - [ ] Linux, Windows, WSL and Docker/NAS lifecycle verification.
 - [ ] Provider and channel substitution tests owned by Hermes capabilities.
 - [ ] Crash, duplicate event, partial send and corrupt-state fault injection.
@@ -1128,3 +1132,16 @@ For each material change:
   The skipped official HookRegistry/PluginManager test passed separately in
   isolated NAS/Linux Docker, as did current evaluation/outcome regressions.
   The dependency warning is retained as an unclosed Phase 6 installation item.
+
+### 2026-10-12 — Real package admission instead of bare-loader inference
+
+- Corrected the assumption behind the tzdata warning: bare loader invocation
+  does not prepare dependencies; SKILL already requests Hermes-owned admission.
+- Added opt-in disposable-profile package/lifecycle runner with imported-core
+  verification and status readiness before runtime writes (ADR-0050).
+- Actual current-source testing found a harmless sensitive-filename negative
+  fixture blocked scanning; retained scanning and expanded synthetic non-web
+  scheme coverage. Admission then failed on offline bootstrap, and a proxy
+  retry failed on a core psutil Git transfer, leaving the plugin disabled.
+- No successful install or lifecycle matrix is claimed. Dependency transport
+  stays Hermes-owned; do not chase it by changing production environments.

@@ -91,6 +91,14 @@ rather than plain `plugins update`: the latter reports newly declared Python
 dependencies but does not install them. Existing runtime state remains outside
 the plugin checkout and must be preserved.
 
+Package placement is not dependency admission. Hermes may print an installed
+banner while refusing enablement after a dependency failure. Before running
+`install-runtime`, require `hermes alive status` to succeed and identify the
+intended profile. If Hermes reports dependency/enablement refusal, stop; do not
+restart Gateway or describe the plugin as installed and working. Let Hermes
+resolve its own environment, then retry. Never substitute system `pip`, disable
+security scanning or alter production model/provider settings to get past it.
+
 ## Configure
 
 Default non-interactive configuration:
