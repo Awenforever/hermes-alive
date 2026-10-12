@@ -40,6 +40,7 @@ comparison/rollback evidence and as the active safeguard when Circadian is
 | `alive_kernel/disposition.py` | Post-selection, evidence-carrying expression cues with no action authority. |
 | `alive_kernel/semantic_rendering.py` | Encrypted meaning atoms, deterministic fidelity proof, and fail-closed model-candidate assessment. |
 | `alive_kernel/semantic_review.py` | Independent review binding, encrypted candidate/receipt persistence, explicit risk classes, and complete multilingual replay metrics. |
+| `alive_kernel/semantic_comparator.py` | Bounded unscheduled model rendering/review through Hermes, actual route attribution, durable failure accounting. |
 | `interest_learning.py` | Attributed, reversible interest updates. |
 | `discovery.py` | Collection, ranking, cached-candidate rotation, and validated content references. |
 | `topic_dedup.py` | Persistent URL/topic reservation, delivery history, material-update fingerprints, and privacy-safe hashes. |

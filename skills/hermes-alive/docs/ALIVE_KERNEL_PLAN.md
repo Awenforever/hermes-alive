@@ -273,8 +273,11 @@ factual error or user-control violations.
   - [x] add the meaning-first deterministic fidelity baseline (ADR-0034);
   - [x] persist encrypted model candidates and authenticated review receipts
     with selection/erasure/expiry invalidation (ADR-0036);
-  - [ ] connect a provider-neutral model-rendering shadow comparator to the
-    ADR-0035/0036 contracts;
+  - [x] connect an unscheduled provider-neutral model-rendering shadow
+    comparator to the ADR-0035/0036 contracts with bounded calls and durable
+    failure accounting (ADR-0037);
+  - [ ] run real-provider replay with verified model-family mappings and
+    human-calibrated judgments;
   - [ ] remove legacy mood, relationship and `social_urge` influence only
     after replay and canary qualification.
 - [ ] Retire the monolithic watcher after parity and rollback drills.
@@ -335,6 +338,20 @@ For each material change:
 8. do not equate code presence with runtime correctness.
 
 ## Change log
+
+### 2026-10-12 — Executable bounded shadow comparator
+
+- Connected deterministic baseline, natural model rendering, encrypted
+  candidate persistence and independent review in a two-call operation
+  (ADR-0037). Hermes retains provider selection and fallback responsibility.
+- Inspected the supported auxiliary interface and used actual response model
+  plus host route metadata; unknown independence domains fail visibly.
+- Added durable start/failure accounting, bounded calls, strict review parsing
+  and cancellation propagation. Repeated operation IDs cannot spend again.
+- Injected execution verified provider errors, timeout, missing route metadata,
+  malformed JSON, same-model review and intent changes during an async call.
+- Real-provider quality calibration remains unfinished; no production scheduler
+  consumes this comparator yet.
 
 ### 2026-10-12 — Revalidated semantic-review receipts
 

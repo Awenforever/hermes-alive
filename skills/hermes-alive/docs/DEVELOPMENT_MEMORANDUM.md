@@ -243,6 +243,14 @@ superseding selection or content erasure. Review prose does not belong in the
 journal. Regression proof lives in
 `tests/run_alive_kernel_semantic_review_store.py`; see ADR-0036.
 
+The shadow comparator (ADR-0037) records its start before calling a provider.
+Never retry an unresolved operation under the same ID or turn a failed review
+into success. Hermes owns fallback; independently verify response model and
+route metadata afterward. Model-family independence comes from a host resolver,
+never from a model's statement or a task alias. Async intent changes and
+content erasure must invalidate returned output. Injected tests prove execution
+contracts only; real-provider and human-calibrated quality remain open.
+
 ## Plugin dependencies must respect the Hermes environment lock
 
 The supported Hermes runtime already provides `cryptography==50.0.0`. Alive's

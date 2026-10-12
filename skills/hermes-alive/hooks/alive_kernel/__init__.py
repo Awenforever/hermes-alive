@@ -112,6 +112,11 @@ from .semantic_rendering import (
     deterministic_text,
     serialize_meaning,
 )
+from .semantic_comparator import (
+    SemanticComparator,
+    SemanticComparison,
+    run_with_hermes as run_semantic_comparison_with_hermes,
+)
 from .semantic_review import (
     AtomReview,
     IndependentSemanticReview,
@@ -495,6 +500,8 @@ __all__ = [
     "Sensitivity",
     "SemanticAtom",
     "SemanticAtomKind",
+    "SemanticComparator",
+    "SemanticComparison",
     "SemanticCaseJudgment",
     "SemanticReplayPrediction",
     "SemanticReviewError",
@@ -543,6 +550,7 @@ __all__ = [
     "record_post_tool_call",
     "run_consolidation_with_hermes",
     "run_deliberation_with_hermes",
+    "run_semantic_comparison_with_hermes",
     "serialize_frame",
     "serialize_meaning",
     "shadow_enabled",
