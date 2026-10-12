@@ -56,6 +56,12 @@ reading, task completion or usefulness. All cases explicitly retain
 
 ## Remaining qualification
 
+The new `--full-bootstrap` mode passed all six cases through actual
+`hermes_cli.main` module entry, with profile resolution/activation intact and
+no patched core functions. This closes the bounded current-source bootstrap
+check, not installed console/PM qualification. ADR-0059 records its scope and
+the corrected missing cron-context fixture precondition.
+
 The six-case probe additionally passes compiled input through `OperatorCliProcess`
 to a separate child, which rechecks the plan with actual host callbacks before
 calling the public command handler. Executable and four exercised source files
@@ -69,7 +75,7 @@ are refused before fixture delivery. Six cases passed again with this path.
 This closes a text-plan integration check only; it does not prove an authorized
 process launch. ADR-0056 records the media/format limits and required follow-up.
 
-The full CLI bootstrap, PM-managed runtime, real external channel and its
+The installed console/PM-managed runtime, real external channel and its
 acknowledgement contract, Alive's authorized outbox bridge, crash recovery,
 human usefulness and longitudinal behavior remain open. Production remains
 unchanged. This test is a transport-integration step, not production acceptance.

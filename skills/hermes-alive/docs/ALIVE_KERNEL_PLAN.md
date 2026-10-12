@@ -1387,3 +1387,20 @@ For each material change:
   retain semantic shadow/human usefulness and longitudinal acceptance gates;
   launcher tests do not substitute for a continuous attentive assistant.
 - Production unchanged. No external send or production transport enablement.
+
+### 2026-10-12 — Current source full module bootstrap
+
+- Added an opt-in actual `hermes_cli.main` module-entry path, retaining Hermes's
+  bootstrap/profile/activation behavior. Disposable profiles and selected-write
+  audit checks protect the source checkout; no core function is patched.
+- Six native Windows cases passed on audited `3f2abce`: success, refusal, partial,
+  cron skip, wrong receiver and disabled channel. Initial cron-skip failure was
+  missing fixture context; restored it and reran all cases. No core/production
+  repair or dependency install was needed.
+- Current upstream tree remains clean. ADR-0059 distinguishes module bootstrap
+  from generated installed console entry and PM-selected installed generation;
+  those broader gates remain open. Terminal results do not imply living jobs.
+- Next qualify the installed runtime and data preservation, not repeated handler
+  checks. Retain semantic shadow, human calibration and longitudinal usefulness
+  gates: successful transport alone cannot make an attentive continuous assistant.
+- Production unchanged; no external delivery or transport activation.

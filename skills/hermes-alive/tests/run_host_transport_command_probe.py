@@ -141,7 +141,54 @@ print(json.dumps({'mode': mode, 'exit_code': code, 'result': payload,
 '''
 
 
-def run(core: Path) -> list[dict]:
+BOOTSTRAP_CHILD = CHILD.split('from hermes_constants import get_hermes_home', 1)[0] + r'''
+import runpy
+def private_writes_only(event, args):
+    paths = []
+    if event == 'open':
+        path, mode, flags = args
+        if isinstance(path, (str, bytes)) and (flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC | os.O_APPEND)):
+            paths.append(path)
+    elif event in {'os.mkdir', 'os.remove', 'os.rmdir', 'os.chmod'}:
+        paths.append(args[0])
+    elif event in {'os.rename', 'os.link', 'os.symlink'}:
+        paths.extend(args[:2])
+    for path in paths:
+        candidate = pathlib.Path(os.fsdecode(path)).resolve()
+        if candidate != profile.resolve() and profile.resolve() not in candidate.parents:
+            raise RuntimeError('bootstrap write outside disposable profile refused')
+sys.addaudithook(private_writes_only)
+if mode == 'skip':
+    os.environ['HERMES_CRON_AUTO_DELIVER_PLATFORM'] = 'alivefixture'
+    os.environ['HERMES_CRON_AUTO_DELIVER_CHAT_ID'] = 'fixture-chat'
+sys.argv = ['hermes', *sys.argv[5:]]
+output, errors = io.StringIO(), io.StringIO()
+failure = None
+with redirect_stdout(output), redirect_stderr(errors):
+    try:
+        runpy.run_module('hermes_cli.main', run_name='__main__', alter_sys=True)
+    except SystemExit as stopped:
+        code = stopped.code or 0
+    except Exception as error:
+        code = 1
+        failure = type(error).__name__ + ': ' + str(error)
+    else:
+        code = 0
+try:
+    payload = json.loads(output.getvalue())
+except ValueError:
+    payload = {'bootstrap_failure': failure, 'diagnostic': errors.getvalue()[-4000:],
+               'stdout_diagnostic': output.getvalue()[-1000:]}
+receipt_path = profile / 'fixture-deliveries.jsonl'
+effects = [json.loads(line) for line in receipt_path.read_text().splitlines()] if receipt_path.exists() else []
+print(json.dumps({'mode': mode, 'exit_code': code, 'result': payload,
+                 'local_fixture_effects': effects, 'external_delivery_proven': False,
+                 'network_and_process_barriers_tested': True,
+                 'source_revision_scope': 'actual module bootstrap, independent test venv, not installed console entry'}))
+'''
+
+
+def run(core: Path, *, full_bootstrap: bool = False) -> list[dict]:
     results = []
     fixture = Path(__file__).parent / "fixtures" / "transport-platform"
     for mode in ("success", "reject", "partial", "skip", "wrong_route", "disabled"):
@@ -181,13 +228,15 @@ def run(core: Path) -> list[dict]:
                 with artifact.open("rb") as stream:
                     pins[artifact] = hashlib.file_digest(stream, "sha256").hexdigest()
             launcher = OperatorCliProcess(
-                (str(executable), "-B", "-c", CHILD, str(core), str(profile), mode,
+                (str(executable), "-B", "-c", BOOTSTRAP_CHILD if full_bootstrap else CHILD, str(core), str(profile), mode,
                  str(Path(__file__).resolve().parents[1] / "hooks")),
                 profile, "fixture", profile, env, pins, 90)
             stdout, code = launcher(plan)
             if code:
                 raise RuntimeError("command probe child failed; external effects remain unproven")
             result = json.loads(stdout)
+            if 'bootstrap_failure' in result['result']:
+                raise RuntimeError('Full bootstrap failed in disposable profile: ' + json.dumps(result['result']))
             effects, payload = result["local_fixture_effects"], result["result"]
             if mode == "success":
                 if payload.get("error"):
@@ -218,11 +267,13 @@ def run(core: Path) -> list[dict]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--hermes-root", type=Path)
+    parser.add_argument("--full-bootstrap", action="store_true",
+                        help="Exercise actual module bootstrap; refuses writes outside the disposable profile")
     args = parser.parse_args()
     if args.hermes_root is None:
         print("SKIP command transport probe: explicit upstream snapshot required")
         return
-    print(json.dumps(run(args.hermes_root.resolve()), sort_keys=True))
+    print(json.dumps(run(args.hermes_root.resolve(), full_bootstrap=args.full_bootstrap), sort_keys=True))
     print("HERMES_ALIVE_HOST_TRANSPORT_COMMAND_PROBE_OK")
 
 
