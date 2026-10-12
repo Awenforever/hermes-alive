@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from dataclasses import replace
 from pathlib import Path
 import sys
 import tempfile
@@ -37,6 +38,32 @@ def main() -> int:
     assert unknown.useful is None
     assert unknown.interruption_regret is None
     assert unknown.delivery_succeeded is None
+    assert unknown.task_completed is None
+    for kind, completed in (
+        (OutcomeKind.TASK_COMPLETED, True), (OutcomeKind.TASK_FAILED, False),
+    ):
+        task = labels_from_outcomes((outcome(kind, {}, 1),))
+        assert task.task_completed is completed
+        assert task.useful is None
+        assert task.delivery_succeeded is None
+    success_but_unhelpful = labels_from_outcomes((
+        outcome(OutcomeKind.TASK_COMPLETED, {}, 1),
+        outcome(OutcomeKind.EXPLICIT_FEEDBACK, {"sentiment": "unhelpful"}, 2),
+    ))
+    assert success_but_unhelpful.task_completed is True
+    assert success_but_unhelpful.useful is False
+    failed_but_helpful = labels_from_outcomes((
+        outcome(OutcomeKind.TASK_FAILED, {}, 1),
+        outcome(OutcomeKind.EXPLICIT_FEEDBACK, {"sentiment": "helpful"}, 2),
+    ))
+    assert failed_but_helpful.task_completed is False
+    assert failed_but_helpful.useful is True
+    conflicting_tasks = labels_from_outcomes((
+        outcome(OutcomeKind.TASK_COMPLETED, {}, 1),
+        outcome(OutcomeKind.TASK_FAILED, {}, 2),
+    ))
+    assert conflicting_tasks.task_completed is None
+    assert conflicting_tasks.useful is None
 
     labelled = labels_from_outcomes(
         (
@@ -87,12 +114,12 @@ def main() -> int:
         episodes = (
             ReplayEpisode(
                 "attempt-a", 3, attempted_at, "candidate-a", "frame-a",
-                FactualLabels(True, False, False, False, True), ("outcome-a",),
+                FactualLabels(True, False, False, False, True, True), ("outcome-a",),
             ),
             ReplayEpisode(
                 "attempt-b", 4, attempted_at + timedelta(minutes=1),
                 "candidate-b", "frame-b",
-                FactualLabels(False, True, True, None, False), ("outcome-b",),
+                FactualLabels(False, True, True, None, False, False), ("outcome-b",),
             ),
         )
         baseline = StrategySubmission(
@@ -115,7 +142,22 @@ def main() -> int:
         assert comparison.candidate_improves_calibration
         assert not comparison.action_policy_superiority_proven
         assert new.delivery_succeeded == 1 and new.delivery_failed == 1
+        assert new.task_completed == 1 and new.task_failed == 1
+        assert new.task_unknown == 0
         assert new.user_control_violation.labelled == 1
+        operational_only = tuple(
+            replace(episode, labels=FactualLabels(
+                task_completed=episode.labels.task_completed
+            )) for episode in episodes
+        )
+        operational_report = evaluate_submission(
+            journal, operational_only, candidate, holdout_after_sequence=2
+        )
+        assert operational_report.useful.labelled == 0
+        assert operational_report.useful.brier is None
+        assert operational_report.task_completed == 1
+        assert operational_report.task_failed == 1
+        assert operational_report.delivery_unknown == 2
 
         forged_episode = ReplayEpisode(
             "attempt-a", 3, attempted_at, "candidate-forged", "frame-a",

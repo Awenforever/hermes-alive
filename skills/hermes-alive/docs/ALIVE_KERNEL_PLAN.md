@@ -1083,3 +1083,14 @@ For each material change:
   rejection and source-receipt clock skew. No operational timestamps rewritten.
 - Duplicate observations, host reconciliation clock semantics and task-result
   versus user-benefit labels remain next audit work, not claimed resolved.
+
+### 2026-10-12 — Operational completion separated from user benefit
+
+- Audit found task success/failure directly voted on usefulness labels. Removed
+  that conflation: explicit user feedback determines usefulness, while task
+  completion has its own label and report counts (ADR-0047).
+- Tests cover operational-only unknown usefulness, independent opposing user
+  feedback, contradictory task receipts and report-level unknown calibration.
+- Preference/reflection admission does not directly auto-accept task-derived
+  preferences; deeper scope validation remains open. Episode label provenance,
+  duplicate receipts and human/live qualification are still required.

@@ -28,6 +28,7 @@ class FactualLabels:
     factual_error: bool | None = None
     user_control_violation: bool | None = None
     delivery_succeeded: bool | None = None
+    task_completed: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,6 +118,9 @@ class StrategyReport:
     delivery_failed: int
     delivery_unknown: int
     counterfactual_claim_allowed: bool = False
+    task_completed: int = 0
+    task_failed: int = 0
+    task_unknown: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,10 +158,8 @@ def labels_from_outcomes(outcomes: Iterable[OutcomeRecord]) -> FactualLabels:
     values = tuple(outcomes)
     kinds = {value.kind for value in values}
     useful_votes: set[bool] = set()
-    if OutcomeKind.TASK_COMPLETED in kinds:
-        useful_votes.add(True)
-    if OutcomeKind.TASK_FAILED in kinds:
-        useful_votes.add(False)
+    # Operational completion is observable, user benefit is not implied.
+    # Keep this separate even for repeated successful executions.
     for outcome in values:
         if outcome.kind is OutcomeKind.EXPLICIT_FEEDBACK:
             sentiment = _feedback_sentiment(outcome.details)
@@ -187,12 +189,18 @@ def labels_from_outcomes(outcomes: Iterable[OutcomeRecord]) -> FactualLabels:
         delivery_votes.add(True)
     if OutcomeKind.DELIVERY_FAILED in kinds:
         delivery_votes.add(False)
+    task_votes: set[bool] = set()
+    if OutcomeKind.TASK_COMPLETED in kinds:
+        task_votes.add(True)
+    if OutcomeKind.TASK_FAILED in kinds:
+        task_votes.add(False)
     return FactualLabels(
         useful=single(useful_votes),
         interruption_regret=single(regret_votes),
         factual_error=single(factual_votes),
         user_control_violation=single(control_votes),
         delivery_succeeded=single(delivery_votes),
+        task_completed=single(task_votes),
     )
 
 
@@ -315,6 +323,7 @@ def evaluate_submission(
         predictions.append((episode, prediction))
 
     delivery = [episode.labels.delivery_succeeded for episode, _ in predictions]
+    tasks = [episode.labels.task_completed for episode, _ in predictions]
     return StrategyReport(
         strategy=submission.strategy,
         evaluated_attempt_ids=tuple(episode.attempt_id for episode, _ in predictions),
@@ -337,6 +346,9 @@ def evaluate_submission(
         delivery_succeeded=sum(value is True for value in delivery),
         delivery_failed=sum(value is False for value in delivery),
         delivery_unknown=sum(value is None for value in delivery),
+        task_completed=sum(value is True for value in tasks),
+        task_failed=sum(value is False for value in tasks),
+        task_unknown=sum(value is None for value in tasks),
     )
 
 
