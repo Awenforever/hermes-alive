@@ -1239,3 +1239,27 @@ For each material change:
 - This is partial Phase 0 evidence, not completion. Next work must expand
   historical coverage and reconstruct genuinely available shadow context;
   semantic/human labels, causal attempts and live effects cannot be guessed.
+
+### 2026-10-12 — Longitudinal baseline and public transport correction
+
+- Expanded the same read-only, content-free exporter to seven rotated logs
+  plus the active log: 17,049 records, 2,221 distinct tick references and 35
+  watcher references within this capture. All timestamps parsed; no malformed
+  rows or within-source timestamp regressions. Fifteen sent-labelled rows
+  remain legacy claims, not verified sends or usefulness rewards. Labels stay
+  unknown. Four opaque decision groups remain unclassified.
+- The private weekly corpus is outside Git with restricted local ACLs. Its
+  pseudonyms cannot be joined to the earlier capture. Caller/source order is
+  not causal order; repeated enforcement rows are not repeated interventions.
+- Corrected ADR-0028's overly broad host-interface conclusion in ADR-0054.
+  `dispatch_tool` is public, but the send helper is deliberately unregistered;
+  the existing public `hermes send` CLI is a legitimate integration candidate.
+  Do not install a fake registry handler to manufacture availability.
+- Executed seven injected-result cases against the preserved official
+  `f925b01` CLI emitter: skipped and truthy non-boolean success both exit zero;
+  partial effects can exit failure. Added a digest-reporting opt-in test.
+  Reviewed newer `3f2abce` source separately; no latest-runtime qualification
+  is claimed. No actual platform send, production mutation or restart occurred.
+- Next: loaded-registry probe and controlled CLI transport qualification, then
+  genuine context/shadow replay and human usefulness calibration. Phase 0,
+  Phase 5 and full Phase 6 remain incomplete; source tests do not replace them.

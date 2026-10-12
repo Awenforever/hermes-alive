@@ -43,9 +43,11 @@ normalized action and decrypted route only after it durably records
 
 The current official `PluginContext.inject_message()` is therefore represented
 as `request_accepted`, not `external_delivered`, and cannot activate live Alive
-dispatch. The bridge stays disconnected until Hermes publishes a supported
-terminal-delivery capability or an equivalent public contract is accepted
-upstream.
+dispatch. The bridge stays disconnected until a supported interface and its
+truthful receipt semantics are qualified. ADR-0054 corrects the broader
+inference that this necessarily requires a new upstream API: the public
+`hermes send` CLI is an existing candidate, although CLI success alone is
+not delivery proof.
 
 ## Consequences
 
