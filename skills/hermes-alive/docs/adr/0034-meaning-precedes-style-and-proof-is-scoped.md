@@ -32,9 +32,9 @@ Two renderer classes are deliberately different:
 
 - `deterministic` emits every atom verbatim and changes formatting separators
   only. Exact reconstruction can prove transformation fidelity.
-- `model_candidate` can never self-promote to proven. Missing atoms or locked
-  literals are rejected; otherwise free surrounding prose remains
-  `review_required` until an independent semantic review boundary exists.
+- `model_candidate` can never self-promote to proven. Missing locked literals
+  are rejected; ordinary atom text that changed or was paraphrased remains
+  `review_required` for the independent boundary defined in ADR-0035.
 
 Fidelity proof is narrowly scoped. It proves that deterministic rendering did
 not change the defined meaning. It does not prove that the meaning is true,
@@ -54,6 +54,7 @@ invalidates an older receipt even when it selects the same candidate.
   few literals.
 - Factuality/entailment, semantic fidelity, action authority and routing remain
   four independent proof obligations.
-- Before model-rendered prose can enter a canary, add an independent reviewer,
-  multilingual adversarial corpus, human-calibrated thresholds and explicit
-  failure reporting. No single similarity score may close that gate.
+- Before model-rendered prose can enter a canary, exercise the ADR-0035
+  independent-review contract over a qualification-sized multilingual corpus
+  with human-calibrated thresholds. No single similarity score may close that
+  gate.

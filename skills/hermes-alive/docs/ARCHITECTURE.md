@@ -39,6 +39,7 @@ comparison/rollback evidence and as the active safeguard when Circadian is
 | `alive_kernel/presentation.py` | Replayable explicit presentation preferences and advisory-only inferred style. |
 | `alive_kernel/disposition.py` | Post-selection, evidence-carrying expression cues with no action authority. |
 | `alive_kernel/semantic_rendering.py` | Encrypted meaning atoms, deterministic fidelity proof, and fail-closed model-candidate assessment. |
+| `alive_kernel/semantic_review.py` | Independent review binding, explicit semantic risk classes, and complete multilingual replay metrics. |
 | `interest_learning.py` | Attributed, reversible interest updates. |
 | `discovery.py` | Collection, ranking, cached-candidate rotation, and validated content references. |
 | `topic_dedup.py` | Persistent URL/topic reservation, delivery history, material-update fingerprints, and privacy-safe hashes. |
@@ -172,10 +173,14 @@ reference. Deterministic rendering emits atoms verbatim with formatting-only
 separators and revalidates the latest selection on every receipt check.
 
 A free model rewrite can be structurally screened but cannot prove itself
-faithful: omissions are rejected and all other free generation remains review
-required. “Fidelity proven” means only that rendering preserved the defined
-meaning; truth/entailment, action authorization and route authorization remain
-separate upstream/downstream boundaries.
+faithful. Missing protected literals are rejected; ordinary paraphrases remain
+review required. ADR-0035 binds any review to the exact candidate digest and
+requires a distinct execution, actual reviewer identity, independence domain,
+complete per-atom findings and explicit added-claim/speech-act checks. A clean
+review grants shadow-comparison eligibility only. “Fidelity proven” still
+means only that deterministic rendering preserved the defined meaning;
+truth/entailment, action authorization and route authorization remain separate
+upstream/downstream boundaries.
 
 External authority also depends on the latest user-owned autonomy policy
 (ADR-0025). The default is no policy and therefore no proactive execution.

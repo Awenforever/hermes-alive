@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "provenance": "synthetic_adversarial_seed",
+  "privacy_reviewed": true,
+  "qualification_evidence": false,
+  "cases": [
+    {
+      "case_id": "zh-faithful",
+      "language_tag": "zh",
+      "meaning": "报名截止时间是 2026-11-03 09:00，尚未完成报名。",
+      "candidate": "你还没有报名；请留意 2026-11-03 09:00 的截止时间。",
+      "expected_risks": [],
+      "challenge_tags": ["paraphrase", "negation", "deadline"]
+    },
+    {
+      "case_id": "en-faithful",
+      "language_tag": "en",
+      "meaning": "The fee may be USD 30; confirm it before paying.",
+      "candidate": "Please verify before payment because the fee may be USD 30.",
+      "expected_risks": [],
+      "challenge_tags": ["paraphrase", "uncertainty", "amount"]
+    },
+    {
+      "case_id": "ja-faithful",
+      "language_tag": "ja",
+      "meaning": "結果は未確認です。詳細は https://example.invalid/result を参照してください。",
+      "candidate": "https://example.invalid/result で詳細を確認できますが、結果自体はまだ未確認です。",
+      "expected_risks": [],
+      "challenge_tags": ["reordering", "uncertainty", "link"]
+    },
+    {
+      "case_id": "zh-omission",
+      "language_tag": "zh",
+      "meaning": "会议改到周四，并且需要携带身份证。",
+      "candidate": "会议改到周四。",
+      "expected_risks": ["omission"],
+      "challenge_tags": ["second-clause-loss"]
+    },
+    {
+      "case_id": "en-contradiction",
+      "language_tag": "en",
+      "meaning": "The server is unavailable.",
+      "candidate": "The server is operating normally.",
+      "expected_risks": ["contradiction"],
+      "challenge_tags": ["antonym"]
+    },
+    {
+      "case_id": "zh-unsupported-addition",
+      "language_tag": "zh",
+      "meaning": "账单已收到。",
+      "candidate": "账单已收到，我已经替你完成付款。",
+      "expected_risks": ["unsupported_addition"],
+      "challenge_tags": ["fabricated-action"]
+    },
+    {
+      "case_id": "en-polarity-shift",
+      "language_tag": "en",
+      "meaning": "Do not restart the gateway.",
+      "candidate": "Restart the gateway.",
+      "expected_risks": ["polarity_shift"],
+      "challenge_tags": ["negation-drop"]
+    },
+    {
+      "case_id": "ja-uncertainty-shift",
+      "language_tag": "ja",
+      "meaning": "明日は雨かもしれません。",
+      "candidate": "明日は雨です。",
+      "expected_risks": ["uncertainty_shift"],
+      "challenge_tags": ["hedge-removal"]
+    },
+    {
+      "case_id": "zh-temporal-shift",
+      "language_tag": "zh",
+      "meaning": "请在 2026-12-01 之前提交。",
+      "candidate": "请在 2026-12-10 之前提交。",
+      "expected_risks": ["temporal_shift"],
+      "challenge_tags": ["deadline-drift"]
+    },
+    {
+      "case_id": "en-quantity-shift",
+      "language_tag": "en",
+      "meaning": "The balance is USD 18.50.",
+      "candidate": "The balance is USD 185.00.",
+      "expected_risks": ["quantity_shift"],
+      "challenge_tags": ["decimal-drift"]
+    },
+    {
+      "case_id": "zh-reference-mismatch",
+      "language_tag": "zh",
+      "meaning": "请访问 https://example.invalid/a 完成确认。",
+      "candidate": "请访问 https://example.invalid/b 完成确认。",
+      "expected_risks": ["reference_mismatch"],
+      "challenge_tags": ["link-substitution"]
+    },
+    {
+      "case_id": "ja-speech-act-shift",
+      "language_tag": "ja",
+      "meaning": "参加できますか？",
+      "candidate": "参加してください。",
+      "expected_risks": ["speech_act_shift"],
+      "challenge_tags": ["question-to-command"]
+    }
+  ]
+}

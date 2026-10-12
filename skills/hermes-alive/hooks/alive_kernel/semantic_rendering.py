@@ -290,14 +290,12 @@ def assess_fidelity(
     unexpected = candidate != expected
     reasons: list[str] = []
     if missing_atoms:
-        reasons.append("required_semantic_atoms_missing")
+        reasons.append("semantic_atoms_changed_or_paraphrased")
     if missing_literals:
         reasons.append("protected_literals_missing_or_changed")
     if renderer is RendererClass.DETERMINISTIC and unexpected:
         reasons.append("deterministic_output_mismatch")
-    if missing_atoms or missing_literals or (
-        renderer is RendererClass.DETERMINISTIC and unexpected
-    ):
+    if missing_literals or (renderer is RendererClass.DETERMINISTIC and unexpected):
         status = FidelityStatus.REJECTED
     elif renderer is RendererClass.DETERMINISTIC:
         status = FidelityStatus.PROVEN

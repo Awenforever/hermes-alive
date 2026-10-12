@@ -213,15 +213,27 @@ Define meaning before presentation as bounded encrypted semantic atoms. Lock
 dates, amounts, links, contacts, negation and uncertainty exactly. A candidate
 references that meaning; a renderer cannot invent its own destination or
 authority. Deterministic verbatim layout may prove only transformation
-fidelity. Free model output stays `review_required` even when every atom is
-present, because surrounding prose can add a claim or change a relation.
+fidelity. Free model output stays `review_required`. Missing a protected
+literal is a hard failure; absence of the complete original sentence is not,
+by itself, proof of failure because a valid paraphrase may change every
+ordinary token.
+
+An independent review must bind the exact candidate digest and inspect every
+atom, additions, speech act and protected literal. The renderer and reviewer
+must use distinct executions and declared independence domains; changing a
+display name is not independence. A clean result is eligible only for shadow
+comparison and can never authorize delivery. Keep omission, contradiction,
+unsupported addition, polarity, uncertainty, time, quantity, reference and
+speech-act errors as separate metrics. The checked-in multilingual seed is a
+test of the evaluator, not evidence that any model pair is production-ready.
 
 Keep four proof obligations visibly separate: factual entailment, rendering
 fidelity, action authority and route authority. A green result in one must
 never stand in for another. Revalidate the exact latest selection whenever a
 render receipt is consumed. Regression proof lives in
 `tests/run_alive_kernel_semantic_rendering.py`; the architectural contract is
-ADR-0034.
+ADR-0034. Independent-review and complete-cohort regression proof lives in
+`tests/run_alive_kernel_semantic_review.py`; its boundary is ADR-0035.
 
 ## Plugin dependencies must respect the Hermes environment lock
 

@@ -261,15 +261,18 @@ factual error or user-control violations.
   - [x] add a dual-opt-in one-way legacy voice shadow bridge;
   - [x] add encrypted meaning atoms, a provably lossless deterministic
     renderer and fail-closed classification for free model output (ADR-0034);
-  - [ ] add independent semantic review, multilingual/human-calibrated
-    evaluation and user inspect/correct controls;
+  - [x] define an independent semantic-review contract, explicit failure
+    taxonomy and complete multilingual adversarial replay metrics (ADR-0035);
+  - [ ] build a qualification-sized human-calibrated corpus and user
+    inspect/correct controls;
   - [ ] replace the legacy live voice consumer only after shadow qualification.
 - [ ] Replace heuristic mood with explainable dispositions:
   - [x] define authenticated post-selection expression cues that retain each
     independent dimension's evidence and grant no decision authority
     (ADR-0033);
   - [x] add the meaning-first deterministic fidelity baseline (ADR-0034);
-  - [ ] add a model-rendering shadow comparator and independent reviewer;
+  - [ ] connect a provider-neutral model-rendering shadow comparator to the
+    ADR-0035 reviewer contract and persist authenticated review receipts;
   - [ ] remove legacy mood, relationship and `social_urge` influence only
     after replay and canary qualification.
 - [ ] Retire the monolithic watcher after parity and rollback drills.
@@ -330,6 +333,23 @@ For each material change:
 8. do not equate code presence with runtime correctness.
 
 ## Change log
+
+### 2026-10-12 — Independent semantic review and adversarial replay
+
+- Corrected an over-conservative baseline: ordinary paraphrases now require
+  review instead of failing merely because they do not contain the entire
+  source sentence. Missing protected dates, amounts, links, contacts,
+  negation or uncertainty markers still fails closed.
+- Added an exact candidate-digest review contract with complete per-atom,
+  added-claim, speech-act and protected-literal findings (ADR-0035).
+- Required distinct renderer/reviewer executions, actual model identities and
+  declared independence domains. Self-review is invalid, not weak evidence.
+- Kept a clean independent result shadow-only: it grants no truth, action,
+  route or delivery authority.
+- Added complete-cohort metrics and a 12-case Chinese/English/Japanese
+  adversarial seed covering faithful paraphrases plus nine distinct semantic
+  failure classes. The seed is explicitly machinery proof, not product
+  qualification; at least 100 blinded, human-calibrated cases remain required.
 
 ### 2026-10-12 — Presentation policy boundary
 
