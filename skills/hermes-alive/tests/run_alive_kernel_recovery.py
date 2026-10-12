@@ -8,6 +8,8 @@ from dataclasses import replace
 from unittest.mock import patch
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+import hashlib
+import os
 import sqlite3
 import sys
 import tempfile
@@ -16,6 +18,7 @@ HOOKS = Path(__file__).resolve().parents[1] / "hooks"
 sys.path.insert(0, str(HOOKS))
 from alive_kernel.dispatch_verifier import DispatchEvidenceVerifier
 from alive_kernel.cli_execution import execute_text_cli_once
+from alive_kernel.cli_process import OperatorCliProcess
 from alive_kernel.event_store import EventConflictError
 
 from alive_kernel import (  # noqa: E402
@@ -383,9 +386,22 @@ def main() -> int:
         assert third_lease is not None
         launch_calls = []
         cli_stdout = '{"success":true,"message_id":"PRIVATE_CLI_REPORT_MARKER"}'
+        process_executable = Path(sys.executable).resolve()
+        process_fixture = Path(__file__).resolve().parent / "fixtures" / "cli-process-fixture.py"
+        pins = {}
+        for artifact in (process_executable, process_fixture):
+            with artifact.open("rb") as stream:
+                pins[artifact] = hashlib.file_digest(stream, "sha256").hexdigest()
+        process_env = {key: value for key, value in os.environ.items()
+                       if key.upper() in {"SYSTEMROOT", "WINDIR", "TEMP", "TMP"}}
+        process_env.update(HERMES_HOME=str(kernel.resolve()), PYTHONUTF8="1",
+                           PYTHONDONTWRITEBYTECODE="1", PYTHONNOUSERSITE="1")
+        synthetic_process = OperatorCliProcess(
+            (str(process_executable), "-B", str(process_fixture), "bridge"),
+            kernel.resolve(), "default", kernel.resolve(), process_env, pins, 5)
         def local_launcher(plan):
             launch_calls.append(plan.stdin_text)
-            return cli_stdout, 0
+            return synthetic_process(plan)
         bridge_options = dict(
             clearance=Sensitivity.RESTRICTED, profile_id="default", hermes_home=kernel,
             resolve_target=lambda platform, reference: (reference, None, None),

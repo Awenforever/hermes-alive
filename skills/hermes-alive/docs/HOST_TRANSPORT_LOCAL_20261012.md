@@ -56,6 +56,12 @@ reading, task completion or usefulness. All cases explicitly retain
 
 ## Remaining qualification
 
+The six-case probe additionally passes compiled input through `OperatorCliProcess`
+to a separate child, which rechecks the plan with actual host callbacks before
+calling the public command handler. Executable and four exercised source files
+have pre-launch hash checks; this is not full runtime/import-graph identity.
+ADR-0058 documents timeout/capture semantics and resource/privacy limitations.
+
 The command probe now compiles its text action through the actual host profile
 getter, destination resolver and media parser, then supplies the unchanged body
 through stdin. Negative preflight checks verify actual host attachment controls

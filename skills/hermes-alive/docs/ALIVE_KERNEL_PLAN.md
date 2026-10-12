@@ -1367,3 +1367,23 @@ For each material change:
   process launcher, then qualify the combined isolated chain before live canary.
 - Production unchanged; broader semantic shadow, agenda/learning usefulness,
   deployment/migration and longitudinal acceptance requirements remain open.
+
+### 2026-10-12 — Actual isolated process launcher
+
+- Added immutable operator-owned process binding and pre-launch artifact/profile
+  checks. No shell, body in argv, inherited caller environment or automatic retry.
+  Lossless output/timeout uncertainty remains nonterminal (ADR-0058).
+- Native Windows process cases pass for multiline Unicode, timeout, oversized
+  output, invalid encoding and changed bindings. The real synthetic recovery
+  authorization now reaches a separate synthetic child through the single-start
+  bridge; repeated execution still does not launch again.
+- All six actual current-upstream local-platform command cases also pass through
+  this launcher, preserving stdin body and actual child-side profile/route/media
+  checks. These are separate qualification paths, not yet a PM-installed host
+  command combined with genuine authorization and platform delivery.
+- Next address full runtime/bootstrap selection, private capture placement and
+  crash cleanup, independently enforced resource limits, then combined authorized
+  installed-runtime qualification before any real-channel canary. Explicitly
+  retain semantic shadow/human usefulness and longitudinal acceptance gates;
+  launcher tests do not substitute for a continuous attentive assistant.
+- Production unchanged. No external send or production transport enablement.

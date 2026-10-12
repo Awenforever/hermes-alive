@@ -7,16 +7,18 @@ provider delivery qualification. Only a disposable profile receives effects.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
 import shutil
-import subprocess
 import sys
 import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "hooks"))
 from alive_kernel.transport_receipts import classify_cli_report
+from alive_kernel.cli_process import OperatorCliProcess
+from alive_kernel.cli_send_contract import compile_text_cli_plan
 
 CHILD = r'''
 import argparse, io, json, os, pathlib, re, shlex, sys
@@ -93,7 +95,7 @@ from gateway.platforms.base import BasePlatformAdapter
 from tools.send_message_targets import resolve_send_target
 chat = 'other-chat' if mode == 'wrong_route' else 'fixture-chat'
 document = {'schema_version': 1, 'capability': 'hermes.channel.send',
-            'operation': {'text': 'synthetic integration body', 'format': 'markdown'}}
+            'operation': {'text': sys.stdin.read(), 'format': 'markdown'}}
 route = {'platform': 'alivefixture', 'profile': 'fixture', 'chat_id': chat, 'thread_id': None}
 # Characterize actual host interpretation before proving preflight rejection.
 media_example = 'MEDIA:' + str(profile / 'synthetic-attachment.pdf')
@@ -115,6 +117,7 @@ plan = compile_text_cli_plan(
     resolve_target=resolve_send_target, extract_media=BasePlatformAdapter.extract_media,
     observe_profile_home=get_hermes_home)
 args = parser.parse_args(plan.arguments)
+assert tuple(sys.argv[5:]) == plan.arguments
 output, errors = io.StringIO(), io.StringIO()
 original_stdin = sys.stdin
 sys.stdin = io.StringIO(plan.stdin_text)
@@ -160,19 +163,35 @@ def run(core: Path) -> list[dict]:
                        GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull,
                        HERMES_BUNDLED_PLUGINS=str(profile / "empty-bundled"),
                        HERMES_PROACTIVE_PLATFORM_ENABLED="false")
-            child = subprocess.run([sys.executable, "-B", "-c", CHILD, str(core),
-                                    str(profile), mode,
-                                    str((Path(__file__).resolve().parents[1] / "hooks"))],
-                                   cwd=profile, env=env,
-                                   capture_output=True, text=True, encoding="utf-8",
-                                   errors="replace", timeout=90)
-            if child.returncode:
-                raise RuntimeError("command probe failed:\n" + child.stderr[-4000:])
-            result = json.loads(child.stdout)
+            # Parent callbacks are synthetic; child rechecks the same plan with
+            # actual host callbacks before invoking the real command handler.
+            chat = "other-chat" if mode == "wrong_route" else "fixture-chat"
+            plan = compile_text_cli_plan(
+                {"schema_version": 1, "capability": "hermes.channel.send",
+                 "operation": {"text": "synthetic integration body", "format": "markdown"}},
+                {"platform": "alivefixture", "profile": "fixture", "chat_id": chat, "thread_id": None},
+                profile_id="fixture", hermes_home=profile, observe_profile_home=lambda: profile,
+                extract_media=lambda text: ([], text), resolve_target=lambda p, r: (r, None, None))
+            executable = Path(sys.executable).resolve()
+            artifacts = [executable, *(core / path for path in (
+                "hermes_cli/plugins.py", "hermes_cli/send_cmd.py", "tools/registry.py",
+                "tools/send_message_tool.py"))]
+            pins = {}
+            for artifact in artifacts:
+                with artifact.open("rb") as stream:
+                    pins[artifact] = hashlib.file_digest(stream, "sha256").hexdigest()
+            launcher = OperatorCliProcess(
+                (str(executable), "-B", "-c", CHILD, str(core), str(profile), mode,
+                 str(Path(__file__).resolve().parents[1] / "hooks")),
+                profile, "fixture", profile, env, pins, 90)
+            stdout, code = launcher(plan)
+            if code:
+                raise RuntimeError("command probe child failed; external effects remain unproven")
+            result = json.loads(stdout)
             effects, payload = result["local_fixture_effects"], result["result"]
             if mode == "success":
                 if payload.get("error"):
-                    raise RuntimeError(str(payload["error"]) + "\n" + child.stderr[-6000:])
+                    raise RuntimeError(str(payload["error"]))
                 assert result["exit_code"] == 0 and payload.get("success") is True, result
                 assert len(effects) == 1 and effects[0]["effect"] == "complete"
             elif mode == "partial":
