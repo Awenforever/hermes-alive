@@ -14,7 +14,7 @@ import tempfile
 
 HOOKS = Path(__file__).resolve().parents[1] / "hooks"
 sys.path.insert(0, str(HOOKS))
-from alive_kernel_testkit import authenticated_dispatch_receipt
+from alive_kernel_testkit import authenticated_dispatch_receipt, inject_legacy_outcome_row
 
 from alive_kernel.deliberation import (  # noqa: E402
     ActionAuthority,
@@ -256,6 +256,23 @@ def main() -> int:
             outcome_id="outcome:delivered-test",
         )
         assert outcomes.apply(delivered_record).outcome == "recorded"
+        alias = replace(delivery, event_id="delivery-receipt:copied")
+        journal.append(alias)
+        copied = outcomes.append_outcome(
+            attempt_id="attempt:outcome-test", kind=OutcomeKind.DELIVERY_SUCCEEDED,
+            source_event_id=alias.event_id, details={"copied_receipt": True},
+            actor="system:channel", subject="user:test", outcome_id="outcome:copied",
+        )
+        assert outcomes.evidence_valid_for(journal, copied)
+        deduplication = outcomes.apply(copied)
+        assert deduplication.outcome == "deduplicated"
+        assert deduplication.outcome_id == delivered_record.event.payload["outcome_id"]
+        inject_legacy_outcome_row(outcomes, copied)
+        with closing(outcomes._connect()) as connection:
+            assert outcomes.canonical_evidence_valid_for(journal, connection, delivered_record)
+            assert not outcomes.canonical_evidence_valid_for(journal, connection, copied)
+        assert len(outcomes.outcomes("attempt:outcome-test", clearance=Sensitivity.PRIVATE)) == 1
+        assert journal.get(copied.event.event_id) is not None
         unsigned = EventEnvelope(
             event_id="delivery:unsigned", event_type="delivery.succeeded", source="test.channel",
             actor="system:test", subject="user:test", payload={"receipt": True},
@@ -443,6 +460,18 @@ def main() -> int:
             outcomes.outcomes("attempt:outcome-test", clearance=Sensitivity.PRIVATE)
             == observed_before
         )
+        # Distinct real user messages are not deduplicated merely because
+        # their text/classification or attributed attempt happens to match.
+        later_reply = replace(reply, event_id="reply:outcome-test-later")
+        journal.append(later_reply)
+        later_outcome = outcomes.append_outcome(
+            attempt_id="attempt:outcome-test", kind=OutcomeKind.USER_REPLIED,
+            source_event_id=later_reply.event_id, details={"classification": "substantive_reply"},
+            actor="user:test", subject="user:test", outcome_id="outcome:later-reply",
+        )
+        assert outcomes.apply(later_outcome).outcome == "recorded"
+        final = outcomes.outcomes("attempt:outcome-test", clearance=Sensitivity.PRIVATE)
+        assert sum(item.kind is OutcomeKind.USER_REPLIED for item in final) == 2
 
     print("HERMES_ALIVE_KERNEL_OUTCOMES_OK")
     return 0

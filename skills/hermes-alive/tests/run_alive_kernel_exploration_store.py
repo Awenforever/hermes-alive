@@ -4,12 +4,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from dataclasses import replace
+from contextlib import closing
 import sys
 import tempfile
 
 HOOKS = Path(__file__).resolve().parents[1] / "hooks"
 sys.path.insert(0, str(HOOKS))
-from alive_kernel_testkit import authenticated_dispatch_receipt
+from alive_kernel_testkit import authenticated_dispatch_receipt, inject_legacy_outcome_row
 
 from alive_kernel import (  # noqa: E402
     ActionAuthority, ActionCandidate, ActionKind, AssessmentBasis,
@@ -120,6 +122,31 @@ def main() -> int:
             outcome_id="outcome:exploration-first",
         )
         outcomes.apply(delivered)
+        alias = replace(receipt, event_id="receipt:exploration-copy")
+        journal.append(alias)
+        copied = outcomes.append_outcome(
+            attempt_id="attempt:exploration-first", kind=OutcomeKind.DELIVERY_SUCCEEDED,
+            source_event_id=alias.event_id, details={"legacy_copy": True}, actor="system:test",
+            subject="user:test", outcome_id="outcome:exploration-copy",
+        )
+        assert outcomes.apply(copied).outcome == "deduplicated"
+        inject_legacy_outcome_row(outcomes, copied)
+        unsigned = EventEnvelope(
+            event_id="receipt:exploration-unsigned", event_type="delivery.succeeded",
+            source="test.channel", actor="system:test", subject="user:test", payload={"legacy": True},
+        )
+        journal.append(unsigned)
+        invalid = outcomes.append_outcome(
+            attempt_id="attempt:exploration-first", kind=OutcomeKind.DELIVERY_SUCCEEDED,
+            source_event_id=unsigned.event_id, details={}, actor="system:test",
+            subject="user:test", outcome_id="outcome:exploration-invalid",
+        )
+        inject_legacy_outcome_row(outcomes, invalid)
+        with closing(exploration._connect()) as connection:
+            # Invalid/duplicate newest rows must not consume a requested
+            # history limit and hide the genuinely observed older exposure.
+            history = exploration._exposure_history(connection, "user:test", 1)
+            assert len(history) == 1 and history[0].outcome_event_id == delivered.event.event_id
 
         second = make_candidate("second")
         second_event, second_frame = deliberation.append_frame(
@@ -154,6 +181,8 @@ def main() -> int:
         rebuilt = exploration.rebuild(batch_size=2)
         assert any(item.event_id == second_gate_event.event.event_id for item in rebuilt)
         assert exploration.gate_result(second_frame.frame_id) == before
+        assert journal.get(copied.event.event_id) is not None
+        assert journal.get(invalid.event.event_id) is not None
 
     print("HERMES_ALIVE_KERNEL_EXPLORATION_STORE_OK")
     return 0

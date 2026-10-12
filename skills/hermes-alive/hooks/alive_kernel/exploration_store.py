@@ -31,7 +31,7 @@ from .exploration import (
     ExposureRecord,
     apply_exploration_gate,
 )
-from .outcomes import OutcomeKind
+from .outcomes import OutcomeKind, OutcomeProjection
 
 
 @dataclass(frozen=True, slots=True)
@@ -386,17 +386,24 @@ class ExplorationProjection:
             JOIN exploration_annotations_v1 a
               ON a.frame_id=s.frame_id AND a.candidate_id=s.candidate_id
             WHERE o.subject=? AND o.kind=?
-            ORDER BY o.rowid DESC LIMIT ?
+            ORDER BY o.rowid DESC
             """,
-            (subject, OutcomeKind.DELIVERY_SUCCEEDED.value, limit),
-        ).fetchall()
-        return tuple(
-            ExposureRecord(
+            (subject, OutcomeKind.DELIVERY_SUCCEEDED.value),
+        )
+        history = []
+        for row in rows:
+            original = self.journal.get(row["outcome_event_id"])
+            if original is None or not OutcomeProjection.canonical_evidence_valid_for(
+                self.journal, connection, original
+            ):
+                continue
+            history.append(ExposureRecord(
                 row["outcome_event_id"], row["candidate_id"], row["topic_digest"],
                 row["source_digest"], ExplorationMode(row["mode"]),
-            )
-            for row in reversed(rows)
-        )
+            ))
+            if len(history) >= limit:
+                break
+        return tuple(reversed(history))
 
     def _history_by_ids(
         self, connection: sqlite3.Connection, subject: str, event_ids: tuple[str, ...]

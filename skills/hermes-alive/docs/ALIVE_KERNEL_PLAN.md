@@ -230,6 +230,10 @@ inspectable; replay is deterministic outside explicitly recorded model calls.
   (ADR-0046..0049; synthetic shadow proof, not human qualification).
 - [ ] Audit remaining projection integrity, duplicate result observations and
   operational host-clock reconciliation behavior before activation.
+  - [x] Exclude signed receipt aliases from outcome admission and dependent
+    cached reads, and validate before limiting exposure history (ADR-0051).
+  - [ ] Qualify arbitrary cache repair/deletion, multi-generation/conflicting
+    outcomes and large-history performance; alias exclusion is not full proof.
 
 - [x] Link action attempts and evidence-backed delivery, reply, correction,
   feedback and downstream task outcomes to validated selections (ADR-0008).
@@ -1145,3 +1149,15 @@ For each material change:
   retry failed on a core psutil Git transfer, leaving the plugin disabled.
 - No successful install or lifecycle matrix is claimed. Dependency transport
   stays Hermes-owned; do not chase it by changing production environments.
+
+### 2026-10-12 — Canonical observations across the learning loop
+
+- Audit found per-event-ID deduplication allowed copied signed receipts to
+  become extra observations. Canonical identity now uses attempt/kind/signed
+  start, with original row/reference validation (ADR-0051).
+- Outcome reads, reflection/preference sources and exploration exposures now
+  revalidate that identity. Exposure limits apply after validation so old valid
+  evidence cannot be hidden by new invalid/duplicate rows.
+- Synthetic alias, legacy cache, erasure/rebuild and distinct-user-message
+  regressions preserve history and demonstrate the bounded correction. Full
+  projection integrity, actual effect identity and live learning stay open.

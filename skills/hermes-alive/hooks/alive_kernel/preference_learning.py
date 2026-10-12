@@ -351,7 +351,7 @@ class PreferenceLearningProjection:
                 row
                 and source_event.event.payload.get("outcome_id") == row["outcome_id"]
                 and source_event.event.payload.get("kind") == row["kind"]
-                and OutcomeProjection.evidence_valid_for(self.journal, source_event)
+                and OutcomeProjection.canonical_evidence_valid_for(self.journal, connection, source_event)
                 and row["event_id"] == source_event_id
                 and row["subject"] == event.subject
                 and _SENSITIVITY_ORDER.index(Sensitivity(row["sensitivity"]))

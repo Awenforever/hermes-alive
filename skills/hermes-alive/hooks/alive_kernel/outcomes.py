@@ -732,6 +732,10 @@ class OutcomeProjection:
             return self._decision(
                 connection, event, "rejected", "outcome_content_unavailable", attempt_id, outcome_id or None
             )
+        duplicate = self._earlier_observation(self.journal, connection, self.journal.get(event.event_id))
+        if duplicate is not None:
+            return self._decision(connection, event, "deduplicated", "same_observation",
+                                  attempt_id, duplicate.event.payload["outcome_id"])
         duplicate = connection.execute(
             """
             SELECT outcome_id FROM action_outcomes_v1
@@ -743,8 +747,8 @@ class OutcomeProjection:
             return self._decision(
                 connection,
                 event,
-                "deduplicated",
-                "same_observation",
+                "rejected",
+                "existing_observation_cache_invalid",
                 attempt_id,
                 duplicate["outcome_id"],
             )
@@ -882,6 +886,68 @@ class OutcomeProjection:
         from .dispatch_verifier import DispatchEvidenceVerifier
         return DispatchEvidenceVerifier(journal, LocalIdentityProtector(key_path)).verify(source, attempt)
 
+    @staticmethod
+    def _row_matches_record(row, record: JournalRecord) -> bool:
+        try:
+            reference = ContentReference.from_event_payload(record.event.payload["content"])
+            return bool(
+                record.event.event_id == row["event_id"]
+                and all(record.event.payload.get(name) == row[name] for name in (
+                    "outcome_id", "attempt_id", "source_event_id", "kind",
+                ))
+                and record.event.subject == row["subject"]
+                and reference.content_id == row["content_id"]
+                and reference.sensitivity is record.event.sensitivity
+                and record.event.sensitivity.value == row["sensitivity"]
+                and record.event.observed_at.isoformat() == row["observed_at"]
+            )
+        except (KeyError, TypeError, ValueError):
+            return False
+
+    @staticmethod
+    def _observation_key(journal, record):
+        if record is None or not OutcomeProjection.evidence_valid_for(journal, record):
+            return None
+        payload = record.event.payload
+        source = journal.get(str(payload["source_event_id"]))
+        kind = OutcomeKind(payload["kind"])
+        if kind in {OutcomeKind.DELIVERY_SUCCEEDED, OutcomeKind.DELIVERY_FAILED,
+                    OutcomeKind.TASK_COMPLETED, OutcomeKind.TASK_FAILED}:
+            # Signatures bind this start ID and generation. Copying a signed
+            # receipt under a different event ID does not create a new effect.
+            identity = source.event.payload["start_event_id"]
+        else:
+            identity = source.event.event_id
+        return (payload["attempt_id"], kind.value, identity)
+
+    @staticmethod
+    def _earlier_observation(journal, connection, record):
+        key = OutcomeProjection._observation_key(journal, record)
+        if key is None:
+            return None
+        earlier = []
+        for row in connection.execute(
+            "SELECT * FROM action_outcomes_v1 WHERE attempt_id=? AND kind=?",
+            key[:2],
+        ).fetchall():
+            original = journal.get(row["event_id"])
+            if (original is not None and original.sequence < record.sequence
+                and OutcomeProjection._row_matches_record(row, original)
+                and OutcomeProjection._observation_key(journal, original) == key):
+                earlier.append(original)
+        return min(earlier, key=lambda item: item.sequence) if earlier else None
+
+    @staticmethod
+    def canonical_evidence_valid_for(journal, connection, record) -> bool:
+        """Validate a materialized observation without multiplying receipt replays."""
+        if OutcomeProjection._observation_key(journal, record) is None:
+            return False
+        row = connection.execute(
+            "SELECT * FROM action_outcomes_v1 WHERE event_id=?", (record.event.event_id,),
+        ).fetchone()
+        return bool(row is not None and OutcomeProjection._row_matches_record(row, record)
+                    and OutcomeProjection._earlier_observation(journal, connection, record) is None)
+
     def outcomes(
         self, attempt_id: str, *, clearance: Sensitivity
     ) -> list[OutcomeRecord]:
@@ -898,23 +964,8 @@ class OutcomeProjection:
             records: list[OutcomeRecord] = []
             for row in rows:
                 original = self.journal.get(row["event_id"])
-                if original is None or not self.evidence_valid_for(self.journal, original):
-                    continue
-                try:
-                    reference = ContentReference.from_event_payload(original.event.payload["content"])
-                except (KeyError, TypeError, ValueError):
-                    continue
-                if (
-                    original.event.payload.get("outcome_id") != row["outcome_id"]
-                    or original.event.payload.get("attempt_id") != row["attempt_id"]
-                    or original.event.payload.get("source_event_id") != row["source_event_id"]
-                    or original.event.payload.get("kind") != row["kind"]
-                    or original.event.subject != row["subject"]
-                    or reference.content_id != row["content_id"]
-                    or original.event.sensitivity.value != row["sensitivity"]
-                    or reference.sensitivity is not original.event.sensitivity
-                    or original.event.observed_at.isoformat() != row["observed_at"]
-                ):
+                if (original is None or not self._row_matches_record(row, original)
+                    or not self.canonical_evidence_valid_for(self.journal, connection, original)):
                     continue
                 sensitivity = Sensitivity(row["sensitivity"])
                 try:

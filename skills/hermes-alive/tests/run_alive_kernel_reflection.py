@@ -4,13 +4,15 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from dataclasses import replace
+from contextlib import closing
 from pathlib import Path
 import sys
 import tempfile
 
 HOOKS = Path(__file__).resolve().parents[1] / "hooks"
 sys.path.insert(0, str(HOOKS))
-from alive_kernel_testkit import authenticated_dispatch_receipt
+from alive_kernel_testkit import authenticated_dispatch_receipt, inject_legacy_outcome_row
 
 from alive_kernel import (  # noqa: E402
     ActionAuthority,
@@ -157,6 +159,15 @@ def main() -> int:
             outcome_id="outcome:reflection-feedback",
         )
         assert outcomes.apply(explicit).outcome == "recorded"
+        alias = replace(receipt, event_id="receipt:reflection-copy")
+        journal.append(alias)
+        copied = outcomes.append_outcome(
+            attempt_id="attempt:reflection-test", kind=OutcomeKind.DELIVERY_SUCCEEDED,
+            source_event_id=alias.event_id, details={}, actor="system:test", subject="user:test",
+            outcome_id="outcome:reflection-copy",
+        )
+        assert outcomes.apply(copied).outcome == "deduplicated"
+        inject_legacy_outcome_row(outcomes, copied)
 
         weak = ReflectionProposal(
             reflection_id="reflection:weak-test",
@@ -187,6 +198,10 @@ def main() -> int:
             expires_at=now + timedelta(days=30),
             model="provider/model",
         )
+        duplicate_proposal = replace(valid, reflection_id="reflection:duplicated-basis",
+                                     evidence_outcome_ids=("outcome:reflection-copy", "outcome:reflection-feedback"))
+        duplicate_decision = reflections.apply(reflections.append_proposal(duplicate_proposal, actor="model:test"))
+        assert duplicate_decision.reason == "outcome_evidence_invalid"
         proposal_event = reflections.append_proposal(valid, actor="model:test")
         assert reflections.apply(proposal_event).outcome == "proposed"
         proposed = reflections.list_reflections(clearance=Sensitivity.PRIVATE)
@@ -222,6 +237,14 @@ def main() -> int:
         assert reflections.apply(accepted_event).outcome == ReflectionState.ACCEPTED.value
         accepted = reflections.list_reflections(clearance=Sensitivity.PRIVATE)
         assert accepted[0].state is ReflectionState.ACCEPTED
+        with closing(reflections._connect()) as connection:
+            connection.execute("INSERT INTO reflection_evidence_v1 VALUES (?, ?)",
+                               (valid.reflection_id, "outcome:reflection-copy"))
+        assert reflections.list_reflections(clearance=Sensitivity.PRIVATE) == []
+        with closing(reflections._connect()) as connection:
+            connection.execute("DELETE FROM reflection_evidence_v1 WHERE reflection_id=? AND outcome_id=?",
+                               (valid.reflection_id, "outcome:reflection-copy"))
+        assert reflections.list_reflections(clearance=Sensitivity.PRIVATE) == accepted
 
         reflections.content_vault.erase_item(accepted[0].content_id)
         erased_before = reflections.list_reflections(clearance=Sensitivity.PRIVATE)

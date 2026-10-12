@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from contextlib import closing
 
 from alive_kernel.action_contract import parse_action_contract
 from alive_kernel.autonomy_policy import AutonomyPolicyProjection
@@ -19,6 +20,18 @@ from alive_kernel.privacy import LocalIdentityProtector
 from alive_kernel.exploration import ExplorationMode, ExplorationPolicy
 from alive_kernel.exploration_store import ExplorationProjection
 from alive_kernel.host_capabilities import HostCapabilityProjection, ReceiptLevel
+
+
+def inject_legacy_outcome_row(projection, record):
+    """Emulate an older materialized row without calling current admission."""
+    event = record.event
+    payload = event.payload
+    with closing(projection._connect()) as connection:
+        connection.execute("INSERT INTO action_outcomes_v1 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (
+            payload["outcome_id"], event.event_id, payload["attempt_id"], payload["kind"],
+            event.subject, payload["source_event_id"], payload["content"]["content_id"],
+            event.sensitivity.value, event.observed_at.isoformat(),
+        ))
 
 
 def authenticated_dispatch_receipt(journal, attempt, *, event_id, event_type="delivery.succeeded"):
