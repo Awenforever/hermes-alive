@@ -25,6 +25,7 @@ from .retention import (
     RetentionValidationError,
 )
 from .semantic_rendering import MeaningStore, SemanticAtomKind
+from .semantic_history import SemanticHistory
 
 
 USAGE = (
@@ -37,6 +38,7 @@ USAGE = (
     "- `/memory alive accept <id>` 或 `/memory alive reject <id>`\n"
     "- `/memory alive retract <id>`（撤回已接受记忆）\n"
     "- `/memory alive message <meaning-event-id>`（查看主动消息依据）\n"
+    "- `/memory alive messages [before-event-id]`（分页查看自己的消息内容记录）\n"
     "- `/memory alive withdraw-message <meaning-event-id>`（撤回待用消息内容）\n"
     "- `/memory alive correct-message <meaning-event-id> <atom-id> <kind>` 后换行输入修正内容\n"
     "- `/memory alive forget`（擦除该用户的 Alive 加密内容）"
@@ -202,6 +204,30 @@ def handle_memory_command(
                     message = "已停止 Alive 生成新的模型记忆提案；既有待审或已接受记忆不变。"
         elif action == "proposals":
             message = _proposals_message(memory, subject)
+        elif action == "messages":
+            if len(tokens) > 3:
+                message = USAGE
+            else:
+                meanings = MeaningStore(
+                    projection.journal, content_vault=projection.content_vault, protector=protector,
+                )
+                page = SemanticHistory(meanings).page(
+                    subject=subject, before_event_id=tokens[2] if len(tokens) == 3 else None,
+                )
+                labels = {"available": "可用", "withdrawn": "已撤回", "corrected": "已纠正",
+                          "correcting": "纠正中", "expired": "已到期", "unavailable": "不可用"}
+                lines = ["Alive 消息内容记录（不代表已发送）："]
+                for item in page.items:
+                    lines.append(f"\n`{item.event_id}` · {labels[item.state]} · `{item.recorded_at.isoformat()}`")
+                    if item.preview:
+                        lines.append(item.preview)
+                    if item.replacement_event_id:
+                        lines.append(f"后继版本：`{item.replacement_event_id}`")
+                if not page.items:
+                    lines.append("暂无记录。")
+                if page.next_before_event_id:
+                    lines.append(f"\n下一页：`/memory alive messages {page.next_before_event_id}`")
+                message = "\n".join(lines)
         elif action in {"message", "withdraw-message", "correct-message"}:
             header, separator, body = raw_args.partition("\n")
             correction_tokens = header.split()

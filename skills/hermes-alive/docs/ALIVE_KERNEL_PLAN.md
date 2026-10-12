@@ -265,8 +265,10 @@ factual error or user-control violations.
     taxonomy and complete multilingual adversarial replay metrics (ADR-0035);
   - [x] add owner-scoped typed inspect/withdraw/correct controls with durable
     successor recovery and downstream receipt invalidation (ADR-0038/0039);
-  - [ ] build a qualification-sized human-calibrated corpus, discoverable
-    message history and live user-control integration;
+  - [x] make semantic message history discoverable with owner-filtered,
+    bounded pagination and revalidated preview states (ADR-0040);
+  - [ ] build a qualification-sized human-calibrated corpus and live
+    user-control integration;
   - [ ] replace the legacy live voice consumer only after shadow qualification.
 - [ ] Replace heuristic mood with explainable dispositions:
   - [x] define authenticated post-selection expression cues that retain each
@@ -997,3 +999,15 @@ For each material change:
 - This completes a bounded typed correction baseline, not the entire natural
   feedback loop. Discoverable message history, live controls and qualification
   remain pending.
+
+### 2026-10-12 — Discoverable owner message history
+
+- Added `/memory alive messages` with newest-first, event-anchored pagination.
+  SQL filters ownership/type before loading; a composite index bounds seeks
+  without altering existing replay/checkpoints or rewriting journal events.
+- ADR-0040 distinguishes content history from actual send/delivery evidence.
+  Withdrawn, corrected, expired and unavailable records have no plaintext
+  preview. Interrupted correction is explicitly different from completion.
+- Tests exercise interleaved users, insertion-safe pagination, index use,
+  invalid cursors/bounds, lifecycle states, erasure and anonymous refusal.
+- Live user-control integration and feedback/outcome linkage remain pending.

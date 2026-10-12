@@ -28,6 +28,16 @@ strand an otherwise identical request. An old retry must not resurrect a later
 withdrawn successor. Preserve expiry, subject, sensitivity and unchanged atom
 evidence. Treat the replacement as the user's assertion, not observed truth.
 
+## Content discovery is not delivery evidence
+
+A meaning definition does not mean a message was sent. History must say what
+it records and never infer delivery from content or selection. Filter the
+owner in SQL before decrypting; use event-anchored pagination instead of an
+offset that shifts under concurrent inserts. Withdrawn, expired and erased
+records cannot carry cached previews. An interrupted successor definition is
+pending, not a successful correction. Cursors are read-only seek anchors, not
+semantic validity or action authority.
+
 ## Model synthesis must never become Dream again
 
 The semantic need is real, but the old coupling is forbidden. Conversation

@@ -96,6 +96,8 @@ class ExperienceJournal:
                     ON experience_events(event_type, sequence);
                 CREATE INDEX IF NOT EXISTS idx_experience_subject_sequence
                     ON experience_events(subject, sequence);
+                CREATE INDEX IF NOT EXISTS idx_experience_subject_type_sequence
+                    ON experience_events(subject, event_type, sequence);
                 CREATE INDEX IF NOT EXISTS idx_experience_correlation_sequence
                     ON experience_events(correlation_id, sequence);
                 CREATE INDEX IF NOT EXISTS idx_experience_causation
@@ -199,6 +201,34 @@ class ExperienceJournal:
                 (event_id,),
             ).fetchone()
         return self._record(row) if row is not None else None
+
+    def recent_for_subject(
+        self, *, subject: str, event_type: str, limit: int = 20,
+        before_sequence: int | None = None,
+    ) -> list[JournalRecord]:
+        """Bounded newest-first reads with ownership filtered in SQL.
+
+        This primitive does not authorize a caller; the host supplies the
+        authenticated subject. Ascending replay/checkpoints remain unchanged.
+        """
+        if not subject or not event_type:
+            raise ValueError("subject and event_type are required")
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
+            raise ValueError("recent read limit must be between 1 and 100")
+        if before_sequence is not None and (
+            isinstance(before_sequence, bool) or not isinstance(before_sequence, int)
+            or before_sequence < 1
+        ):
+            raise ValueError("before_sequence must be a positive integer")
+        query = "SELECT sequence, canonical_json, integrity_hash FROM experience_events WHERE subject=? AND event_type=?"
+        parameters: list[object] = [subject, event_type]
+        if before_sequence is not None:
+            query += " AND sequence < ?"
+            parameters.append(before_sequence)
+        query += " ORDER BY sequence DESC LIMIT ?"
+        parameters.append(limit)
+        with closing(self._connect()) as connection:
+            return [self._record(row) for row in connection.execute(query, parameters)]
 
     def read(
         self,

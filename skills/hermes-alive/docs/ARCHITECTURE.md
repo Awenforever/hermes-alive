@@ -204,6 +204,12 @@ unchanged evidence and the original expiry, rejects competing edits and can
 finish an identical interrupted request after restart. Corrected content must
 be selected and reviewed anew; no previous authority or receipt transfers.
 
+Owner-scoped semantic history is discoverable through `/memory alive messages`
+(ADR-0040). Bounded SQL pagination filters user/type before loading content,
+uses stable event anchors and a composite index, and recomputes privacy/lifecycle
+states on each read. It reports content records, not invented send outcomes;
+linking actual delivery and user feedback remains separate work.
+
 External authority also depends on the latest user-owned autonomy policy
 (ADR-0025). The default is no policy and therefore no proactive execution.
 Authorization receipts and outbox rows bind an exact policy event/revision;
