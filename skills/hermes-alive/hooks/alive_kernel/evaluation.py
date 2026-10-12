@@ -202,8 +202,20 @@ def build_factual_episodes(
     *,
     clearance: Sensitivity,
     observed_through_sequence: int | None = None,
+    observed_by: datetime | None = None,
 ) -> tuple[ReplayEpisode, ...]:
-    """Build factual episodes, excluding observations beyond the snapshot."""
+    """Build factual episodes within journal and optional wall-clock snapshots.
+
+    Sequence describes journal availability, not chronological observation.
+    Retrospective callers must supply observed_by as well: an earlier append
+    may carry a future observation time (for example under host clock skew).
+    Both the outcome and its originating observation must fit the snapshot.
+    """
+
+    if observed_by is not None and (
+        observed_by.tzinfo is None or observed_by.utcoffset() is None
+    ):
+        raise ReplayEvaluationError("observed_by must be timezone-aware")
 
     through = (
         journal.last_sequence()
@@ -217,12 +229,22 @@ def build_factual_episodes(
         attempt_event = journal.get(f"action.attempt:{attempt.attempt_id}")
         if attempt_event is None or attempt_event.sequence > through:
             continue
+        if observed_by is not None and attempt_event.event.observed_at > observed_by:
+            continue
         included: list[OutcomeRecord] = []
         event_ids: list[str] = []
         for outcome in outcomes.outcomes(attempt.attempt_id, clearance=clearance):
             event_id = f"outcome.record:{outcome.outcome_id}"
             record = journal.get(event_id)
-            if record is not None and record.sequence <= through:
+            source = journal.get(outcome.source_event_id)
+            if (
+                record is not None and source is not None
+                and record.sequence <= through and source.sequence <= through
+                and (observed_by is None or (
+                    record.event.observed_at <= observed_by
+                    and source.event.observed_at <= observed_by
+                ))
+            ):
                 included.append(outcome)
                 event_ids.append(event_id)
         episodes.append(

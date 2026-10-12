@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 from contextlib import closing
+from datetime import timedelta
+from dataclasses import replace
+from unittest.mock import patch
 
 from pathlib import Path
 import sqlite3
@@ -386,6 +389,54 @@ def main() -> int:
         )
         assert current_episodes[0].labels.delivery_succeeded is True
         assert current_episodes[0].labels.useful is None
+        delivery = observed_before[0]
+        delivery_event = journal.get(f"outcome.record:{delivery.outcome_id}")
+        delivery_source = journal.get(delivery.source_event_id)
+        before_delivery = max(
+            delivery_event.event.observed_at, delivery_source.event.observed_at
+        ) - timedelta(microseconds=1)
+        clock_snapshot = build_factual_episodes(
+            journal, outcomes, clearance=Sensitivity.PRIVATE,
+            observed_by=before_delivery,
+        )
+        assert clock_snapshot[0].labels.delivery_succeeded is None
+        assert delivery_event.event.event_id not in clock_snapshot[0].outcome_event_ids
+        after_delivery = build_factual_episodes(
+            journal, outcomes, clearance=Sensitivity.PRIVATE,
+            observed_by=max(delivery_event.event.observed_at, delivery_source.event.observed_at),
+        )
+        assert after_delivery[0].labels.delivery_succeeded is True
+        # A recorded outcome alone is insufficient if its receipt was observed
+        # after the requested historical clock boundary (host clock skew).
+        cutoff = max(delivery_event.event.observed_at, delivery_source.event.observed_at)
+        original_get = journal.get
+        def future_receipt(event_id):
+            record = original_get(event_id)
+            if event_id == delivery.source_event_id:
+                return replace(record, event=replace(
+                    record.event, observed_at=cutoff + timedelta(days=1)
+                ))
+            return record
+        with patch.object(journal, "get", side_effect=future_receipt):
+            source_clock_snapshot = build_factual_episodes(
+                journal, outcomes, clearance=Sensitivity.PRIVATE, observed_by=cutoff,
+            )
+        assert source_clock_snapshot[0].labels.delivery_succeeded is None
+        before_attempt = build_factual_episodes(
+            journal, outcomes, clearance=Sensitivity.PRIVATE,
+            observed_by=journal.get("action.attempt:attempt:outcome-test").event.observed_at
+            - timedelta(microseconds=1),
+        )
+        assert before_attempt == ()
+        try:
+            build_factual_episodes(
+                journal, outcomes, clearance=Sensitivity.PRIVATE,
+                observed_by=before_delivery.replace(tzinfo=None),
+            )
+        except ValueError as error:
+            assert "timezone-aware" in str(error)
+        else:
+            raise AssertionError("ambiguous historical clock cutoff was accepted")
         outcomes.rebuild(batch_size=2)
         assert outcomes.attempts(clearance=Sensitivity.PRIVATE) == attempts_before
         assert (

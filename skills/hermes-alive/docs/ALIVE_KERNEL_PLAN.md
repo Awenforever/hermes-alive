@@ -1073,3 +1073,13 @@ For each material change:
   excluded, retaining their journal history.
 - ADR-0045 records remaining duplication, clock/cutoff, projection-integrity
   and live-channel proof requirements. Production was not changed.
+
+### 2026-10-12 — Factual replay observation-time boundary
+
+- Sequence-only snapshots do not prove historical clock availability. Added
+  optional timezone-aware observation cutoff for attempts, outcome records
+  and source receipts (ADR-0046); both clock and sequence bounds apply.
+- Authenticated integration tests cover exclusion, equality, ambiguous clock
+  rejection and source-receipt clock skew. No operational timestamps rewritten.
+- Duplicate observations, host reconciliation clock semantics and task-result
+  versus user-benefit labels remain next audit work, not claimed resolved.
