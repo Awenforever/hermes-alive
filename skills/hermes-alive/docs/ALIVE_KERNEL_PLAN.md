@@ -1094,3 +1094,15 @@ For each material change:
 - Preference/reflection admission does not directly auto-accept task-derived
   preferences; deeper scope validation remains open. Episode label provenance,
   duplicate receipts and human/live qualification are still required.
+
+### 2026-10-12 — Evaluator episode provenance
+
+- Confirmed evaluator accepted arbitrary labels once attempt metadata matched.
+  Scoring now reconstructs the validated privacy-bounded factual snapshot and
+  rejects altered labels/evidence or silent stale-label reuse (ADR-0048).
+- Replaced the scoring fixture with complete admitted authorization/attempt,
+  signed dispatch and attributed feedback chains; added erasure and explicit
+  historical snapshot tests. Label unit arithmetic remains a distinct test.
+- Reports bind comparison to identical label/evidence snapshots, not just
+  equal attempt IDs and label counts. Broader cache integrity, duplicates,
+  human/live calibration and production activation remain incomplete.

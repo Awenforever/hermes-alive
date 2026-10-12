@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import hashlib
+import json
 import math
 from typing import Iterable, Mapping
 
@@ -29,6 +31,15 @@ class FactualLabels:
     user_control_violation: bool | None = None
     delivery_succeeded: bool | None = None
     task_completed: bool | None = None
+
+    def __post_init__(self) -> None:
+        for name in (
+            "useful", "interruption_regret", "factual_error", "user_control_violation",
+            "delivery_succeeded", "task_completed",
+        ):
+            value = getattr(self, name)
+            if value is not None and type(value) is not bool:
+                raise ReplayEvaluationError(f"{name} must be boolean or unknown")
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,6 +128,7 @@ class StrategyReport:
     delivery_succeeded: int
     delivery_failed: int
     delivery_unknown: int
+    factual_snapshot_digest: str
     counterfactual_claim_allowed: bool = False
     task_completed: int = 0
     task_failed: int = 0
@@ -287,12 +299,34 @@ def evaluate_submission(
     submission: StrategySubmission,
     *,
     holdout_after_sequence: int,
+    outcomes: OutcomeProjection,
+    clearance: Sensitivity,
+    observed_through_sequence: int | None = None,
+    observed_by: datetime | None = None,
 ) -> StrategyReport:
+    if outcomes.journal is not journal:
+        raise ReplayEvaluationError("outcome projection must belong to the evaluation journal")
+    if holdout_after_sequence < 0 or holdout_after_sequence > journal.last_sequence():
+        raise ReplayEvaluationError("invalid holdout boundary")
     if submission.trained_through_sequence > holdout_after_sequence:
         raise ReplayEvaluationError("strategy training crosses the holdout boundary")
+    # Supplied episodes are a request, not a trusted label authority. Rebuild
+    # labels and their complete evidence set from current validated reads under
+    # the explicitly requested snapshot, including erased-content semantics.
+    factual = {
+        episode.attempt_id: episode for episode in build_factual_episodes(
+            journal, outcomes, clearance=clearance,
+            observed_through_sequence=observed_through_sequence, observed_by=observed_by,
+        )
+    }
+    supplied = tuple(episodes)
+    if len({episode.attempt_id for episode in supplied}) != len(supplied):
+        raise ReplayEvaluationError("duplicate factual episode")
+    if any(factual.get(episode.attempt_id) != episode for episode in supplied):
+        raise ReplayEvaluationError("episode labels or evidence do not match the factual snapshot")
     episode_map = {
         episode.attempt_id: episode
-        for episode in episodes
+        for episode in supplied
         if episode.attempt_sequence > holdout_after_sequence
     }
     predictions: list[tuple[ReplayEpisode, ReplayPrediction]] = []
@@ -324,6 +358,21 @@ def evaluate_submission(
 
     delivery = [episode.labels.delivery_succeeded for episode, _ in predictions]
     tasks = [episode.labels.task_completed for episode, _ in predictions]
+    snapshot = [
+        {
+            "attempt_id": episode.attempt_id,
+            "attempt_sequence": episode.attempt_sequence,
+            "attempted_at": episode.attempted_at.isoformat(),
+            "candidate_id": episode.candidate_id,
+            "frame_id": episode.frame_id,
+            "outcome_event_ids": episode.outcome_event_ids,
+            "labels": {name: getattr(episode.labels, name) for name in (
+                "useful", "interruption_regret", "factual_error", "user_control_violation",
+                "delivery_succeeded", "task_completed",
+            )},
+        }
+        for episode, _ in sorted(predictions, key=lambda pair: pair[0].attempt_id)
+    ]
     return StrategyReport(
         strategy=submission.strategy,
         evaluated_attempt_ids=tuple(episode.attempt_id for episode, _ in predictions),
@@ -349,6 +398,9 @@ def evaluate_submission(
         task_completed=sum(value is True for value in tasks),
         task_failed=sum(value is False for value in tasks),
         task_unknown=sum(value is None for value in tasks),
+        factual_snapshot_digest=hashlib.sha256(
+            json.dumps(snapshot, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest(),
     )
 
 
@@ -361,6 +413,10 @@ def compare_reports(baseline: StrategyReport, candidate: StrategyReport) -> Repl
         or set(common) != candidate_ids
     ):
         raise ReplayEvaluationError("strategy comparison requires the same factual attempt cohort")
+    if not baseline.factual_snapshot_digest or (
+        baseline.factual_snapshot_digest != candidate.factual_snapshot_digest
+    ):
+        raise ReplayEvaluationError("strategy comparison requires the same factual label snapshot")
     deltas: dict[str, float | None] = {}
     comparable: list[float] = []
     for name in (

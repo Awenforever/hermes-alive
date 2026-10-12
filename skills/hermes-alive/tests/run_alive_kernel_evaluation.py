@@ -16,12 +16,60 @@ from alive_kernel import EventEnvelope, ExperienceJournal  # noqa: E402
 from alive_kernel.evaluation import (  # noqa: E402
     FactualLabels, ReplayEpisode, ReplayEvaluationError, ReplayPrediction,
     StrategySubmission, compare_reports, evaluate_submission,
-    labels_from_outcomes,
+    labels_from_outcomes, build_factual_episodes,
 )
 from alive_kernel.events import Sensitivity  # noqa: E402
 from alive_kernel.outcomes import (  # noqa: E402
-    OutcomeContentStatus, OutcomeKind, OutcomeRecord,
+    OutcomeContentStatus, OutcomeKind, OutcomeRecord, OutcomeProjection,
 )
+from alive_kernel.deliberation import (
+    ActionAuthority, ActionCandidate, ActionKind, AssessmentBasis,
+    DecisionDimensions, DimensionAssessment, PolicyContext, SelectionProposal, SideEffect,
+)
+from alive_kernel.deliberation_store import DeliberationProjection
+from alive_kernel_testkit import (
+    install_action_authorization, install_exploration_gate, authenticated_dispatch_receipt,
+)
+
+
+def admitted_attempt(journal, projection, suffix):
+    deliberation = DeliberationProjection(journal)
+    def dimension(value):
+        return DimensionAssessment(value, AssessmentBasis.MEASURED, ("evidence:prior",), "fixture")
+    candidate = ActionCandidate(
+        candidate_id=f"candidate-{suffix}", action_kind=ActionKind.SHARE,
+        side_effect=SideEffect.COMMUNICATION, authority=ActionAuthority.USER_DELEGATED,
+        content_id=f"content-{suffix}", dimensions=DecisionDimensions(
+            dimension(.8), dimension(.4), dimension(.9), dimension(.9), dimension(.2), dimension(.1),
+        ),
+    )
+    record, frame = deliberation.append_frame(
+        (candidate,), PolicyContext(can_interrupt=True), actor="system:alive", subject="user:test",
+        frame_id=f"frame-{suffix}", candidate_contents={candidate.content_id: {
+            "schema_version": 1, "capability": "hermes.channel.send",
+            "operation": {"text": "Synthetic evaluation fixture", "format": "markdown"},
+        }},
+    )
+    deliberation.apply(record)
+    gate = install_exploration_gate(journal, deliberation, frame, subject="user:test", fixture_name=suffix)
+    selection = deliberation.append_selection(
+        SelectionProposal(frame.frame_id, candidate.candidate_id, "test/model", "fixture"),
+        actor="model:test", subject="user:test", selection_id=f"selection-{suffix}",
+        exploration_gate_event_id=gate,
+    )
+    assert deliberation.apply(selection).outcome == "validated"
+    authorization = install_action_authorization(
+        journal, selection_event_id=selection.event.event_id, candidate_id=candidate.candidate_id,
+        subject="user:test", executor="hermes.channel.send", fixture_name=suffix,
+    )
+    attempt = projection.append_attempt(
+        authorization_event_id=authorization, selection_event_id=selection.event.event_id,
+        candidate_id=candidate.candidate_id, executor="hermes.channel.send",
+        idempotency_key=f"fixture:{suffix}", actor="system:executor", subject="user:test",
+        attempt_id=f"attempt-{suffix}",
+    )
+    assert projection.apply(attempt).outcome == "recorded"
+    return attempt
 
 
 def outcome(kind: OutcomeKind, details: object, number: int) -> OutcomeRecord:
@@ -39,6 +87,13 @@ def main() -> int:
     assert unknown.interruption_regret is None
     assert unknown.delivery_succeeded is None
     assert unknown.task_completed is None
+    for invalid in (1, 0, "true", "false"):
+        try:
+            FactualLabels(useful=invalid)
+        except ReplayEvaluationError:
+            pass
+        else:
+            raise AssertionError("coercible non-boolean factual label accepted")
     for kind, completed in (
         (OutcomeKind.TASK_COMPLETED, True), (OutcomeKind.TASK_FAILED, False),
     ):
@@ -94,34 +149,50 @@ def main() -> int:
             payload={"fixture": True},
         )
         journal.append(boundary)
-        attempted_at = datetime(2026, 10, 10, 8, 0, tzinfo=timezone.utc)
-        for suffix, observed_at in (
-            ("a", attempted_at), ("b", attempted_at + timedelta(minutes=1))
-        ):
-            journal.append(EventEnvelope(
-                event_id=f"action.attempt:attempt-{suffix}", event_type="action.attempted",
-                source="test.fixture", actor="system:test", subject="user:test",
-                observed_at=observed_at,
-                payload={"candidate_id": f"candidate-{suffix}", "fixture": True},
-            ))
+        projection = OutcomeProjection(journal)
+        attempts = [admitted_attempt(journal, projection, suffix) for suffix in ("a", "b")]
+        attempted_at = attempts[0].event.observed_at
+        before_feedback = journal.last_sequence()
+        for suffix, attempt, helpful in zip(("a", "b"), attempts, (True, False)):
+            receipt = authenticated_dispatch_receipt(
+                journal, attempt, event_id=f"receipt:{suffix}",
+                event_type="delivery.succeeded" if helpful else "delivery.failed",
+            )
+            delivery_record = projection.append_outcome(
+                attempt_id=f"attempt-{suffix}",
+                kind=OutcomeKind.DELIVERY_SUCCEEDED if helpful else OutcomeKind.DELIVERY_FAILED,
+                source_event_id=receipt.event_id, details={}, actor=receipt.actor,
+                subject="user:test", outcome_id=f"delivery-{suffix}",
+            )
+            assert projection.apply(delivery_record).outcome == "recorded"
+            source = EventEnvelope(
+                event_id=f"feedback:{suffix}", event_type="conversation.inbound",
+                source="test.channel", actor="user:test", subject="user:test",
+                causation_id=attempt.event.event_id,
+                payload={"user_outcome_kind": OutcomeKind.EXPLICIT_FEEDBACK.value},
+            )
+            journal.append(source)
+            feedback_record = projection.append_outcome(
+                attempt_id=f"attempt-{suffix}", kind=OutcomeKind.EXPLICIT_FEEDBACK,
+                source_event_id=source.event_id, actor="user:test", subject="user:test",
+                outcome_id=f"feedback-{suffix}", details={
+                    "sentiment": "helpful" if helpful else "unhelpful",
+                    "interruption_regret": not helpful, "factual_error": not helpful,
+                    **({"user_control_violation": False} if helpful else {}),
+                },
+            )
+            assert projection.apply(feedback_record).outcome == "recorded"
+        def evaluate(journal, episodes, submission, **kwargs):
+            return evaluate_submission(journal, episodes, submission, outcomes=projection,
+                                       clearance=Sensitivity.PRIVATE, **kwargs)
         future = EventEnvelope(
             event_id="evidence:future", event_type="feedback.observed",
             source="test.fixture", actor="system:test", subject="user:test",
-            observed_at=datetime(2026, 10, 10, 9, 0, tzinfo=timezone.utc),
+            observed_at=attempted_at + timedelta(hours=1),
             payload={"fixture": True},
         )
         journal.append(future)
-        episodes = (
-            ReplayEpisode(
-                "attempt-a", 3, attempted_at, "candidate-a", "frame-a",
-                FactualLabels(True, False, False, False, True, True), ("outcome-a",),
-            ),
-            ReplayEpisode(
-                "attempt-b", 4, attempted_at + timedelta(minutes=1),
-                "candidate-b", "frame-b",
-                FactualLabels(False, True, True, None, False, False), ("outcome-b",),
-            ),
-        )
+        episodes = build_factual_episodes(journal, projection, clearance=Sensitivity.PRIVATE)
         baseline = StrategySubmission(
             "baseline", 2,
             (
@@ -136,35 +207,57 @@ def main() -> int:
                 ReplayPrediction("attempt-b", attempted_at, (prior.event_id,), .1, .9, .9, .2),
             ),
         )
-        old = evaluate_submission(journal, episodes, baseline, holdout_after_sequence=2)
-        new = evaluate_submission(journal, episodes, candidate, holdout_after_sequence=2)
+        old = evaluate(journal, episodes, baseline, holdout_after_sequence=2)
+        new = evaluate(journal, episodes, candidate, holdout_after_sequence=2)
         comparison = compare_reports(old, new)
         assert comparison.candidate_improves_calibration
         assert not comparison.action_policy_superiority_proven
         assert new.delivery_succeeded == 1 and new.delivery_failed == 1
-        assert new.task_completed == 1 and new.task_failed == 1
-        assert new.task_unknown == 0
+        assert new.task_completed == 0 and new.task_failed == 0
+        assert new.task_unknown == 2
         assert new.user_control_violation.labelled == 1
-        operational_only = tuple(
-            replace(episode, labels=FactualLabels(
-                task_completed=episode.labels.task_completed
-            )) for episode in episodes
-        )
-        operational_report = evaluate_submission(
-            journal, operational_only, candidate, holdout_after_sequence=2
-        )
+        for altered in (
+            replace(episodes[0], labels=replace(episodes[0].labels, useful=False)),
+            replace(episodes[0], frame_id="frame-forged"),
+            replace(episodes[0], outcome_event_ids=()),
+            replace(episodes[0], outcome_event_ids=episodes[1].outcome_event_ids),
+            replace(episodes[0], outcome_event_ids=("outcome.record:missing",)),
+            replace(episodes[0], outcome_event_ids=episodes[0].outcome_event_ids * 2),
+        ):
+            try:
+                evaluate(journal, (altered, episodes[1]), candidate, holdout_after_sequence=2)
+            except ReplayEvaluationError as error:
+                assert "factual snapshot" in str(error)
+            else:
+                raise AssertionError("fabricated labels/evidence were scored")
+        try:
+            evaluate(journal, (episodes[0], episodes[0]), baseline, holdout_after_sequence=2)
+        except ReplayEvaluationError as error:
+            assert "duplicate" in str(error)
+        else:
+            raise AssertionError("duplicate episodes were scored")
+        historical = build_factual_episodes(journal, projection, clearance=Sensitivity.PRIVATE,
+                                           observed_through_sequence=before_feedback)
+        operational_report = evaluate(journal, historical, candidate, holdout_after_sequence=2,
+                                      observed_through_sequence=before_feedback)
         assert operational_report.useful.labelled == 0
         assert operational_report.useful.brier is None
-        assert operational_report.task_completed == 1
-        assert operational_report.task_failed == 1
+        assert operational_report.task_completed == 0
+        assert operational_report.task_failed == 0
         assert operational_report.delivery_unknown == 2
+        try:
+            evaluate(journal, historical, candidate, holdout_after_sequence=2)
+        except ReplayEvaluationError as error:
+            assert "factual snapshot" in str(error)
+        else:
+            raise AssertionError("silently omitted later feedback was accepted")
 
         forged_episode = ReplayEpisode(
             "attempt-a", 3, attempted_at, "candidate-forged", "frame-a",
             FactualLabels(True), (),
         )
         try:
-            evaluate_submission(
+            evaluate(
                 journal, (forged_episode,),
                 StrategySubmission(
                     "forged", 2,
@@ -173,7 +266,7 @@ def main() -> int:
                 holdout_after_sequence=2,
             )
         except ReplayEvaluationError as error:
-            assert "factual attempt" in str(error)
+            assert "factual snapshot" in str(error)
         else:
             raise AssertionError("a fabricated episode was evaluated")
 
@@ -182,7 +275,7 @@ def main() -> int:
             (ReplayPrediction("attempt-a", attempted_at, (future.event_id,), .9),),
         )
         try:
-            evaluate_submission(journal, episodes, leaked, holdout_after_sequence=2)
+            evaluate(journal, episodes, leaked, holdout_after_sequence=2)
         except ReplayEvaluationError as error:
             assert "future" in str(error)
         else:
@@ -190,7 +283,7 @@ def main() -> int:
 
         trained_on_holdout = StrategySubmission("leaked-training", 3, ())
         try:
-            evaluate_submission(
+            evaluate(
                 journal, episodes, trained_on_holdout, holdout_after_sequence=2
             )
         except ReplayEvaluationError as error:
@@ -202,7 +295,7 @@ def main() -> int:
             "partial", 2,
             (ReplayPrediction("attempt-a", attempted_at, (prior.event_id,), .9),),
         )
-        partial_report = evaluate_submission(
+        partial_report = evaluate(
             journal, episodes, partial, holdout_after_sequence=2
         )
         try:
@@ -211,6 +304,25 @@ def main() -> int:
             assert "same factual" in str(error)
         else:
             raise AssertionError("different factual cohorts were compared")
+        feedback = next(item for item in projection.outcomes("attempt-a", clearance=Sensitivity.PRIVATE)
+                        if item.kind is OutcomeKind.EXPLICIT_FEEDBACK)
+        projection.content_vault.erase_item(feedback.content_id)
+        try:
+            evaluate(journal, episodes, candidate, holdout_after_sequence=2)
+        except ReplayEvaluationError as error:
+            assert "factual snapshot" in str(error)
+        else:
+            raise AssertionError("erased feedback survived as an old cached episode label")
+        erased = build_factual_episodes(journal, projection, clearance=Sensitivity.PRIVATE)
+        erased_report = evaluate(journal, erased, candidate, holdout_after_sequence=2)
+        assert erased_report.useful.labelled == 1
+        assert erased_report.delivery_succeeded == 1
+        try:
+            compare_reports(old, erased_report)
+        except ReplayEvaluationError as error:
+            assert "label snapshot" in str(error)
+        else:
+            raise AssertionError("reports over different factual labels were compared")
 
     print("HERMES_ALIVE_KERNEL_EVALUATION_OK")
     return 0
