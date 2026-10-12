@@ -17,6 +17,17 @@ fixed offsets from process start can falsely put later selections in the
 future on slower filesystems. Never weaken production causal validation to
 make those tests pass.
 
+## Correction is succession, not in-place repair
+
+Never change the old encrypted meaning in place or carry its selection/review
+authority into a corrected version. Keep the full prepared successor encrypted,
+withdraw the original durably, then define that exact successor. Faults before
+and after the withdrawal boundary need separate tests. Preparation identity
+must not depend on retry-time timestamps, or a crash before withdrawal can
+strand an otherwise identical request. An old retry must not resurrect a later
+withdrawn successor. Preserve expiry, subject, sensitivity and unchanged atom
+evidence. Treat the replacement as the user's assertion, not observed truth.
+
 ## Model synthesis must never become Dream again
 
 The semantic need is real, but the old coupling is forbidden. Conversation

@@ -263,8 +263,10 @@ factual error or user-control violations.
     renderer and fail-closed classification for free model output (ADR-0034);
   - [x] define an independent semantic-review contract, explicit failure
     taxonomy and complete multilingual adversarial replay metrics (ADR-0035);
-  - [ ] build a qualification-sized human-calibrated corpus and user
-    inspect/correct controls;
+  - [x] add owner-scoped typed inspect/withdraw/correct controls with durable
+    successor recovery and downstream receipt invalidation (ADR-0038/0039);
+  - [ ] build a qualification-sized human-calibrated corpus, discoverable
+    message history and live user-control integration;
   - [ ] replace the legacy live voice consumer only after shadow qualification.
 - [ ] Replace heuristic mood with explainable dispositions:
   - [x] define authenticated post-selection expression cues that retain each
@@ -982,3 +984,16 @@ For each material change:
 - Focused tests exercise ownership, idempotency and downstream invalidation.
   Correction/replacement and discoverable identifiers remain pending; this is
   not a claim that all user-control or production gates have passed.
+
+### 2026-10-12 — Crash-safe owner-authored correction
+
+- Added a typed per-atom `correct-message` control and visible atom IDs.
+  Corrections preserve provenance, unchanged atoms, sensitivity and expiry.
+- ADR-0039 defines stable encrypted preparation, permanent old-version
+  withdrawal and retryable successor definition. An old retry cannot revive a
+  withdrawn successor; new content receives no inherited delivery authority.
+- Added faults on both sides of withdrawal and checks for multi-line input,
+  cross-user refusal, competing edits, successive edits and review invalidation.
+- This completes a bounded typed correction baseline, not the entire natural
+  feedback loop. Discoverable message history, live controls and qualification
+  remain pending.

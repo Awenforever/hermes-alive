@@ -195,8 +195,14 @@ Owner-scoped `/memory alive message` and `withdraw-message` controls expose
 meaning provenance and permanently withdraw future use (ADR-0038). Each
 meaning resolution checks the authenticated withdrawal event, invalidating
 dependent render/review receipts without rewriting history. This is not
-platform recall or content erasure; correction/replacement and live activation
-remain separate work.
+platform recall or content erasure; correction uses a separate succession
+protocol, and live activation remains pending.
+
+Owner-authored per-atom correction now creates an encrypted successor through
+a durable preparation/withdrawal/definition protocol (ADR-0039). It retains
+unchanged evidence and the original expiry, rejects competing edits and can
+finish an identical interrupted request after restart. Corrected content must
+be selected and reviewed anew; no previous authority or receipt transfers.
 
 External authority also depends on the latest user-owned autonomy policy
 (ADR-0025). The default is no policy and therefore no proactive execution.

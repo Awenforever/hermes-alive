@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from enum import StrEnum
 import hmac
@@ -482,7 +482,19 @@ class MeaningStore:
                 and event.causation_id == source.event_id
                 and payload.get("meaning_event_id") == source.event_id
                 and payload.get("subject") == source.subject
-                and payload.get("reason") == "explicit_user_withdrawal"
+                and payload.get("reason") in {
+                    "explicit_user_withdrawal", "explicit_user_correction"
+                }
+                and (
+                    payload.get("reason") != "explicit_user_correction"
+                    or (
+                        isinstance(payload.get("request_digest"), str)
+                        and isinstance(payload.get("replacement_content"), Mapping)
+                        and isinstance(payload.get("replacement_event_id"), str)
+                        and payload.get("action_authority_granted") is False
+                        and payload.get("truth_claimed") is False
+                    )
+                )
                 and event.expires_at is None
                 and withdrawal.sequence > meaning.sequence
                 and self.protector.verify_json(
@@ -544,6 +556,141 @@ class MeaningStore:
         if source is None or source.event.subject != subject:
             raise SemanticRenderingError("meaning is unavailable for this user")
         return self.resolve(meaning_event_id)
+
+    def correct_atom(
+        self, meaning_event_id: str, *, subject: str, actor: str,
+        atom_id: str, kind: SemanticAtomKind, text: str,
+    ) -> JournalRecord:
+        """Replace one user-selected atom without granting new action authority.
+
+        A permanent authenticated withdrawal is the durable preparation point.
+        It encrypts the complete successor so identical retries can finish after
+        a crash. Different corrections of the same original conflict; a later
+        correction must target the successor. Old meaning never revives.
+        """
+        source = self.journal.get(meaning_event_id)
+        if (
+            source is None or source.event.event_type != "message.meaning_defined"
+            or source.event.subject != subject or actor != subject
+        ):
+            raise SemanticRenderingError("meaning is unavailable for this user")
+        kind = SemanticAtomKind(kind)
+        atom_id, text = str(atom_id).strip().lower(), str(text).strip()
+        request_digest = self.content_vault.digest_json({
+            "meaning_event_id": meaning_event_id, "subject": subject,
+            "atom_id": atom_id, "kind": kind.value, "text": text,
+        })
+        withdrawal_id = f"message.meaning_retracted:{source.event.payload.get('message_id', '')}"
+        pending = self.journal.get(withdrawal_id)
+        if pending is None:
+            original = self.inspect_for_user(meaning_event_id, subject=subject)
+            current = datetime.now(timezone.utc)
+            if not original.created_at <= current < original.expires_at:
+                raise SemanticRenderingError("meaning correction is outside its lifetime")
+            if atom_id not in {atom.atom_id for atom in original.atoms}:
+                raise SemanticRenderingError("correction atom is unavailable")
+            # Protect exactly the user-authored replacement, not model-inferred
+            # dates, quantities or polarities. Chunk only to bound literal size.
+            literals = tuple(
+                text[offset:offset + _MAX_LITERAL_CHARS]
+                for offset in range(0, len(text), _MAX_LITERAL_CHARS)
+            ) if kind in _LITERAL_REQUIRED else ()
+            replacement_atom = SemanticAtom(atom_id, kind, text, (withdrawal_id,), literals)
+            replacement = replace(
+                original, message_id=f"corrected:{request_digest}", created_at=current,
+                atoms=tuple(replacement_atom if atom.atom_id == atom_id else atom
+                            for atom in original.atoms),
+            )
+            content_id = f"message-correction:{request_digest}"
+            try:
+                content = self.content_vault.put_json(
+                    serialize_meaning(replacement), subject=subject, purpose="message.correction",
+                    sensitivity=original.sensitivity, retention_until=original.expires_at,
+                    content_id=content_id,
+                )
+            except ContentVaultError:
+                # An earlier identical request may have prepared content before
+                # crashing, or another worker may have won the preparation race.
+                # Keep its real creation time, not the original's or retry's.
+                try:
+                    prepared = deserialize_meaning(self.content_vault.resolve_json(
+                        content_id, expected_subject=subject, expected_purpose="message.correction",
+                        expected_sensitivity=original.sensitivity,
+                    ))
+                except (ContentVaultError, KeyError, TypeError, ValueError) as exc:
+                    raise SemanticRenderingError("correction preparation is unavailable") from exc
+                if (
+                    replace(replacement, created_at=prepared.created_at) != prepared
+                    or not source.event.observed_at <= prepared.created_at <= datetime.now(timezone.utc)
+                ):
+                    raise SemanticRenderingError("correction preparation diverged")
+                replacement = prepared
+                content = self.content_vault.put_json(
+                    serialize_meaning(replacement), subject=subject, purpose="message.correction",
+                    sensitivity=original.sensitivity, retention_until=original.expires_at,
+                    content_id=content_id,
+                )
+            current = datetime.now(timezone.utc)
+            payload = {
+                "meaning_event_id": meaning_event_id, "subject": subject,
+                "reason": "explicit_user_correction", "request_digest": request_digest,
+                "replacement_event_id": f"message.meaning:{replacement.message_id}",
+                "replacement_content": content.to_event_payload(),
+                "action_authority_granted": False, "truth_claimed": False,
+            }
+            payload["integrity_authenticator"] = self.protector.authenticate_json(
+                "message.meaning_retracted.v1",
+                self._authentication_document("message.meaning_retracted.v1", payload),
+            )
+            event = EventEnvelope(
+                event_id=withdrawal_id, event_type="message.meaning_retracted",
+                source="alive.semantic-control", actor=actor, subject=subject,
+                causation_id=meaning_event_id, sensitivity=original.sensitivity,
+                occurred_at=current, observed_at=current, payload=payload,
+            )
+            try:
+                appended = self.journal.append(event)
+                pending = JournalRecord(appended.sequence, appended.event)
+            except EventConflictError:
+                pending = self.journal.get(withdrawal_id)
+        if pending is None or not self._valid_withdrawal(pending, source):
+            raise SemanticRenderingError("meaning correction integrity is invalid")
+        payload = pending.event.payload
+        if (
+            payload.get("reason") != "explicit_user_correction"
+            or not hmac.compare_digest(str(payload.get("request_digest", "")), request_digest)
+        ):
+            raise SemanticRenderingError("meaning was withdrawn or replaced by a different correction")
+        try:
+            content = ContentReference.from_event_payload(payload["replacement_content"])
+            replacement = deserialize_meaning(self.content_vault.resolve_json(
+                content.content_id, expected_subject=subject,
+                expected_purpose="message.correction", expected_sensitivity=source.event.sensitivity,
+            ))
+        except (ContentVaultError, KeyError, TypeError, ValueError) as exc:
+            raise SemanticRenderingError("correction content is unavailable") from exc
+        if (
+            replacement.subject != subject
+            or not hmac.compare_digest(
+                self.content_vault.digest_json(serialize_meaning(replacement)), content.digest
+            )
+            or content.sensitivity != source.event.sensitivity
+            or content.retention_until != source.event.expires_at
+            or f"message.meaning:{replacement.message_id}" != payload.get("replacement_event_id")
+            or replacement.sensitivity != source.event.sensitivity
+            or replacement.expires_at != source.event.expires_at
+            or not source.event.observed_at <= replacement.created_at <= pending.event.observed_at
+            or not replacement.created_at <= datetime.now(timezone.utc) < replacement.expires_at
+            or not any(
+                atom.atom_id == atom_id and atom.kind == kind and atom.text == text
+                and atom.evidence_event_ids == (withdrawal_id,)
+                for atom in replacement.atoms
+            )
+        ):
+            raise SemanticRenderingError("correction document and event diverged")
+        result = self.define(replacement, actor=actor, observed_at=pending.event.observed_at)
+        self.resolve(result.event.event_id)  # Never resurrect a withdrawn successor.
+        return result
 
     def candidate_reference(self, meaning_event_id: str) -> dict[str, Any]:
         """Strict candidate content shape used by deliberation."""

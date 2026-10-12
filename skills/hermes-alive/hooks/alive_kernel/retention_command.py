@@ -24,7 +24,7 @@ from .retention import (
     RetentionProjection,
     RetentionValidationError,
 )
-from .semantic_rendering import MeaningStore
+from .semantic_rendering import MeaningStore, SemanticAtomKind
 
 
 USAGE = (
@@ -38,6 +38,7 @@ USAGE = (
     "- `/memory alive retract <id>`（撤回已接受记忆）\n"
     "- `/memory alive message <meaning-event-id>`（查看主动消息依据）\n"
     "- `/memory alive withdraw-message <meaning-event-id>`（撤回待用消息内容）\n"
+    "- `/memory alive correct-message <meaning-event-id> <atom-id> <kind>` 后换行输入修正内容\n"
     "- `/memory alive forget`（擦除该用户的 Alive 加密内容）"
 )
 
@@ -201,15 +202,30 @@ def handle_memory_command(
                     message = "已停止 Alive 生成新的模型记忆提案；既有待审或已接受记忆不变。"
         elif action == "proposals":
             message = _proposals_message(memory, subject)
-        elif action in {"message", "withdraw-message"}:
-            if len(tokens) != 3:
+        elif action in {"message", "withdraw-message", "correct-message"}:
+            header, separator, body = raw_args.partition("\n")
+            correction_tokens = header.split()
+            invalid_correction = action == "correct-message" and (
+                len(correction_tokens) != 5 or not separator or not body.strip()
+            )
+            if invalid_correction or (action != "correct-message" and len(tokens) != 3):
                 message = USAGE
             else:
                 meanings = MeaningStore(
                     projection.journal, content_vault=projection.content_vault,
                     protector=protector,
                 )
-                if action == "withdraw-message":
+                if action == "correct-message":
+                    corrected = meanings.correct_atom(
+                        correction_tokens[2], subject=subject, actor=subject,
+                        atom_id=correction_tokens[3], kind=SemanticAtomKind(correction_tokens[4]),
+                        text=body,
+                    )
+                    message = (
+                        f"已修正该消息内容，新版本：`{corrected.event.event_id}`。"
+                        "旧版本不再可用；新版本仍需重新决策和审阅，不会自动发送。"
+                    )
+                elif action == "withdraw-message":
                     meanings.retract(tokens[2], subject=subject, actor=subject)
                     message = (
                         "已撤回该消息内容，相关表达与审阅结果不再可用。"
@@ -220,7 +236,7 @@ def handle_memory_command(
                     lines = [f"Alive 消息依据：`{tokens[2]}`",
                              f"有效期至：`{document.expires_at.isoformat()}`"]
                     for atom in document.atoms:
-                        lines.append(f"\n{atom.kind.value}：{atom.text}")
+                        lines.append(f"\n`{atom.atom_id}` · {atom.kind.value}：{atom.text}")
                         lines.append("依据事件：" + ", ".join(atom.evidence_event_ids))
                     lines.append("\n这些是定义的消息内容及其引用，引用本身不证明事实正确。")
                     message = "\n".join(lines)

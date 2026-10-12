@@ -403,7 +403,12 @@ def main() -> int:
         withdrawal_record = journal.get(withdrawal_receipt.event_id)
         assert withdrawal_record is not None
         assert store.verify_review(withdrawal_record, as_of=now + timedelta(seconds=9)) is not None
-        meanings.retract(meaning_record.event.event_id, subject=subject, actor=subject)
+        replacement = meanings.correct_atom(
+            meaning_record.event.event_id, subject=subject, actor=subject,
+            atom_id="deadline", kind=SemanticAtomKind.DEADLINE,
+            text="请在 2026-10-16 09:00 CST 前确认。",
+        )
+        assert meanings.resolve(replacement.event.event_id).atoms[0].text == "请在 2026-10-16 09:00 CST 前确认。"
         assert store.resolve_model_candidate(
             withdrawal_candidate.event_id, as_of=now + timedelta(seconds=9)
         ) is None
