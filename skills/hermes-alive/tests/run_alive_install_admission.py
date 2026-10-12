@@ -37,12 +37,24 @@ def main() -> int:
                    PYTHONDONTWRITEBYTECODE="1", HERMES_PROACTIVE_PLATFORM_ENABLED="false")
         # Fail rather than accidentally using a caller's old image checkout.
         def run(command, *, cwd=core):
-            result = subprocess.run(command, cwd=cwd, env=env, capture_output=True,
-                                    text=True, timeout=600)
+            # These commands contain only disposable fixture paths and public
+            # installation arguments, never credentials or retained user text.
+            print("HERMES_ALIVE_ADMISSION_STEP_START=" + json.dumps(command), flush=True)
+            try:
+                result = subprocess.run(command, cwd=cwd, env=env, capture_output=True,
+                                        text=True, timeout=600)
+            except subprocess.TimeoutExpired as error:
+                for stream in (error.stdout, error.stderr):
+                    if stream:
+                        text = stream.decode("utf-8", errors="replace") if isinstance(stream, bytes) else stream
+                        print(text[-12000:], file=sys.stderr, flush=True)
+                print("HERMES_ALIVE_ADMISSION_STEP_TIMEOUT", file=sys.stderr, flush=True)
+                raise
             print(result.stdout, end="", flush=True)
             if result.returncode:
                 print(result.stderr[-12000:], file=sys.stderr, flush=True)
                 raise RuntimeError(f"admission command failed: exit={result.returncode}")
+            print("HERMES_ALIVE_ADMISSION_STEP_FINISHED", flush=True)
             return result.stdout
         location = run([sys.executable, "-B", "-c",
                         "import hermes_cli; print(hermes_cli.__file__)"])
@@ -77,18 +89,44 @@ def main() -> int:
         sentinel.parent.mkdir(parents=True, exist_ok=True)
         sentinel.write_text('{"synthetic_user_state":true}\n', encoding="utf-8")
         expected = sentinel.read_bytes()
-        for _ in range(2):
+        # Ask Hermes for its committed environment. Never resolve dependencies
+        # ourselves or assume the bootstrap interpreter is the runtime one.
+        managed = json.loads(run([sys.executable, "-B", "-c",
+            "import json,sys; from pathlib import Path; "
+            "from pm.environments import selected_venv,venv_command; "
+            "r=Path(sys.argv[1]); print(json.dumps(venv_command(r,selected_venv(r),['-B'])))",
+            str(core)]))
+        assert isinstance(managed, list) and managed and all(isinstance(item, str) for item in managed)
+        cli = managed + ["-m", "hermes_cli.main"]
+        fixture = Path(__file__).with_name("admission_state_fixture.py")
+        baseline = root / "durable-state-baseline.json"
+        def durable(mode):
+            run(managed + [str(fixture), mode, "--profile", str(profile),
+                           "--expected", str(baseline)])
+        for index in range(2):
             run(cli + ["alive", "install-runtime"])
             assert sentinel.read_bytes() == expected
             assert (profile / "hooks" / "hermes-alive" / "handler.py").is_file()
+            durable("create" if index == 0 else "check")
+        # Same-revision package refresh is deliberately not called an upgrade
+        # from an earlier release. It still must not discard installed state.
+        run(cli + ["plugins", "install", package.as_uri(), "--force", "--yes-deps", "--enable"])
+        run(cli + ["alive", "install-runtime"])
+        durable("check")
         state = json.loads(run(cli + ["alive", "status"]))
         assert state["hook_installed"] is True
+        assert state["enabled"] is False
         run(cli + ["alive", "uninstall-runtime"])
         assert not (profile / "hooks" / "hermes-alive").exists()
         assert sentinel.read_bytes() == expected
+        run(cli + ["plugins", "remove", "hermes-alive"])
+        assert not (profile / "plugins" / "hermes-alive").exists()
+        assert sentinel.read_bytes() == expected
+        run(cli + ["plugins", "install", package.as_uri(), "--force", "--yes-deps", "--enable"])
         run(cli + ["alive", "install-runtime"])
         assert sentinel.read_bytes() == expected
         assert (profile / "hooks" / "hermes-alive" / "handler.py").is_file()
+        durable("check")
     print("HERMES_ALIVE_INSTALL_ADMISSION_OK")
     return 0
 

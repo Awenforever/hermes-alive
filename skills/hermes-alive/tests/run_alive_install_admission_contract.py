@@ -61,6 +61,33 @@ def main() -> int:
                     raise AssertionError("failed admission was reported as success")
             assert "HERMES_ALIVE_INSTALL_ADMISSION_NOT_READY_NO_RUNTIME_WRITE" in output.getvalue()
             assert not any(command[-1] == "install-runtime" for command in calls)
+
+        # A timed-out installer is neither success nor evidence that its output
+        # vanished. Keep the captured failure evidence and stop before hooks.
+        calls = []
+        def timed_out(command, **kwargs):
+            calls.append(command)
+            if command[-1] == "--enable":
+                raise subprocess.TimeoutExpired(command, 600, output=b"fixture install in progress",
+                                                stderr=b"fixture transport interrupted")
+            stdout = str(core / "hermes_cli" / "__init__.py") if "-c" in command else ""
+            return subprocess.CompletedProcess(command, 0, stdout, "")
+        output = io.StringIO()
+        with patch.object(sys, "argv", [str(path), "--hermes-root", str(core),
+                                       "--allow-dependency-install"]), \
+             patch.object(runner.subprocess, "run", side_effect=timed_out), \
+             patch.object(runner.shutil, "copytree"), \
+             redirect_stdout(output), redirect_stderr(output):
+            try:
+                runner.main()
+            except subprocess.TimeoutExpired:
+                pass
+            else:
+                raise AssertionError("timed-out admission was reported as success")
+        assert "HERMES_ALIVE_ADMISSION_STEP_TIMEOUT" in output.getvalue()
+        assert "fixture transport interrupted" in output.getvalue()
+        assert "fixture install in progress" in output.getvalue()
+        assert not any(command[-1] == "install-runtime" for command in calls)
     print("HERMES_ALIVE_INSTALL_ADMISSION_CONTRACT_OK")
     return 0
 

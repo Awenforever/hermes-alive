@@ -312,10 +312,12 @@ and a one-command rollback.
     `tzdata>=2025.2` warning observed in the isolated production image on
     2026-10-12. Declared dependencies and a successful hook load are not proof
     of a correct from-zero installation.
-    - ADR-0050: the contract already declares/requests dependencies. Real
-      current-source admission reached core dependency transport failure;
-      installed-but-disabled output must not be counted as success. Full
-      lifecycle qualification remains pending, not an Alive-specific pip fix.
+    - ADR-0050: declared dependencies were subsequently admitted on inspected
+      official snapshot `f925b017` in disposable NAS/Linux Docker. Same-revision
+      refresh plus package/runtime uninstall-reinstall preserved real synthetic
+      journal, checkpoints, keys and encrypted content. This is a bounded pass,
+      not today's latest commit, published GitHub transport, earlier-release
+      upgrade or full platform qualification. See `INSTALL_ADMISSION_20261012.md`.
 - [ ] Linux, Windows, WSL and Docker/NAS lifecycle verification.
 - [ ] Provider and channel substitution tests owned by Hermes capabilities.
 - [ ] Crash, duplicate event, partial send and corrupt-state fault injection.
@@ -1178,3 +1180,19 @@ For each material change:
   projection integrity or large-history performance. Phase 0 corpus, Phase 5
   human/live calibration and Phase 6 actual latest-install/lifecycle/rollback
   gates remain incomplete. Do not activate based on synthetic contract tests.
+
+### 2026-10-12 — Real dependency admission and encrypted lifecycle preservation
+
+- Revalidated the stopped previous test and retried only in a resource-limited
+  disposable container, using Git HTTP/1.1 through the existing NAS proxy.
+  Public package admission completed without bypassing scanning or Hermes PM.
+- Strengthened the runner to select the Hermes-owned runtime and preserve
+  actual journal/checkpoint/key/encrypted-content evidence through repeated
+  runtime install, package refresh, removal and reinstall. Both real runs
+  passed; the stronger run closes the bounded encrypted lifecycle smoke gate.
+- Added timeout evidence retention and missing/replaced-key/baseline-overwrite
+  regressions. Local injected tests are distinguished from the actual run.
+- Full Phase 6 remains unchecked: current release-time upstream, real GitHub
+  distribution, earlier-release upgrade, native Windows/WSL, authorization
+  migrations and rollback still require direct evidence. Phase 0/5 corpus,
+  human calibration and live usefulness remain incomplete. Production unchanged.

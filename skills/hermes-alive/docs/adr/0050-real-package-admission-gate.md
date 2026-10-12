@@ -1,6 +1,7 @@
 # ADR-0050: Real package placement is not runtime admission
 
-Status: accepted test/installation contract; complete admission remains unproven
+Status: accepted test/installation contract; bounded real admission and lifecycle
+passed on the inspected official source snapshot (2026-10-12)
 
 ## Decision
 
@@ -47,9 +48,26 @@ Hermes-owned; the plugin must not add its own pip/provider repair path.
 
 ## Limits and next work
 
+### Subsequent real admission evidence
+
+The test-only HTTP/1.1 Git retry completed public CLI installation with Hermes
+dependency consent and security scanning retained. Both the initial sentinel
+runner and its strengthened successor exited zero with
+`HERMES_ALIVE_INSTALL_ADMISSION_OK`. The strengthened runner used Hermes'
+committed dependency environment for lifecycle and cryptographic state probes.
+Repeated runtime install, same-revision package refresh, runtime uninstall,
+package removal and package/runtime reinstall preserved a synthetic journal
+event, its checkpoint, identity/content keys and decryptable private content.
+The installed status remained non-proactive; no gateway was launched.
+
+Local fault tests verify missing/replaced keys and baseline overwrite are not
+misreported as preserved state. Runner timeout diagnostics retain captured
+evidence and stop before runtime installation. See
+`../INSTALL_ADMISSION_20261012.md` for the exact scope and remaining gates.
+
 The source snapshot is not a claim about today's newest upstream commit.
 The initial tzdata warning came from bare PluginManager loading, which does
 not exercise dependency preparation; it was not proof of a missing declaration
-or a broken package-manager contract. Successful current-runtime admission and
-the full install/upgrade/uninstall/reinstall matrix remain open. Core dependency
+or a broken package-manager contract. Bounded admission is now proved on this
+snapshot; the full install/upgrade/platform matrix remains open. Core dependency
 transport is not an Alive model problem and production is unchanged.
