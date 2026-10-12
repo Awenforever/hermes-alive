@@ -375,18 +375,29 @@ class ExplorationProjection:
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='action_outcomes_v1'"
         ).fetchone()
         if outcome_schema is None:
+            for row in connection.execute(
+                "SELECT event_id FROM experience_events WHERE subject=? "
+                "AND event_type='outcome.recorded' "
+                "AND json_extract(canonical_json, '$.payload.kind')=?",
+                (subject, OutcomeKind.DELIVERY_SUCCEEDED.value),
+            ):
+                original = self.journal.get(row["event_id"])
+                if OutcomeProjection._observation_key(self.journal, original) is not None:
+                    raise ExplorationValidationError("exposure cache schema requires repair")
             return ()
         rows = connection.execute(
             """
-            SELECT o.event_id AS outcome_event_id, s.candidate_id,
+            SELECT e.event_id AS outcome_event_id, s.candidate_id,
                    a.topic_digest, a.source_digest, a.mode
-            FROM action_outcomes_v1 o
-            JOIN action_attempts_v1 t ON t.attempt_id=o.attempt_id
-            JOIN deliberation_selections_v1 s ON s.event_id=t.selection_event_id
-            JOIN exploration_annotations_v1 a
+            FROM experience_events e
+            LEFT JOIN action_attempts_v1 t
+              ON t.attempt_id=json_extract(e.canonical_json, '$.payload.attempt_id')
+            LEFT JOIN deliberation_selections_v1 s ON s.event_id=t.selection_event_id
+            LEFT JOIN exploration_annotations_v1 a
               ON a.frame_id=s.frame_id AND a.candidate_id=s.candidate_id
-            WHERE o.subject=? AND o.kind=?
-            ORDER BY o.rowid DESC
+            WHERE e.subject=? AND e.event_type='outcome.recorded'
+              AND json_extract(e.canonical_json, '$.payload.kind')=?
+            ORDER BY e.sequence DESC
             """,
             (subject, OutcomeKind.DELIVERY_SUCCEEDED.value),
         )
@@ -396,7 +407,25 @@ class ExplorationProjection:
             if original is None or not OutcomeProjection.canonical_evidence_valid_for(
                 self.journal, connection, original
             ):
+                if (
+                    original is not None and original.event.subject == subject
+                    and OutcomeProjection._observation_key(self.journal, original) is not None
+                ):
+                    canonical = (
+                        OutcomeProjection._earlier_observation(self.journal, connection, original)
+                        or original
+                    )
+                    cached = connection.execute(
+                        "SELECT * FROM action_outcomes_v1 WHERE event_id=?", (canonical.event.event_id,),
+                    ).fetchone()
+                    if cached is None or not OutcomeProjection._row_matches_record(cached, canonical):
+                        raise ExplorationValidationError("canonical exposure cache requires repair")
                 continue
+            if any(
+                row[name] is None
+                for name in ("candidate_id", "topic_digest", "source_digest", "mode")
+            ):
+                raise ExplorationValidationError("exposure provenance cache requires repair")
             history.append(ExposureRecord(
                 row["outcome_event_id"], row["candidate_id"], row["topic_digest"],
                 row["source_digest"], ExplorationMode(row["mode"]),

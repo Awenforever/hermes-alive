@@ -246,6 +246,15 @@ def main() -> int:
         delivery = authenticated_dispatch_receipt(
             journal, attempt_record, event_id="delivery-receipt:outcome-test",
         )
+        malformed = journal.append(EventEnvelope(
+            event_id="outcome.record:malformed", event_type="outcome.recorded",
+            source="alive.outcomes", actor="system:channel", subject="user:test",
+            causation_id=delivery.event_id, sensitivity=Sensitivity.PRIVATE,
+            payload={"outcome_id": "malformed", "attempt_id": "attempt:outcome-test",
+                     "kind": OutcomeKind.DELIVERY_SUCCEEDED.value,
+                     "source_event_id": delivery.event_id, "content": {}},
+        ))
+        assert outcomes.apply(malformed).reason == "outcome_payload_invalid"
         delivered_record = outcomes.append_outcome(
             attempt_id="attempt:outcome-test",
             kind=OutcomeKind.DELIVERY_SUCCEEDED,
@@ -393,6 +402,23 @@ def main() -> int:
             "attempt:outcome-test", clearance=Sensitivity.PRIVATE
         )
         assert observed_before[0].content_status is OutcomeContentStatus.ERASED
+        with closing(outcomes._connect()) as connection:
+            connection.execute("DELETE FROM action_outcomes_v1 WHERE outcome_id=?",
+                               (delivered_record.event.payload["outcome_id"],))
+            assert not outcomes.canonical_evidence_valid_for(journal, connection, copied)
+            plan = connection.execute(
+                "EXPLAIN QUERY PLAN SELECT event_id FROM experience_events WHERE subject=? "
+                "AND event_type='outcome.recorded' "
+                "AND json_extract(canonical_json, '$.payload.attempt_id')=? "
+                "AND json_extract(canonical_json, '$.payload.kind')=? AND sequence<? ORDER BY sequence",
+                ("user:test", "attempt:outcome-test", OutcomeKind.DELIVERY_SUCCEEDED.value, copied.sequence),
+            ).fetchall()
+            assert any("idx_experience_outcome_identity" in row["detail"] for row in plan)
+        missing_cache = outcomes.outcomes("attempt:outcome-test", clearance=Sensitivity.PRIVATE)
+        assert [item.kind for item in missing_cache] == [OutcomeKind.USER_REPLIED]
+        assert journal.get(delivered_record.event.event_id) is not None
+        outcomes.rebuild(batch_size=2)
+        assert outcomes.outcomes("attempt:outcome-test", clearance=Sensitivity.PRIVATE) == observed_before
         historical_episodes = build_factual_episodes(
             journal, outcomes, clearance=Sensitivity.PRIVATE,
             observed_through_sequence=snapshot_before_outcomes,

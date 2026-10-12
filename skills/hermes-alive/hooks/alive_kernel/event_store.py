@@ -102,6 +102,13 @@ class ExperienceJournal:
                     ON experience_events(correlation_id, sequence);
                 CREATE INDEX IF NOT EXISTS idx_experience_causation
                     ON experience_events(causation_id);
+                CREATE INDEX IF NOT EXISTS idx_experience_outcome_identity
+                    ON experience_events(
+                        subject,
+                        json_extract(canonical_json, '$.payload.attempt_id'),
+                        json_extract(canonical_json, '$.payload.kind'),
+                        sequence
+                    ) WHERE event_type='outcome.recorded';
                 CREATE TABLE IF NOT EXISTS consumer_checkpoints (
                     consumer_name TEXT PRIMARY KEY,
                     last_sequence INTEGER NOT NULL,

@@ -1161,3 +1161,20 @@ For each material change:
 - Synthetic alias, legacy cache, erasure/rebuild and distinct-user-message
   regressions preserve history and demonstrate the bounded correction. Full
   projection integrity, actual effect identity and live learning stay open.
+
+### 2026-10-12 — Canonical history survives disposable-cache loss
+
+- Rechecked ADR-0051 and found its cache-membership election could promote a
+  receipt alias after deleting the original row. Election now uses validated
+  original journal observations and an indexed identity lookup (ADR-0052).
+- Erased/unavailable original content remains an identity fence, not permission
+  to restore copied plaintext. Malformed original references are excluded.
+- Exposure reads begin at the journal and require repair for missing canonical
+  rows, schema or provenance, rather than treating cache loss as empty history.
+- Windows regression: 35 passed, one missing-runtime skip, zero failed; expanded
+  whole-table/provenance loss cases passed separately. Seven dependent tests
+  passed in network-disabled isolated NAS/Linux Docker. Production untouched.
+- This closes the specific cache-deletion election hole, not arbitrary repair,
+  projection integrity or large-history performance. Phase 0 corpus, Phase 5
+  human/live calibration and Phase 6 actual latest-install/lifecycle/rollback
+  gates remain incomplete. Do not activate based on synthetic contract tests.

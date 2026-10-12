@@ -1,6 +1,7 @@
 # ADR-0051: Receipt aliases are not additional observations
 
-Status: accepted for shadow admission and dependent reads
+Status: accepted for shadow admission and dependent reads; canonical election
+superseded by ADR-0052's journal-based fence
 
 ## Decision
 

@@ -719,6 +719,9 @@ class OutcomeProjection:
                 return self._decision(
                     connection, event, "rejected", "dispatch_receipt_unproven", attempt_id, outcome_id or None
                 )
+        if self._observation_key(self.journal, self.journal.get(event.event_id)) is None:
+            return self._decision(connection, event, "rejected", "observation_envelope_invalid",
+                                  attempt_id, outcome_id or None)
         try:
             self.content_vault.resolve_json(
                 content.content_id,
@@ -909,6 +912,21 @@ class OutcomeProjection:
         if record is None or not OutcomeProjection.evidence_valid_for(journal, record):
             return None
         payload = record.event.payload
+        try:
+            reference = ContentReference.from_event_payload(payload["content"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        attempt = journal.get(f"action.attempt:{payload['attempt_id']}")
+        if (
+            record.event.source != "alive.outcomes"
+            or not payload.get("outcome_id")
+            or record.event.event_id != f"outcome.record:{payload['outcome_id']}"
+            or attempt is None
+            or record.event.subject != attempt.event.subject
+            or record.event.sensitivity is not attempt.event.sensitivity
+            or reference.sensitivity is not record.event.sensitivity
+        ):
+            return None
         source = journal.get(str(payload["source_event_id"]))
         kind = OutcomeKind(payload["kind"])
         if kind in {OutcomeKind.DELIVERY_SUCCEEDED, OutcomeKind.DELIVERY_FAILED,
@@ -925,17 +943,22 @@ class OutcomeProjection:
         key = OutcomeProjection._observation_key(journal, record)
         if key is None:
             return None
-        earlier = []
+        # The cache is disposable. Removing its original row must never turn a
+        # later receipt alias (and its duplicate plaintext) into the first fact.
+        # Structural journal observations remain fences even if their content
+        # is unavailable or erased; cache repair cannot silently replace them.
         for row in connection.execute(
-            "SELECT * FROM action_outcomes_v1 WHERE attempt_id=? AND kind=?",
-            key[:2],
-        ).fetchall():
+            "SELECT event_id FROM experience_events WHERE subject=? "
+            "AND event_type='outcome.recorded' "
+            "AND json_extract(canonical_json, '$.payload.attempt_id')=? "
+            "AND json_extract(canonical_json, '$.payload.kind')=? "
+            "AND sequence<? ORDER BY sequence",
+            (record.event.subject, key[0], key[1], record.sequence),
+        ):
             original = journal.get(row["event_id"])
-            if (original is not None and original.sequence < record.sequence
-                and OutcomeProjection._row_matches_record(row, original)
-                and OutcomeProjection._observation_key(journal, original) == key):
-                earlier.append(original)
-        return min(earlier, key=lambda item: item.sequence) if earlier else None
+            if OutcomeProjection._observation_key(journal, original) == key:
+                return original
+        return None
 
     @staticmethod
     def canonical_evidence_valid_for(journal, connection, record) -> bool:

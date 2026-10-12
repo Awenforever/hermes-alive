@@ -22,7 +22,7 @@ from alive_kernel import (  # noqa: E402
 from alive_kernel.exploration import (  # noqa: E402
     ExplorationMode, ExplorationPolicy, exploration_rejection_map,
 )
-from alive_kernel.exploration_store import ExplorationProjection  # noqa: E402
+from alive_kernel.exploration_store import ExplorationProjection, ExplorationValidationError  # noqa: E402
 from alive_kernel_testkit import install_action_authorization  # noqa: E402
 
 
@@ -147,6 +147,52 @@ def main() -> int:
             # history limit and hide the genuinely observed older exposure.
             history = exploration._exposure_history(connection, "user:test", 1)
             assert len(history) == 1 and history[0].outcome_event_id == delivered.event.event_id
+        with closing(outcomes._connect()) as connection:
+            connection.execute("DELETE FROM action_outcomes_v1 WHERE outcome_id=?",
+                               (delivered.event.payload["outcome_id"],))
+            connection.execute("DELETE FROM action_outcomes_v1 WHERE outcome_id IN (?, ?)",
+                               (copied.event.payload["outcome_id"], invalid.event.payload["outcome_id"]))
+        with closing(exploration._connect()) as connection:
+            try:
+                exploration._exposure_history(connection, "user:test", 1)
+            except ExplorationValidationError as error:
+                assert "requires repair" in str(error)
+            else:
+                raise AssertionError("missing canonical exposure silently loosened the policy")
+        inject_legacy_outcome_row(outcomes, delivered)
+
+        # A missing whole projection is not evidence of a pristine exposure history.
+        with closing(exploration._connect()) as connection:
+            connection.execute("ALTER TABLE action_outcomes_v1 RENAME TO fixture_outcomes_saved")
+            try:
+                exploration._exposure_history(connection, "user:test", 1)
+            except ExplorationValidationError as error:
+                assert "schema requires repair" in str(error)
+            else:
+                raise AssertionError("missing outcome schema erased known delivery history")
+            finally:
+                connection.execute("ALTER TABLE fixture_outcomes_saved RENAME TO action_outcomes_v1")
+
+        with closing(exploration._connect()) as connection:
+            saved = dict(connection.execute(
+                "SELECT * FROM exploration_annotations_v1 WHERE annotation_id=?",
+                (first_annotation_event.event.payload["annotation_id"],),
+            ).fetchone())
+            connection.execute("DELETE FROM exploration_annotations_v1 WHERE annotation_id=?",
+                               (first_annotation_event.event.payload["annotation_id"],))
+            try:
+                exploration._exposure_history(connection, "user:test", 1)
+            except ExplorationValidationError as error:
+                assert "provenance cache requires repair" in str(error)
+            else:
+                raise AssertionError("missing exposure provenance silently loosened the policy")
+            finally:
+                columns = ",".join(saved)
+                placeholders = ",".join("?" for _ in saved)
+                connection.execute(
+                    f"INSERT INTO exploration_annotations_v1 ({columns}) VALUES ({placeholders})",
+                    tuple(saved.values()),
+                )
 
         second = make_candidate("second")
         second_event, second_frame = deliberation.append_frame(
