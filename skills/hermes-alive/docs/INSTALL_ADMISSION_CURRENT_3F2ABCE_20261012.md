@@ -1,6 +1,6 @@
 # Current audited-source installed-runtime verification
 
-Status: terminated before admission; harness line-ending correction verified
+Status: r5 installed-runtime lifecycle passed; overall production acceptance incomplete
 
 ## Immutable inputs
 
@@ -50,6 +50,63 @@ downloaded. Never treat a missing container alone as a success or failure proof.
 After terminal evidence, record actual results here and clean only these verified
 owned archives/scratch after preserving needed evidence. Do not delete other
 historical `/tmp/alive*` directories based on their names.
+
+## 2026-10-13 — Cached base and standard core preparation
+
+- Test-only base build completed with exit zero. Image ID:
+  `sha256:5cb2abffe8c4229ba1be65f0e61ec7393d17ba27dffc8066a908b7c2a52df063`.
+  Tag `hermes-alive-admission-base:20261012-v1`; recipe is
+  `tests/fixtures/install-admission-base.Dockerfile`. No source/profile/key is
+  baked in. The base prepares OS tooling and uv, not Hermes-managed dependencies.
+- r2 container `alive-installed-20261013-r2` has terminal exit 1. Its exact
+  argument vector had no CR. Imported core location was correct, but a bare
+  Python carrier lacked `ruamel.yaml` before CLI dependency activation. No
+  plugin admission occurred; retained `admission-r2.log` is prerequisite evidence.
+- r3 container `alive-installed-20261013-r3` has terminal exit 1. The official
+  `pm install --extra all` path prepared some tools but refused venv sync because
+  standard node/npm/ffmpeg/ripgrep tools were absent. This source checkout was
+  not yet a complete installed Hermes. Retained `admission-r3.log`; do not label
+  this a plugin regression or bypass the guard with raw pip.
+- r4 uses the normal public `pm install` first, omitting only the two explicitly
+  optional browser/CUA tools, then runs the unchanged admission fixture. Required
+  tools and default Python extras remain Hermes-owned. No dependency lock is
+  changed. Already downloaded tools are reused under the owned scratch home.
+- r4 container `alive-installed-20261013-r4`, started
+  `2026-10-12T17:47:40.781315002Z`, ultimately exited 1. Standard core preparation
+  succeeded, including required tools and default venv. The subsequent fixture
+  still called bare carrier Python rather than that managed interpreter and
+  failed on YAML import before plugin admission. Reuse the completed core,
+  not a repeated install or a manually patched carrier.
+- Its home is `/test/managed-owner` within the owned scratch mount; source/core
+  archives remain the original immutable inputs. No production data is mounted.
+- Retained log: `admission-r4.log`; log-follow handle 71068 is an observer, not
+  the task. Keep the stopped test containers until their exit/evidence is
+  recorded; do not infer success from a running container's default exit value.
+- No automatic restart on timeout; revalidate actual state before continuing.
+
+## 2026-10-13 — r5 terminal installed-runtime result
+
+- Asked actual `pm.environments.selected_venv` and `venv_command` for the
+  committed core environment, then ran the unchanged fixture in that runtime.
+  No additional core preparation or raw dependency install occurred.
+- Container `alive-installed-20261013-r5` started
+  `2026-10-12T17:54:04.077016424Z`, finished
+  `2026-10-12T17:57:54.006214203Z`, running false, exit zero. Collected terminal
+  log-follower handle 19133; retained `admission-r5.log` contains
+  `HERMES_ALIVE_INSTALL_ADMISSION_OK` and durable-state create/check results.
+- Actual public package admission and loaded `alive status` succeeded. Runtime
+  install twice, same-revision package refresh, runtime uninstall, package removal
+  and reinstall passed. The original synthetic journal/checkpoint, identity and
+  content keys, and decryptable private content survived every checked transition.
+  The runner selected the plugin-enabled managed generation for subsequent steps.
+- This is exact audited-source, NAS/Linux Docker, local Git-fixture package
+  qualification. It is not a published-GitHub install, previous-release upgrade,
+  generated console-entry pass, real authenticated-user migration, live gateway
+  delivery or usefulness result. No gateway ran; proactive enabled remained false.
+- The reusable tooling image and owned managed store now exist for subsequent
+  bounded tests. Keep their identity/evidence; do not redownload core dependencies
+  or silently use the carrier interpreter on continuation. Stopped containers
+  remain available for exit-code verification until explicit owned cleanup.
 
 ## Remaining scope
 

@@ -2,7 +2,7 @@
 
 Status: active
 
-Last reviewed: 2026-10-12
+Last reviewed: 2026-10-13
 
 Current phase: Phase 5 — faculty migration in bounded shadow mode
 
@@ -1426,3 +1426,34 @@ For each material change:
   original container is absent. Corrected line-ending transfer passed a small
   network-disabled probe. No plugin failure/pass is inferred. Preserve original
   log; next corrected attempt should use a reusable test-only tooling image.
+
+### 2026-10-13 — Cached base and genuine core prerequisites
+
+- Base image build completed and its actual ID is recorded. Added the test-only
+  Dockerfile so tooling preparation is reproducible/reusable, not repeated per
+  case. Production remains running with the same start time.
+- Corrected r2 arguments were exact, but bare Python lacked core YAML dependency;
+  r3 official extra preparation then refused missing required tools. Both exited
+  before plugin admission. These are installed-Hermes prerequisite gaps, not
+  Alive regression evidence. No hand-installed core dependencies or skipped guard.
+- r4 now uses normal public core PM install with only optional browser/CUA
+  opt-outs, then the existing fixture. Required tools were prepared and a real uv
+  dependency process is running. Owned source/store mount preserves downloaded
+  work for continuation. Exact container/log/pointer and open gates are recorded
+  in `INSTALL_ADMISSION_CURRENT_3F2ABCE_20261012.md`.
+- No plugin/lifecycle pass claimed yet; verify the same active job rather than
+  starting duplicates. Console entry, real delivery, migration and semantic/
+  longitudinal usefulness gates remain incomplete. No production change/send.
+
+- Terminal follow-up: r4 completed core preparation but its carrier-interpreter
+  fixture invocation still failed. r5 reused the exact completed environment via
+  Hermes `selected_venv`/`venv_command`, then passed public plugin admission and
+  the encrypted lifecycle fixture, with terminal exit zero. Repeated install,
+  refresh, removal and reinstall preserved journal/checkpoint/keys/decryptable
+  synthetic content. No core reinstall or manually added dependency.
+- This closes the bounded audited-source NAS/Linux managed-runtime lifecycle
+  check, not current published distribution, generated launcher, live migration
+  or longitudinal usefulness. Evidence/limits are updated in the current
+  admission record. Production remains unchanged. Next reuse the prepared
+  runtime for real hook/cognition qualification and the actual console entry;
+  do not return to repeated cold carrier/source-handler tests.
