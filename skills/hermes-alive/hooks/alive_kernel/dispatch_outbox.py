@@ -1291,6 +1291,60 @@ class DispatchOutbox:
             lease, start_event.event_id, contract.to_document(), route
         )
 
+    def validate_execution_for_launch(
+        self, execution: DispatchExecution, *, now: datetime | None = None,
+    ) -> None:
+        """Recheck a start immediately before a trusted executor's launch.
+
+        This is not an atomic transaction with external delivery. Host runtime
+        identity and process launch still belong to the qualified executor.
+        """
+        current = self._utc(now)
+        target_sequence = self.journal.last_sequence()
+        while self.journal.checkpoint(self.autonomy.CHECKPOINT) < target_sequence:
+            before = self.journal.checkpoint(self.autonomy.CHECKPOINT)
+            self.autonomy.project_new()
+            if self.journal.checkpoint(self.autonomy.CHECKPOINT) <= before:
+                raise DispatchOutboxError("authority projection made no progress")
+        lease = execution.lease
+        start = self.journal.get(execution.start_event_id)
+        attempt = self.journal.get(f"action.attempt:{lease.attempt_id}")
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                "SELECT * FROM dispatch_outbox_v3 WHERE dispatch_id=?",
+                (lease.dispatch_id,),
+            ).fetchone()
+        policy = self.autonomy.current(lease.subject)
+        if (row is None or row["state"] != "started"
+                or row["started_event_id"] != execution.start_event_id
+                or row["lease_generation"] != lease.generation
+                or row["lease_token_digest"] != self.protector.pseudonym("dispatch_lease", lease.token)
+                or datetime.fromisoformat(row["lease_until"]) <= current
+                or datetime.fromisoformat(row["execute_by"]) <= current
+                or policy is None or not policy.enabled
+                or policy.event_id != row["policy_event_id"]
+                or not self._valid_start_evidence(
+                    start, self._authenticated_start_payload(start), attempt,
+                    dispatch_id=lease.dispatch_id, attempt_id=lease.attempt_id,
+                    idempotency_key=lease.idempotency_key, capability=lease.capability,
+                    policy_event_id=str(row["policy_event_id"]), subject=lease.subject,
+                    sensitivity=lease.sensitivity, generation=lease.generation)
+                or current < start.event.observed_at):
+            raise DispatchOutboxError("launch does not own a live authenticated start")
+        authorization = self.journal.get(str(row["authorization_event_id"]))
+        binding, reasons = self._authorization_route(
+            authorization, subject=lease.subject, capability=lease.capability, now=current)
+        if binding is None:
+            raise DispatchOutboxError("launch route is no longer authorized: " + ",".join(reasons))
+        contract = parse_action_contract(execution.content, capability=lease.capability)
+        if (not self.protector.verify_json(
+                "action.contract.v1", contract.to_document(),
+                authorization.event.payload.get("action_contract_binding"))
+                or self.protector.authenticate_json("dispatch.launch.route.v1", execution.route)
+                != self.protector.authenticate_json(
+                    "dispatch.launch.route.v1", self.host.resolve_route(binding))):
+            raise DispatchOutboxError("launch content or route differs from authorization")
+
     def record_cli_observation(
         self, execution: DispatchExecution, *, stdout: str,
         exit_code: int | None, now: datetime | None = None,

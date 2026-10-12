@@ -1348,3 +1348,22 @@ For each material change:
   preserving uncertainty across crashes and obtaining real channel receipts.
   Semantic shadow/human usefulness and longitudinal acceptance remain open.
   Production remains unchanged; no live sender was activated.
+
+### 2026-10-12 — Single-start execution bridge
+
+- Connected authenticated outbox start, authorized text compilation, a final
+  journal-authority recheck, one trusted launcher call and nonterminal CLI
+  observation (ADR-0057). No retry/release/acknowledgement on process errors.
+- Added send-time content/route/window checks and caught pending journal policy
+  updates before launch admission. This is not an atomic external-effect guard;
+  host identity and concurrent revocation remain integration obligations.
+- Real synthetic recovery authorization passes through the bridge and rejects
+  a second launcher call, changed body/route and an expired launch window.
+  Failure-isolation, text-contract, recovery, dispatch migration, evidence
+  projection and action-authorization checks pass.
+- Launcher/parsing callbacks in the recovery fixture are synthetic. Actual
+  host command tests are separate: no combined real-process/runtime qualification
+  or external delivery has been proved. Next implement the operator-owned
+  process launcher, then qualify the combined isolated chain before live canary.
+- Production unchanged; broader semantic shadow, agenda/learning usefulness,
+  deployment/migration and longitudinal acceptance requirements remain open.

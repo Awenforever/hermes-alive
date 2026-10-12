@@ -15,6 +15,7 @@ import tempfile
 HOOKS = Path(__file__).resolve().parents[1] / "hooks"
 sys.path.insert(0, str(HOOKS))
 from alive_kernel.dispatch_verifier import DispatchEvidenceVerifier
+from alive_kernel.cli_execution import execute_text_cli_once
 from alive_kernel.event_store import EventConflictError
 
 from alive_kernel import (  # noqa: E402
@@ -380,11 +381,43 @@ def main() -> int:
             now=first_lease.lease_until,
         )
         assert third_lease is not None
-        execution = outbox.begin_execution(
-            third_lease,
-            clearance=Sensitivity.RESTRICTED,
-            now=first_lease.lease_until,
-        )
+        launch_calls = []
+        cli_stdout = '{"success":true,"message_id":"PRIVATE_CLI_REPORT_MARKER"}'
+        def local_launcher(plan):
+            launch_calls.append(plan.stdin_text)
+            return cli_stdout, 0
+        bridge_options = dict(
+            clearance=Sensitivity.RESTRICTED, profile_id="default", hermes_home=kernel,
+            resolve_target=lambda platform, reference: (reference, None, None),
+            extract_media=lambda text: ([], text), observe_profile_home=lambda: kernel,
+            launch=local_launcher, clock=lambda: first_lease.lease_until)
+        bridge_result = execute_text_cli_once(outbox, third_lease, **bridge_options)
+        execution = bridge_result.execution
+        assert launch_calls == ["encrypted causal recovery candidate"]
+        try:
+            execute_text_cli_once(outbox, third_lease, **bridge_options)
+        except DispatchOutboxError:
+            pass
+        else:
+            raise AssertionError("consumed start launched twice")
+        assert len(launch_calls) == 1
+        for changed in (
+            replace(execution, route={**execution.route, "chat_id": "other"}),
+            replace(execution, content={**execution.content, "operation": {
+                "text": "unauthorized body", "format": "markdown"}}),
+        ):
+            try:
+                outbox.validate_execution_for_launch(changed, now=first_lease.lease_until)
+            except DispatchOutboxError:
+                pass
+            else:
+                raise AssertionError("launch accepted changed content or route")
+        try:
+            outbox.validate_execution_for_launch(execution, now=third_lease.lease_until)
+        except DispatchOutboxError:
+            pass
+        else:
+            raise AssertionError("launch accepted an expired execution window")
         assert execution.content == {
             "schema_version": 1,
             "capability": "hermes.channel.send",
@@ -403,7 +436,6 @@ def main() -> int:
             "lease_generation": third_lease.generation,
             "outcome": "delivery_succeeded",
         }
-        cli_stdout = '{"success":true,"message_id":"PRIVATE_CLI_REPORT_MARKER"}'
         cli_observation = outbox.record_cli_observation(
             execution, stdout=cli_stdout, exit_code=0, now=first_lease.lease_until)
         assert cli_observation.event.event_type == "transport.cli.observed"
