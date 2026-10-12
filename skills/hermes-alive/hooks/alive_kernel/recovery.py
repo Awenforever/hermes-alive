@@ -21,6 +21,7 @@ from .exploration_store import ExplorationProjection
 from .memory import MemoryProjection
 from .outcomes import OutcomeProjection
 from .preference_learning import PreferenceLearningProjection
+from .presentation import PresentationProjection
 from .reflection import ReflectionProjection
 from .retention import RetentionProjection
 
@@ -127,6 +128,7 @@ class KernelRecoverySupervisor:
                 ("memory", MemoryProjection(journal, content_vault=vault)),
                 ("agenda", AgendaProjection(journal, content_vault=vault)),
                 ("availability", AvailabilityProjection(journal)),
+                ("presentation", PresentationProjection(journal)),
                 ("deliberation-frames", deliberation),
                 ("exploration", exploration),
                 ("deliberation", deliberation),

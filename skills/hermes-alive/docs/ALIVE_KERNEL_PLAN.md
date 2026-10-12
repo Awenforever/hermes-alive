@@ -255,7 +255,12 @@ factual error or user-control violations.
   - [x] add a dual-opt-in one-way shadow bridge from the legacy activity guard;
   - [ ] remove Circadian phase as live interruption authority after shadow
     comparison and retain it, if useful, only as presentation rhythm.
-- [ ] Port voice as presentation policy, not a truth source.
+- [ ] Port voice as presentation policy, not a truth source:
+  - [x] add a replayable explicit-preference projection with deterministic
+    neutral defaults and advisory-only inferred/legacy state (ADR-0032);
+  - [x] add a dual-opt-in one-way legacy voice shadow bridge;
+  - [ ] add semantic-fidelity evaluation, user inspect/correct controls and
+    replace the legacy live voice consumer only after shadow qualification.
 - [ ] Replace heuristic mood with explainable dispositions.
 - [ ] Retire the monolithic watcher after parity and rollback drills.
 
@@ -315,6 +320,25 @@ For each material change:
 8. do not equate code presence with runtime correctness.
 
 ## Change log
+
+### 2026-10-12 — Presentation policy boundary
+
+- Audited the legacy voice path and found that it combined prose style with
+  guessed relationship stage, ignored-message counters and `social_urge`.
+  Ordinary replies, silence, night activity and lexical heuristics could
+  durably mutate the same state consumed by composition.
+- Added an authenticated, replayable presentation projection (ADR-0032).
+  Only causally proven explicit user preferences affect its resolved plan;
+  accepted-learning and legacy signals remain expiring advisory evidence.
+- Added deterministic neutral defaults and fail-neutral corruption behavior.
+  The plan cannot grant action/route authority or permit semantic changes.
+- Added a dual-opt-in one-way legacy bridge. It stores pseudonymous subjects
+  and numeric dimensions only, and the production watcher never reads back
+  the shadow result.
+- Current research/product evidence supports separating controllable style
+  from capability and safety, while warning that implicit personalization can
+  change safety and utility. This strengthens the requirement for explicit
+  provenance and independent semantic-fidelity evaluation.
 
 ### 2026-10-12 — Incremental dispatch evidence projection
 

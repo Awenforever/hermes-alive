@@ -35,7 +35,8 @@ comparison/rollback evidence and as the active safeguard when Circadian is
 | `context_tracker.py` | Bounded context, last-speaker state, activity lease, and send-time guards. |
 | `alive_state.py` | Interaction evidence, current flow, recent speech acts, and bounded mood state. |
 | `proactive_disposition.py` | Personality-informed willingness/restraint without a normal fixed unanswered switch. |
-| `voice_engine.py` | Bounded voice profile and reversible adaptation. |
+| `voice_engine.py` | Legacy live voice/profile adaptation; retained during shadow migration only. |
+| `alive_kernel/presentation.py` | Replayable explicit presentation preferences and advisory-only inferred style. |
 | `interest_learning.py` | Attributed, reversible interest updates. |
 | `discovery.py` | Collection, ranking, cached-candidate rotation, and validated content references. |
 | `topic_dedup.py` | Persistent URL/topic reservation, delivery history, material-update fingerprints, and privacy-safe hashes. |
@@ -142,6 +143,15 @@ mirror the legacy activity guard for comparison, but the current watcher does
 not consume the projection yet. Circadian remains a legacy live gate until
 shadow evaluation supports removing its authority and retaining, at most, its
 optional presentation rhythm.
+
+Presentation is also a separate shadow-kernel projection (ADR-0032). Its
+resolved plan applies only same-subject, causally proven explicit user style
+preferences over deterministic neutral defaults. Learned estimates and legacy
+voice snapshots are advisory-only and expiring. The plan cannot establish a
+fact or relationship, change message semantics, authorize an action or select
+a route. Projection corruption returns neutral style until replay repair. A
+dual-opt-in bridge mirrors only pseudonymous numeric legacy dimensions; the
+legacy watcher never reads the projection back into composition.
 
 External authority also depends on the latest user-owned autonomy policy
 (ADR-0025). The default is no policy and therefore no proactive execution.

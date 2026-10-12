@@ -2732,9 +2732,36 @@ class ProactivePlatformWatcher:
         if engine is None:
             return None
         try:
-            return engine.genome
+            voice = engine.genome
+            self._mirror_presentation_kernel_shadow(voice)
+            return voice
         except Exception:
             return None
+
+    def _mirror_presentation_kernel_shadow(self, voice: Any) -> None:
+        """Observe the legacy voice without granting it presentation authority."""
+
+        try:
+            from alive_kernel.presentation import (
+                mirror_legacy_voice,
+                presentation_shadow_enabled,
+            )
+
+            if not presentation_shadow_enabled() or not self._active_delivery_subject:
+                return
+            decisions = mirror_legacy_voice(
+                _SHARED_DIR,
+                raw_subject=self._active_delivery_subject,
+                voice=voice,
+            )
+            logger.info(
+                "Alive presentation kernel shadow observed=%d recorded=%d advisory_only=1",
+                len(decisions),
+                sum(item.outcome == "recorded" for item in decisions),
+            )
+        except Exception:
+            # A shadow observer must not alter legacy compose or send behavior.
+            logger.exception("Alive presentation kernel shadow ingestion failed")
 
     def _voice_state_or_default(self, voice: Any | None) -> Any:
         if voice is not None:

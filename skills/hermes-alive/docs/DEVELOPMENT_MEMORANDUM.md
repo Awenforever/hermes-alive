@@ -168,6 +168,24 @@ migration debt, not the target design. Regression proof lives in
 `tests/run_alive_kernel_availability.py`; the architectural contract is
 ADR-0031.
 
+## Presentation may shape form, never facts or initiative
+
+Do not reconstruct the legacy `VoiceEngine` inside the kernel. Message length,
+vocabulary, emojis, ordinary replies, silence and time of day are ambiguous
+signals. They may support an expiring advisory estimate, but must not silently
+become active style, relationship state or permission to speak.
+
+Only a same-subject explicit instruction may enter the active presentation
+plan. Accepted reflection or explicit feedback remains advisory until a later
+reviewed promotion design exists. Never store `social_urge`, ignored-message
+punishment or guessed `relationship_stage` in presentation state. A resolved
+plan must not select content, alter claims/amounts/dates/uncertainty, choose a
+route or authorize an action. Corrupt state returns neutral defaults. Before a
+live renderer consumes this policy, require semantic-fidelity tests and user
+inspection/correction controls. Regression proof lives in
+`tests/run_alive_kernel_presentation.py`; the architectural contract is
+ADR-0032.
+
 ## Plugin dependencies must respect the Hermes environment lock
 
 The supported Hermes runtime already provides `cryptography==50.0.0`. Alive's
