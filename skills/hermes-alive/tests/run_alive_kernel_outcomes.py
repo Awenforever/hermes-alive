@@ -261,6 +261,7 @@ def main() -> int:
         reply = EventEnvelope(
             event_id="reply:outcome-test",
             event_type="conversation.inbound",
+            causation_id=attempt_record.event.event_id,
             source="test.channel",
             actor="user:test",
             subject="user:test",
@@ -277,6 +278,25 @@ def main() -> int:
             outcome_id="outcome:reply-test",
         )
         assert outcomes.apply(reply_record).outcome == "recorded"
+
+        unrelated = EventEnvelope(
+            event_id="reply:unrelated", event_type="conversation.inbound", source="test.channel",
+            actor="user:test", subject="user:test", payload={"structural": True},
+        )
+        journal.append(unrelated)
+        for kind in (OutcomeKind.USER_REPLIED, OutcomeKind.EXPLICIT_FEEDBACK):
+            wrongly_attributed = outcomes.append_outcome(
+                attempt_id="attempt:outcome-test", kind=kind, source_event_id=unrelated.event_id,
+                details={"signal": "model guessed this was helpful"},
+                actor="user:test", subject="user:test", outcome_id=f"unrelated:{kind.value}",
+            )
+            assert outcomes.apply(wrongly_attributed).reason == "user_outcome_not_attributed"
+        unproven_feedback = outcomes.append_outcome(
+            attempt_id="attempt:outcome-test", kind=OutcomeKind.EXPLICIT_FEEDBACK,
+            source_event_id=reply.event_id, details={"signal": "model guessed this was helpful"},
+            actor="user:test", subject="user:test", outcome_id="unproven-feedback",
+        )
+        assert outcomes.apply(unproven_feedback).reason == "user_outcome_kind_unproven"
 
         stale_source_record = outcomes.append_outcome(
             attempt_id="attempt:outcome-test",

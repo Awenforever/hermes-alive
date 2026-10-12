@@ -38,6 +38,15 @@ records cannot carry cached previews. An interrupted successor definition is
 pending, not a successful correction. Cursors are read-only seek anchors, not
 semantic validity or action authority.
 
+## Later same-user traffic is not causal feedback
+
+An inbound message after an action is not necessarily a reply to that action.
+Require exact host-resolved attempt attribution. An ordinary linked reply is
+not explicit feedback/correction/dismissal unless the host records that user
+operation. Model-authored outcome details cannot manufacture user intent.
+Admission fixes do not retroactively sanitize cached outcomes or learned
+projections: audit and revalidate those before activating the new kernel.
+
 ## Model synthesis must never become Dream again
 
 The semantic need is real, but the old coupling is forbidden. Conversation

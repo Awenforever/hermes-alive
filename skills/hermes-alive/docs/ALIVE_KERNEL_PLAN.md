@@ -219,6 +219,11 @@ inspectable; replay is deterministic outside explicitly recorded model calls.
 
 ### Phase 4 — Outcomes, reflection and learning
 
+- [x] Harden new user-outcome admission with exact attempt attribution and
+  host-recorded explicit operation kinds (ADR-0041).
+- [ ] Revalidate legacy materialized outcomes and all dependent reflection/
+  preference reads; audit generic transport/task attribution before activation.
+
 - [x] Link action attempts and evidence-backed delivery, reply, correction,
   feedback and downstream task outcomes to validated selections (ADR-0008).
 - [x] Learn timing, topic, presentation and interruption estimates from bounded,
@@ -1011,3 +1016,13 @@ For each material change:
 - Tests exercise interleaved users, insertion-safe pagination, index use,
   invalid cursors/bounds, lifecycle states, erasure and anonymous refusal.
 - Live user-control integration and feedback/outcome linkage remain pending.
+
+### 2026-10-12 — User-outcome attribution defect found and narrowed
+
+- Audit found that later same-user inbound events could be attached to any
+  prior attempt, and ordinary replies upgraded through model-written details.
+- New admission now requires exact attempt causation, consistent observation
+  times and host-typed metadata for explicit feedback/correction/dismissal.
+- ADR-0041 records the defect and regression proof without overclaiming:
+  cached legacy outcomes, dependent learned state and transport/task attribution
+  still need revalidation before live use. Production remains unchanged.

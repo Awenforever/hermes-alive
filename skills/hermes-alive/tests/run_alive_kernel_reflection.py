@@ -145,10 +145,11 @@ def main() -> int:
         feedback = EventEnvelope(
             event_id="feedback:reflection-test",
             event_type="conversation.inbound",
+            causation_id=attempt_event.event.event_id,
             source="test.channel",
             actor="user:test",
             subject="user:test",
-            payload={"structural": True},
+            payload={"structural": True, "user_outcome_kind": "explicit_feedback"},
         )
         journal.append(feedback)
         explicit = outcomes.append_outcome(
@@ -160,7 +161,7 @@ def main() -> int:
             subject="user:test",
             outcome_id="outcome:reflection-feedback",
         )
-        outcomes.apply(explicit)
+        assert outcomes.apply(explicit).outcome == "recorded"
 
         weak = ReflectionProposal(
             reflection_id="reflection:weak-test",

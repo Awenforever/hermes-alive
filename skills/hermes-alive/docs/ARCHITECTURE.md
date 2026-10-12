@@ -210,6 +210,12 @@ uses stable event anchors and a composite index, and recomputes privacy/lifecycl
 states on each read. It reports content records, not invented send outcomes;
 linking actual delivery and user feedback remains separate work.
 
+New user-outcome admission requires an inbound source explicitly caused by
+the exact action attempt, monotonic observation times and host-typed operation
+metadata for feedback/correction/dismissal (ADR-0041). Same-user traffic and
+model-authored details are insufficient. Previously materialized outcome and
+learned projections still require revalidation before live activation.
+
 External authority also depends on the latest user-owned autonomy policy
 (ADR-0025). The default is no policy and therefore no proactive execution.
 Authorization receipts and outbox rows bind an exact policy event/revision;

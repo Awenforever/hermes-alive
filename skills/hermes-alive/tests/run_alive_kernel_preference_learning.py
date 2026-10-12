@@ -103,8 +103,9 @@ def main() -> int:
         outcomes.apply(attempted)
         feedback_event = EventEnvelope(
             event_id="feedback:preference-test", event_type="conversation.inbound",
+            causation_id=attempted.event.event_id,
             source="test.channel", actor="user:test", subject="user:test",
-            payload={"structural": True},
+            payload={"structural": True, "user_outcome_kind": "explicit_feedback"},
         )
         journal.append(feedback_event)
         feedback = outcomes.append_outcome(
@@ -114,7 +115,7 @@ def main() -> int:
             actor="user:test", subject="user:test",
             outcome_id="outcome:preference-feedback",
         )
-        outcomes.apply(feedback)
+        assert outcomes.apply(feedback).outcome == "recorded"
 
         explicit_signal = PreferenceSignalProposal(
             observation_id="preference-observation:explicit",

@@ -694,6 +694,25 @@ class OutcomeProjection:
             return self._decision(
                 connection, event, "rejected", "user_outcome_actor_mismatch", attempt_id, outcome_id or None
             )
+        if kind in {
+            OutcomeKind.USER_REPLIED, OutcomeKind.USER_CORRECTED,
+            OutcomeKind.USER_DISMISSED, OutcomeKind.EXPLICIT_FEEDBACK,
+        }:
+            if (
+                source.event.causation_id != attempt_event.event.event_id
+                or source.event.observed_at < attempt_event.event.observed_at
+                or event.observed_at < source.event.observed_at
+            ):
+                return self._decision(
+                    connection, event, "rejected", "user_outcome_not_attributed", attempt_id, outcome_id or None
+                )
+            # A linked ordinary reply is not explicit feedback/correction.
+            # The host must record an explicit user operation as typed metadata;
+            # model-provided outcome details cannot manufacture that intent.
+            if kind is not OutcomeKind.USER_REPLIED and source.event.payload.get("user_outcome_kind") != kind.value:
+                return self._decision(
+                    connection, event, "rejected", "user_outcome_kind_unproven", attempt_id, outcome_id or None
+                )
         try:
             self.content_vault.resolve_json(
                 content.content_id,
