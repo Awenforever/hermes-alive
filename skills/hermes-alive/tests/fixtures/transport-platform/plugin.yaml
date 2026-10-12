@@ -1,0 +1,4 @@
+name: alive-transport-fixture
+version: 0.0.1
+description: Test-only local transport sink; never a user delivery channel.
+kind: platform

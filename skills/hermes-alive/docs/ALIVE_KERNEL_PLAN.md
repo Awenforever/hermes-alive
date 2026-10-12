@@ -1289,3 +1289,21 @@ For each material change:
   changing the old snapshot. This closes a bounded current-source/native
   Windows SDK check, not a complete current Hermes installation or gateway
   execution gate. No production changes or external sends occurred.
+
+### 2026-10-12 — Full command path to a discovered local platform
+
+- Added a test-only custom platform through public plugin discovery and
+  `register_platform`; no fake send tool or patched core function is involved.
+  The real command, config loader, route parser, standalone routing and result
+  emitter now run together against current `3f2abce` source on native Windows.
+- Six local integration cases passed: success, refusal, partial effect, cron
+  duplicate skip, wrong receiver route and disabled channel. Synthetic local
+  receipts prove fixture effects only; skip has exit zero but no new effect,
+  while partial has exit one and an effect that must not be blindly retried.
+- Solved actual test-environment failures without bypassing relay authorization:
+  narrow read-only Git provenance queries, real missing dependencies, explicit
+  UTF-8 capture. Recorded dependency/sandbox limitations and exact scope in
+  `HOST_TRANSPORT_LOCAL_20261012.md`; production and upstream source untouched.
+- Next integration work must connect the qualified public command semantics
+  to authorized attempts and ambiguous receipts, then obtain actual channel
+  and usefulness evidence. Full bootstrap/PM/live/canary gates stay open.
