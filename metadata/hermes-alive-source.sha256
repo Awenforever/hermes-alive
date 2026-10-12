@@ -2,7 +2,7 @@
 cf444ad0788f9ab925b944e4668d974fb8dc36161d3bdc8d9963b6a5021dd53f  ./README.md
 15aa69e768b45e17d71ff22155150fac4d0925ba172748432c5c8c307985e1bb  ./README_CN.md
 a3ab6cbfada2ab9a7e9e0693d376d354563e3e50f4b368f6c45e3cfa7773ba35  ./SKILL.md
-0a1374e481d023b1fdb7bd4bfdb5be439a79e1347ca15cf23e855f51a532a17f  ./docs/ALIVE_KERNEL_PLAN.md
+b1d1221576a1a85d1218401b500156a485f635784fcfde43b6563e24a29be62d  ./docs/ALIVE_KERNEL_PLAN.md
 97ab9e52cbfbc23d98822e39ecd598be1bb7ccd78395cf59aca7929a3ed98d5d  ./docs/ARCHITECTURE.md
 60a2ffe527b49c1598e8275b205985b63653270b499cdb29a2f7ab672e88fc0e  ./docs/DATA_AND_PRIVACY.md
 858c8d0089d0e8be7fbf40fe70fe162918edc43c1aa264f50fe6f07e0ce7ab1f  ./docs/DEVELOPMENT_MEMORANDUM.md
@@ -65,6 +65,7 @@ f229514a3682d946a92acdf89aa6ce2bb730963251cafeb8ddf9cb2ac5c6fcf8  ./docs/adr/004
 b61f51a12a9b060e3e17bc500e8a298ff67c6d316c2e23cd8a911c0c498b5956  ./docs/adr/0050-real-package-admission-gate.md
 b3e06f1a4e85cc249c088ebb373388c20c440c19cbd012b454a8ee44cd975e07  ./docs/adr/0051-canonical-outcome-observations.md
 961a58ab13cd46205efc5b53d07194d179f6f038c371bf138b7c782954583d12  ./docs/adr/0052-journal-observations-survive-projection-loss.md
+c5f78ddacef494ee8c4649f6d1372624906bac2da829467de33b6c25e3444db4  ./docs/adr/0053-legacy-history-is-observation-not-outcome.md
 4d6108e5f522390a4f9008265a2681771192c500c4c34a02179e24a238b55332  ./docs/evidence/deepseek-seed-20261012.json
 40941e141314d626c51ad4d22ccc19c76dcf4b770a85daa0881d135089fb75ea  ./docs/evidence/qwen-route-20261012.json
 460cffae94c5494e13515ab9c2dc42331e9fd14260bf4182086d5f3bd9e19114  ./hooks/HOOK.yaml
@@ -143,6 +144,7 @@ eaf39dcc0d7d54b1400cc1c5b6a94c9081fa1defcfb955d4ace450054c415f0b  ./hooks/safe_i
 0212ed61f64bd812aae9781d66be4efbf1499970f655ea3c27d52098b55affc2  ./scripts/hermes-alive-lifecycle
 69c7a050d3ab078109e4f7eb147349cde5962ede2fa1716af6e1bce85154f1d0  ./scripts/hermes-alive-lifecycle.py
 2723476a0f5d1d11e3f8f55b1d56026679fbb63249575d475003c868abde9ed5  ./scripts/install.sh
+cda2433fecdf03da2690cdc97ce38ac6a84ff36db6ad7d72a964ebb8eff6fbca  ./scripts/legacy-history-corpus.py
 bd24578d3faf39fe8bd0926d2b9468b178676ce857ca6fa31e38486281a23ecb  ./scripts/logs.py
 dc2397cf06cc3013a31f40fa32c6e36b638f0c8dcaff8d368725d66ff189e9e4  ./scripts/semantic-review-replay.py
 c209d590a2e4d7f22215c8e94aab4a8cad083422a0bfdf161bd62fc227fef497  ./scripts/uninstall.sh
@@ -213,6 +215,7 @@ b19462f735a4319638631ce69e20b9564d7509c214bc7a56dd285447c76ac752  ./tests/run_ed
 7d41cb9f1fb2a5b28ee28eee309e4f0c69f00fa3eccb2944321d056fae0b4aea  ./tests/run_isolated_enforcement.py
 78da2f442f4217e4808e4d4d95a01b7e29fd3cd1d83e5ad393c29ddcc8c3696a  ./tests/run_joint_shadow_replay.py
 67cc8bb65bf88310148a9887bc3f41f049e211da6e4e220a7a592b14ec5d805c  ./tests/run_legacy_dream_retirement.py
+7287a06f3b78435daf08598225c03606207dcac55bd3d60536726aad38d9a23c  ./tests/run_legacy_history_corpus.py
 00a942df57ee0fdf93aa620e0c9688a3eb2a5a6d7a029f9b2343d2948a689646  ./tests/run_location_weather_onboarding.py
 7523cc7a796268606c345906aa9e3c9d441bdeebd104424dc154734dcab3fae7  ./tests/run_matrix.py
 cf83d75d6ff3555905e4ca12acd9a9f0c1b46ff821dd36f98efe79fd2a5c6269  ./tests/run_personality_semantic_bubbles.py

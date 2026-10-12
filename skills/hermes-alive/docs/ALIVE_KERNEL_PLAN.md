@@ -122,6 +122,10 @@ main loop.
 - [x] Record the North Star and invariants.
 - [x] Preserve the working 2.9.8 behavior on a separate branch.
 - [ ] Capture a replay corpus from sanitized historical events.
+  - [x] Read-only content-free current-log pilot with per-export pseudonyms and
+    explicitly unknown outcome labels (ADR-0053); private data stays outside Git.
+    This does not close rotated-history coverage, human calibration or causal
+    decision replay, and must not be scored as useful/confirmed delivery.
 - [ ] Define longitudinal quality and interruption metrics.
 
 Exit: old behavior can be replayed and scored without sending messages.
@@ -1217,3 +1221,21 @@ For each material change:
   new-kernel learning or shadow decision parity is justified. Next behavior
   work must obtain privacy-bounded history and actual shadow evidence, not
   extrapolate product usefulness from install/fault tests.
+
+### 2026-10-12 — Privacy-bounded legacy structural baseline
+
+- Inspected production log field shapes without printing bodies. Found text,
+  previews, unsalted hashes and only a small number of delivery-audit rows;
+  broad JSON copy or retrospective reward labelling would be inappropriate.
+- Added a standard-library read-only exporter with typed scalar minimization,
+  per-corpus identities, append/truncation accounting and bounded snapshots.
+  It neither writes production state nor turns legacy logs into kernel outcomes.
+- Actual final capture: 1,731 records, no malformed lines, all aware timestamps,
+  no source-order timestamp regressions, four legacy sent-labelled rows and
+  zero labelled outcomes. Four unknown decision groups remain opaque, not lost.
+- Stored only the final structural capture privately outside the repository;
+  removed two intermediate exports. Tests passed locally and the real extractor
+  ran in the production image without model calls, sends or gateway mutation.
+- This is partial Phase 0 evidence, not completion. Next work must expand
+  historical coverage and reconstruct genuinely available shadow context;
+  semantic/human labels, causal attempts and live effects cannot be guessed.
