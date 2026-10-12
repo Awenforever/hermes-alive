@@ -2,6 +2,8 @@
 
 Status: accepted for outcome reads; dependent projection hardening pending
 
+Amended by ADR-0043 for dependent feedback projection paths.
+
 ## Decision
 
 An `action_outcomes_v1` row is a cache, not evidence that its original

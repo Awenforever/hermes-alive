@@ -221,8 +221,10 @@ inspectable; replay is deterministic outside explicitly recorded model calls.
 
 - [x] Harden new user-outcome admission with exact attempt attribution and
   host-recorded explicit operation kinds (ADR-0041).
-- [ ] Revalidate legacy materialized outcomes and all dependent reflection/
-  preference reads; audit generic transport/task attribution before activation.
+- [x] Revalidate user attribution in legacy outcome, reflection and preference
+  reads, including source expiry (ADR-0042/0043).
+- [ ] Audit generic transport/task attribution and remaining projection
+  integrity before activation.
 
 - [x] Link action attempts and evidence-backed delivery, reply, correction,
   feedback and downstream task outcomes to validated selections (ADR-0008).
@@ -1036,3 +1038,15 @@ For each material change:
   absent from current reads while its journal event remains intact.
 - Direct reflection/preference SQL reads remain a confirmed bypass requiring
   the next hardening step; this is not full learning-loop qualification.
+
+### 2026-10-12 — Derived feedback projections revalidated
+
+- Reflection admission/acceptance/reads and explicit/reflected preference
+  admission/estimates now share stateless current user-attribution checks.
+- Estimates bind cached signal identifiers, direction, weight and expiry to
+  their original journal event, and reject expired source reflections.
+- An integration regression emulates accepted and active legacy projections
+  backed by unlinked feedback: invalid influence disappears without rebuild
+  or history deletion. Altered cached weight is separately excluded.
+- ADR-0043 retains open transport/task evidence and long-term usefulness
+  qualification; production remains unchanged.

@@ -21,8 +21,8 @@ from .content_vault import (
 )
 from .event_store import EventConflictError, ExperienceJournal, JournalRecord
 from .events import EventEnvelope, Sensitivity
-from .outcomes import OutcomeKind
-from .reflection import ReflectionState
+from .outcomes import OutcomeKind, OutcomeProjection
+from .reflection import ReflectionState, ReflectionProjection
 
 
 class PreferenceLearningError(ValueError):
@@ -349,6 +349,7 @@ class PreferenceLearningProjection:
             ).fetchone()
             return bool(
                 row
+                and OutcomeProjection.user_attribution_valid_for(self.journal, source_event)
                 and row["event_id"] == source_event_id
                 and row["subject"] == event.subject
                 and _SENSITIVITY_ORDER.index(Sensitivity(row["sensitivity"]))
@@ -374,6 +375,7 @@ class PreferenceLearningProjection:
         return bool(
             row
             and transition
+            and ReflectionProjection.outcome_evidence_valid(self.journal, connection, source_id, event.subject)
             and row["subject"] == event.subject
             and _SENSITIVITY_ORDER.index(Sensitivity(row["sensitivity"]))
             <= _SENSITIVITY_ORDER.index(event.sensitivity)
@@ -551,7 +553,7 @@ class PreferenceLearningProjection:
                   ON p.origin=? AND r.reflection_id=p.source_id
                 WHERE p.state=? AND p.expires_at>?
                   AND p.sensitivity IN ({placeholders})
-                  AND (p.origin<>? OR r.state=?)
+                  AND (p.origin<>? OR (r.state=? AND r.expires_at>?))
                 ORDER BY p.rowid
                 """,
                 (
@@ -561,10 +563,26 @@ class PreferenceLearningProjection:
                     *(value.value for value in allowed),
                     PreferenceSignalOrigin.ACCEPTED_REFLECTION.value,
                     ReflectionState.ACCEPTED.value,
+                    current.astimezone(timezone.utc).isoformat(),
                 ),
             ).fetchall()
             grouped: dict[str, list[sqlite3.Row]] = {}
             for row in rows:
+                original = self.journal.get(row["event_id"])
+                if original is None or any(
+                    original.event.payload.get(field) != row[field]
+                    for field in ("observation_id", "origin", "source_id", "source_event_id",
+                                  "target_digest", "direction", "weight")
+                ) or original.event.subject != row["subject"] or (
+                    original.event.expires_at is None
+                    or original.event.expires_at.isoformat() != row["expires_at"]
+                ):
+                    continue
+                if not self._source_valid(
+                    connection, original.event, PreferenceSignalOrigin(row["origin"]),
+                    row["source_id"], row["source_event_id"],
+                ):
+                    continue
                 grouped.setdefault(row["target_digest"], []).append(row)
             estimates: list[PreferenceEstimate] = []
             for target_digest, evidence in sorted(grouped.items()):

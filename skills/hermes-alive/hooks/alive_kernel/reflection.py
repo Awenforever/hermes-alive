@@ -21,7 +21,7 @@ from .content_vault import (
 )
 from .event_store import EventConflictError, ExperienceJournal, JournalRecord
 from .events import EventEnvelope, Sensitivity
-from .outcomes import OutcomeKind
+from .outcomes import OutcomeKind, OutcomeProjection
 
 
 class ReflectionValidationError(ValueError):
@@ -400,6 +400,12 @@ class ReflectionProjection:
                 connection, event, "rejected", "outcome_evidence_missing", reflection_id
             )
         kinds = {row["kind"] for row in evidence}
+        if any(
+            (original := self.journal.get(row["event_id"])) is None
+            or not OutcomeProjection.user_attribution_valid_for(self.journal, original)
+            for row in evidence
+        ):
+            return self._decision(connection, event, "rejected", "outcome_evidence_invalid", reflection_id)
         evidence_events = {row["outcome_id"]: row["event_id"] for row in evidence}
         if event.causation_id != evidence_events[evidence_ids[-1]]:
             return self._decision(
@@ -464,6 +470,29 @@ class ReflectionProjection:
             connection, event, "proposed", "requires_user_review", reflection_id
         )
 
+    @staticmethod
+    def outcome_evidence_valid(journal, connection, reflection_id, subject) -> bool:
+        rows = connection.execute(
+            "SELECT o.* FROM reflection_evidence_v1 e JOIN action_outcomes_v1 o "
+            "ON o.outcome_id=e.outcome_id WHERE e.reflection_id=?", (reflection_id,),
+        ).fetchall()
+        count = connection.execute(
+            "SELECT COUNT(*) FROM reflection_evidence_v1 WHERE reflection_id=?", (reflection_id,),
+        ).fetchone()[0]
+        if not rows or len(rows) != count:
+            return False
+        for row in rows:
+            original = journal.get(row["event_id"])
+            if (
+                original is None or original.event.subject != subject or row["subject"] != subject
+                or original.event.payload.get("outcome_id") != row["outcome_id"]
+                or original.event.payload.get("kind") != row["kind"]
+                or original.event.payload.get("attempt_id") != row["attempt_id"]
+                or not OutcomeProjection.user_attribution_valid_for(journal, original)
+            ):
+                return False
+        return True
+
     def _apply_review(
         self, connection: sqlite3.Connection, event: EventEnvelope
     ) -> ReflectionProjectionDecision:
@@ -496,6 +525,10 @@ class ReflectionProjection:
                 connection, event, "rejected", "review_authority_invalid", reflection_id
             )
         current = ReflectionState(row["state"])
+        if review is ReflectionReview.ACCEPT and not self.outcome_evidence_valid(
+            self.journal, connection, reflection_id, event.subject
+        ):
+            return self._decision(connection, event, "rejected", "outcome_evidence_invalid", reflection_id)
         transition = {
             (ReflectionState.PROPOSED, ReflectionReview.ACCEPT): ReflectionState.ACCEPTED,
             (ReflectionState.PROPOSED, ReflectionReview.REJECT): ReflectionState.REJECTED,
@@ -593,6 +626,8 @@ class ReflectionProjection:
             ).fetchall()
             records: list[ReflectionRecord] = []
             for row in rows:
+                if not self.outcome_evidence_valid(self.journal, connection, row["reflection_id"], row["subject"]):
+                    continue
                 sensitivity = Sensitivity(row["sensitivity"])
                 try:
                     details = self.content_vault.resolve_json(

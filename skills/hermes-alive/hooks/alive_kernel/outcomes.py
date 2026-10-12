@@ -815,6 +815,10 @@ class OutcomeProjection:
             ]
 
     def user_attribution_valid(self, record: JournalRecord) -> bool:
+        return self.user_attribution_valid_for(self.journal, record)
+
+    @staticmethod
+    def user_attribution_valid_for(journal: ExperienceJournal, record: JournalRecord) -> bool:
         """Recheck user attribution without trusting a materialized outcome row.
 
         Non-user outcomes are outside this check, not certified transport facts.
@@ -832,8 +836,8 @@ class OutcomeProjection:
             OutcomeKind.USER_DISMISSED, OutcomeKind.EXPLICIT_FEEDBACK,
         }:
             return True
-        attempt = self.journal.get(f"action.attempt:{event.payload.get('attempt_id', '')}")
-        source = self.journal.get(str(event.payload.get("source_event_id") or ""))
+        attempt = journal.get(f"action.attempt:{event.payload.get('attempt_id', '')}")
+        source = journal.get(str(event.payload.get("source_event_id") or ""))
         return bool(
             attempt is not None and source is not None
             and attempt.event.event_type == "action.attempted"

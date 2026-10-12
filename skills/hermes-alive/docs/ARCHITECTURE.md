@@ -218,8 +218,11 @@ learned projections still require revalidation before live activation.
 
 The outcome API now revalidates legacy user attribution and cache-to-journal
 bindings on every read (ADR-0042), excluding invalid rows without erasing their
-history. Direct reflection/preference SQL consumers remain a separate open
-hardening item; this API change alone does not qualify the learning loop.
+history. Direct reflection/preference consumers now use the same stateless
+attribution check for proposal admission, acceptance, current reflection reads
+and preference estimates (ADR-0043). Estimates also bind cached signal weights
+and identities to journal events and exclude expired source reflections.
+Generic transport evidence and longitudinal learning quality remain unqualified.
 
 External authority also depends on the latest user-owned autonomy policy
 (ADR-0025). The default is no policy and therefore no proactive execution.

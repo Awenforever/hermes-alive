@@ -54,6 +54,12 @@ their journal bindings on read and preserve invalid history rather than
 deleting it. Cover direct SQL consumers as well as public projection readers;
 reflection/preference caches can otherwise bypass the improved outcome API.
 
+Reuse journal attribution checks without constructing projections under an
+existing write transaction; schema initialization can deadlock on a second
+connection. Revalidate accepted/active caches as well as new admissions.
+Signal weights must match the journal, and reflected influence ends when the
+source reflection expires, even if the signal itself remains unexpired.
+
 ## Model synthesis must never become Dream again
 
 The semantic need is real, but the old coupling is forbidden. Conversation

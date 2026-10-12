@@ -2,6 +2,9 @@
 """Bounded influence, source authority, rollback, privacy and replay tests."""
 
 from __future__ import annotations
+from unittest.mock import patch
+from dataclasses import replace
+from contextlib import closing
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -208,6 +211,61 @@ def main() -> int:
         assert learning.apply(reflected_record).outcome == "recorded"
         estimate = learning.estimates(clearance=Sensitivity.PRIVATE)[0]
         assert round(estimate.probability, 6) == round(2.25 / 4.4, 6)
+        with patch.object(OutcomeProjection, "user_attribution_valid_for", return_value=False):
+            assert learning.estimates(clearance=Sensitivity.PRIVATE) == []
+            assert reflections.list_reflections(clearance=Sensitivity.PRIVATE) == []
+        assert learning.estimates(clearance=Sensitivity.PRIVATE)
+        expired_source_estimate = learning.estimates(
+            clearance=Sensitivity.PRIVATE, as_of=now + timedelta(days=91)
+        )[0]
+        assert expired_source_estimate.evidence_ids == (explicit_signal.observation_id,)
+        # Emulate old accepted/learned caches built from an unlinked inbound.
+        unrelated = EventEnvelope(
+            event_id="legacy:unlinked-feedback", event_type="conversation.inbound",
+            source="test.channel", actor="user:test", subject="user:test", payload={},
+        )
+        journal.append(unrelated)
+        legacy_outcome = outcomes.append_outcome(
+            attempt_id="attempt:preference-test", kind=OutcomeKind.EXPLICIT_FEEDBACK,
+            source_event_id=unrelated.event_id, details={"signal": "legacy guess"},
+            actor="user:test", subject="user:test", outcome_id="legacy:feedback",
+        )
+        assert outcomes.apply(legacy_outcome).outcome == "rejected"
+        event = legacy_outcome.event
+        with closing(outcomes._connect()) as connection:
+            connection.execute("INSERT INTO action_outcomes_v1 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                ("legacy:feedback", event.event_id, "attempt:preference-test", "explicit_feedback",
+                 "user:test", unrelated.event_id, event.payload["content"]["content_id"],
+                 event.sensitivity.value, event.observed_at.isoformat()))
+        legacy_reflection = replace(reflection, reflection_id="legacy:reflection",
+                                    evidence_outcome_ids=("legacy:feedback",))
+        legacy_signal = replace(explicit_signal, observation_id="legacy:signal",
+                                source_id="legacy:feedback", source_event_id=event.event_id)
+        with patch.object(OutcomeProjection, "user_attribution_valid_for", return_value=True):
+            proposal = reflections.append_proposal(legacy_reflection, actor="model:test")
+            assert reflections.apply(proposal).outcome == "proposed"
+            approval = EventEnvelope(
+                event_id="legacy:approval", event_type="conversation.inbound", source="test.channel",
+                actor="user:test", subject="user:test", payload={},
+            )
+            journal.append(approval)
+            review = reflections.append_review("legacy:reflection", ReflectionReview.ACCEPT,
+                source_event_id=approval.event_id, actor="user:test", subject="user:test",
+                operation_id="legacy:accept")
+            assert reflections.apply(review).outcome == "accepted"
+            observation = learning.append_observation(legacy_signal, actor="system:learning")
+            assert learning.apply(observation).outcome == "recorded"
+        assert "legacy:reflection" not in {item.reflection_id for item in
+                                            reflections.list_reflections(clearance=Sensitivity.PRIVATE)}
+        assert learning.estimates(clearance=Sensitivity.PRIVATE)[0].support_mass == 0.25
+        assert journal.get(proposal.event.event_id) and journal.get(observation.event.event_id)
+        with closing(learning._connect()) as connection:
+            connection.execute("UPDATE preference_observations_v1 SET weight=99 WHERE observation_id=?",
+                               (explicit_signal.observation_id,))
+        assert learning.estimates(clearance=Sensitivity.PRIVATE)[0].support_mass == 0
+        with closing(learning._connect()) as connection:
+            connection.execute("UPDATE preference_observations_v1 SET weight=? WHERE observation_id=?",
+                               (explicit_signal.weight, explicit_signal.observation_id))
         learning.content_vault.erase_item(
             f"preference-observation:{reflected_signal.observation_id}"
         )
