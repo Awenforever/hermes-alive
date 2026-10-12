@@ -33,6 +33,7 @@ from alive_kernel import (  # noqa: E402
     ExperienceJournal,
     ExplorationPolicy,
     PolicyContext,
+    SelectionProposal,
     SideEffect,
 )
 
@@ -220,6 +221,130 @@ async def exercise(path: Path) -> None:
     assert receipts[1].event.payload["actual_model"] == "provider/actual-fallback"
     assert all(record.event.payload["raw_prompt_stored"] is False for record in receipts)
     assert all(record.event.payload["raw_response_stored"] is False for record in receipts)
+
+    cancelled_calls = 0
+
+    async def cancelled_call(**_kwargs):
+        nonlocal cancelled_calls
+        cancelled_calls += 1
+        raise asyncio.CancelledError()
+
+    try:
+        await synthesizer.run(
+            frame_id=cycle.selection.frame_id,
+            gate_event_id=refreshed_record.event.event_id,
+            subject="user:test", call=cancelled_call,
+            operation_id="selector-cancelled",
+        )
+    except asyncio.CancelledError:
+        pass
+    else:
+        raise AssertionError("cancellation was consumed")
+    await rejected(synthesizer.run(
+        frame_id=cycle.selection.frame_id,
+        gate_event_id=refreshed_record.event.event_id,
+        subject="user:test", call=cancelled_call,
+        operation_id="selector-cancelled",
+    ))
+    assert cancelled_calls == 1
+
+    concurrent_calls = 0
+
+    async def concurrent_call(**_kwargs):
+        nonlocal concurrent_calls
+        concurrent_calls += 1
+        await asyncio.sleep(0)
+        return response(json.dumps({"candidate_id": safe.candidate_id,
+                                    "rationale": "one concurrent operation"}))
+
+    concurrent = await asyncio.gather(*(synthesizer.run(
+        frame_id=cycle.selection.frame_id,
+        gate_event_id=refreshed_record.event.event_id,
+        subject="user:test", call=concurrent_call,
+        operation_id="selector-concurrent",
+    ) for _ in range(2)), return_exceptions=True)
+    assert concurrent_calls == 1
+    assert sum(isinstance(item, DeliberationSynthesisError) for item in concurrent) == 1
+
+    async def selection_changed_during_call(**_kwargs):
+        record = coordinator.deliberation.append_selection(
+            SelectionProposal(cycle.selection.frame_id, safe.candidate_id,
+                              "provider/newer-choice", "newer independent judgment"),
+            actor="system:test", subject="user:test",
+            selection_id="newer-selection-during-call",
+            exploration_gate_event_id=refreshed_record.event.event_id,
+        )
+        assert coordinator.deliberation.apply(record).outcome == "validated"
+        return response(json.dumps({"candidate_id": safe.candidate_id,
+                                    "rationale": "older choice must not overwrite newer intent"}))
+
+    before_newer = len(journal.read(event_type="deliberation.selected"))
+    await rejected(synthesizer.run(
+        frame_id=cycle.selection.frame_id,
+        gate_event_id=refreshed_record.event.event_id,
+        subject="user:test", call=selection_changed_during_call,
+        operation_id="selection-changed-in-flight", attempts=2,
+    ))
+    assert len(journal.read(event_type="deliberation.selected")) == before_newer + 1
+
+    # A model call yields control: a newer gate can replace the one shown in
+    # its prompt before the response returns. Old context must not become a
+    # durable current selection, even when the candidate IDs happen to match.
+    async def gate_changed_during_call(**_kwargs):
+        record, _gate = coordinator.exploration.append_evaluation(
+            cycle.selection.frame_id,
+            ExplorationPolicy(),
+            actor="system:test", subject="user:test",
+            evaluation_id="selector-gate-during-call",
+        )
+        assert coordinator.exploration.apply(record).outcome == "recorded"
+        return response(json.dumps({
+            "candidate_id": safe.candidate_id,
+            "rationale": "response based on superseded context",
+        }))
+
+    selections_before = len(journal.read(event_type="deliberation.selected"))
+    await rejected(synthesizer.run(
+        frame_id=cycle.selection.frame_id,
+        gate_event_id=refreshed_record.event.event_id,
+        subject="user:test", call=gate_changed_during_call,
+        operation_id="gate-changed-during-call", attempts=2,
+    ))
+    assert len(journal.read(event_type="deliberation.selected")) == selections_before
+
+    failure_calls = 0
+    current_gate_id = coordinator.exploration.latest_gate_event_id(cycle.selection.frame_id)
+
+    async def gate_changed_then_provider_failed(**_kwargs):
+        nonlocal failure_calls
+        failure_calls += 1
+        record, _gate = coordinator.exploration.append_evaluation(
+            cycle.selection.frame_id, ExplorationPolicy(),
+            actor="system:test", subject="user:test",
+            evaluation_id="selector-gate-during-provider-failure",
+        )
+        assert coordinator.exploration.apply(record).outcome == "recorded"
+        raise ConnectionError("private provider error must not be retained")
+
+    await rejected(synthesizer.run(
+        frame_id=cycle.selection.frame_id, gate_event_id=current_gate_id,
+        subject="user:test", call=gate_changed_then_provider_failed,
+        operation_id="context-invalid-before-retry", attempts=2,
+    ))
+    assert failure_calls == 1
+
+    async def erase_during_call(**_kwargs):
+        coordinator.vault.erase_item(safe.content_id)
+        return response(json.dumps({"candidate_id": safe.candidate_id,
+                                    "rationale": "erased candidate cannot be selected"}))
+
+    await rejected(synthesizer.run(
+        frame_id=cycle.selection.frame_id,
+        gate_event_id=coordinator.exploration.latest_gate_event_id(cycle.selection.frame_id),
+        subject="user:test", call=erase_during_call,
+        operation_id="candidate-erased-in-flight", attempts=2,
+    ))
+    assert len(journal.read(event_type="deliberation.selected")) == selections_before
 
     database = (path / "kernel.sqlite3").read_bytes()
     wal = path / "kernel.sqlite3-wal"

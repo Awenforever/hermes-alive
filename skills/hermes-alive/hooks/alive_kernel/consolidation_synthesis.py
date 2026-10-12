@@ -57,6 +57,10 @@ class ConsolidationSynthesisError(ValueError):
     """A synthesis request or response violates the consolidation contract."""
 
 
+class ConsolidationContextChanged(ConsolidationSynthesisError):
+    """Retained evidence or consent no longer matches the model operation."""
+
+
 @dataclass(frozen=True, slots=True)
 class RetainedEvidence:
     event_id: str
@@ -379,6 +383,22 @@ class ConsolidationSynthesizer:
             raise ConsolidationSynthesisError("conflicting synthesis receipt") from exc
         return JournalRecord(appended.sequence, appended.event)
 
+    def _revalidate_context(self, subject: str, policy: Any,
+                            evidence: tuple[RetainedEvidence, ...]) -> None:
+        try:
+            unchanged = (
+                self.policy.policy(subject) == policy
+                and self.evidence_window(subject) == evidence
+            )
+        except Exception as exc:
+            raise ConsolidationContextChanged(
+                "consolidation evidence or consent changed while awaiting the model"
+            ) from exc
+        if not unchanged:
+            raise ConsolidationContextChanged(
+                "consolidation evidence or consent changed while awaiting the model"
+            )
+
     async def run(
         self,
         *,
@@ -399,6 +419,7 @@ class ConsolidationSynthesizer:
         if current.tzinfo is None or current.utcoffset() is None:
             raise ConsolidationSynthesisError("now must be timezone-aware")
         current = current.astimezone(timezone.utc)
+        policy = self.policy.policy(subject)
         evidence = self.evidence_window(subject)
         if not evidence:
             raise ConsolidationSynthesisError("no authorized retained evidence is available")
@@ -406,15 +427,29 @@ class ConsolidationSynthesizer:
         operation = str(operation_id or uuid4()).strip()
         if not _OPERATION_RE.fullmatch(operation):
             raise ConsolidationSynthesisError("invalid synthesis operation identifier")
-        if operation_id is not None and any(
-            self.journal.get(f"consolidation.synthesis:{operation}:{attempt}") is not None
-            for attempt in range(1, 4)
-        ):
+        if any(self.journal.get(f"consolidation.synthesis:{operation}:{stage}") is not None
+               for stage in ("started", 1, 2, 3)):
+            raise ConsolidationSynthesisError("synthesis operation was already attempted")
+        try:
+            started = self.journal.append(EventEnvelope(
+                event_id=f"consolidation.synthesis:{operation}:started",
+                event_type="consolidation.synthesis_started",
+                source="alive.consolidation", actor="system:alive-consolidator",
+                subject=subject, sensitivity=Sensitivity.PRIVATE,
+                causation_id=policy.consent_event_id,
+                payload={"evidence_event_ids": list(evidence_ids),
+                         "requested_model": str(requested_model or "").strip(),
+                         "raw_prompt_stored": False, "raw_response_stored": False},
+            ))
+        except EventConflictError as exc:
+            raise ConsolidationSynthesisError("synthesis operation was already attempted") from exc
+        if not started.created:
             raise ConsolidationSynthesisError("synthesis operation was already attempted")
         receipts: list[str] = []
         last_error: ConsolidationSynthesisError | None = None
         for attempt in range(1, attempts + 1):
             try:
+                self._revalidate_context(subject, policy, evidence)
                 response = await call(
                     task="alive_memory_consolidation",
                     messages=[
@@ -427,6 +462,7 @@ class ConsolidationSynthesizer:
                     if requested_model is not None
                     else None,
                 )
+                self._revalidate_context(subject, policy, evidence)
                 content, actual_model = self._response(response)
                 plan = self._parse(
                     subject=subject,
@@ -452,6 +488,8 @@ class ConsolidationSynthesizer:
                     error_class=type(exc).__name__,
                 )
                 receipts.append(receipt.event.event_id)
+                if isinstance(exc, ConsolidationContextChanged):
+                    raise error
                 continue
             receipt = self._receipt(
                 subject=subject,

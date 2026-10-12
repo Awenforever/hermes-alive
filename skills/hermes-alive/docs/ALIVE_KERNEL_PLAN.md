@@ -1498,3 +1498,39 @@ For each material change:
   remains synthetic and disposable; no production provider, profile or sends.
   Longitudinal agenda usefulness, human semantic calibration, independent review,
   real authorization migration and production canary gates remain open.
+
+### 2026-10-13 — Temporal trust across model waits
+
+- Actual interleaved-event regression runs exposed two previously accepted
+  failures: a deliberation response admitted after a newer exploration gate,
+  and a consolidation retry disclosing retained excerpts after learning consent
+  withdrawal. Both regression checks failed on the pre-fix implementation.
+- ADR-0060 establishes an evidence/consent epoch across every plugin-level
+  model await. Decision frame, candidate content, latest gate/selection and
+  learning consent/evidence are revalidated before calls and after responses.
+  Invalidated context ends that operation, not a retry using its old prompt.
+- Both stages now persist an exclusive start before the first provider call.
+  Cancellation/unresolved starts fence repeat use of that operation ID; no
+  completion, useful outcome or action authority is invented on recovery.
+- Regression cases additionally cover superseded intent, erasure, provider
+  failure before retry, simultaneous same-operation callers and cancellation.
+  Stable-context retries and true response-model attribution remain supported.
+  These callbacks are deterministic and local; no real provider was invoked.
+- This is cognition safety progress, not model-quality or complete orchestration
+  qualification. Event-to-candidate/agenda orchestration, human semantic corpus,
+  longitudinal usefulness and production canary are still required. Revalidation
+  is not atomic with networking and cannot cancel an already in-flight request
+  or govern internal Hermes provider retries. Production stays unchanged.
+- Independent Windows Python 3.14 run: 36 kernel test files, 35 PASS and one
+  explicit absent-Hermes-runtime hook SKIP, zero failures. This source suite
+  does not supersede admitted installed-hook evidence or close live gates.
+- Reused the audited core-managed runtime in network-disabled NAS/Linux
+  container `alive-temporal-20261013-r1`: both updated synthesis regressions,
+  cognition-cycle and recovery contracts passed, terminal exit zero. Inputs are
+  immutable tree `bc5df08116dcd36cbb95258b9ef01262f076b083`; archive SHA256
+  `2c720b5e9c56124d3512c23fd73255b329a61b35344f435b7ecb38cbe02a5a0b`.
+  Retained owned-scratch `temporal-r1.log`, SHA256
+  `03db287b47ab13609db7be8f976e3f4904b52549a02266322c9d553b8c075d67`.
+  Started `2026-10-12T18:35:45.103235009Z`, finished
+  `2026-10-12T18:35:49.962114724Z`. This is current source in the prepared core
+  environment, not a new admitted-package/console/live-provider qualification.

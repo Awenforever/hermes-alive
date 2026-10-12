@@ -40,6 +40,10 @@ class DeliberationSynthesisError(ValueError):
     """A model selection crossed the durable deliberation boundary."""
 
 
+class DeliberationContextChanged(DeliberationSynthesisError):
+    """A suspended model operation must not reuse superseded evidence."""
+
+
 @dataclass(frozen=True, slots=True)
 class DeliberationSynthesisResult:
     operation_id: str
@@ -208,6 +212,56 @@ class DeliberationSynthesizer:
             raise DeliberationSynthesisError("conflicting deliberation receipt") from exc
         return JournalRecord(appended.sequence, appended.event)
 
+    def _context(self, frame_id: str, gate_event_id: str, owner: str,
+                 sensitivity: Sensitivity) -> tuple[Any, Any, str | None]:
+        stored = self.deliberation.inspect(frame_id, clearance=sensitivity)
+        gate_record = self.journal.get(gate_event_id)
+        gate = self.exploration.gate_result(frame_id)
+        latest_gate_event_id = self.exploration.latest_gate_event_id(frame_id)
+        frame_record = self.journal.get(f"deliberation.frame:{frame_id}")
+        if (
+            stored is None
+            or gate is None
+            or gate_record is None
+            or frame_record is None
+            or gate_record.event.event_type != "exploration.evaluated"
+            or gate_record.event.subject != owner
+            or frame_record.event.subject != owner
+            or gate_record.event.sensitivity != sensitivity
+            or frame_record.event.sensitivity != sensitivity
+            or latest_gate_event_id != gate_event_id
+            or gate_record.event.payload.get("frame_id") != frame_id
+            or tuple(gate_record.event.payload.get("admissible_ids", ()))
+            != gate.admissible_ids
+        ):
+            raise DeliberationSynthesisError(
+                "durable frame or exploration gate is unavailable"
+            )
+        return stored, gate, self.deliberation.latest_selection_event_id(frame_id)
+
+    def _revalidate_context(self, frame_id: str, gate_event_id: str,
+                            owner: str, sensitivity: Sensitivity,
+                            stored: Any, gate: Any, selection_event_id: str | None) -> None:
+        try:
+            current, current_gate, current_selection = self._context(
+                frame_id, gate_event_id, owner, sensitivity
+            )
+            unchanged = (
+                current.frame == stored.frame
+                and current.context == stored.context
+                and current.candidate_contents == stored.candidate_contents
+                and current_gate == gate
+                and current_selection == selection_event_id
+            )
+        except Exception as exc:
+            raise DeliberationContextChanged(
+                "deliberation context changed while awaiting the model"
+            ) from exc
+        if not unchanged:
+            raise DeliberationContextChanged(
+                "deliberation context changed while awaiting the model"
+            )
+
     async def run(
         self,
         *,
@@ -232,36 +286,12 @@ class DeliberationSynthesizer:
             requested_model = str(requested_model).strip()
             if requested_model and not _MODEL_RE.fullmatch(requested_model):
                 raise DeliberationSynthesisError("invalid requested model identifier")
-        if operation_id is not None and any(
-            self.journal.get(f"deliberation.synthesis:{operation}:{attempt}") is not None
-            for attempt in range(1, 4)
-        ):
+        if any(self.journal.get(f"deliberation.synthesis:{operation}:{stage}") is not None
+               for stage in ("started", 1, 2, 3)):
             raise DeliberationSynthesisError("deliberation operation was already attempted")
 
         sensitivity = Sensitivity(sensitivity)
-        stored = self.deliberation.inspect(frame_id, clearance=sensitivity)
-        gate_record = self.journal.get(gate_event_id)
-        gate = self.exploration.gate_result(frame_id)
-        latest_gate_event_id = self.exploration.latest_gate_event_id(frame_id)
-        frame_record = self.journal.get(f"deliberation.frame:{frame_id}")
-        if (
-            stored is None
-            or gate is None
-            or gate_record is None
-            or frame_record is None
-            or gate_record.event.event_type != "exploration.evaluated"
-            or gate_record.event.subject != owner
-            or frame_record.event.subject != owner
-            or gate_record.event.sensitivity != sensitivity
-            or frame_record.event.sensitivity != sensitivity
-            or latest_gate_event_id != gate_event_id
-            or gate_record.event.payload.get("frame_id") != frame_id
-            or tuple(gate_record.event.payload.get("admissible_ids", ()))
-            != gate.admissible_ids
-        ):
-            raise DeliberationSynthesisError(
-                "durable frame or exploration gate is unavailable"
-            )
+        stored, gate, selection_event_id = self._context(frame_id, gate_event_id, owner, sensitivity)
         if len(stored.frame.candidates) > self.MAX_FRAME_CANDIDATES:
             raise DeliberationSynthesisError("deliberation frame exceeds candidate boundary")
         prompt = self._prompt(
@@ -271,10 +301,29 @@ class DeliberationSynthesizer:
         )
         if len(prompt) > self.MAX_PROMPT_CHARS:
             raise DeliberationSynthesisError("deliberation prompt exceeds size boundary")
+        # A durable, exclusive start fences crashes/cancellation/concurrent calls
+        # before spending on the provider. A result receipt alone is too late.
+        try:
+            started = self.journal.append(EventEnvelope(
+                event_id=f"deliberation.synthesis:{operation}:started",
+                event_type="deliberation.synthesis_started",
+                source="alive.deliberation", actor="system:alive-deliberator",
+                subject=owner, causation_id=gate_event_id, sensitivity=sensitivity,
+                payload={"frame_id": frame_id, "gate_event_id": gate_event_id,
+                         "requested_model": requested_model or "",
+                         "raw_prompt_stored": False, "raw_response_stored": False},
+            ))
+        except EventConflictError as exc:
+            raise DeliberationSynthesisError("deliberation operation was already attempted") from exc
+        if not started.created:
+            raise DeliberationSynthesisError("deliberation operation was already attempted")
         receipts: list[str] = []
         last_error: DeliberationSynthesisError | None = None
         for attempt in range(1, attempts + 1):
             try:
+                self._revalidate_context(
+                    frame_id, gate_event_id, owner, sensitivity, stored, gate, selection_event_id
+                )
                 response = await call(
                     task="alive_deliberation",
                     messages=[
@@ -284,6 +333,9 @@ class DeliberationSynthesizer:
                     temperature=0.1,
                     max_tokens=500,
                     model=requested_model or None,
+                )
+                self._revalidate_context(
+                    frame_id, gate_event_id, owner, sensitivity, stored, gate, selection_event_id
                 )
                 content, actual_model = self._response(response)
                 candidate_id, rationale = self._selection_document(content)
@@ -309,6 +361,8 @@ class DeliberationSynthesizer:
                     error_class=type(exc).__name__,
                 )
                 receipts.append(receipt.event.event_id)
+                if isinstance(exc, DeliberationContextChanged):
+                    raise error
                 continue
             receipt = self._receipt(
                 operation_id=operation,

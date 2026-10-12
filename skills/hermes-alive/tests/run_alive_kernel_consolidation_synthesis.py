@@ -206,7 +206,71 @@ async def exercise(shared: Path) -> None:
     assert b"RAW_MODEL_RESPONSE_SENTINEL" not in database
     assert b"concise-but-complete" not in database
 
-    bridge.content_vault.erase_subject(subject)
+    cancelled_calls = 0
+
+    async def cancelled_call(**_kwargs):
+        nonlocal cancelled_calls
+        cancelled_calls += 1
+        raise asyncio.CancelledError()
+
+    try:
+        await synthesizer.run(subject=subject, call=cancelled_call,
+                              operation_id="synthesis-cancelled")
+    except asyncio.CancelledError:
+        pass
+    else:
+        raise AssertionError("cancellation was consumed")
+    await must_reject(synthesizer.run(
+        subject=subject, call=cancelled_call, operation_id="synthesis-cancelled",
+    ))
+    assert cancelled_calls == 1
+
+    concurrent_calls = 0
+
+    async def concurrent_call(**_kwargs):
+        nonlocal concurrent_calls
+        concurrent_calls += 1
+        await asyncio.sleep(0)
+        return response('{"candidates":[]}')
+
+    concurrent = await asyncio.gather(*(synthesizer.run(
+        subject=subject, call=concurrent_call, operation_id="synthesis-concurrent",
+    ) for _ in range(2)), return_exceptions=True)
+    assert concurrent_calls == 1
+    assert sum(isinstance(item, ConsolidationSynthesisError) for item in concurrent) == 1
+
+    withdrawal_calls = 0
+
+    async def withdrawn_during_call(**_kwargs):
+        nonlocal withdrawal_calls
+        withdrawal_calls += 1
+        handle_memory_command(
+            shared, {"user_id": "synthesis-user", "args": "alive learn off"}
+        )
+        return response("invalid response must not retry withdrawn private evidence")
+
+    await must_reject(synthesizer.run(
+        subject=subject, call=withdrawn_during_call,
+        operation_id="consent-withdrawn-in-flight", attempts=2,
+    ))
+    assert withdrawal_calls == 1
+    handle_memory_command(
+        shared, {"user_id": "synthesis-user", "args": "alive learn on"}
+    )
+
+    erased_calls = 0
+
+    async def erased_during_call(**_kwargs):
+        nonlocal erased_calls
+        erased_calls += 1
+        bridge.content_vault.erase_subject(subject)
+        return response('{"candidates":[]}')
+
+    await must_reject(synthesizer.run(
+        subject=subject, call=erased_during_call,
+        operation_id="evidence-erased-in-flight", attempts=2,
+    ))
+    assert erased_calls == 1
     before = len(calls)
     error = await must_reject(
         synthesizer.run(subject=subject, call=forbidden_call, operation_id="erased")
