@@ -68,6 +68,11 @@ or action methods. Bind policy to original authorization and reject booleans
 as lease generations. A verifier existing is not proof that outcome admission
 or cached/dependent reads actually call it; test those integrations separately.
 
+Unsigned positive receipts hide integration defects. Use signed start/result
+chains over validated attempts in positive fixtures and keep unsigned receipts
+as negative/legacy-cache cases. Bind cached outcome kinds to the journal so
+transport acknowledgements cannot masquerade as explicit user feedback.
+
 ## Model synthesis must never become Dream again
 
 The semantic need is real, but the old coupling is forbidden. Conversation

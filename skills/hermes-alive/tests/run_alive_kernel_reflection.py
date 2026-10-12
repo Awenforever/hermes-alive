@@ -10,6 +10,7 @@ import tempfile
 
 HOOKS = Path(__file__).resolve().parents[1] / "hooks"
 sys.path.insert(0, str(HOOKS))
+from alive_kernel_testkit import authenticated_dispatch_receipt
 
 from alive_kernel import (  # noqa: E402
     ActionAuthority,
@@ -123,15 +124,9 @@ def main() -> int:
         )
         outcomes.apply(attempt_event)
 
-        receipt = EventEnvelope(
-            event_id="receipt:reflection-test",
-            event_type="delivery.succeeded",
-            source="test.channel",
-            actor="system:test",
-            subject="user:test",
-            payload={"receipt": True},
+        receipt = authenticated_dispatch_receipt(
+            journal, attempt_event, event_id="receipt:reflection-test",
         )
-        journal.append(receipt)
         delivered = outcomes.append_outcome(
             attempt_id="attempt:reflection-test",
             kind=OutcomeKind.DELIVERY_SUCCEEDED,

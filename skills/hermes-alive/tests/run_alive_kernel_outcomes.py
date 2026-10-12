@@ -11,6 +11,7 @@ import tempfile
 
 HOOKS = Path(__file__).resolve().parents[1] / "hooks"
 sys.path.insert(0, str(HOOKS))
+from alive_kernel_testkit import authenticated_dispatch_receipt
 
 from alive_kernel.deliberation import (  # noqa: E402
     ActionAuthority,
@@ -239,15 +240,9 @@ def main() -> int:
         )
         assert retry.event.event_id == attempt_record.event.event_id
 
-        delivery = EventEnvelope(
-            event_id="delivery-receipt:outcome-test",
-            event_type="delivery.succeeded",
-            source="test.channel",
-            actor="system:channel",
-            subject="user:test",
-            payload={"receipt": True},
+        delivery = authenticated_dispatch_receipt(
+            journal, attempt_record, event_id="delivery-receipt:outcome-test",
         )
-        journal.append(delivery)
         delivered_record = outcomes.append_outcome(
             attempt_id="attempt:outcome-test",
             kind=OutcomeKind.DELIVERY_SUCCEEDED,
@@ -258,6 +253,27 @@ def main() -> int:
             outcome_id="outcome:delivered-test",
         )
         assert outcomes.apply(delivered_record).outcome == "recorded"
+        unsigned = EventEnvelope(
+            event_id="delivery:unsigned", event_type="delivery.succeeded", source="test.channel",
+            actor="system:test", subject="user:test", payload={"receipt": True},
+        )
+        journal.append(unsigned)
+        unproven = outcomes.append_outcome(
+            attempt_id="attempt:outcome-test", kind=OutcomeKind.DELIVERY_SUCCEEDED,
+            source_event_id=unsigned.event_id, details={"receipt": "legacy"},
+            actor="system:test", subject="user:test", outcome_id="unsigned:success",
+        )
+        assert outcomes.apply(unproven).reason == "dispatch_receipt_unproven"
+        event = unproven.event
+        with closing(outcomes._connect()) as connection:
+            connection.execute("INSERT INTO action_outcomes_v1 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                ("unsigned:success", event.event_id, "attempt:outcome-test", "delivery_succeeded",
+                 "user:test", unsigned.event_id, event.payload["content"]["content_id"],
+                 event.sensitivity.value, event.observed_at.isoformat()))
+        assert not outcomes.evidence_valid_for(journal, unproven)
+        assert all(item.outcome_id != "unsigned:success" for item in
+                   outcomes.outcomes("attempt:outcome-test", clearance=Sensitivity.PRIVATE))
+        assert journal.get(event.event_id) is not None
 
         reply = EventEnvelope(
             event_id="reply:outcome-test",

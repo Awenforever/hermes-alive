@@ -21,6 +21,46 @@ from alive_kernel.exploration_store import ExplorationProjection
 from alive_kernel.host_capabilities import HostCapabilityProjection, ReceiptLevel
 
 
+def authenticated_dispatch_receipt(journal, attempt, *, event_id, event_type="delivery.succeeded"):
+    """Synthetic host receipt over a real validated authorization/attempt fixture."""
+    from alive_kernel.dispatch_outbox import DispatchOutbox
+    protector = LocalIdentityProtector(journal.path.parent / "identity.key")
+    authorization = journal.get(attempt.event.payload["authorization_event_id"])
+    dispatch_id = f"fixture:{event_id}"
+    start_time = max(datetime.now(timezone.utc), attempt.event.observed_at)
+    payload = {
+        "dispatch_id": dispatch_id, "attempt_id": attempt.event.payload["attempt_id"],
+        "idempotency_key": attempt.event.payload["idempotency_key"],
+        "capability": attempt.event.payload["executor"],
+        "policy_event_id": authorization.event.payload.get("policy_event_id"),
+        "route_binding_id": authorization.event.payload.get("route_binding_id"),
+        "route_binding_event_id": authorization.event.payload.get("route_binding_event_id"),
+        "host_snapshot_event_id": authorization.event.payload.get("host_snapshot_event_id"),
+        "lease_generation": 1, "external_result_observed": False,
+    }
+    payload["integrity_authenticator"] = protector.authenticate_json("dispatch.start.v1", payload)
+    start = journal.append(EventEnvelope(
+        event_id=DispatchOutbox._start_event_id(dispatch_id, 1), event_type="dispatch.started",
+        source="alive.dispatch", actor="system:alive-dispatch", subject=attempt.event.subject,
+        sensitivity=attempt.event.sensitivity, causation_id=attempt.event.event_id,
+        observed_at=start_time, occurred_at=start_time, payload=payload,
+    ))
+    payload = {
+        "dispatch_id": dispatch_id, "attempt_id": attempt.event.payload["attempt_id"],
+        "idempotency_key": attempt.event.payload["idempotency_key"],
+        "capability": attempt.event.payload["executor"], "start_event_id": start.event.event_id,
+        "lease_generation": 1, "outcome": DispatchOutbox.RESULT_OUTCOMES[event_type],
+    }
+    payload["integrity_authenticator"] = protector.authenticate_json("dispatch.result.v1", payload)
+    event = EventEnvelope(
+        event_id=event_id, event_type=event_type, source="test.channel", actor="system:test",
+        subject=attempt.event.subject, sensitivity=attempt.event.sensitivity,
+        observed_at=max(datetime.now(timezone.utc), start_time), payload=payload,
+    )
+    journal.append(event)
+    return event
+
+
 def install_terminal_route(
     journal: ExperienceJournal,
     *,

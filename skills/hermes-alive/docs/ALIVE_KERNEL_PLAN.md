@@ -223,8 +223,10 @@ inspectable; replay is deterministic outside explicitly recorded model calls.
   host-recorded explicit operation kinds (ADR-0041).
 - [x] Revalidate user attribution in legacy outcome, reflection and preference
   reads, including source expiry (ADR-0042/0043).
-- [ ] Audit generic transport/task attribution and remaining projection
-  integrity before activation.
+- [x] Bind generic delivery/task admission and cached/dependent evidence reads
+  to canonical signed dispatch chains (ADR-0044/0045).
+- [ ] Audit remaining projection integrity, duplicate result observations and
+  host-clock/evaluation cutoff behavior before activation.
 
 - [x] Link action attempts and evidence-backed delivery, reply, correction,
   feedback and downstream task outcomes to validated selections (ADR-0008).
@@ -1061,3 +1063,13 @@ For each material change:
   and compatibility with the existing authenticated crash-recovery fixture.
 - Outcome admission/read and dependent non-user evidence integration is the
   required next step, not claimed complete by the verifier's existence.
+
+### 2026-10-12 — Dispatch receipts connected to outcome evidence
+
+- Generic transport/task admission now requires canonical signed receipt
+  chains. Cached outcomes and dependent reflection/feedback reads recheck them.
+- Positive fixtures use full authenticated chains over real test authorization
+  and attempts. Unsigned new/legacy success observations are rejected or
+  excluded, retaining their journal history.
+- ADR-0045 records remaining duplication, clock/cutoff, projection-integrity
+  and live-channel proof requirements. Production was not changed.

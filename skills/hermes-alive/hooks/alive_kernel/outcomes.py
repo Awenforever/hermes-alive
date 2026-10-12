@@ -713,6 +713,12 @@ class OutcomeProjection:
                 return self._decision(
                     connection, event, "rejected", "user_outcome_kind_unproven", attempt_id, outcome_id or None
                 )
+        else:
+            from .dispatch_verifier import DispatchEvidenceVerifier
+            if not DispatchEvidenceVerifier(self.journal, self.receipt_protector).verify(source, attempt_event):
+                return self._decision(
+                    connection, event, "rejected", "dispatch_receipt_unproven", attempt_id, outcome_id or None
+                )
         try:
             self.content_vault.resolve_json(
                 content.content_id,
@@ -852,6 +858,30 @@ class OutcomeProjection:
                  or source.event.payload.get("user_outcome_kind") == kind.value)
         )
 
+    @staticmethod
+    def evidence_valid_for(journal: ExperienceJournal, record: JournalRecord) -> bool:
+        """Check user attribution or canonical dispatch receipt linkage."""
+        if not OutcomeProjection.user_attribution_valid_for(journal, record):
+            return False
+        kind = OutcomeKind(record.event.payload["kind"])
+        if kind not in {OutcomeKind.DELIVERY_SUCCEEDED, OutcomeKind.DELIVERY_FAILED,
+                        OutcomeKind.TASK_COMPLETED, OutcomeKind.TASK_FAILED}:
+            return True
+        attempt = journal.get(f"action.attempt:{record.event.payload.get('attempt_id', '')}")
+        source = journal.get(str(record.event.payload.get("source_event_id") or ""))
+        key_path = journal.path.parent / "identity.key"
+        if attempt is None or source is None or not key_path.is_file():
+            return False
+        if (
+            record.sequence <= source.sequence or source.sequence <= attempt.sequence
+            or source.event.event_type not in _SOURCE_TYPES[kind]
+            or record.event.causation_id != source.event.event_id
+            or record.event.subject != source.event.subject
+        ):
+            return False
+        from .dispatch_verifier import DispatchEvidenceVerifier
+        return DispatchEvidenceVerifier(journal, LocalIdentityProtector(key_path)).verify(source, attempt)
+
     def outcomes(
         self, attempt_id: str, *, clearance: Sensitivity
     ) -> list[OutcomeRecord]:
@@ -868,7 +898,7 @@ class OutcomeProjection:
             records: list[OutcomeRecord] = []
             for row in rows:
                 original = self.journal.get(row["event_id"])
-                if original is None or not self.user_attribution_valid(original):
+                if original is None or not self.evidence_valid_for(self.journal, original):
                     continue
                 try:
                     reference = ContentReference.from_event_payload(original.event.payload["content"])

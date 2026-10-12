@@ -2,6 +2,8 @@
 
 Status: accepted as verification foundation; outcome integration pending
 
+Amended by ADR-0045 for outcome admission/read integration.
+
 ## Finding and decision
 
 Generic outcome admission and feedback-derived projections do not yet prove

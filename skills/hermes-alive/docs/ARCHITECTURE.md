@@ -228,7 +228,9 @@ A read-only dispatch evidence facade reuses the canonical start/result
 predicates without constructing an executor or its operational schema
 (ADR-0044). It binds policy to authorization and verifies exact signed receipt
 chains, including observation cutoffs and strict lease generations. Integrating
-it into generic outcome/dependent reads remains required before activation.
+it into generic outcome admission, cached reads and dependent reflection
+evidence is now implemented (ADR-0045). Actual channel delivery, duplicate
+observation and host-clock/cutoff qualification remain separate gates.
 
 External authority also depends on the latest user-owned autonomy policy
 (ADR-0025). The default is no policy and therefore no proactive execution.

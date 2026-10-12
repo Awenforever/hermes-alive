@@ -402,7 +402,10 @@ class ReflectionProjection:
         kinds = {row["kind"] for row in evidence}
         if any(
             (original := self.journal.get(row["event_id"])) is None
-            or not OutcomeProjection.user_attribution_valid_for(self.journal, original)
+            or original.event.payload.get("outcome_id") != row["outcome_id"]
+            or original.event.payload.get("kind") != row["kind"]
+            or original.event.payload.get("attempt_id") != row["attempt_id"]
+            or not OutcomeProjection.evidence_valid_for(self.journal, original)
             for row in evidence
         ):
             return self._decision(connection, event, "rejected", "outcome_evidence_invalid", reflection_id)
@@ -488,7 +491,7 @@ class ReflectionProjection:
                 or original.event.payload.get("outcome_id") != row["outcome_id"]
                 or original.event.payload.get("kind") != row["kind"]
                 or original.event.payload.get("attempt_id") != row["attempt_id"]
-                or not OutcomeProjection.user_attribution_valid_for(journal, original)
+                or not OutcomeProjection.evidence_valid_for(journal, original)
             ):
                 return False
         return True
