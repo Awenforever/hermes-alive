@@ -202,6 +202,27 @@ trusting stored labels. Regression proof lives in
 `tests/run_alive_kernel_disposition.py`; the architectural contract is
 ADR-0033.
 
+## A schema is not semantic proof
+
+Never treat valid JSON, protected-token coverage, embedding similarity or a
+renderer's self-review as proof that a rewrite preserved meaning. Style-transfer
+evaluation has separate style, preservation and naturalness axes, and no one
+automatic metric closes the production gate.
+
+Define meaning before presentation as bounded encrypted semantic atoms. Lock
+dates, amounts, links, contacts, negation and uncertainty exactly. A candidate
+references that meaning; a renderer cannot invent its own destination or
+authority. Deterministic verbatim layout may prove only transformation
+fidelity. Free model output stays `review_required` even when every atom is
+present, because surrounding prose can add a claim or change a relation.
+
+Keep four proof obligations visibly separate: factual entailment, rendering
+fidelity, action authority and route authority. A green result in one must
+never stand in for another. Revalidate the exact latest selection whenever a
+render receipt is consumed. Regression proof lives in
+`tests/run_alive_kernel_semantic_rendering.py`; the architectural contract is
+ADR-0034.
+
 ## Plugin dependencies must respect the Hermes environment lock
 
 The supported Hermes runtime already provides `cryptography==50.0.0`. Alive's

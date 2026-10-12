@@ -259,13 +259,17 @@ factual error or user-control violations.
   - [x] add a replayable explicit-preference projection with deterministic
     neutral defaults and advisory-only inferred/legacy state (ADR-0032);
   - [x] add a dual-opt-in one-way legacy voice shadow bridge;
-  - [ ] add semantic-fidelity evaluation, user inspect/correct controls and
-    replace the legacy live voice consumer only after shadow qualification.
+  - [x] add encrypted meaning atoms, a provably lossless deterministic
+    renderer and fail-closed classification for free model output (ADR-0034);
+  - [ ] add independent semantic review, multilingual/human-calibrated
+    evaluation and user inspect/correct controls;
+  - [ ] replace the legacy live voice consumer only after shadow qualification.
 - [ ] Replace heuristic mood with explainable dispositions:
   - [x] define authenticated post-selection expression cues that retain each
     independent dimension's evidence and grant no decision authority
     (ADR-0033);
-  - [ ] add a semantic-fidelity renderer and shadow comparator;
+  - [x] add the meaning-first deterministic fidelity baseline (ADR-0034);
+  - [ ] add a model-rendering shadow comparator and independent reviewer;
   - [ ] remove legacy mood, relationship and `social_urge` influence only
     after replay and canary qualification.
 - [ ] Retire the monolithic watcher after parity and rollback drills.
@@ -360,6 +364,23 @@ For each material change:
 - Consumers must re-authenticate and recompute the snapshot from the latest
   validated selection. The new path is unscheduled and not connected to the
   production watcher.
+
+### 2026-10-12 — Meaning-first semantic fidelity baseline
+
+- Added encrypted, evidence-linked semantic atoms before style rendering
+  (ADR-0034). Critical dates, amounts, links, contacts, uncertainty and
+  negation require exact protected literals.
+- Bound meaning to a strict reference-only deliberation candidate and then to
+  the exact latest validated selection. A later validated intent invalidates
+  the old render receipt even if the candidate identity is unchanged.
+- Added a deterministic renderer that changes separators only and can prove
+  exact transformation fidelity. It stores raw text only in the erasable
+  content vault.
+- Free model output cannot self-certify. Missing atoms/literals are rejected;
+  otherwise it remains `review_required` because extra prose can introduce
+  unsupported claims or shift relations.
+- Clarified the proof boundary in code and events: rendering fidelity does not
+  prove truth, evidence entailment, action authority or route authority.
 
 ### 2026-10-12 — Incremental dispatch evidence projection
 

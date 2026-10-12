@@ -38,6 +38,7 @@ comparison/rollback evidence and as the active safeguard when Circadian is
 | `voice_engine.py` | Legacy live voice/profile adaptation; retained during shadow migration only. |
 | `alive_kernel/presentation.py` | Replayable explicit presentation preferences and advisory-only inferred style. |
 | `alive_kernel/disposition.py` | Post-selection, evidence-carrying expression cues with no action authority. |
+| `alive_kernel/semantic_rendering.py` | Encrypted meaning atoms, deterministic fidelity proof, and fail-closed model-candidate assessment. |
 | `interest_learning.py` | Attributed, reversible interest updates. |
 | `discovery.py` | Collection, ranking, cached-candidate rotation, and validated content references. |
 | `topic_dedup.py` | Persistent URL/topic reservation, delivery history, material-update fingerprints, and privacy-safe hashes. |
@@ -162,6 +163,19 @@ renderable disposition. A consumer must prove the exact latest validated
 selection, authenticate the snapshot and deterministically recompute the cues.
 The snapshot cannot change selection, semantics, routing or authority and is
 not connected to the production watcher.
+
+Meaning precedes any new style renderer (ADR-0034). Bounded semantic atoms keep
+raw content in the encrypted vault and expose only structural IDs/kinds and
+evidence references to the journal. Critical literals are explicitly locked.
+The selected deliberation candidate contains only a strict meaning-event
+reference. Deterministic rendering emits atoms verbatim with formatting-only
+separators and revalidates the latest selection on every receipt check.
+
+A free model rewrite can be structurally screened but cannot prove itself
+faithful: omissions are rejected and all other free generation remains review
+required. “Fidelity proven” means only that rendering preserved the defined
+meaning; truth/entailment, action authorization and route authorization remain
+separate upstream/downstream boundaries.
 
 External authority also depends on the latest user-owned autonomy policy
 (ADR-0025). The default is no policy and therefore no proactive execution.
