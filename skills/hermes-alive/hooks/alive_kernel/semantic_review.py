@@ -8,12 +8,27 @@ select a route, or authorize delivery.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from enum import StrEnum
 import hashlib
+import hmac
 import re
-from typing import Iterable
+from typing import Any, Iterable, Mapping
 
-from .semantic_rendering import MeaningDocument
+from .content_vault import ContentReference, ContentVault, ContentVaultError
+from .deliberation import ActionKind, SideEffect
+from .deliberation_store import DeliberationProjection
+from .event_store import EventConflictError, ExperienceJournal, JournalRecord
+from .events import EventEnvelope, _thaw_json
+from .privacy import LocalIdentityProtector
+from .semantic_rendering import (
+    FidelityStatus,
+    MeaningDocument,
+    MeaningStore,
+    RendererClass,
+    SemanticRenderingError,
+    assess_fidelity,
+)
 
 
 _ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,254}$")
@@ -330,6 +345,540 @@ class SemanticReviewQualityReport:
 class SemanticReviewQualification:
     qualified: bool
     failures: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class StoredModelCandidate:
+    event_id: str
+    selection_event_id: str
+    meaning_event_id: str
+    frame_id: str
+    candidate_id: str
+    text: str
+    digest: str
+    renderer_execution_id: str
+    renderer_model: str
+    renderer_independence_domain: str
+    expires_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class StoredReviewReceipt:
+    event_id: str
+    candidate_event_id: str
+    review_id: str
+    assessment: ReviewAssessment
+
+
+class SemanticReviewStore:
+    """Persist encrypted model candidates and authenticated review receipts."""
+
+    def __init__(
+        self,
+        journal: ExperienceJournal,
+        *,
+        content_vault: ContentVault | None = None,
+        protector: LocalIdentityProtector | None = None,
+    ) -> None:
+        self.journal = journal
+        self.content_vault = content_vault or ContentVault(
+            journal.path.parent / f"{journal.path.stem}-content-vault",
+            backup_root=journal.path.parent / f"{journal.path.stem}-content-backups",
+        )
+        self.protector = protector or LocalIdentityProtector(
+            journal.path.parent / "identity.key"
+        )
+        self.meanings = MeaningStore(
+            journal, content_vault=self.content_vault, protector=self.protector
+        )
+        self.deliberation = DeliberationProjection(
+            journal, content_vault=self.content_vault
+        )
+
+    @staticmethod
+    def _authentication_document(
+        contract: str, payload: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        value = _thaw_json(payload)
+        value.pop("integrity_authenticator", None)
+        return {"contract": contract, "payload": value}
+
+    @staticmethod
+    def _utc(value: datetime, name: str) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise SemanticReviewError(f"{name} must be timezone-aware")
+        return value.astimezone(timezone.utc)
+
+    def _selection_context(
+        self,
+        *,
+        selection_event_id: str,
+        meaning_event_id: str,
+        subject: str,
+        observed_at: datetime,
+    ) -> tuple[JournalRecord, MeaningDocument, str, str]:
+        source = self.journal.get(selection_event_id)
+        if (
+            source is None
+            or source.event.event_type != "deliberation.selected"
+            or source.event.subject != subject
+        ):
+            raise SemanticReviewError("selection evidence is missing or foreign")
+        frame_id = str(source.event.payload.get("frame_id") or "")
+        self.deliberation.project_new()
+        if self.deliberation.latest_selection_event_id(frame_id) != selection_event_id:
+            raise SemanticReviewError("selection is not the latest validated intent")
+        stored = self.deliberation.inspect(frame_id, clearance=source.event.sensitivity)
+        if stored is None or stored.selection is None:
+            raise SemanticReviewError("validated selection is unavailable")
+        selected = stored.selection.candidate
+        if (
+            selected.action_kind is ActionKind.SILENCE
+            or selected.side_effect is not SideEffect.COMMUNICATION
+        ):
+            raise SemanticReviewError("selected action is not renderable communication")
+        expected = {
+            "schema_version": 1,
+            "kind": "semantic_message",
+            "meaning_event_id": meaning_event_id,
+        }
+        if dict(stored.candidate_contents).get(str(selected.content_id)) != expected:
+            raise SemanticReviewError("selected candidate does not bind this meaning")
+        try:
+            document = self.meanings.resolve(meaning_event_id)
+        except SemanticRenderingError as exc:
+            raise SemanticReviewError("meaning is unavailable") from exc
+        if (
+            document.subject != subject
+            or observed_at < source.event.observed_at
+            or observed_at >= document.expires_at
+        ):
+            raise SemanticReviewError(
+                "meaning is foreign, expired, or reviewed out of causal order"
+            )
+        return source, document, frame_id, selected.candidate_id
+
+    def record_model_candidate(
+        self,
+        *,
+        selection_event_id: str,
+        meaning_event_id: str,
+        subject: str,
+        text: str,
+        renderer_execution_id: str,
+        renderer_model: str,
+        renderer_independence_domain: str,
+        observed_at: datetime | None = None,
+    ) -> StoredModelCandidate:
+        candidate_text = str(text)
+        if not candidate_text or len(candidate_text.encode("utf-8")) > 256_000:
+            raise SemanticReviewError("model candidate is empty or too large")
+        current = self._utc(
+            observed_at or datetime.now(timezone.utc), "observed_at"
+        )
+        for name, value, pattern in (
+            ("renderer_execution_id", renderer_execution_id, _ID_RE),
+            ("renderer_model", renderer_model, _MODEL_RE),
+            ("renderer_independence_domain", renderer_independence_domain, _ID_RE),
+        ):
+            if not pattern.fullmatch(str(value).strip()):
+                raise SemanticReviewError(f"invalid {name}")
+        source, document, frame_id, selected_candidate_id = self._selection_context(
+            selection_event_id=selection_event_id,
+            meaning_event_id=meaning_event_id,
+            subject=subject,
+            observed_at=current,
+        )
+        assessment = assess_fidelity(
+            document,
+            candidate_text,
+            renderer_class=RendererClass.MODEL_CANDIDATE,
+        )
+        if assessment.status is FidelityStatus.REJECTED:
+            raise SemanticReviewError(
+                "model candidate failed deterministic protected-literal checks"
+            )
+        digest = candidate_digest(candidate_text)
+        output_id = self.protector.pseudonym(
+            "semantic-model-candidate",
+            f"{selection_event_id}\0{renderer_execution_id}\0{digest}",
+        )
+        if output_id is None:
+            raise SemanticReviewError("model candidate identity is unavailable")
+        content = self.content_vault.put_json(
+            {"text": candidate_text},
+            subject=subject,
+            purpose="message.model_candidate",
+            sensitivity=source.event.sensitivity,
+            retention_until=document.expires_at,
+            content_id=f"message-model-candidate:{output_id}",
+        )
+        payload: dict[str, Any] = {
+            "meaning_event_id": meaning_event_id,
+            "selection_event_id": selection_event_id,
+            "frame_id": frame_id,
+            "candidate_id": selected_candidate_id,
+            "candidate_digest": digest,
+            "renderer_execution_id": str(renderer_execution_id).strip(),
+            "renderer_model": str(renderer_model).strip(),
+            "renderer_independence_domain": str(
+                renderer_independence_domain
+            ).strip(),
+            "fidelity_status": assessment.status.value,
+            "changed_atom_ids": list(assessment.missing_atom_ids),
+            "content": content.to_event_payload(),
+            "raw_content_stored_in_journal": False,
+            "independent_review_required": True,
+            "truth_claimed": False,
+            "evidence_entailment_proven": False,
+            "action_authority_granted": False,
+            "route_authority_granted": False,
+            "delivery_authority_granted": False,
+        }
+        payload["integrity_authenticator"] = self.protector.authenticate_json(
+            "message.model_candidate.v1",
+            self._authentication_document("message.model_candidate.v1", payload),
+        )
+        event = EventEnvelope(
+            event_id=f"message.model_candidate:{output_id.split(':', 1)[-1]}",
+            event_type="message.model_candidate",
+            source="alive.semantic-review",
+            actor="system:alive-model-renderer",
+            subject=subject,
+            correlation_id=frame_id,
+            causation_id=selection_event_id,
+            occurred_at=source.event.observed_at,
+            observed_at=current,
+            sensitivity=source.event.sensitivity,
+            expires_at=document.expires_at,
+            payload=payload,
+        )
+        record = self._append_idempotent(event)
+        resolved = self.resolve_model_candidate(
+            record.event.event_id, as_of=current
+        )
+        if resolved is None:
+            raise SemanticReviewError("stored model candidate failed verification")
+        return resolved
+
+    def resolve_model_candidate(
+        self, event_id: str, *, as_of: datetime | None = None
+    ) -> StoredModelCandidate | None:
+        record = self.journal.get(event_id)
+        if record is None:
+            return None
+        event = record.event
+        payload = event.payload
+        try:
+            current = self._utc(as_of or datetime.now(timezone.utc), "as_of")
+            if (
+                event.expires_at is None
+                or current < event.observed_at
+                or current >= event.expires_at
+            ):
+                return None
+            supplied = str(payload["integrity_authenticator"])
+            if not self.protector.verify_json(
+                "message.model_candidate.v1",
+                self._authentication_document("message.model_candidate.v1", payload),
+                supplied,
+            ):
+                return None
+            content = ContentReference.from_event_payload(payload["content"])
+            stored = self.content_vault.resolve_json(
+                content.content_id,
+                expected_subject=event.subject,
+                expected_purpose="message.model_candidate",
+                expected_sensitivity=event.sensitivity,
+            )
+            text = str(stored["text"])
+            digest = candidate_digest(text)
+            selection_id = str(payload["selection_event_id"])
+            meaning_id = str(payload["meaning_event_id"])
+            _source, document, frame_id, selected_candidate_id = (
+                self._selection_context(
+                    selection_event_id=selection_id,
+                    meaning_event_id=meaning_id,
+                    subject=str(event.subject),
+                    observed_at=event.observed_at,
+                )
+            )
+            assessment = assess_fidelity(
+                document, text, renderer_class=RendererClass.MODEL_CANDIDATE
+            )
+            valid = bool(
+                event.event_type == "message.model_candidate"
+                and event.source == "alive.semantic-review"
+                and event.actor == "system:alive-model-renderer"
+                and event.causation_id == selection_id
+                and event.correlation_id == frame_id
+                and event.expires_at == document.expires_at
+                and event.observed_at < document.expires_at
+                and payload.get("frame_id") == frame_id
+                and payload.get("candidate_id") == selected_candidate_id
+                and payload.get("candidate_digest") == digest
+                and payload.get("fidelity_status")
+                == FidelityStatus.REVIEW_REQUIRED.value
+                and tuple(payload.get("changed_atom_ids") or ())
+                == assessment.missing_atom_ids
+                and assessment.status is FidelityStatus.REVIEW_REQUIRED
+                and payload.get("raw_content_stored_in_journal") is False
+                and payload.get("independent_review_required") is True
+                and payload.get("truth_claimed") is False
+                and payload.get("evidence_entailment_proven") is False
+                and payload.get("action_authority_granted") is False
+                and payload.get("route_authority_granted") is False
+                and payload.get("delivery_authority_granted") is False
+            )
+            if not valid:
+                return None
+            return StoredModelCandidate(
+                event.event_id,
+                selection_id,
+                meaning_id,
+                frame_id,
+                selected_candidate_id,
+                text,
+                digest,
+                str(payload["renderer_execution_id"]),
+                str(payload["renderer_model"]),
+                str(payload["renderer_independence_domain"]),
+                document.expires_at,
+            )
+        except (
+            KeyError,
+            TypeError,
+            ValueError,
+            ContentVaultError,
+            SemanticReviewError,
+        ):
+            return None
+
+    def record_review(
+        self,
+        *,
+        candidate_event_id: str,
+        review: IndependentSemanticReview,
+        actor: str,
+        observed_at: datetime | None = None,
+    ) -> StoredReviewReceipt:
+        current = self._utc(
+            observed_at or datetime.now(timezone.utc), "observed_at"
+        )
+        candidate = self.resolve_model_candidate(candidate_event_id, as_of=current)
+        if candidate is None:
+            raise SemanticReviewError("model candidate is unavailable or stale")
+        candidate_record = self.journal.get(candidate_event_id)
+        if candidate_record is None:
+            raise SemanticReviewError("model candidate event is unavailable")
+        if current < candidate_record.event.observed_at or current >= candidate.expires_at:
+            raise SemanticReviewError("review is outside the candidate lifetime")
+        if not (
+            review.meaning_event_id == candidate.meaning_event_id
+            and review.candidate_digest == candidate.digest
+            and review.renderer_execution_id == candidate.renderer_execution_id
+            and review.renderer_model == candidate.renderer_model
+            and review.renderer_independence_domain
+            == candidate.renderer_independence_domain
+        ):
+            raise SemanticReviewError("review does not bind the stored renderer evidence")
+        document = self.meanings.resolve(candidate.meaning_event_id)
+        assessment = assess_independent_review(document, candidate.text, review)
+        if assessment.disposition is ReviewDisposition.INVALID:
+            raise SemanticReviewError("invalid independent review cannot be recorded")
+        payload: dict[str, Any] = {
+            "review_id": review.review_id,
+            "candidate_event_id": candidate_event_id,
+            "meaning_event_id": candidate.meaning_event_id,
+            "selection_event_id": candidate.selection_event_id,
+            "candidate_digest": candidate.digest,
+            "reviewer_kind": review.reviewer_kind.value,
+            "reviewer_execution_id": review.reviewer_execution_id,
+            "reviewer_model": review.reviewer_model,
+            "reviewer_independence_domain": review.reviewer_independence_domain,
+            "atom_reviews": [
+                {
+                    "atom_id": item.atom_id,
+                    "preserved": item.preserved,
+                    "risks": [risk.value for risk in item.risks],
+                }
+                for item in review.atom_reviews
+            ],
+            "added_claims_detected": review.added_claims_detected,
+            "speech_act_preserved": review.speech_act_preserved,
+            "protected_literals_preserved": review.protected_literals_preserved,
+            "disposition": assessment.disposition.value,
+            "risks": [risk.value for risk in assessment.risks],
+            "safe_for_automatic_delivery": False,
+            "raw_review_prose_stored_in_journal": False,
+            "truth_claimed": False,
+            "evidence_entailment_proven": False,
+            "action_authority_granted": False,
+            "route_authority_granted": False,
+            "delivery_authority_granted": False,
+        }
+        payload["integrity_authenticator"] = self.protector.authenticate_json(
+            "message.semantic_review.v1",
+            self._authentication_document("message.semantic_review.v1", payload),
+        )
+        event = EventEnvelope(
+            event_id=f"message.semantic_review:{review.review_id}",
+            event_type="message.semantic_reviewed",
+            source="alive.semantic-review",
+            actor=str(actor),
+            subject=candidate_record.event.subject,
+            correlation_id=candidate.frame_id,
+            causation_id=candidate_event_id,
+            occurred_at=candidate_record.event.observed_at,
+            observed_at=current,
+            sensitivity=candidate_record.event.sensitivity,
+            expires_at=candidate.expires_at,
+            payload=payload,
+        )
+        record = self._append_idempotent(event)
+        verified = self.verify_review(record, as_of=current)
+        if verified is None:
+            raise SemanticReviewError("stored semantic review failed verification")
+        return verified
+
+    def verify_review(
+        self, record: JournalRecord, *, as_of: datetime | None = None
+    ) -> StoredReviewReceipt | None:
+        event = record.event
+        payload = event.payload
+        try:
+            current = self._utc(as_of or datetime.now(timezone.utc), "as_of")
+            if (
+                event.expires_at is None
+                or current < event.observed_at
+                or current >= event.expires_at
+            ):
+                return None
+            supplied = str(payload["integrity_authenticator"])
+            if not self.protector.verify_json(
+                "message.semantic_review.v1",
+                self._authentication_document("message.semantic_review.v1", payload),
+                supplied,
+            ):
+                return None
+            candidate_event_id = str(payload["candidate_event_id"])
+            candidate = self.resolve_model_candidate(
+                candidate_event_id, as_of=current
+            )
+            candidate_record = self.journal.get(candidate_event_id)
+            if candidate is None or candidate_record is None:
+                return None
+            atom_reviews_raw = payload["atom_reviews"]
+            if not isinstance(atom_reviews_raw, (list, tuple)):
+                return None
+            review = IndependentSemanticReview(
+                review_id=str(payload["review_id"]),
+                meaning_event_id=str(payload["meaning_event_id"]),
+                candidate_digest=str(payload["candidate_digest"]),
+                renderer_execution_id=candidate.renderer_execution_id,
+                renderer_model=candidate.renderer_model,
+                renderer_independence_domain=candidate.renderer_independence_domain,
+                reviewer_kind=ReviewerKind(payload["reviewer_kind"]),
+                reviewer_execution_id=str(payload["reviewer_execution_id"]),
+                reviewer_model=(
+                    str(payload["reviewer_model"])
+                    if payload.get("reviewer_model") is not None
+                    else None
+                ),
+                reviewer_independence_domain=str(
+                    payload["reviewer_independence_domain"]
+                ),
+                atom_reviews=tuple(
+                    AtomReview(
+                        str(item["atom_id"]),
+                        item["preserved"],
+                        tuple(SemanticRisk(value) for value in item["risks"]),
+                    )
+                    for item in atom_reviews_raw
+                ),
+                added_claims_detected=payload["added_claims_detected"],
+                speech_act_preserved=payload["speech_act_preserved"],
+                protected_literals_preserved=payload[
+                    "protected_literals_preserved"
+                ],
+            )
+            document = self.meanings.resolve(candidate.meaning_event_id)
+            assessment = assess_independent_review(document, candidate.text, review)
+            return (
+                StoredReviewReceipt(
+                    event.event_id,
+                    candidate_event_id,
+                    review.review_id,
+                    assessment,
+                )
+                if event.event_type == "message.semantic_reviewed"
+                and event.source == "alive.semantic-review"
+                and event.causation_id == candidate_event_id
+                and event.correlation_id == candidate.frame_id
+                and event.subject == candidate_record.event.subject
+                and event.observed_at >= candidate_record.event.observed_at
+                and event.observed_at < candidate.expires_at
+                and event.expires_at == candidate.expires_at
+                and payload.get("selection_event_id")
+                == candidate.selection_event_id
+                and payload.get("disposition") == assessment.disposition.value
+                and tuple(payload.get("risks") or ())
+                == tuple(risk.value for risk in assessment.risks)
+                and assessment.disposition is not ReviewDisposition.INVALID
+                and payload.get("safe_for_automatic_delivery") is False
+                and payload.get("raw_review_prose_stored_in_journal") is False
+                and payload.get("truth_claimed") is False
+                and payload.get("evidence_entailment_proven") is False
+                and payload.get("action_authority_granted") is False
+                and payload.get("route_authority_granted") is False
+                and payload.get("delivery_authority_granted") is False
+                else None
+            )
+        except (
+            KeyError,
+            TypeError,
+            ValueError,
+            ContentVaultError,
+            SemanticRenderingError,
+            SemanticReviewError,
+        ):
+            return None
+
+    def _append_idempotent(self, event: EventEnvelope) -> JournalRecord:
+        existing = self.journal.get(event.event_id)
+        if existing is not None:
+            return self._compatible(existing, event)
+        try:
+            result = self.journal.append(event)
+            return JournalRecord(result.sequence, result.event)
+        except EventConflictError:
+            existing = self.journal.get(event.event_id)
+            if existing is None:
+                raise
+            return self._compatible(existing, event)
+
+    @staticmethod
+    def _compatible(existing: JournalRecord, proposed: EventEnvelope) -> JournalRecord:
+        fields = (
+            "event_type",
+            "source",
+            "actor",
+            "subject",
+            "correlation_id",
+            "causation_id",
+            "occurred_at",
+            "sensitivity",
+            "confidence",
+            "expires_at",
+            "payload",
+        )
+        if any(
+            getattr(existing.event, name) != getattr(proposed, name) for name in fields
+        ):
+            raise SemanticReviewError(
+                "semantic review identity was reused with different semantics"
+            )
+        return existing
 
 
 def _ratio(numerator: int, denominator: int) -> float | None:

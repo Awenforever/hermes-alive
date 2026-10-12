@@ -235,6 +235,14 @@ render receipt is consumed. Regression proof lives in
 ADR-0034. Independent-review and complete-cohort regression proof lives in
 `tests/run_alive_kernel_semantic_review.py`; its boundary is ADR-0035.
 
+Never persist a bare semantic `pass`. Store candidate text only in the
+erasable vault and bind the journal receipt to its digest, renderer execution,
+validated selection and meaning. On every read, re-run the dependency chain;
+an authentic historical receipt is not current authority after expiry,
+superseding selection or content erasure. Review prose does not belong in the
+journal. Regression proof lives in
+`tests/run_alive_kernel_semantic_review_store.py`; see ADR-0036.
+
 ## Plugin dependencies must respect the Hermes environment lock
 
 The supported Hermes runtime already provides `cryptography==50.0.0`. Alive's

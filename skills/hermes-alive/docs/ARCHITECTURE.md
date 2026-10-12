@@ -39,7 +39,7 @@ comparison/rollback evidence and as the active safeguard when Circadian is
 | `alive_kernel/presentation.py` | Replayable explicit presentation preferences and advisory-only inferred style. |
 | `alive_kernel/disposition.py` | Post-selection, evidence-carrying expression cues with no action authority. |
 | `alive_kernel/semantic_rendering.py` | Encrypted meaning atoms, deterministic fidelity proof, and fail-closed model-candidate assessment. |
-| `alive_kernel/semantic_review.py` | Independent review binding, explicit semantic risk classes, and complete multilingual replay metrics. |
+| `alive_kernel/semantic_review.py` | Independent review binding, encrypted candidate/receipt persistence, explicit risk classes, and complete multilingual replay metrics. |
 | `interest_learning.py` | Attributed, reversible interest updates. |
 | `discovery.py` | Collection, ranking, cached-candidate rotation, and validated content references. |
 | `topic_dedup.py` | Persistent URL/topic reservation, delivery history, material-update fingerprints, and privacy-safe hashes. |
@@ -181,6 +181,14 @@ review grants shadow-comparison eligibility only. “Fidelity proven” still
 means only that deterministic rendering preserved the defined meaning;
 truth/entailment, action authorization and route authorization remain separate
 upstream/downstream boundaries.
+
+Model candidates and reviews are durable but not permanently valid
+(ADR-0036). Candidate plaintext stays in the erasable vault; journal events
+retain its digest, exact renderer execution and structural evidence. Every
+review read re-authenticates both events, decrypts and re-hashes the candidate,
+reruns semantic assessment, checks current expiry and proves that the bound
+selection is still latest. Meaning/candidate erasure, superseding intent,
+tampering or expiry leaves history intact but invalidates current use.
 
 External authority also depends on the latest user-owned autonomy policy
 (ADR-0025). The default is no policy and therefore no proactive execution.

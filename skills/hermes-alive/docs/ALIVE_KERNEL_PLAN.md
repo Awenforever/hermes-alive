@@ -271,8 +271,10 @@ factual error or user-control violations.
     independent dimension's evidence and grant no decision authority
     (ADR-0033);
   - [x] add the meaning-first deterministic fidelity baseline (ADR-0034);
+  - [x] persist encrypted model candidates and authenticated review receipts
+    with selection/erasure/expiry invalidation (ADR-0036);
   - [ ] connect a provider-neutral model-rendering shadow comparator to the
-    ADR-0035 reviewer contract and persist authenticated review receipts;
+    ADR-0035/0036 contracts;
   - [ ] remove legacy mood, relationship and `social_urge` influence only
     after replay and canary qualification.
 - [ ] Retire the monolithic watcher after parity and rollback drills.
@@ -333,6 +335,21 @@ For each material change:
 8. do not equate code presence with runtime correctness.
 
 ## Change log
+
+### 2026-10-12 — Revalidated semantic-review receipts
+
+- Added encrypted persistence for free model candidates; the journal retains
+  only a content reference, digest, renderer provenance, changed atom IDs and
+  explicit authority nonclaims (ADR-0036).
+- Added authenticated structural review receipts bound to the exact candidate
+  event, selection, reviewer execution/model/domain and complete atom findings.
+- Every read now decrypts and re-hashes content, reruns deterministic and
+  independent checks, confirms the bound selection is still latest and checks
+  current expiry. A signature alone is deliberately insufficient.
+- Verified fail-closed invalidation after superseding intent, candidate erasure,
+  renderer-evidence mismatch and expiry. Raw candidate text and review prose
+  never enter the experience journal.
+- The store remains shadow-only and performs no provider call or delivery.
 
 ### 2026-10-12 — Independent semantic review and adversarial replay
 
