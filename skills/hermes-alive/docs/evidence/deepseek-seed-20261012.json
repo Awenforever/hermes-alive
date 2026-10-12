@@ -1,0 +1,218 @@
+{
+  "schema_version": 1,
+  "scope": "reviewer_only_synthetic_seed",
+  "requested_model": null,
+  "fixture_sha256": "3eee7a792f5c4c8989f4687e0dbcba811c59844efb229885776f133fe5915988",
+  "qualification_evidence": false,
+  "complete": true,
+  "requested_cases": 12,
+  "results": [
+    {
+      "case_id": "zh-faithful",
+      "status": "scored",
+      "actual_model": "deepseek-flash",
+      "provider": "custom:ustc",
+      "predicted_risks": [],
+      "expected_risks": []
+    },
+    {
+      "case_id": "en-faithful",
+      "status": "scored",
+      "actual_model": "deepseek-flash",
+      "provider": "custom:ustc",
+      "predicted_risks": [],
+      "expected_risks": []
+    },
+    {
+      "case_id": "ja-faithful",
+      "status": "scored",
+      "actual_model": "deepseek-flash",
+      "provider": "custom:ustc",
+      "predicted_risks": [],
+      "expected_risks": []
+    },
+    {
+      "case_id": "zh-omission",
+      "status": "scored",
+      "actual_model": "deepseek-flash",
+      "provider": "custom:ustc",
+      "predicted_risks": [
+        "omission"
+      ],
+      "expected_risks": [
+        "omission"
+      ]
+    },
+    {
+      "case_id": "en-contradiction",
+      "status": "scored",
+      "actual_model": "deepseek-flash",
+      "provider": "custom:ustc",
+      "predicted_risks": [
+        "contradiction",
+        "polarity_shift"
+      ],
+      "expected_risks": [
+        "contradiction"
+      ]
+    },
+    {
+      "case_id": "zh-unsupported-addition",
+      "status": "scored",
+      "actual_model": "deepseek-flash",
+      "provider": "custom:ustc",
+      "predicted_risks": [
+        "unsupported_addition"
+      ],
+      "expected_risks": [
+        "unsupported_addition"
+      ]
+    },
+    {
+      "case_id": "en-polarity-shift",
+      "status": "scored",
+      "actual_model": "deepseek-flash",
+      "provider": "custom:ustc",
+      "predicted_risks": [
+        "polarity_shift",
+        "speech_act_shift"
+      ],
+      "expected_risks": [
+        "polarity_shift"
+      ]
+    },
+    {
+      "case_id": "ja-uncertainty-shift",
+      "status": "scored",
+      "actual_model": "deepseek-flash",
+      "provider": "custom:ustc",
+      "predicted_risks": [
+        "uncertainty_shift",
+        "polarity_shift"
+      ],
+      "expected_risks": [
+        "uncertainty_shift"
+      ]
+    },
+    {
+      "case_id": "zh-temporal-shift",
+      "status": "scored",
+      "actual_model": "deepseek-flash",
+      "provider": "custom:ustc",
+      "predicted_risks": [
+        "temporal_shift"
+      ],
+      "expected_risks": [
+        "temporal_shift"
+      ]
+    },
+    {
+      "case_id": "en-quantity-shift",
+      "status": "scored",
+      "actual_model": "deepseek-flash",
+      "provider": "custom:ustc",
+      "predicted_risks": [
+        "quantity_shift"
+      ],
+      "expected_risks": [
+        "quantity_shift"
+      ]
+    },
+    {
+      "case_id": "zh-reference-mismatch",
+      "status": "scored",
+      "actual_model": "deepseek-flash",
+      "provider": "custom:ustc",
+      "predicted_risks": [
+        "reference_mismatch"
+      ],
+      "expected_risks": [
+        "reference_mismatch"
+      ]
+    },
+    {
+      "case_id": "ja-speech-act-shift",
+      "status": "scored",
+      "actual_model": "deepseek-flash",
+      "provider": "custom:ustc",
+      "predicted_risks": [
+        "speech_act_shift",
+        "polarity_shift"
+      ],
+      "expected_risks": [
+        "speech_act_shift"
+      ]
+    }
+  ],
+  "annotation_scope": "targeted_non_exhaustive",
+  "metrics": {
+    "cases": 12,
+    "languages": [
+      "en",
+      "ja",
+      "zh"
+    ],
+    "faithful_cases": 3,
+    "risky_cases": 9,
+    "unsafe_acceptances": 0,
+    "faithful_acceptances": 3,
+    "independence_violations": 0,
+    "unsafe_acceptance_rate": 0.0,
+    "faithful_acceptance_rate": 1.0,
+    "issue_precision": null,
+    "macro_risk_recall": 1.0,
+    "risk_recall": [
+      [
+        "contradiction",
+        1.0
+      ],
+      [
+        "omission",
+        1.0
+      ],
+      [
+        "polarity_shift",
+        1.0
+      ],
+      [
+        "quantity_shift",
+        1.0
+      ],
+      [
+        "reference_mismatch",
+        1.0
+      ],
+      [
+        "speech_act_shift",
+        1.0
+      ],
+      [
+        "temporal_shift",
+        1.0
+      ],
+      [
+        "uncertainty_shift",
+        1.0
+      ],
+      [
+        "unsupported_addition",
+        1.0
+      ]
+    ],
+    "renderer_models": [
+      "synthetic/seed"
+    ],
+    "reviewer_models": [
+      "deepseek-flash"
+    ]
+  },
+  "qualification": {
+    "qualified": false,
+    "failures": [
+      "nonexhaustive_seed_annotations",
+      "insufficient_cases",
+      "no_human_calibration"
+    ]
+  },
+  "production_delivery_qualified": false
+}

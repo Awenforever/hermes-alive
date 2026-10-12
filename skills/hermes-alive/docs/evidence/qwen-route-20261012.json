@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "scope": "reviewer_only_synthetic_seed",
+  "requested_model": "qwen3.6-chat",
+  "fixture_sha256": "3eee7a792f5c4c8989f4687e0dbcba811c59844efb229885776f133fe5915988",
+  "qualification_evidence": false,
+  "complete": false,
+  "requested_cases": 3,
+  "results": [
+    {
+      "case_id": "zh-faithful",
+      "status": "failed",
+      "error_class": "PermissionDeniedError"
+    },
+    {
+      "case_id": "en-faithful",
+      "status": "failed",
+      "error_class": "PermissionDeniedError"
+    },
+    {
+      "case_id": "ja-faithful",
+      "status": "failed",
+      "error_class": "PermissionDeniedError"
+    }
+  ],
+  "annotation_scope": "targeted_non_exhaustive",
+  "metrics": null,
+  "qualification": {
+    "qualified": false,
+    "failures": [
+      "nonexhaustive_seed_annotations",
+      "insufficient_cases",
+      "no_human_calibration"
+    ]
+  },
+  "production_delivery_qualified": false
+}

@@ -339,6 +339,21 @@ For each material change:
 
 ## Change log
 
+### 2026-10-12 — First real multilingual reviewer evidence
+
+- Ran all 12 distinct public seed cases through the inherited Hermes route
+  in the production image with a disposable profile. Actual responses were
+  `custom:ustc / deepseek-flash`: 3/3 faithful controls accepted, 0/9 risky
+  cases accepted, all nine focal risks found.
+- Actual output exposed incomplete seed labels. Marked their scope explicitly
+  and withheld issue precision; overlapping classifications require exhaustive
+  human judgments before they can be called false positives.
+- Added an opt-in replay runner with saved-batch rescoring, exact-cohort
+  accounting, failed-case retention and explicit nonqualification reporting.
+- A second requested selector returned permission denial for 3/3 controls.
+  Independent full-pair execution remains unverified; production model
+  configuration was not changed. See `SEMANTIC_REPLAY_20261012.md` and evidence.
+
 ### 2026-10-12 — Executable bounded shadow comparator
 
 - Connected deterministic baseline, natural model rendering, encrypted

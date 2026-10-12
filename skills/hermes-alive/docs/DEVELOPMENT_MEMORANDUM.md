@@ -251,6 +251,14 @@ never from a model's statement or a task alias. Async intent changes and
 content erasure must invalidate returned output. Injected tests prove execution
 contracts only; real-provider and human-calibrated quality remain open.
 
+The first real reviewer replay (2026-10-12) demonstrated why annotation scope
+must be recorded. A seed that lists one focal risk per candidate cannot support
+issue precision: additional overlapping classifications need human judgment.
+Do not rewrite gold labels to match model output or treat the seed as a
+qualification corpus. Preserve failed routes in the cohort, withhold aggregate
+metrics when any case is unscored, and rescore saved results without spending
+another model call. Evidence is in `SEMANTIC_REPLAY_20261012.md`.
+
 ## Plugin dependencies must respect the Hermes environment lock
 
 The supported Hermes runtime already provides `cryptography==50.0.0`. Alive's

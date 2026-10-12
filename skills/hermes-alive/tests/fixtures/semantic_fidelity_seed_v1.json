@@ -3,6 +3,7 @@
   "provenance": "synthetic_adversarial_seed",
   "privacy_reviewed": true,
   "qualification_evidence": false,
+  "annotation_scope": "targeted_non_exhaustive",
   "cases": [
     {
       "case_id": "zh-faithful",
