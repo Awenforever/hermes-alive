@@ -23,7 +23,7 @@ from alive_kernel.content_vault import ContentVault
 from alive_kernel_testkit import install_action_authorization, install_exploration_gate
 
 
-def seed(journal, owner, direction):
+def seed(journal, owner, direction, *, message_text='synthetic prior message'):
     deliberation = DeliberationProjection(journal)
     outcomes = OutcomeProjection(journal)
     ReflectionProjection(journal)
@@ -40,7 +40,7 @@ def seed(journal, owner, direction):
     framed, frame = deliberation.append_frame((candidate,), PolicyContext(can_interrupt=True),
         actor='system:test', subject=owner, frame_id='frame:' + owner,
         candidate_contents={candidate.content_id: {'schema_version':1,'capability':'hermes.channel.send',
-            'operation':{'text':'synthetic prior message','format':'plain'}}})
+            'operation':{'text':message_text,'format':'plain'}}})
     deliberation.apply(framed)
     fixture = owner.replace(':','-')
     gate = install_exploration_gate(journal, deliberation, frame, subject=owner, fixture_name=fixture)

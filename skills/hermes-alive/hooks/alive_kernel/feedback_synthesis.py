@@ -45,6 +45,12 @@ class FeedbackSynthesisReceipt:
     actual_model: str
     actual_provider: str
     snapshot_digest: str
+    accepted_signal_count: int = 0
+    rejected_signal_count: int = 0
+
+    @property
+    def all_signals_structurally_valid(self):
+        return self.rejected_signal_count == 0
 
     @property
     def safe_for_automatic_learning(self):
@@ -177,7 +183,8 @@ class FeedbackSynthesizer:
                 or not prose(value["summary"], 2000) or not notes(value["unresolved"])
                 or not isinstance(value["signals"], list) or len(value["signals"]) > 8):
             raise FeedbackSynthesisError("invalid feedback interpretation")
-        for signal in value["signals"]:
+        accepted, rejected = [], []
+        for index, signal in enumerate(value["signals"]):
             if (not isinstance(signal, dict) or set(signal) != {
                     "axis", "key", "option", "direction", "scope", "quote", "hypothesis", "uncertainties"}
                     or not isinstance(signal["axis"], str) or signal["axis"] not in {"topic", "presentation", "timing", "interruption"}
@@ -185,9 +192,17 @@ class FeedbackSynthesizer:
                     or not isinstance(signal["scope"], str) or signal["scope"] not in {"durable", "situational", "uncertain"}
                     or not prose(signal["key"], 128) or not prose(signal["option"], 256)
                     or not prose(signal["hypothesis"], 1500) or not notes(signal["uncertainties"])
-                    or not prose(signal["quote"], 2000) or signal["quote"] not in snapshot["feedback_text"]):
-                raise FeedbackSynthesisError("feedback hypothesis lacks bounded original evidence")
-        return value
+                    or not prose(signal["quote"], 2000)):
+                rejected.append({"index": index, "reason": "feedback hypothesis violates bounded signal protocol"})
+            elif signal["quote"] not in snapshot["feedback_text"]:
+                rejected.append({"index": index, "reason": "feedback hypothesis lacks bounded original evidence"})
+            else:
+                accepted.append(signal)
+        # Unit-level invalidity must not erase unrelated supported hypotheses.
+        # The original output is retained separately; quarantine is not repair,
+        # complete semantic coverage, or permission to learn from partial output.
+        return {"summary": value["summary"], "signals": accepted, "unresolved": value["unresolved"],
+                "rejected_signals": rejected}
 
     def _prefix(self, subject, operation_id):
         if not isinstance(operation_id, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}", operation_id):
@@ -216,13 +231,16 @@ class FeedbackSynthesizer:
                 raise FeedbackSynthesisError("feedback context changed during model wait")
             text, actual_model, provider = SemanticComparator._response(response, route)
             findings = self.findings(text, data)
-            reference = self.vault.put_json(findings, subject=subject, purpose="feedback.interpretation",
+            reference = self.vault.put_json(json.loads(text), subject=subject, purpose="feedback.interpretation",
                 sensitivity=Sensitivity(clearance), retention_until=until, content_id=prefix)
             result = self.journal.append(EventEnvelope(event_id=prefix + ":completed", event_type="feedback.synthesis_completed",
                 causation_id=prefix + ":started", payload={"snapshot_digest": digest, "prompt_digest": prompt_digest,
                     "content": reference.to_event_payload(), "actual_model": actual_model, "actual_provider": provider,
+                    "processing_contract_version": 2, "accepted_signal_count": len(findings["signals"]),
+                    "rejected_signal_count": len(findings["rejected_signals"]),
                     "automatic_learning_authority": False, "semantic_accuracy_proven": False}, **base))
-            return FeedbackSynthesisReceipt(result.event.event_id, actual_model, provider, digest)
+            return FeedbackSynthesisReceipt(result.event.event_id, actual_model, provider, digest,
+                                            len(findings["signals"]), len(findings["rejected_signals"]))
         except Exception as error:
             self.journal.append(EventEnvelope(event_id=prefix + ":failed", event_type="feedback.synthesis_failed",
                 causation_id=prefix + ":started", payload={"error_class": type(error).__name__,
@@ -261,4 +279,11 @@ class FeedbackSynthesizer:
         if (self.vault.digest_json(findings) != reference.digest or reference.retention_until != until
                 or reference.sensitivity != Sensitivity(clearance)):
             raise FeedbackSynthesisError("feedback receipt content changed")
-        return self.findings(json.dumps(findings), current)
+        interpreted = self.findings(json.dumps(findings), current)
+        version = completed.event.payload.get("processing_contract_version", 1)
+        if version not in (1, 2) or (version == 2 and (
+            completed.event.payload.get("accepted_signal_count") != len(interpreted["signals"])
+            or completed.event.payload.get("rejected_signal_count") != len(interpreted["rejected_signals"])
+        )):
+            raise FeedbackSynthesisError("feedback unit accounting changed")
+        return interpreted

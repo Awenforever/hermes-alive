@@ -102,7 +102,8 @@ async def exercise(root):
     prior_signals = tuple(journal.read(event_type="preference.observed"))
     result = await interpreter.run(subject=subject, outcome_event_id=valid.event.event_id, operation_id="mixed", call=generate)
     assert not result.safe_for_automatic_learning
-    assert interpreter.load_completed(subject=subject, outcome_event_id=valid.event.event_id, operation_id="mixed") == findings
+    assert interpreter.load_completed(subject=subject, outcome_event_id=valid.event.event_id, operation_id="mixed") == {
+        **findings, "rejected_signals": []}
     assert tuple(journal.read(event_type="preference.observed")) == prior_signals
     assert not journal.read(event_type="reflection.proposed")
     assert text not in journal.get(result.event_id).event.canonical_json()
@@ -112,16 +113,35 @@ async def exercise(root):
     wrong = json.loads(json.dumps(findings))
     wrong["signals"][1].update(axis="topic", scope="durable", option="all news",
                               hypothesis="用户永远讨厌全部新闻。")
-    assert interpreter.findings(json.dumps(wrong), snapshot) == wrong
+    assert interpreter.findings(json.dumps(wrong), snapshot) == {**wrong, "rejected_signals": []}
     assert not result.safe_for_automatic_learning
     fabricated = json.loads(json.dumps(findings))
     fabricated["signals"][0]["quote"] = "I dislike all news"
-    try:
-        interpreter.findings(json.dumps(fabricated), snapshot)
-    except FeedbackSynthesisError:
-        pass
-    else:
-        raise AssertionError("fabricated quote accepted")
+    partial = interpreter.findings(json.dumps(fabricated), snapshot)
+    assert partial["signals"] == [findings["signals"][1]]
+    assert partial["rejected_signals"] == [{"index": 0, "reason": "feedback hypothesis lacks bounded original evidence"}]
+    source_swap = json.loads(json.dumps(findings))
+    source_swap["signals"][0]["quote"] = snapshot["delivered_text"]
+    assert interpreter.findings(json.dumps(source_swap), snapshot)["rejected_signals"][0]["index"] == 0
+    malformed = {**findings, "signals": [42, *findings["signals"]]}
+    isolated = interpreter.findings(json.dumps(malformed), snapshot)
+    assert isolated["signals"] == findings["signals"] and isolated["rejected_signals"][0]["index"] == 0
+    assert isolated["rejected_signals"][0]["reason"] == "feedback hypothesis violates bounded signal protocol"
+    omitted = json.loads(json.dumps(findings))
+    del omitted["signals"][0]["uncertainties"]
+    diagnosed = interpreter.findings(json.dumps(omitted), snapshot)
+    assert diagnosed["signals"] == [findings["signals"][1]]
+    assert diagnosed["rejected_signals"] == [{"index": 0, "reason": "feedback hypothesis violates bounded signal protocol"}]
+    async def partial_generate(**kw):
+        kw["route_info"]["provider"] = "synthetic-provider"
+        return SimpleNamespace(model="synthetic/feedback-interpreter",
+            choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps(fabricated)))])
+    partial_receipt = await interpreter.run(subject=subject, outcome_event_id=valid.event.event_id,
+                                           operation_id="partial", call=partial_generate)
+    assert partial_receipt.accepted_signal_count == 1 and partial_receipt.rejected_signal_count == 1
+    assert not partial_receipt.all_signals_structurally_valid and not partial_receipt.safe_for_automatic_learning
+    assert interpreter.load_completed(subject=subject, outcome_event_id=valid.event.event_id, operation_id="partial") == partial
+    assert tuple(journal.read(event_type="preference.observed")) == prior_signals
     outcomes.content_vault.erase_item(reference.content_id)
     try:
         interpreter.load_completed(subject=subject, outcome_event_id=valid.event.event_id, operation_id="mixed")
@@ -140,7 +160,7 @@ async def exercise(root):
     await rejected(interpreter.run(subject=subject, outcome_event_id=changed.event.event_id,
                                   operation_id="consent-changed", call=revoke))
     assert len(journal.read(event_type="feedback.synthesis_failed")) == 1
-    assert len(journal.read(event_type="feedback.synthesis_completed")) == 1
+    assert len(journal.read(event_type="feedback.synthesis_completed")) == 2
     assert not journal.read(event_type="dispatch.externally_started")
 
 

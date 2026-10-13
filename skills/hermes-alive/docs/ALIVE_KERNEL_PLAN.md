@@ -2605,3 +2605,41 @@ For each material change:
   tentative learning integration, not per-example keyword patches. Real ingress,
   complete input capture and derived-copy forgetting remain open alongside the full
   long-term cognition, memory, migration, lifecycle and production acceptance scope.
+
+### 2026-10-14 — Real semantic evidence and per-unit error isolation, ADR 0084
+
+- First three prospective synthetic interpretations complete on configured main
+  deepseek-flash; configured Qwen3.5 review considers them acceptable with explicit
+  limits. Shared frontend/reported names and agreement are not semantic ground truth.
+- Three new cases expose one irony validation failure, not a transport failure.
+  A separately recorded diagnostic repeat captures the original output: three
+  reply-grounded hypotheses plus one hypothesis quoting the sender, previously
+  rejected as an entire interpretation. No irony-specific rule or source repair.
+- Per-unit quarantine now preserves valid hypotheses and explicit rejected indexes.
+  Partial receipts/recovery expose counts; the probe does not call partial output
+  structurally complete. No automatic learning or profile/job/send authority.
+- Observation regression preserves rejected public synthetic output while excluding
+  potentially secret provider exception text. Actual failed histories stay failed.
+- All four live containers are confirmed terminal and exact credentials removed.
+  Production running/start unchanged `2026-10-11T07:43:25.630569081Z`; no private
+  chat, send, other-plugin, production configuration or wmw change. Actual logical
+  calls now 51; observed async HTTP attempts 63, counting failures and repeats.
+- Six distinct corpus cases attempted, four untested; not ten zero-error full Alive
+  calls. Continue semantic/utility qualification, appropriate incomplete-result
+  handling, authenticated host integration, expression, long-term memory/agenda/
+  adaptation, forgetting/migration/rollback/portable lifecycle and production scope.
+
+### 2026-10-14 — Remaining prospective feedback cases expose protocol omissions
+
+- All ten distinct prewritten public synthetic cases now attempted. Eight first
+  attempts structurally complete; irony originally fails and explicit topic
+  boundaries produce a partial result. This is not ten zero-error complete calls.
+- The topic-boundary model output understood the meaning but omitted per-signal
+  uncertainty fields. No fabricated defaults or example-specific prompt patch.
+  Fixed diagnostics separate malformed protocol from unsupported reply quotes.
+- Four additional actual calls / four HTTP 200; cumulative 55 logical / 67 observed
+  async HTTP attempts. Six containers terminal, all exact model exports absent;
+  production start unchanged, no actual sends or preference/configuration changes.
+- Next: bounded model-driven contract recovery and independent assessment of
+  partial results, followed by tentative learning utility qualification and the
+  unchanged full host, expression, memory, agenda, portability and production scope.
