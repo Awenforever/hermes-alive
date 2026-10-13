@@ -17,10 +17,11 @@ unchanged isolated synthetic/public-only, no-send, no-production-change scope.
 
 Current phase: Phase 5 — faculty migration in bounded shadow mode
 
-Next critical path (revisit after evidence, not a frozen design): bind a selected
-generated opportunity to meaning without changing its identity or silently
-promoting a draft to truth; compose current presentation and calibrated semantic
-review; observe useful, authorized outcomes and learn from them. Guard regressions
+Next critical path (revisit after evidence, not a frozen design): calibrate semantic
+and source-entailment review for the now-bound selected draft; admit an eligible
+expression through current user policy and dispatch; observe useful, authorized
+outcomes and learn from them. Selected-opportunity binding and style composition
+exist in shadow, not a qualified production loop. Guard regressions
 are necessary, but cannot substitute for this useful end-to-end behavior or the
 current-installation, lifecycle, migration and production canary gates below.
 
@@ -1859,3 +1860,46 @@ For each material change:
   `2026-10-11T07:43:25.630569081Z`; no restart, send, deployment or model changes.
   Official and USTC routes serving the same model family are not independent
   semantic reviewers. Further bridge/calibration/outcome/lifecycle work is open.
+
+### 2026-10-13 — Bind actual selected intent to proposed-content expression
+
+- ADR-0067 adds an explicit specialized shadow review store. The original
+  generated SHARE/ASK selection and frame are immutable; meaning binds that
+  selection and the complete original draft as proposed content, never fact.
+  This avoids an extra generative extraction changing intent. The original
+  source URL is protected when present; generic semantic review must still
+  assess all other claims, relations, uncertainty and unsupported additions.
+- Seven composition cases passed: normal SHARE/ASK, withdrawal and erasure
+  during generation, superseding selection, foreign owner, and withdrawal after
+  completed review. Repeat meaning definition appends nothing. Original frame
+  remains byte-identical. Review success is shadow-only; no attempted action.
+- Live experiment reused the retained actual model-selected synthetic repair
+  workshop draft. Zero interpretation/selection calls, one expression call,
+  USTC HTTP 200, actual `deepseek-flash`. A bound encrypted model-candidate receipt
+  is created and resolvable. The experiment deliberately did not invent an
+  independent review or send grant. Cumulative live logical calls: ten; 20
+  observed async HTTP requests across the recorded experiments.
+- Qualitative read: Chinese output retains workshop content, availability,
+  no-registration/deadline/purchase conditions, explicitly sourced profile
+  relevance, original URL and non-verification caveat. It is still rather formal
+  and explanatory, not evidence of an engaging proactive voice or benefit. No
+  blind semantic qualification or human outcome exists for it.
+- Windows: 45 kernel files, 44 PASS, one absent-Hermes hook SKIP, zero failures.
+  Linux `alive-selected-expression-offline-20261013-r1` passes the new composition,
+  semantic rendering/review store and natural presentation contracts, network
+  disabled, exit zero. Start `2026-10-13T08:06:59.912055299Z`, finish
+  `2026-10-13T08:07:08.844321571Z`; log SHA256
+  `eca3b672db673bf0a86e89526515d0703537ade4056ff87c6ae4513c15b29fd6`.
+- Both tests used immutable tree `cd9b0c54aa27132ed0059dfb6c314dc7b442f3b0`,
+  archive SHA256 `61135512ef81e80edae3a63c6a7247e430cf76f5e8415f93d83d554821ae62e0`.
+  `alive-live-selected-expression-20261013-r1` exit zero, start
+  `2026-10-13T08:07:00.061940889Z`, finish `2026-10-13T08:07:20.378295895Z`;
+  report SHA256 `9ed23219dd1f68db63e16f851abf921828fac98019b833aedd648a381746b1b9`,
+  log SHA256 `5939a79b3afd6b2a5ba1bcbc4521310b91c05a43db83e5773ba01e3376937e6a`.
+  The probe has a durable one-attempt fence for this selection; don't rerun it
+  merely by choosing another report directory. No guessed provider independence.
+- Cleaned isolated exported credential/config files after terminal confirmation.
+  Production remains running with unchanged start `2026-10-11T07:43:25.630569081Z`.
+  Version/public release/install defaults remain untouched. Typed decomposition
+  where useful, source truth, calibrated review, reviewed-expression admission,
+  outcomes/learning, current installation/lifecycle and live canary remain open.

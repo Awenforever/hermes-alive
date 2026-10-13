@@ -34,6 +34,7 @@ class SemanticRenderingError(ValueError):
 
 
 class SemanticAtomKind(StrEnum):
+    PROPOSED_CONTENT = "proposed_content"
     FACT = "fact"
     REQUEST = "request"
     QUESTION = "question"
@@ -102,12 +103,14 @@ class SemanticAtom:
         kind = SemanticAtomKind(self.kind)
         if not _ATOM_ID_RE.fullmatch(atom_id):
             raise SemanticRenderingError("invalid atom_id")
-        if not text or len(text) > _MAX_ATOM_CHARS:
+        maximum_text = 1600 if kind is SemanticAtomKind.PROPOSED_CONTENT else _MAX_ATOM_CHARS
+        if not text or len(text) > maximum_text:
             raise SemanticRenderingError("semantic atom text is empty or too long")
         if not evidence or any(not _ID_RE.fullmatch(item) for item in evidence):
             raise SemanticRenderingError("semantic atom requires valid evidence")
         if len(literals) > 16 or any(
-            len(value) > _MAX_LITERAL_CHARS or value not in text for value in literals
+            len(value) > (1600 if kind is SemanticAtomKind.PROPOSED_CONTENT else _MAX_LITERAL_CHARS)
+            or value not in text for value in literals
         ):
             raise SemanticRenderingError("protected literal is invalid or absent")
         if kind in _LITERAL_REQUIRED and not literals:
