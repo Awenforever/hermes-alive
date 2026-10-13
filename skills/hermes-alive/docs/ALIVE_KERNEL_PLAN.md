@@ -2398,3 +2398,33 @@ For each material change:
   current policy at the final action boundary. Neither a support receipt nor an
   inspectable quotation ledger can supply missing user authority or repair a
   semantically disputed label. No automatic-delivery gate is enabled by this turn.
+
+### 2026-10-13 — Unambiguous source-review recovery before admission
+
+- ADR 0075 closes a recorded lifecycle gap in both whole-message and claim
+  accounting: completed plus failed history for one operation cannot resolve as
+  usable. Canonical operation/start/completion binding rejects completion aliases.
+  Another operation's conflict does not globally silence valid receipts.
+- Actual old-versus-new regression: loaded only the `d18f535` verifier into a
+  synthetic local test process. New ambiguity assertion failed with the committed
+  implementation; fixed current implementation passes. No production record was
+  read/deleted or rewritten, and no provider call was made for this regression.
+- Windows current whole-message and claim suites pass; tests include alias refusal,
+  conflicting terminals, independent valid receipt preservation, source deletion,
+  owner isolation, method changes and spent-operation refusal. Such lifecycle
+  correctness is necessary but not semantic accuracy, source truth or user benefit.
+- Immutable runtime/test input tree `daa1ed982a8caba24d7f44013ce9a95a1475bfea`,
+  archive SHA256 `4958c7cc698e5e87e0c4709b745cf0f12f9a206bb167a5f4fe5f77f4a4a60947`.
+  Network-none `alive-review-terminal-offline-20261013-r1`: exit zero, start
+  `2026-10-13T13:01:21.638092211Z`, finish `2026-10-13T13:01:25.516456646Z`;
+  log SHA256 `4f8e5d4967ada98fe3b27ed0c0bef2067b12ed04ca25bf7ccc3ea88d3ed01da9`.
+  Source/claim/accounting focused suites pass. Later docs/manifests are not that
+  snapshot; no broad installed-runtime, gateway or lifecycle acceptance is inferred.
+- No new real model calls: cumulative logical calls remain 41, async HTTP requests
+  51. No temporary credential export was created; no model, channel, private-chat,
+  wmw or production configuration mutation. Production running/start unchanged
+  `2026-10-11T07:43:25.630569081Z`.
+- Next critical path remains mixed-unit material-assertion accounting and the full
+  current-policy/admission/dispatch/attributed-outcome chain. Do not count a recovered
+  review as permission, manufacture a new operation to hide interrupted history,
+  or replace the actual continuous behavior and production gates with more guards.

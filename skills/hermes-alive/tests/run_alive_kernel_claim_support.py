@@ -10,7 +10,7 @@ import tempfile
 from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'hooks'))
-from alive_kernel import ExperienceJournal, DiscoveryCandidate, DiscoveryOpportunityIngestor, OpportunitySynthesizer
+from alive_kernel import EventEnvelope, ExperienceJournal, DiscoveryCandidate, DiscoveryOpportunityIngestor, OpportunitySynthesizer
 from alive_kernel.claim_support import ClaimSupportReviewer, account_claims
 from alive_kernel.source_support import SourceSupportError, SourceSupportReviewer
 
@@ -107,6 +107,16 @@ async def exercise(root):
     else:
         raise AssertionError('claim accounting repeated an attempted operation')
     assert len(calls) == 1 and not journal.read(event_type='action.attempted')
+    other = await reviewer.run(**{**args, 'operation_id':'claim-accounting-ambiguous'})
+    journal.append(EventEnvelope(event_id='opportunity.source-support:claim-accounting-ambiguous:failed',
+        event_type='opportunity.source_support_failed',source='alive.source-support',
+        actor='system:alive-shadow-reviewer',subject='user:test',
+        sensitivity=journal.get(other.event_id).event.sensitivity,
+        causation_id='opportunity.source-support:claim-accounting-ambiguous:started',
+        payload={'error_class':'SyntheticInterruptedFinalization','delivery_authority_granted':False}))
+    assert reviewer.verify_current(other.event_id,subject='user:test',interpretation_id='generate',candidate_id=cid) is None
+    assert reviewer.verify_current(receipt.event_id,subject='user:test',interpretation_id='generate',candidate_id=cid) == parsed
+    assert len(calls) == 2 and not journal.read(event_type='action.attempted')
     ingestor.vault.erase_item(journal.get(source.observation_event_id).event.payload['content']['content_id'])
     assert reviewer.verify_current(receipt.event_id, subject='user:test', interpretation_id='generate', candidate_id=cid) is None
 

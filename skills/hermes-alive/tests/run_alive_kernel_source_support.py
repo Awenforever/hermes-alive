@@ -65,12 +65,22 @@ async def exercise(root,mode):
         assert mode in ('source-changed','invalid','self-review','start-race')
         assert not journal.read(event_type='opportunity.source_support_completed')
     else:
-        assert mode in ('supported','unsupported')
+        assert mode in ('supported','unsupported','ambiguous-terminal')
         assert not receipt.safe_for_automatic_delivery
         assert reviewer.verify_current(receipt.event_id,subject='user:test',interpretation_id='generate',
-            candidate_id=candidate_id)['verdict']==mode
+            candidate_id=candidate_id)['verdict']==('supported' if mode=='ambiguous-terminal' else mode)
         assert reviewer.verify_current(receipt.event_id,subject='user:other',interpretation_id='generate',
             candidate_id=candidate_id) is None
+        if mode=='supported':
+            original=journal.get(receipt.event_id).event
+            alias=journal.append(support_module.EventEnvelope(event_id='opportunity.source-support:alias:completed',
+                event_type=original.event_type,source=original.source,actor=original.actor,
+                subject=original.subject,sensitivity=original.sensitivity,
+                causation_id=original.causation_id,payload=original.payload))
+            assert reviewer.verify_current(alias.event.event_id,subject='user:test',interpretation_id='generate',
+                candidate_id=candidate_id) is None
+            assert reviewer.verify_current(receipt.event_id,subject='user:test',interpretation_id='generate',
+                candidate_id=candidate_id)['verdict']=='supported'
         original_prompt=support_module.PROMPT
         try:
             support_module.PROMPT += '\nSynthetic method version change.'
@@ -78,6 +88,15 @@ async def exercise(root,mode):
                 candidate_id=candidate_id) is None
         finally:
             support_module.PROMPT=original_prompt
+        if mode=='ambiguous-terminal':
+            journal.append(support_module.EventEnvelope(event_id='opportunity.source-support:review:failed',
+                event_type='opportunity.source_support_failed',source='alive.source-support',
+                actor='system:alive-shadow-reviewer',subject='user:test',
+                sensitivity=journal.get(receipt.event_id).event.sensitivity,
+                causation_id='opportunity.source-support:review:started',
+                payload={'error_class':'SyntheticInterruptedFinalization','delivery_authority_granted':False}))
+            assert reviewer.verify_current(receipt.event_id,subject='user:test',interpretation_id='generate',
+                candidate_id=candidate_id) is None
         reader.vault.erase_item(journal.get(source.observation_event_id).event.payload['content']['content_id'])
         assert reviewer.verify_current(receipt.event_id,subject='user:test',interpretation_id='generate',
             candidate_id=candidate_id) is None
@@ -93,7 +112,7 @@ async def exercise(root,mode):
 
 
 async def main(root):
-    for mode in ('supported','unsupported','invalid','self-review','source-changed','start-race'):
+    for mode in ('supported','unsupported','invalid','self-review','source-changed','start-race','ambiguous-terminal'):
         await exercise(root/mode,mode)
 
 with tempfile.TemporaryDirectory(prefix='alive-source-support-') as folder:

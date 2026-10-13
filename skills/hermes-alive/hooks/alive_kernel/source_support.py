@@ -83,6 +83,14 @@ class SourceSupportReviewer:
                     or start.event.subject != subject or start.event.source != record.event.source
                     or start.event.actor != record.event.actor or start.event.sensitivity != record.event.sensitivity):
                 return None
+            prefix = start.event.event_id.removesuffix(':started')
+            if (not start.event.event_id.startswith('opportunity.source-support:')
+                    or not start.event.event_id.endswith(':started')
+                    or record.event.event_id != prefix + ':completed'
+                    or self.journal.get(prefix + ':failed') is not None):
+                # Conflicting terminal histories cannot be repaired by selecting
+                # whichever successful record is convenient during recovery.
+                return None
             data, generated = self.snapshot(subject=subject, interpretation_id=interpretation_id,
                                             candidate_id=candidate_id, clearance=clearance)
             payload = record.event.payload
