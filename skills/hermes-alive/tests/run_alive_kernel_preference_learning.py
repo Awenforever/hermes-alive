@@ -32,6 +32,7 @@ from alive_kernel.reflection import (  # noqa: E402
     ReflectionProjection, ReflectionProposal, ReflectionReview, ReflectionScope
 )
 from alive_kernel_testkit import (  # noqa: E402
+    inject_legacy_outcome_row,
     install_action_authorization,
     install_exploration_gate,
 )
@@ -140,6 +141,28 @@ def main() -> int:
         estimate = learning.estimates(subject="user:test", clearance=Sensitivity.PRIVATE)[0]
         assert round(estimate.probability, 6) == round(2.25 / 4.25, 6)
         assert estimate.support_mass == 0.25
+
+        # Migrated cache rows must not let another person's otherwise linked,
+        # explicitly typed feedback train this owner's preferences.
+        foreign_source = replace(feedback_event, event_id="feedback:foreign-owner",
+                                 actor="user:other")
+        journal.append(foreign_source)
+        foreign_feedback = outcomes.append_outcome(
+            attempt_id="attempt:preference-test", kind=OutcomeKind.EXPLICIT_FEEDBACK,
+            source_event_id=foreign_source.event_id,
+            details={"signal": "prefer concise proactive messages"},
+            actor="user:other", subject="user:test", outcome_id="outcome:foreign-owner",
+        )
+        inject_legacy_outcome_row(outcomes, foreign_feedback)
+        foreign_signal = replace(
+            explicit_signal, observation_id="preference-observation:foreign-owner",
+            source_id="outcome:foreign-owner", source_event_id=foreign_feedback.event.event_id,
+        )
+        assert learning.apply(learning.append_observation(
+            foreign_signal, actor="system:learning"
+        )).outcome == "rejected"
+        assert learning.estimates(subject="user:test", clearance=Sensitivity.PRIVATE)[0] == estimate
+        assert journal.get(foreign_feedback.event.event_id) is not None
 
         overweight = PreferenceSignalProposal(
             observation_id="preference-observation:overweight",

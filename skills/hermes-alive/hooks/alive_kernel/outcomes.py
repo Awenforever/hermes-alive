@@ -698,6 +698,14 @@ class OutcomeProjection:
             OutcomeKind.USER_REPLIED, OutcomeKind.USER_CORRECTED,
             OutcomeKind.USER_DISMISSED, OutcomeKind.EXPLICIT_FEEDBACK,
         }:
+            # This projection is personal-owner scoped, not a shared audience
+            # feedback pool. Matching actors alone cannot establish ownership.
+            # Host authentication is a separate ingress obligation; equality
+            # here is necessary, not proof of authenticated user identity.
+            if event.actor != event.subject:
+                return self._decision(
+                    connection, event, "rejected", "user_outcome_owner_mismatch", attempt_id, outcome_id or None
+                )
             if (
                 source.event.causation_id != attempt_event.event.event_id
                 or source.event.observed_at < attempt_event.event.observed_at
@@ -857,7 +865,7 @@ class OutcomeProjection:
             and source.event.event_type == "conversation.inbound"
             and record.sequence > source.sequence > attempt.sequence
             and event.subject == source.event.subject == attempt.event.subject
-            and event.actor == source.event.actor
+            and event.actor == source.event.actor == event.subject
             and event.causation_id == source.event.event_id
             and source.event.causation_id == attempt.event.event_id
             and attempt.event.observed_at <= source.event.observed_at <= event.observed_at

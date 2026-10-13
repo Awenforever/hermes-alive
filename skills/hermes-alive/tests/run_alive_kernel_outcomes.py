@@ -381,6 +381,29 @@ def main() -> int:
         )
         assert outcomes.apply(forged).reason == "user_outcome_actor_mismatch"
 
+        # Matching source/outcome actors do not establish ownership: another
+        # person (or a model) must not supply the personal owner's feedback.
+        for foreign_actor in ("user:other", "model:test"):
+            foreign_source = replace(
+                reply, event_id=f"feedback:foreign:{foreign_actor}",
+                actor=foreign_actor,
+                payload={"user_outcome_kind": OutcomeKind.EXPLICIT_FEEDBACK.value},
+            )
+            journal.append(foreign_source)
+            foreign_outcome = outcomes.append_outcome(
+                attempt_id="attempt:outcome-test", kind=OutcomeKind.EXPLICIT_FEEDBACK,
+                source_event_id=foreign_source.event_id,
+                details={"useful": True}, actor=foreign_actor, subject="user:test",
+                outcome_id=f"outcome:foreign:{foreign_actor}",
+            )
+            foreign_decision = outcomes.apply(foreign_outcome)
+            assert foreign_decision.reason == "user_outcome_owner_mismatch", foreign_decision
+            assert not outcomes.user_attribution_valid(foreign_outcome)
+            inject_legacy_outcome_row(outcomes, foreign_outcome)
+            assert all(item.outcome_id != foreign_outcome.event.payload["outcome_id"]
+                       for item in outcomes.outcomes("attempt:outcome-test", clearance=Sensitivity.PRIVATE))
+            assert journal.get(foreign_outcome.event.event_id) is not None
+
         try:
             OutcomeKind("no_reply")
         except ValueError:

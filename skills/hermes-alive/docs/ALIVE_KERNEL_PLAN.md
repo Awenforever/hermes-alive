@@ -2551,3 +2551,21 @@ For each material change:
   authenticated feedback/onboarding, actual delivery/attributed outcomes and the
   full long-term memory/agenda/adaptation, forgetting/migration/rollback and portable
   production acceptance requirements. The overall goal remains active.
+
+### 2026-10-13 — Personal-owner feedback attribution, ADR 0081
+
+- Actual reproduction accepted a foreign actor's correctly linked typed feedback
+  as the personal owner's outcome. Matching source/outcome actors alone was too
+  weak. Admission and immutable recovery now require the personal owner principal.
+- Foreign human/model outcomes and legacy cache injection no longer enter current
+  outcomes. A migrated foreign feedback row cannot train preferences; positive
+  owner feedback still contributes its bounded weight. Original journal retained.
+- Local outcome, preference learning, reflection and evaluation suites pass.
+  Ordinary reply and delivery success do not imply useful benefit. This does not
+  establish authenticated real ingress or semantic correctness of feedback.
+- Production is read-only verified running, start still
+  `2026-10-11T07:43:25.630569081Z`. No model call or send; cumulative logical model
+  calls remain 43 and observed async HTTP requests 55. No other-plugin/wmw changes.
+- Continue actual content-linked authenticated feedback, longitudinal utility,
+  natural expression qualification and the full memory/agenda/adaptation,
+  forgetting/migration/rollback/portable lifecycle and production acceptance scope.
