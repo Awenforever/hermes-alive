@@ -96,6 +96,18 @@ async def exercise(root: Path) -> None:
         raise AssertionError("same interpretation operation ran twice")
     assert len(calls) == 1
 
+    evidence = reader.active_evidence(subject="user:test", clearance=Sensitivity.PRIVATE)
+    for length in (129, 512, 513):
+        bounded = proposal(own.agenda_item_id)
+        bounded["dimensions"]["risk"]["reason"] = "r" * length
+        candidates, drafts, rejected, indices = synthesizer._candidates(
+            {"candidates": [bounded]}, evidence, "dimension-reason-boundary", "fixture:boundary", ActionAuthority.NONE)
+        if length <= 512:
+            assert len(candidates) == 1 and rejected == 0
+            assert candidates[0].action.dimensions.risk.reason == "r" * length
+        else:
+            assert not candidates and rejected == 1
+
     delegated = await synthesizer.run(
         subject="user:test", operation_id="host-delegated-fixture", call=interpret,
         authority=ActionAuthority.USER_DELEGATED, requested_model="provider/requested-primary",

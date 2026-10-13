@@ -23,7 +23,8 @@ from alive_kernel.content_vault import ContentVault
 from alive_kernel_testkit import install_action_authorization, install_exploration_gate
 
 
-def seed(journal, owner, direction, *, message_text='synthetic prior message', rationale='synthetic authored feedback'):
+def seed(journal, owner, direction, *, message_text='synthetic prior message', rationale='synthetic authored feedback',
+         axis=PreferenceAxis.PRESENTATION, key='message_length', option='concise'):
     deliberation = DeliberationProjection(journal)
     outcomes = OutcomeProjection(journal)
     ReflectionProjection(journal)
@@ -63,8 +64,8 @@ def seed(journal, owner, direction, *, message_text='synthetic prior message', r
         source_event_id=inbound.event_id, details={'fixture':'prefer/dislike concise'}, actor=owner,
         subject=owner, outcome_id='feedback:' + owner)
     assert outcomes.apply(outcome).outcome == 'recorded'
-    proposal = PreferenceSignalProposal(subject=owner, axis=PreferenceAxis.PRESENTATION,
-        key='message_length', option='concise', direction=direction,
+    proposal = PreferenceSignalProposal(subject=owner, axis=axis,
+        key=key, option=option, direction=direction,
         origin=PreferenceSignalOrigin.EXPLICIT_FEEDBACK, source_id='feedback:' + owner,
         source_event_id=outcome.event.event_id, rationale=rationale, weight=.25,
         expires_at=datetime.now(timezone.utc)+timedelta(days=10), observation_id='signal:' + owner)

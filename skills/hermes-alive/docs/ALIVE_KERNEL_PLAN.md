@@ -14,9 +14,17 @@ This is diagnostic evidence, not semantic ground truth or qualified usefulness.
 
 The existing learned-advice bridge dropped encrypted rationale while transmitting
 polarity/masses. It now carries canonical source-linked notes with qualifications
-and unchanged weights/authority. Next measure whether these notes improve model
-decisions on fresh counterfactual scenarios rather than assuming richer context
-is better; then qualify tentative feedback integration and longitudinal benefit.
+and unchanged weights/authority. ADR-0087's first matched ablation does not establish
+improvement: two pairs return empty proposals; the third has similar raw drafts,
+with an acceptance difference caused by a 143-character reason exceeding the old
+128-character adapter cap. Aligned that cap with the domain's 512-character limit
+and distinguish model silence from parser rejection. Next use fresh meaningful
+opportunities with matched explicit baseline context and controls, not winning
+sample selection; then qualify tentative feedback integration and longitudinal benefit.
+The same paired audit also found scenario names leaking into subject IDs and URLs;
+matched arms alone are insufficient. New paired inputs use opaque identifiers,
+but prior feedback/reviewer fixtures need their own blinding audit before semantic
+qualification. Preserve those results with limitations, not as clean blind evidence.
 This does not supersede the expression/source-support or real host-chain gates.
 
 ### Prior finding: independence does not establish source support
@@ -2699,3 +2707,22 @@ For each material change:
 - Next measure counterfactual operational benefit, integrate bounded tentative
   feedback only after utility qualification, and continue full host/expression,
   long-term memory/agenda/adaptation, forgetting/migration/rollback and portability.
+
+### 2026-10-14 — Matched advice ablation, no demonstrated benefit, ADR 0087
+
+- Three prospective synthetic pairs clone canonical evidence and remove only
+  notes from one arm. Same prompt/mass label, alternating order; sequential clock
+  and one-sample stochastic variation remain limitations, not hidden controls.
+- Six actual calls/HTTP 200. Two pairs choose no draft in both arms; the meeting
+  pair proposes similar shares in both. Its apparent acceptance difference is
+  validation: a 143-character explanation exceeds the old adapter's 128 cap.
+- Align rationale capacity with the domain's existing 512-character bound without
+  truncation or authority relaxation. Tests cover 129/512 acceptance, 513 rejection.
+  Report model-empty versus parser-rejected drafts separately. Original result stays.
+- Totals 64 actual logical calls / 76 observed async HTTP attempts; live container
+  terminal, credential exports absent, production unchanged. No actual send,
+  private read, learned update or production/wmw/other-plugin configuration change.
+- Next: discriminating fresh cases with matched explicit baseline interests and
+  positive/negative controls, repeated decision/utility assessment, then bounded
+  feedback learning and the unchanged full production objective. Do not equate
+  more accepted drafts, silence or a passing parser with user benefit.
