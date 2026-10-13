@@ -17,6 +17,13 @@ unchanged isolated synthetic/public-only, no-send, no-production-change scope.
 
 Current phase: Phase 5 — faculty migration in bounded shadow mode
 
+Next critical path (revisit after evidence, not a frozen design): bind a selected
+generated opportunity to meaning without changing its identity or silently
+promoting a draft to truth; compose current presentation and calibrated semantic
+review; observe useful, authorized outcomes and learn from them. Guard regressions
+are necessary, but cannot substitute for this useful end-to-end behavior or the
+current-installation, lifecycle, migration and production canary gates below.
+
 Working branch: `feat/alive-kernel-3`
 
 This is a living engineering contract, not a frozen specification. It records
@@ -1805,3 +1812,50 @@ For each material change:
   seven. Production running/start time unchanged. Version, release branch and
   public installation defaults were not changed. Natural presentation, further
   source lifetime binding, actual outcomes and installation/canary gates remain.
+
+### 2026-10-13 — Connect natural expression to current style
+
+- ADR-0066 connects current explicit presentation preferences and an optional
+  host language to the renderer. No installation-specific persona or fixed
+  sentence template; no learned/legacy preference silently becoming authority.
+  The reviewer sees meaning/candidate only. Context is checked before/after
+  both asynchronous stages; style changes and meaning withdrawal abort.
+- Composition regression: typed share selection, explicit warmth, host language,
+  generation and structurally independent fake review; rejects invalid language,
+  changed style during generation/review and withdrawn meaning. No sends.
+- Two actual USTC `deepseek-flash` generations succeeded with two observed HTTP
+  200 requests. They preserve the URL and uncertainty literal. Cumulative logical
+  live calls: nine; observed async HTTP requests across recorded experiments: 19.
+  These two were prompt/style experiments, NOT validated selection, independently
+  reviewed renders, evidence entailment, human usefulness or delivery. Reports
+  explicitly mark selection/review unexecuted and delivery unqualified.
+- Qualitative finding: warm/brief wording is modestly conversational; formal/brief
+  wording copied the test's "synthetic public scenario" marker because we had
+  wrongly placed that metadata inside a fact atom. Removed the marker from the
+  fixture fact, keeping synthetic provenance outside body meaning. No renderer
+  output keyword cleanup. The corrected fixture has offline validation only;
+  the live evidence remains attached to its original immutable input.
+- Live input tree `2cb739e5fce81215731e3ebb6cb6dbe3f9051b32`, archive SHA256
+  `df612b5604c281d0883b4ae36cc753a311fb797a761341fc8947f35da9db8551`.
+  `alive-live-natural-20261013-r1` terminated before inference (missing bootstrap
+  module path). Verified terminal exit one/no profile, then corrected only the
+  test process PYTHONPATH. `alive-live-natural-20261013-r2` exit zero; start
+  `2026-10-13T07:33:36.803830264Z`, finish `2026-10-13T07:34:35.910277139Z`.
+  Report SHA256 `659f45967d6ad812f024217c7a53f5159a8ea2711e9ba06a02990050b7e811f4`;
+  log SHA256 `4a2ac7bbf6f53c9325af7b378e5200efc1a33130d1577ab07996d4a51b19d6d0`.
+- Windows: 44 kernel files, 43 PASS, one absent-Hermes hook SKIP, zero failures;
+  reran the affected probe contract after suppressing its verbose synthetic report
+  on stdout (report-file assertions remain). No real network in offline tests.
+- Linux `alive-natural-offline-20261013-r2`: corrected-fixture natural composition,
+  paired probe accounting, semantic-review-store and presentation contracts pass;
+  network disabled, exit zero, start `2026-10-13T07:36:49.754369442Z`, finish
+  `2026-10-13T07:36:52.802290791Z`. Input tree
+  `b0912896ccc8cbec42f25a5fc7e7b0ba7987c3cd`, archive SHA256
+  `375397341cc4df3b9d9d7703f876c5250bcffda6f7c3ef8d8e271c0f4a65bbc3`;
+  log SHA256 `f11a94c764078abc922fad785f4d0e05a08af8e958ac58bc956b2d3330a55a10`.
+  This precedes only the probe test's stdout-suppression change.
+- Cleaned isolated exported model credentials/configuration after verified live
+  termination. Production still running with unchanged start time
+  `2026-10-11T07:43:25.630569081Z`; no restart, send, deployment or model changes.
+  Official and USTC routes serving the same model family are not independent
+  semantic reviewers. Further bridge/calibration/outcome/lifecycle work is open.
