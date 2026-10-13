@@ -1903,3 +1903,55 @@ For each material change:
   Version/public release/install defaults remain untouched. Typed decomposition
   where useful, source truth, calibrated review, reviewed-expression admission,
   outcomes/learning, current installation/lifecycle and live canary remain open.
+
+### 2026-10-13 — Actual different-family review, not a new fallback
+
+- User explicitly authorized isolated review with an already-configured different
+  model family, synthetic/public input only, no new keys, production main/fallback
+  changes or channel sends. Read only configured model names before selecting the
+  private test lane. This expands experiment permission, not runtime defaults.
+- First configured review lane `qwen3.6-chat` returned HTTP 403/PermissionDeniedError.
+  One logical call, no review receipt or qualification. Exit zero means the probe
+  wrote its report, NOT successful inference. No production model repair attempted.
+- A different configured lane, `claude-haiku-4-5`, returned HTTP 200 and that actual
+  response model. It reviewed the retained DeepSeek expression without generating
+  or selecting again. All proposed-content meaning, speech act and literals were
+  judged preserved, with no added claims. The authenticated review is resolvable
+  and `shadow_eligible`, never safe for automatic delivery. Model-family attribution
+  relies on configured/response metadata, not a weights audit or calibrated proof.
+- Cumulative live logical calls: twelve (including the failed Qwen call); observed
+  async HTTP requests: 22. One positive synthetic semantic comparison does not
+  prove factual entailment, reviewer accuracy, naturalness, benefit or production
+  acceptance. A shared service endpoint is not silently relabeled as an independent
+  model; the actual different response model/family is checked after inference.
+- Added a one-attempt-per-candidate/family probe fence. Offline contract verifies
+  successful review, same-family fallback refusal, provider failure accounting,
+  no renderer/selector/send, and no second call on repeat, even with another report
+  directory. Main/fallback selection remains Hermes-owned; the probe's family
+  argument is an explicit experiment assertion, not a public skill model default.
+- Qwen input tree `17ca7349d019e5a9fa064d176b48a2fd42aa2872`, archive SHA256
+  `ef475b29e60d1257b7683670db64329857e16a120b0c98929136dcca83a9d2a0`.
+  `alive-live-selected-review-20261013-r1`: exit zero, start
+  `2026-10-13T08:19:32.146670463Z`, finish `2026-10-13T08:19:35.346123927Z`;
+  report SHA256 `c7eb4acb0274f8521408a80ff30998978c9b980ec5e2446ebcaacba8734a8252`,
+  log SHA256 `0db6a8f3f91ee29b132d6bd90475ee9911f07da6ff09251ae1b46ba9846dbbe1`.
+- Claude input tree `3c08a4f82f6bfdbcc9996ae91b691e608c53c530`, archive SHA256
+  `6d7979e908f73486d074757ae71136d8e10791eaa68995f08a744b5563dc005a`.
+  `alive-live-selected-review-20261013-r2`: exit zero, start
+  `2026-10-13T08:22:24.60909Z`, finish `2026-10-13T08:22:35.552958376Z`;
+  report SHA256 `216703c4de0e753dc62cc7f4d641343d45c25405a962191a35ae714b1ebf3fdd`,
+  log SHA256 `4335f43c3fc49c92e1abc8d2e55005de16577629bac289309af5efc54460709d`.
+- Windows: 46 kernel files, 45 PASS, one absent-Hermes hook SKIP, zero failures.
+  Linux network-disabled `alive-review-contract-offline-20261013-r1` passes probe
+  contract, opportunity-expression composition and semantic review store; exit
+  zero, start `2026-10-13T08:26:49.181975089Z`, finish `2026-10-13T08:26:59.430279503Z`.
+  Input tree `d624863f5b4f3b4b90fd477d2a4068edb3cd70be`, archive SHA256
+  `e5df3acf9597a61a1364518b5d6f07e8fe5be3fd1ecfbc8b4d46c15a91349863`;
+  log SHA256 `0a1ad493da1c9786074571d845e2a1b952fcd8316c043812a96ec01f6d0e35d4`.
+- Removed both isolated review credential exports/configs after confirmed terminal
+  states. Production running/start time remains `2026-10-11T07:43:25.630569081Z`.
+  No production activation, default model changes, user exposure, outcome feedback
+  or installation qualification occurred. Next: calibration and useful authorized
+  outcomes, including checking that new unrelated discoveries do not unnecessarily
+  invalidate otherwise current opportunities; that potential coupling is not yet
+  reproduced or resolved and must not be presented as a proven defect.

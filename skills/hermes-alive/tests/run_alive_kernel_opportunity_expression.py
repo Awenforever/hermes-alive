@@ -21,20 +21,20 @@ def response(text, model='actual/synthetic'):
     return SimpleNamespace(model=model, choices=[SimpleNamespace(message=SimpleNamespace(content=text))])
 
 
-async def scenario(root, mode):
+async def scenario(root, mode, owner='user:test'):
     journal = ExperienceJournal(root / 'experience.sqlite3')
     reader = DiscoveryOpportunityIngestor(journal)
     source = reader.ingest(DiscoveryCandidate(source='synthetic-public-fixture', title='Repair',
         summary='Community repair workshop, attendance unknown.', url='https://example.invalid/repair',
-        observed_at=datetime.now(timezone.utc)), subject='user:test')
+        observed_at=datetime.now(timezone.utc)), subject=owner)
     memory = MemoryProjection(journal)
     inbound = EventEnvelope(event_type='conversation.inbound', source='synthetic',
-        actor='user:test', subject='user:test', payload={'synthetic': True})
+        actor=owner, subject=owner, payload={'synthetic': True})
     journal.append(inbound)
-    pref = MemoryProposal(kind=MemoryKind.PREFERENCE, subject='user:test', predicate='profile.interest',
+    pref = MemoryProposal(kind=MemoryKind.PREFERENCE, subject=owner, predicate='profile.interest',
         value='repair', authority=MemoryAuthority.USER_EXPLICIT,
         source_event_ids=(inbound.event_id,), confidence=1)
-    memory.append_proposal(pref, actor='user:test')
+    memory.append_proposal(pref, actor=owner)
     async def generate(**kw):
         return response(json.dumps({'candidates': [{'agenda_item_id': source.agenda_item_id,
             'kind': 'ask' if mode == 'ask' else 'share',
@@ -44,20 +44,20 @@ async def scenario(root, mode):
             ('risk','interruption_cost','urgency') else .9, 'reason': 'synthetic judgment'}
             for name in ('user_value','urgency','novelty','confidence','risk','interruption_cost')}}]}))
     interpreter = OpportunitySynthesizer(journal, content_vault=reader.vault)
-    draft = await interpreter.run(subject='user:test', operation_id='interpret', call=generate,
+    draft = await interpreter.run(subject=owner, operation_id='interpret', call=generate,
                                   authority=ActionAuthority.USER_DELEGATED)
     async def choose(**kw):
         return response(json.dumps({'candidate_id': draft.candidates[0].action.candidate_id,
                                     'rationale': 'synthetic useful candidate'}))
     coordinator = CognitionCycleCoordinator(journal, content_vault=reader.vault)
-    selected = await coordinator.plan_with_model(cycle_id='cycle', subject='user:test',
+    selected = await coordinator.plan_with_model(cycle_id='cycle', subject=owner,
         candidates=draft.candidates, policy_context=PolicyContext(can_interrupt=True), call=choose)
     original_frame = journal.get(selected.frame_event_id).event.canonical_json()
     store = OpportunityExpressionStore(journal, content_vault=reader.vault)
-    meaning = store.define_for_selection(selection_event_id=selected.selection_event_id, subject='user:test')
+    meaning = store.define_for_selection(selection_event_id=selected.selection_event_id, subject=owner)
     before = journal.last_sequence()
     assert store.define_for_selection(selection_event_id=selected.selection_event_id,
-                                     subject='user:test') == meaning
+                                     subject=owner) == meaning
     assert journal.last_sequence() == before
     document = store.meanings.resolve(meaning.event.event_id)
     assert document.atoms[0].kind is SemanticAtomKind.PROPOSED_CONTENT
@@ -81,7 +81,7 @@ async def scenario(root, mode):
             assert prompt['meaning']['atoms'][0]['kind'] == 'proposed_content'
             text, model = document.atoms[0].text, 'synthetic-renderer'
             if mode == 'withdraw-during-render':
-                memory.forget_item(pref.proposal_id, actor='user:test', request_id='withdraw')
+                memory.forget_item(pref.proposal_id, actor=owner, request_id='withdraw')
             elif mode == 'erase-during-render':
                 ref = journal.get(source.observation_event_id).event.payload['content']
                 reader.vault.erase_item(ref['content_id'])
@@ -89,7 +89,7 @@ async def scenario(root, mode):
                 coordinator.deliberation.append_selection(SelectionProposal(
                     journal.get(selected.selection_event_id).event.payload['frame_id'],
                     draft.candidates[0].action.candidate_id, 'actual/selector', 'synthetic newer intent'),
-                    actor='system:synthetic', subject='user:test', selection_id='newer-selection',
+                    actor='system:synthetic', subject=owner, selection_id='newer-selection',
                     exploration_gate_event_id=selected.exploration_event_id)
         else:
             text = json.dumps({'atom_reviews': [{'atom_id': 'proposed-message', 'preserved': True, 'risks': []}],
@@ -100,21 +100,23 @@ async def scenario(root, mode):
         return response(text, model)
     try:
         compared = await SemanticComparator(store).run(selection_event_id=selected.selection_event_id,
-            meaning_event_id=meaning.event.event_id, subject='user:test', call=express,
+            meaning_event_id=meaning.event.event_id, subject=owner, call=express,
             resolve_domain=lambda provider, model: model, operation_id='express')
     except SemanticReviewError:
         assert mode in ('withdraw-during-render','erase-during-render','superseded-during-render') and len(calls) == 1
         assert not journal.read(event_type='message.model_candidate')
     else:
-        assert mode in ('unchanged','ask','withdraw-after-review') and len(calls) == 2
+        assert mode in ('unchanged','ask','withdraw-after-review','probe-fixture') and len(calls) == 2
         assert compared.review.assessment.eligible_for_shadow_comparison
         assert not compared.review.assessment.safe_for_automatic_delivery
         if mode == 'withdraw-after-review':
-            memory.forget_item(pref.proposal_id, actor='user:test', request_id='withdraw')
+            memory.forget_item(pref.proposal_id, actor=owner, request_id='withdraw')
             assert store.resolve_model_candidate(compared.candidate.event_id) is None
             assert store.verify_review(journal.get(compared.review.event_id)) is None
     assert journal.get(selected.frame_event_id).event.canonical_json() == original_frame
     assert not journal.read(event_type='action.attempted')
+    if mode == 'probe-fixture':
+        return journal.path, compared.candidate.event_id
 
 
 async def main(root):
