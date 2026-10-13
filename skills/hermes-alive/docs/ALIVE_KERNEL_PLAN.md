@@ -4,7 +4,16 @@ Status: active
 
 Last reviewed: 2026-10-13
 
-### Current finding: evidence lifetime through selection
+### Current finding: independence does not establish source support
+
+ADR-0072 records a real different-family reviewer accepting the retained draft's
+unsupported zero-loss guarantee. Source-support review exists in bounded shadow
+mode, but is not semantically qualified and does not authorize delivery. Preserve
+the miss and calibrate claim/evidence reasoning on fresh diverse cases, not a
+phrase blacklist or a regenerated cleaner draft. Recorded source timing and an
+atomic start-insertion fence now strengthen the review contract, not its judgment.
+
+### Prior finding: evidence lifetime through selection
 
 ADR-0065 records a reproduced gap: withdrawal of an explicit profile during
 model selection did not invalidate the retained frame. Generated candidates now
@@ -2204,3 +2213,54 @@ For each material change:
 - Full Windows current-code regression: 49 kernel files, 48 PASS, one absent-Hermes
   hook SKIP, zero failures. Only test/probe/docs artifacts changed in this turn;
   this does not qualify a published install, real gateway cycle or production use.
+
+### 2026-10-13 — Independent source-review pilot misses an unsupported guarantee
+
+- Added a shadow source-support component and opt-in retained-candidate probe.
+  ADR 0072 records both its boundaries and the actual calibration failure. No
+  source-support delivery gate, release or production activation is claimed.
+- Reviewed the existing detailed candidate, not a new generation. Actual
+  `claude-haiku-4-5` / `custom:ustc`, one logical call and one observed HTTP 200.
+  Verdict `supported` missed the previously identified zero-loss assurance.
+  Thus structural success is NOT semantic success. Sends zero, no new generation,
+  no selection call and automatic-delivery qualification false.
+- Cumulative logical calls 24; observed asynchronous HTTP requests 34.
+  Original live input tree `5eec99b86ee9ad332c7e40d9c540c66f32338571`, archive
+  SHA256 `88ec022955d5ef7f9244589bddbd753d3d5fcc9bc98e4439499f4085d19083d6`.
+  Live container `alive-source-support-live-20261013-r1`: exit zero, started
+  `2026-10-13T11:43:51.476551308Z`, finished `2026-10-13T11:44:16.412710878Z`;
+  log SHA256 `4df9c0aa746d5fa23504066ba7413fcabb524fda8457a2c2318514bf1ddba391`.
+  Report SHA256 `3a9bab5670f57ede83fb304eeb14fccaab232380084a49dad3d39794eb8fdf05`,
+  retained in owned NAS scratch `model-only-source-support-20261013-r1/results/report.json`
+  and private Windows `../work/alive-source-support-report-20261013-r1.json`.
+- Network-disabled Linux `alive-source-support-offline-20261013-r1`: exit zero,
+  started `2026-10-13T11:43:51.615418855Z`, finished
+  `2026-10-13T11:43:53.866445836Z`; log SHA256
+  `3cd79c45e92ae9bef2e4583dee76e4c0c0051b64e63d5b80e5ece541ad54d723`.
+  Contract checks cover scope, deletion, in-flight source change, contradictions,
+  independence, one-attempt refusal and no authority, not semantic accuracy.
+- Later local change retains publication times and a stable interpretation-start
+  anchor in review snapshots. Earlier live/offline input is not that later code;
+  no live rerun or silent retroactive verdict correction. Exact generation prompt
+  clock was not retained, and start timestamp must not be described as identical.
+- Confirmed both containers terminal before removing owned model-profile export,
+  isolated configuration and configuration backups. Synthetic evidence/logs kept.
+  Production remains running, start `2026-10-11T07:43:25.630569081Z`; no restart,
+  configuration change, private chat reads, external send or wmw modification.
+- Previous broad Windows run became terminal, but its output handle was lost;
+  no full-suite result is inferred from process absence. Current-code focused
+  tests and subsequent verifiers must be recorded separately.
+- Current Windows focused source-support test passes with a losing atomic insert
+  producing zero model calls. Full Windows rerun completed: 50 files, 49 PASS,
+  one absent-Hermes hook SKIP, zero failures; private log
+  `../work/source-support-kernel-regression-20261013-r2.log`. Runtime/test edits
+  finished before this suite reached the source-support file; other tested files
+  did not change during the rerun. This is not actual gateway qualification.
+- Updated source-support offline Linux snapshot tree
+  `b03e405320a4ec26665ef0807fd5b7fcbdad2474`, archive SHA256
+  `d12a8e8bdaca064ccaa62e5dc403e19ffce8c7af329bc24ddeb86c3a487fa8c2`.
+  `alive-source-support-offline-20261013-r2` network disabled, exit zero, started
+  `2026-10-13T11:56:25.612221889Z`, finished `2026-10-13T11:56:27.819982539Z`;
+  log SHA256 `3cd79c45e92ae9bef2e4583dee76e4c0c0051b64e63d5b80e5ece541ad54d723`.
+  Snapshot includes final runtime/tests, not the later documentation/manifests;
+  this focused contract is not a whole-repository manifest or install acceptance.
