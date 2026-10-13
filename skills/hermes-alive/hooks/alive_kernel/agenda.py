@@ -661,6 +661,7 @@ class AgendaProjection:
         limit: int = 100,
         subject: str | None = None,
         kinds: Iterable[AgendaItemKind] | None = None,
+        item_ids: Iterable[str] | None = None,
     ) -> list[AgendaRecord]:
         clearance = Sensitivity(clearance)
         allowed = _SENSITIVITY_ORDER[: _SENSITIVITY_ORDER.index(clearance) + 1]
@@ -679,6 +680,16 @@ class AgendaProjection:
                 return []
             extra += f" AND kind IN ({','.join('?' for _ in selected_kinds)})"
             extra_parameters.extend(value.value for value in selected_kinds)
+        if item_ids is not None:
+            if isinstance(item_ids, (str, bytes)):
+                raise AgendaValidationError("item_ids must be a bounded collection")
+            selected_ids = tuple(dict.fromkeys(_identity(value, "item_id") for value in item_ids))
+            if len(selected_ids) > 32:
+                raise AgendaValidationError("too many pinned agenda items")
+            if not selected_ids:
+                return []
+            extra += f" AND item_id IN ({','.join('?' for _ in selected_ids)})"
+            extra_parameters.extend(selected_ids)
         query = f"""
             SELECT * FROM agenda_items_v1
             WHERE state IN ({','.join('?' for _ in selected_states)})

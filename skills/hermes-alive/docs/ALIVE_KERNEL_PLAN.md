@@ -2021,3 +2021,54 @@ For each material change:
   `2026-10-13T08:55:37.364274545Z`, finish `2026-10-13T08:55:37.911896929Z`,
   log SHA256 `7f5db0aa9a21b32e1dea5e4050543bb20ac233a9f93035a934b3d90bff53e7c2`.
   Same PASS-marker log hash as r1 does not mean identical input trees or coverage.
+
+### 2026-10-13 — Stable discovery dependencies across a continuous cognition cycle
+
+- Previous goal turn completed the independent-review pilot and changed test/docs
+  state; the subsequent user question was a status/path report, not a code change.
+  Rechecked clean HEAD `cd17ae598be73c0c2a9ffea5236b641379c8dcc8` before resuming.
+- Reproduced the previously suspected window coupling with a real kernel flow:
+  interpret one discovery, ingest one distinct new discovery, then prepare the
+  existing candidate for model selection. Before the repair this failed with
+  `DeliberationContextChanged` before a selector call. It is now a verified defect,
+  not merely the earlier hypothesis. No live provider or production input needed.
+- ADR 0069: revalidate the original authenticated observation dependency set in
+  original order, not equality with a changing ranked discovery window. Bounded
+  pinned agenda IDs are filtered together with owner, clearance, type, state and
+  expiry BEFORE LIMIT; source version/provenance and decrypted content remain
+  validated. Default new-discovery ranking is unchanged. Missing or invalid pins
+  do not fall back to a broad query or silently substitute a fresh source.
+- Both interpretation's post-await check and completed-proposal recovery use the
+  pinned set. The latter supplies the existing selection/expression guards, so
+  there is no separate permissive path for later model stages. All originally
+  supplied discovery evidence remains required, not just the chosen item's source.
+  An unselected original input being superseded still invalidates the old judgment.
+- Tests now cover new arrivals before selection, during selection, during initial
+  interpretation, during expression and review; twelve unrelated arrivals before
+  reopening a completed partial bundle; owner/clearance boundaries and malformed,
+  duplicate, empty/unhashable pins. Existing withdrawal, source erasure,
+  supersession, changed intent, relabeled candidates and foreign-owner failures
+  remain covered. Recovery retains exact action/content identities and requires
+  fresh host authority without another model call or appended journal event.
+- Network-disabled Linux run `alive-scoped-evidence-offline-20261013-r1` passed
+  source-epoch, recovery, interpretation, opportunity-expression and agenda tests;
+  exit zero, start `2026-10-13T09:07:15.687454295Z`, finish
+  `2026-10-13T09:07:28.341879339Z`. Immutable input tree
+  `52648dae41fb52f92a2fcfe04059055a0b374bcc`, archive SHA256
+  `38da856754c4dbd4ed08c20fcc98af3bff83edc1c77811148cda8cb42767ed6b`,
+  log SHA256 `dc6f7c8ec917ccd5e410f2abe9806bfccc71a5dcc8396832c12648f2c934ebc7`.
+- No additional real model calls: cumulative logical calls remain twenty and
+  observed async HTTP requests 30. Production still running with unchanged start
+  `2026-10-11T07:43:25.630569081Z`; no restart, configuration/auth changes, messages,
+  production deployment or public release. Experimental runtime code remains on
+  the isolated feature branch, not the current production 2.9.8 installation.
+- User-context freshness remains conservative; this does not prove that arbitrary
+  new preferences or conflicting claims are irrelevant. Observation identity is
+  not factual entailment. Next critical work: general review reliability using
+  fresh diagnostic evidence, claim-to-source support and useful authorized outcome
+  feedback. Do not let these dependency fixes substitute for actual ongoing
+  agendas, benefit, learning or full lifecycle/production acceptance.
+- Updated full Windows regression finished: 47 kernel files, 46 PASS, one
+  absent-Hermes hook SKIP, zero failures. Linux evidence above exercises the same
+  runtime/test code tree before this later plan entry and manifest regeneration;
+  it is not a current public-GitHub installation or authenticated channel canary.

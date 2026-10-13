@@ -165,9 +165,14 @@ class OpportunitySynthesizer:
             raise OpportunitySynthesisError("opportunity completion has wrong cause")
         if authority is not ActionAuthority.NONE and authority.value != start.event.payload.get("host_authority"):
             raise OpportunitySynthesisError("recovery cannot upgrade original host authority")
-        evidence = self.reader.active_evidence(subject=subject, clearance=clearance, limit=8)
+        original_ids = tuple(start.event.payload.get("observation_event_ids", ()))
+        try:
+            evidence = self.reader.active_evidence(subject=subject, clearance=clearance, limit=8,
+                                                 observation_event_ids=original_ids)
+        except (TypeError, ValueError):
+            raise OpportunitySynthesisError("original discovery evidence cannot be resolved") from None
         context = self.context_reader.read(subject=subject, clearance=clearance)
-        if (tuple(e.observation_event_id for e in evidence) != tuple(start.event.payload.get("observation_event_ids", ()))
+        if (tuple(e.observation_event_id for e in evidence) != original_ids
                 or tuple(c.proposal_event_id for c in context) != tuple(start.event.payload.get("context_proposal_event_ids", ()))):
             raise OpportunitySynthesisError("opportunity recovery evidence is no longer current")
         try:
@@ -251,7 +256,8 @@ class OpportunitySynthesizer:
                           {"role": "user", "content": prompt}],
                 temperature=.2, max_tokens=4000,
             ), timeout=timeout_seconds)
-            if self.reader.active_evidence(subject=subject, clearance=clearance, limit=8) != evidence:
+            if self.reader.active_evidence(subject=subject, clearance=clearance, limit=8,
+                    observation_event_ids=tuple(e.observation_event_id for e in evidence)) != evidence:
                 raise OpportunitySynthesisError("opportunity evidence changed during model wait")
             if self.context_reader.read(subject=subject, clearance=clearance) != context:
                 raise OpportunitySynthesisError("user context changed during model wait")

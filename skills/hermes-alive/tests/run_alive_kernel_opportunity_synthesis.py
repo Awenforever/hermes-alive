@@ -18,6 +18,7 @@ from alive_kernel import (  # noqa: E402
     DiscoveryCandidate, DiscoveryOpportunityIngestor, ExperienceJournal,
     OpportunitySynthesizer, OpportunitySynthesisError, PolicyContext, Sensitivity,
 )
+from alive_kernel.discovery_opportunities import DiscoveryOpportunityError
 
 
 def response(value: dict) -> SimpleNamespace:
@@ -42,6 +43,23 @@ async def exercise(root: Path) -> None:
     selected = reader.active_evidence(subject="user:test", clearance=Sensitivity.PRIVATE, limit=1)
     assert len(selected) == 1 and selected[0].agenda_item_id == own.agenda_item_id
     assert reader.active_evidence(subject="user:test", clearance=Sensitivity.PUBLIC) == ()
+    pins = (own.observation_event_id,)
+    assert reader.active_evidence(subject="user:test", clearance=Sensitivity.PRIVATE,
+                                  observation_event_ids=pins) == selected
+    assert reader.active_evidence(subject="user:test", clearance=Sensitivity.PUBLIC,
+                                  observation_event_ids=pins) == ()
+    assert reader.active_evidence(subject="user:other", clearance=Sensitivity.PRIVATE,
+                                  observation_event_ids=pins) == ()
+    assert reader.active_evidence(subject="user:test", clearance=Sensitivity.PRIVATE,
+        observation_event_ids=(other.observation_event_id, own.observation_event_id)) == selected
+    for invalid_pins in ((), (own.observation_event_id,)*2, (["unhashable"],), "not-a-tuple"):
+        try:
+            reader.active_evidence(subject="user:test", clearance=Sensitivity.PRIVATE,
+                                   observation_event_ids=invalid_pins)
+        except DiscoveryOpportunityError:
+            pass
+        else:
+            raise AssertionError("invalid pinned identities were admitted")
     synthesizer = OpportunitySynthesizer(journal, content_vault=reader.vault)
     calls = []
 

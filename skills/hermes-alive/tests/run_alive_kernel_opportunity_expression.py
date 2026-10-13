@@ -91,7 +91,13 @@ async def scenario(root, mode, owner='user:test'):
                     draft.candidates[0].action.candidate_id, 'actual/selector', 'synthetic newer intent'),
                     actor='system:synthetic', subject=owner, selection_id='newer-selection',
                     exploration_gate_event_id=selected.exploration_event_id)
+            elif mode == 'unrelated-during-render':
+                reader.ingest(DiscoveryCandidate(source='synthetic', title='Unrelated', summary='new source',
+                    url='https://example.invalid/new-source', observed_at=datetime.now(timezone.utc)), subject=owner)
         else:
+            if mode == 'unrelated-during-review':
+                reader.ingest(DiscoveryCandidate(source='synthetic', title='Unrelated', summary='new source',
+                    url='https://example.invalid/new-source', observed_at=datetime.now(timezone.utc)), subject=owner)
             text = json.dumps({'atom_reviews': [{'atom_id': 'proposed-message', 'preserved': True, 'risks': []}],
                 'added_claims_detected': False, 'speech_act_preserved': True,
                 'protected_literals_preserved': True})
@@ -106,7 +112,8 @@ async def scenario(root, mode, owner='user:test'):
         assert mode in ('withdraw-during-render','erase-during-render','superseded-during-render') and len(calls) == 1
         assert not journal.read(event_type='message.model_candidate')
     else:
-        assert mode in ('unchanged','ask','withdraw-after-review','probe-fixture') and len(calls) == 2
+        assert mode in ('unchanged','ask','withdraw-after-review','probe-fixture',
+                        'unrelated-during-render','unrelated-during-review') and len(calls) == 2
         assert compared.review.assessment.eligible_for_shadow_comparison
         assert not compared.review.assessment.safe_for_automatic_delivery
         if mode == 'withdraw-after-review':
@@ -121,7 +128,8 @@ async def scenario(root, mode, owner='user:test'):
 
 async def main(root):
     for mode in ('unchanged','ask','withdraw-during-render','erase-during-render',
-                 'superseded-during-render','withdraw-after-review','foreign-owner'):
+                 'superseded-during-render','withdraw-after-review','foreign-owner',
+                 'unrelated-during-render','unrelated-during-review'):
         await scenario(root / mode, mode)
 
 

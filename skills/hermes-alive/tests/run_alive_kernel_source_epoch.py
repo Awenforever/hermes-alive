@@ -29,6 +29,9 @@ async def scenario(root, mode):
     reader = DiscoveryOpportunityIngestor(journal)
     source = reader.ingest(DiscoveryCandidate(source='synthetic', title='Fixture', summary='original',
         url='https://example.invalid/item', observed_at=datetime.now(timezone.utc)), subject='user:test')
+    if mode == 'other-input-supersession':
+        reader.ingest(DiscoveryCandidate(source='synthetic', title='Other input', summary='other original',
+            url='https://example.invalid/other-input', observed_at=datetime.now(timezone.utc)), subject='user:test')
     memory = MemoryProjection(journal)
     statement = EventEnvelope(event_type='conversation.inbound', source='synthetic', actor='user:test',
                                subject='user:test', payload={'fixture': True})
@@ -39,6 +42,9 @@ async def scenario(root, mode):
     memory.append_proposal(preference, actor='user:test')
 
     async def generate(**kw):
+        if mode == 'unrelated-during-interpretation':
+            reader.ingest(DiscoveryCandidate(source='synthetic', title='Unrelated', summary='new source',
+                url='https://example.invalid/new-source', observed_at=datetime.now(timezone.utc)), subject='user:test')
         return response({'candidates': [{'agenda_item_id': source.agenda_item_id, 'kind': 'share',
             'text': 'PRIVATE_DRAFT', 'topic': 'fixture', 'dimensions': {
                 n: {'value': .1 if n in ('risk','interruption_cost') else .9, 'reason': 'synthetic judgment'}
@@ -50,8 +56,14 @@ async def scenario(root, mode):
     def withdraw():
         memory.forget_item(preference.proposal_id, actor='user:test', request_id='withdraw')
 
+    def add_unrelated():
+        reader.ingest(DiscoveryCandidate(source='synthetic', title='Unrelated', summary='new unrelated source',
+            url='https://example.invalid/unrelated', observed_at=datetime.now(timezone.utc)), subject='user:test')
+
     if mode == 'before-call':
         withdraw()
+    elif mode == 'unrelated-before-call':
+        add_unrelated()
     candidates = draft.candidates
     owner = 'user:test'
     if mode == 'relabeled':
@@ -71,6 +83,11 @@ async def scenario(root, mode):
         elif mode == 'supersession':
             reader.ingest(DiscoveryCandidate(source='synthetic', title='Fixture', summary='updated',
                 url='https://example.invalid/item', observed_at=datetime.now(timezone.utc)), subject='user:test')
+        elif mode == 'unrelated-during-call':
+            add_unrelated()
+        elif mode == 'other-input-supersession':
+            reader.ingest(DiscoveryCandidate(source='synthetic', title='Other input', summary='other updated',
+                url='https://example.invalid/other-input', observed_at=datetime.now(timezone.utc)), subject='user:test')
         if mode == 'retry-withdrawal':
             raise RuntimeError('synthetic provider error after withdrawal')
         return response({'candidate_id': draft.candidates[0].action.candidate_id, 'rationale': 'fixture choice'})
@@ -80,20 +97,21 @@ async def scenario(root, mode):
             candidates=candidates, policy_context=PolicyContext(can_interrupt=True),
             causation_id=draft.receipt_event_id, call=choose, attempts=2)
     except DeliberationContextChanged:
-        assert mode != 'unchanged'
+        assert mode not in ('unchanged','unrelated-before-call','unrelated-during-call','unrelated-during-interpretation'), mode
         assert len(calls) == (0 if mode in ('before-call','relabeled','foreign-owner') else 1)
         assert not journal.read(event_type='deliberation.selected')
         if mode in ('before-call','relabeled','foreign-owner'):
             assert not journal.read(event_type='deliberation.framed')
     else:
-        assert mode == 'unchanged', 'stale source/profile accepted by selector: ' + mode
+        assert mode in ('unchanged','unrelated-before-call','unrelated-during-call','unrelated-during-interpretation'), 'stale source/profile accepted by selector: ' + mode
         assert chosen.selection.candidate.action_kind is ActionKind.SHARE and len(calls) == 1
     assert not journal.read(event_type='action.attempted')
 
 
 async def main(root):
     for mode in ('withdrawal','source-erasure','supersession','before-call','retry-withdrawal',
-                 'relabeled','foreign-owner','unchanged'):
+                 'relabeled','foreign-owner','unchanged','unrelated-before-call','unrelated-during-call',
+                 'unrelated-during-interpretation','other-input-supersession'):
         await scenario(root/mode, mode)
 
 with tempfile.TemporaryDirectory(prefix='alive-source-epoch-') as folder:

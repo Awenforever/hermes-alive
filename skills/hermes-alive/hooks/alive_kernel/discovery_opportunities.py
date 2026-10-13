@@ -521,7 +521,8 @@ class DiscoveryOpportunityIngestor:
         return DiscoveryProjectionRecord(**self._row_document(row))
 
     def active_evidence(self, *, subject: str, clearance: Sensitivity,
-                        limit: int = 8) -> tuple[OpportunityEvidence, ...]:
+                        limit: int = 8,
+                        observation_event_ids: tuple[str, ...] | None = None) -> tuple[OpportunityEvidence, ...]:
         """Read authenticated current discovery content, scoped before LIMIT.
 
         The caller supplies a Hermes-authorized principal, never a model-proposed
@@ -530,6 +531,21 @@ class DiscoveryOpportunityIngestor:
         owner = _bounded(subject, "subject", 128, required=True)
         if not _IDENTITY_RE.fullmatch(owner) or not 1 <= limit <= 32:
             raise DiscoveryOpportunityError("invalid evidence subject or limit")
+        pinned_ids = None
+        if observation_event_ids is not None:
+            if (not isinstance(observation_event_ids, tuple)
+                    or not 1 <= len(observation_event_ids) <= limit
+                    or any(not isinstance(value, str) or not _IDENTITY_RE.fullmatch(value)
+                           for value in observation_event_ids)
+                    or len(set(observation_event_ids)) != len(observation_event_ids)):
+                raise DiscoveryOpportunityError("invalid pinned observation identities")
+            pinned_ids = []
+            for observation_id in observation_event_ids:
+                record = self.journal.get(observation_id)
+                # Scope and authenticate before reading any associated content.
+                if (record is not None and record.event.subject == owner
+                        and self._valid_observation(record)):
+                    pinned_ids.append(str(record.event.payload["agenda_item_id"]))
         target = self.journal.last_sequence()
         while self.journal.checkpoint(self.agenda.CHECKPOINT) < target:
             before = self.journal.checkpoint(self.agenda.CHECKPOINT)
@@ -541,11 +557,14 @@ class DiscoveryOpportunityIngestor:
         items = self.agenda.list_items(
             subject=owner, kinds=(AgendaItemKind.OPPORTUNITY,),
             states=(AgendaState.ACTIVE,), clearance=clearance, as_of=now, limit=1000,
+            item_ids=pinned_ids,
         )
         for item in items:
             if item.content_status is not AgendaContentStatus.AVAILABLE:
                 continue
             observation_id = str(item.details.get("observation_event_id") or "")
+            if observation_event_ids is not None and observation_id not in observation_event_ids:
+                continue
             record = self.journal.get(observation_id)
             if (record is None or record.event.subject != owner
                     or item.source_event_ids != (observation_id,)
@@ -571,6 +590,9 @@ class DiscoveryOpportunityIngestor:
             ))
             if len(values) == limit:
                 break
+        if observation_event_ids is not None:
+            by_id = {value.observation_event_id: value for value in values}
+            return tuple(by_id[value] for value in observation_event_ids if value in by_id)
         return tuple(values)
 
     def _append_idempotent(self, event: EventEnvelope) -> tuple[JournalRecord, bool]:

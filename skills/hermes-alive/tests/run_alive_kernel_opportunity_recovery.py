@@ -62,6 +62,14 @@ async def exercise(root):
     delegated = reopened.load_completed(subject='user:test', operation_id='partial', authority=ActionAuthority.USER_DELEGATED)
     assert delegated == original
     assert journal.last_sequence() == before and len(calls) == 1
+    for index in range(12):
+        reader.ingest(DiscoveryCandidate(source='synthetic', title='Unrelated ' + str(index),
+            summary='unrelated arrival', url='https://example.invalid/new/' + str(index),
+            observed_at=datetime.now(timezone.utc)), subject='user:test')
+    before = journal.last_sequence()
+    assert reopened.load_completed(subject='user:test', operation_id='partial',
+        authority=ActionAuthority.USER_DELEGATED) == original
+    assert journal.last_sequence() == before and len(calls) == 1
     refused(lambda: reopened.load_completed(subject='user:other', operation_id='partial'))
     refused(lambda: reopened.load_completed(subject='user:test', operation_id='partial', clearance=Sensitivity.PUBLIC))
     refused(lambda: reopened.load_completed(subject='user:test', operation_id='partial', authority=ActionAuthority.SYSTEM_CRITICAL))
