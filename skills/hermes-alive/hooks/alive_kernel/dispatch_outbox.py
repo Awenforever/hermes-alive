@@ -127,6 +127,15 @@ class DispatchOutbox:
         if authorization is None:
             return None, ("authorization_unavailable",)
         payload = authorization.event.payload
+        delegation_id = payload.get("delegation_event_id")
+        if delegation_id:
+            from .action_delegation import ActionDelegationStore
+            if not ActionDelegationStore(self.journal).permits(str(delegation_id),
+                    subject=subject, policy_event_id=payload.get("policy_event_id"),
+                    route_binding_id=payload.get("route_binding_id"), capability=capability,
+                    action_kind=payload.get("delegated_action_kind"),
+                    sensitivity=authorization.event.sensitivity, now=now):
+                return None, ("delegation_not_current",)
         binding_id = str(payload.get("route_binding_id") or "")
         binding, reasons = self.host.execution_binding(
             binding_id,

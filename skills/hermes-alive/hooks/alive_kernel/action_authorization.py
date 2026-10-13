@@ -149,6 +149,7 @@ class SendTimeAuthorizer:
         route_binding_id: str | None,
         permit_ttl_seconds: float,
         expression_event_id: str | None,
+        delegation_event_id: str | None,
     ) -> ActionAuthorizationDecision | None:
         record = self.journal.get(f"action.authorization:{operation}")
         if record is None:
@@ -169,6 +170,7 @@ class SendTimeAuthorizer:
             or payload.get("policy_revision") != policy_revision
             or payload.get("confirmation_event_id") != confirmation_event_id
             or payload.get("expression_event_id") != expression_event_id
+            or payload.get("delegation_event_id") != delegation_event_id
             or payload.get("route_binding_id") != route_binding_id
             or payload.get("permit_ttl_seconds") != permit_ttl_seconds
             or payload.get("action_contract_version") != 1
@@ -225,6 +227,15 @@ class SendTimeAuthorizer:
             except (DeliberationContextChanged, SemanticReviewError):
                 authorized = False
                 reasons = (*reasons, "selection_inputs_not_current")
+        if authorized and delegation_event_id is not None:
+            from .action_delegation import ActionDelegationStore
+            if not ActionDelegationStore(self.journal).permits(delegation_event_id,
+                    subject=subject, policy_event_id=policy_event_id,
+                    route_binding_id=route_binding_id, capability=capability,
+                    action_kind=payload.get("delegated_action_kind"),
+                    sensitivity=event.sensitivity, now=now):
+                authorized = False
+                reasons = (*reasons, "delegation_not_current")
         return ActionAuthorizationDecision(
             operation,
             event.event_id,
@@ -247,6 +258,7 @@ class SendTimeAuthorizer:
         operation_id: str | None = None,
         confirmation_event_id: str | None = None,
         expression_event_id: str | None = None,
+        delegation_event_id: str | None = None,
         route_binding_id: str | None = None,
         now: datetime | None = None,
         permit_ttl: timedelta = timedelta(seconds=30),
@@ -268,6 +280,10 @@ class SendTimeAuthorizer:
             expression_event_id = str(expression_event_id).strip()
             if not _EVENT_ID_RE.fullmatch(expression_event_id):
                 raise ActionAuthorizationError("invalid expression event identity")
+        if delegation_event_id is not None:
+            delegation_event_id = str(delegation_event_id).strip()
+            if not _EVENT_ID_RE.fullmatch(delegation_event_id):
+                raise ActionAuthorizationError("invalid delegation event identity")
         if confirmation_event_id is not None:
             confirmation_event_id = str(confirmation_event_id).strip()
             if not _EVENT_ID_RE.fullmatch(confirmation_event_id):
@@ -319,6 +335,7 @@ class SendTimeAuthorizer:
             route_binding_id=route_binding_id,
             permit_ttl_seconds=permit_ttl_seconds,
             expression_event_id=expression_event_id,
+            delegation_event_id=delegation_event_id,
         )
         if existing is not None:
             return existing
@@ -394,6 +411,8 @@ class SendTimeAuthorizer:
                 reasons.append("selection_from_future")
 
         if candidate is not None:
+            if delegation_event_id is not None and candidate.authority is not ActionAuthority.USER_DELEGATED:
+                reasons.append("delegation_not_applicable")
             from .deliberation_synthesis import DeliberationSynthesizer, DeliberationContextChanged
             try:
                 DeliberationSynthesizer(self.journal,
@@ -503,7 +522,14 @@ class SendTimeAuthorizer:
                 ):
                     reasons.append("user_confirmation_unavailable")
             elif candidate.authority is ActionAuthority.USER_DELEGATED:
-                if agenda_record is None or agenda_record.authority not in {
+                if delegation_event_id is not None:
+                    from .action_delegation import ActionDelegationStore
+                    if not ActionDelegationStore(self.journal).permits(delegation_event_id,
+                            subject=owner, policy_event_id=policy_event_id,
+                            route_binding_id=route_binding_id, capability=capability,
+                            action_kind=candidate.action_kind, sensitivity=sensitivity, now=current):
+                        reasons.append("delegation_not_current")
+                elif agenda_record is None or agenda_record.authority not in {
                     AgendaAuthority.USER_EXPLICIT,
                 }:
                     reasons.append("user_delegation_unproven")
@@ -524,6 +550,8 @@ class SendTimeAuthorizer:
             "agenda_item_id": getattr(candidate, "agenda_item_id", None),
             "confirmation_event_id": confirmation_event_id,
             "expression_event_id": expression_event_id,
+            "delegation_event_id": delegation_event_id,
+            "delegated_action_kind": candidate.action_kind.value if candidate is not None and delegation_event_id else None,
             "executable_content_id": executable_content_id,
             "route_binding_id": route_binding_id,
             "route_binding_event_id": route_binding_event_id,

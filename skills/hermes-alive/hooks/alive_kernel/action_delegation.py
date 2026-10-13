@@ -1,0 +1,92 @@
+"""Explicit bounded communication delegation, independent of model judgments."""
+from datetime import datetime, timedelta, timezone
+import re
+
+from .deliberation import ActionKind
+from .event_store import ExperienceJournal
+from .events import EventEnvelope, Sensitivity, _thaw_json
+from .privacy import LocalIdentityProtector
+
+
+class ActionDelegationError(ValueError):
+    pass
+
+
+class ActionDelegationStore:
+    """Trusted user-command API; no model may infer or expand these grants.
+
+    This establishes permission scope, not factual quality, interruption value,
+    trusted gateway ingress or qualified automatic delivery.
+    """
+    def __init__(self, journal: ExperienceJournal):
+        self.journal = journal
+        self.protector = LocalIdentityProtector(journal.path.parent / 'identity.key')
+
+    @staticmethod
+    def _utc(value):
+        current = value or datetime.now(timezone.utc)
+        if current.tzinfo is None or current.utcoffset() is None:
+            raise ActionDelegationError('delegation time must be timezone-aware')
+        return current.astimezone(timezone.utc)
+
+    def grant(self, *, subject, actor, policy_event_id, route_binding_id,
+              action_kinds, maximum_sensitivity, expires_at, operation_id, now=None):
+        current, expiry = self._utc(now), self._utc(expires_at)
+        if (actor != subject or not subject or not policy_event_id or not route_binding_id
+                or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}', operation_id)
+                or not current < expiry <= current + timedelta(days=30)):
+            raise ActionDelegationError('invalid self-authorized delegation scope')
+        kinds = sorted({ActionKind(kind).value for kind in action_kinds})
+        if not kinds or not set(kinds) <= {'share', 'ask'}:
+            raise ActionDelegationError('delegation supports only share/ask communication')
+        sensitivity = Sensitivity(maximum_sensitivity)
+        payload = {'operation_id': operation_id, 'policy_event_id': policy_event_id,
+            'route_binding_id': route_binding_id, 'capability': 'hermes.channel.send',
+            'action_kinds': kinds, 'maximum_sensitivity': sensitivity.value,
+            'expires_at': expiry.isoformat(), 'quality_qualified': False}
+        payload['integrity_authenticator'] = self.protector.authenticate_json('action.delegation.v1', payload)
+        return self.journal.append(EventEnvelope(event_id='action.delegation:' + operation_id,
+            event_type='action.delegation_granted', source='hermes.command.alive', actor=actor,
+            subject=subject, sensitivity=Sensitivity.PRIVATE, observed_at=current,
+            occurred_at=current, expires_at=expiry, payload=payload))
+
+    def revoke(self, *, delegation_event_id, subject, actor, now=None):
+        grant = self.journal.get(delegation_event_id)
+        if (actor != subject or grant is None or grant.event.subject != subject
+                or grant.event.event_type != 'action.delegation_granted'):
+            raise ActionDelegationError('cannot revoke a foreign or missing delegation')
+        current = self._utc(now)
+        payload = {'delegation_event_id': delegation_event_id}
+        payload['integrity_authenticator'] = self.protector.authenticate_json('action.delegation.revoke.v1', payload)
+        return self.journal.append(EventEnvelope(event_id=delegation_event_id + ':revoked',
+            event_type='action.delegation_revoked', source='hermes.command.alive', actor=actor,
+            subject=subject, sensitivity=Sensitivity.PRIVATE, occurred_at=current,
+            observed_at=current, causation_id=delegation_event_id, payload=payload))
+
+    def permits(self, delegation_event_id, *, subject, policy_event_id, route_binding_id,
+                capability, action_kind, sensitivity, now=None):
+        """Read-only check, safe inside existing writer transactions."""
+        record = self.journal.get(str(delegation_event_id))
+        if record is None:
+            return False
+        event = record.event
+        current = self._utc(now)
+        payload = _thaw_json(event.payload)
+        authenticator = payload.pop('integrity_authenticator', None)
+        try:
+            return bool(event.event_type == 'action.delegation_granted'
+                and event.source == 'hermes.command.alive' and event.actor == subject
+                and event.subject == subject and event.sensitivity is Sensitivity.PRIVATE
+                and event.event_id == 'action.delegation:' + payload['operation_id']
+                and event.observed_at <= current < event.expires_at
+                and event.expires_at == datetime.fromisoformat(payload['expires_at'])
+                and self.protector.verify_json('action.delegation.v1', payload, authenticator)
+                and self.journal.get(event.event_id + ':revoked') is None
+                and payload['policy_event_id'] == policy_event_id
+                and payload['route_binding_id'] == route_binding_id
+                and payload['capability'] == capability == 'hermes.channel.send'
+                and ActionKind(action_kind).value in payload['action_kinds']
+                and tuple(Sensitivity).index(Sensitivity(sensitivity)) <=
+                    tuple(Sensitivity).index(Sensitivity(payload['maximum_sensitivity'])))
+        except (KeyError, TypeError, ValueError):
+            return False

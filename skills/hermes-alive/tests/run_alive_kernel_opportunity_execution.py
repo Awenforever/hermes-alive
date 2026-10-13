@@ -4,7 +4,7 @@
 All user/model/host fixtures are synthetic. No transport is called or qualified.
 """
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import sys
@@ -21,6 +21,7 @@ from alive_kernel_testkit import install_terminal_route
 from alive_kernel.content_vault import ContentVault
 from alive_kernel.opportunity_expression import OpportunityExpressionStore
 from alive_kernel.action_authorization import ActionAuthorizationError
+from alive_kernel.action_delegation import ActionDelegationStore
 
 
 def response(value):
@@ -53,7 +54,7 @@ async def scenario(root, mode, custom_context=False):
     # Trusted test-host metadata, NOT permission inferred by a model or installed
     # as a public default. The authorizer still requires a later exact confirmation.
     generated = await OpportunitySynthesizer(journal, context_vault=context_vault).run(subject=owner, operation_id='generate',
-        authority=ActionAuthority.USER_CONFIRMED, call=generate)
+        authority=ActionAuthority.USER_DELEGATED if mode.startswith('delegated') else ActionAuthority.USER_CONFIRMED, call=generate)
     async def choose(**kwargs):
         return response({'candidate_id': generated.candidates[0].action.candidate_id,
                          'rationale': 'synthetic useful candidate'})
@@ -64,6 +65,14 @@ async def scenario(root, mode, custom_context=False):
     assert policy.apply(policy.append_update(subject=owner, actor=owner, expected_revision=0,
         enabled=True, context=PolicyContext(can_interrupt=True), operation_id='policy')).outcome == 'recorded'
     route = install_terminal_route(journal, subject=owner, content_vault=coordinator.vault)
+    delegation = None
+    if mode.startswith('delegated'):
+        delegation = ActionDelegationStore(journal).grant(subject=owner, actor=owner,
+            policy_event_id=policy.current(owner).event_id,
+            route_binding_id='other-route' if mode == 'delegated-wrong-route' else route,
+            action_kinds=('ask',) if mode == 'delegated-wrong-kind' else ('share',),
+            maximum_sensitivity=Sensitivity.PUBLIC if mode == 'delegated-wrong-clearance' else Sensitivity.PRIVATE,
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1), operation_id='delegation')
     expression = None
     expressed_text = 'You might like this free repair recording; the notice is unverified. https://example.invalid/repair'
     if mode.startswith('expression'):
@@ -82,7 +91,10 @@ async def scenario(root, mode, custom_context=False):
     authorizer = SendTimeAuthorizer(journal, content_vault=coordinator.vault, route_binding_id=route,
                                    context_vault=context_vault)
     def invalidate():
-        if mode.startswith('forget'):
+        if mode.startswith('delegated-revoke'):
+            ActionDelegationStore(journal).revoke(delegation_event_id=delegation.event.event_id,
+                                                 subject=owner, actor=owner)
+        elif mode.startswith('forget'):
             memory.forget_item(pref.proposal_id, actor=owner, request_id='forget')
         elif mode.startswith('erase'):
             reader.vault.erase_item(journal.get(source.observation_event_id).event.payload['content']['content_id'])
@@ -95,8 +107,12 @@ async def scenario(root, mode, custom_context=False):
         invalidate()
     decision = authorizer.evaluate(selection_event_id=selected.selection_event_id, subject=owner,
         capability='hermes.channel.send', operation_id='authorize',
-        confirmation_event_id=confirmation.event.event_id,
-        expression_event_id=expression.event_id if expression else None)
+        confirmation_event_id=None if delegation else confirmation.event.event_id,
+        expression_event_id=expression.event_id if expression else None,
+        delegation_event_id=delegation.event.event_id if delegation else None)
+    if mode in ('delegated-wrong-route', 'delegated-wrong-kind', 'delegated-wrong-clearance'):
+        assert not decision.authorized and 'delegation_not_current' in decision.reasons
+        return
     if mode == 'expression-unconfirmed':
         assert not decision.authorized and 'exact_expression_confirmation_required' in decision.reasons
         assert not journal.read(event_type='action.attempted')
@@ -106,6 +122,14 @@ async def scenario(root, mode, custom_context=False):
         assert not journal.read(event_type='action.attempted')
         return
     assert decision.authorized, decision.reasons
+    if mode == 'delegated-revoke-replay':
+        ActionDelegationStore(journal).revoke(delegation_event_id=delegation.event.event_id,
+                                             subject=owner, actor=owner)
+        replay = authorizer.evaluate(selection_event_id=selected.selection_event_id, subject=owner,
+            capability='hermes.channel.send', operation_id='authorize',
+            confirmation_event_id=None, delegation_event_id=delegation.event.event_id)
+        assert not replay.authorized and 'delegation_not_current' in replay.reasons
+        return
     if mode == 'expression':
         try:
             authorizer.evaluate(selection_event_id=selected.selection_event_id, subject=owner,
@@ -179,6 +203,10 @@ async def main(root):
     for mode in ('clean', 'forget-before-authorize', 'forget-before-begin', 'forget-before-launch'):
         await scenario(root / ('custom-' + mode), mode, custom_context=True)
     for mode in ('expression', 'expression-unconfirmed', 'expression-erased-before-launch', 'replay-after-forget'):
+        await scenario(root / mode, mode)
+    for mode in ('delegated-clean', 'delegated-revoke-before-authorize', 'delegated-revoke-before-begin',
+                 'delegated-revoke-before-launch', 'delegated-revoke-replay', 'delegated-wrong-route',
+                 'delegated-wrong-kind', 'delegated-wrong-clearance'):
         await scenario(root / mode, mode)
 
 

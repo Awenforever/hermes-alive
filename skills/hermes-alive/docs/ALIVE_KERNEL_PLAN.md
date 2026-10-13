@@ -2475,3 +2475,27 @@ For each material change:
   remain unresolved. Next continue the user-delegated quality/admission path and
   trusted host/outcome attribution, plus derived-copy forgetting and the full
   persistent agenda/memory/adaptation, portability and rollback requirements.
+
+### 2026-10-13 — User delegation without corrupting discovery provenance
+
+- ADR 0078 separates user permission to communicate from discovery agenda origin.
+  Explicit signed grants bind owner/current policy/exact route/SHARE or ASK/
+  maximum sensitivity/expiry, without upgrading original generated authority.
+  Grant recovery and dispatch route checks reject revocation and scope changes.
+- Twenty-four local execution modes pass, including eight new delegated scenarios
+  without a per-message confirmation parameter. The dedicated scope/authenticity
+  suite and authorization/outcome/dispatch-evidence regressions also pass.
+- Immutable tree `737f02c2b0ce6771bd4fa486a42f84f79fb9f4c9` passed four focused
+  suites in network-none `alive-delegation-offline-20261013-r1`, exited zero.
+  ADR records archive, times and log digest. This is isolated Python/runtime evidence,
+  not a qualified Hermes gateway, complete lifecycle matrix or actual delivery.
+- No provider calls or sends. Read-only production inspection confirms running,
+  unchanged start `2026-10-11T07:43:25.630569081Z`. No production grant/configuration,
+  other plugin or wmw modification. Cumulative actual model calls remain 41.
+- Next implement trustworthy user-command/onboarding integration and autonomous
+  quality admission with bounded cadence; do not turn permission into source truth
+  or a topic-keyword gate. Natural expression still requires exact confirmation
+  until its automatic quality path is qualified. Continue actual host delivery,
+  attributed outcomes and longitudinal benefit rather than accumulating only
+  structural guards; all memory/agenda/adaptation/portability/rollback obligations
+  remain part of the final goal.
