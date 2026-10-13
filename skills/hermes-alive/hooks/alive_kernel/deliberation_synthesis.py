@@ -290,7 +290,8 @@ class DeliberationSynthesizer:
             while self.journal.checkpoint(self.deliberation.CHECKPOINT) < target:
                 before = self.journal.checkpoint(self.deliberation.CHECKPOINT)
                 self.deliberation.project_new()
-                if self.journal.checkpoint(self.deliberation.CHECKPOINT) <= before:
+                after = self.journal.checkpoint(self.deliberation.CHECKPOINT)
+                if after < target and after <= before:
                     raise DeliberationContextChanged("selection projection stalled")
             stored = self.deliberation.inspect(frame_id, clearance=sensitivity)
             if (stored is None or stored.selection is None

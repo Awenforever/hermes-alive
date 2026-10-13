@@ -2499,3 +2499,29 @@ For each material change:
   attributed outcomes and longitudinal benefit rather than accumulating only
   structural guards; all memory/agenda/adaptation/portability/rollback obligations
   remain part of the final goal.
+
+### 2026-10-13 — Atomic cadence and concurrent input recovery
+
+- ADR 0079 separates consumed delegated starts from diversity exploration,
+  delivery success and user benefit. Grants carry customizable generic cadence;
+  the owner-wide rolling-day/interval check shares the start append transaction.
+  New grants/routes do not reset history; another owner is isolated.
+- Actual committed-component regression reproduces two starts for one declared
+  slot. Fixed concurrent one-slot exclusion and two-start positive control pass
+  through pre-launch validation. Writer-lock timestamping avoids invocation-time
+  inversion caused by transaction waits. Uncertain starts still consume capacity.
+- Parallel recovery uncovered false-stall and backwards-acknowledgement races.
+  Deterministic old context-reader failure plus an actual reflection checkpoint
+  traceback identify the causes. Idempotent projecting readers now coalesce later
+  acknowledgements; strict manual checkpoints and genuine stalls still reject.
+- Twenty-six local execution modes and focused cadence/journal/outcome/dispatch
+  tests pass. Seven suites also pass in network-none managed Python 3.13 against
+  immutable tree `48df6a35c0cf607bdb4adbb3c8f1bbf7f6a0b0cc`; ADR records archive,
+  container terminal times and log digest. No actual send/user-benefit claim.
+- Production remains running, unchanged start `2026-10-11T07:43:25.630569081Z`.
+  No real model call, private chat, production grant/configuration, other-plugin or
+  wmw change. Actual model call total remains 41, observed async HTTP requests 51.
+- Continue automatic quality admission and authenticated onboarding/feedback,
+  qualified delivery/outcomes and longitudinal benefit; do not mistake frequency
+  safety for useful cognition or reduce the full memory/agenda/adaptation,
+  forgetting/migration/rollback/portable lifecycle and production acceptance scope.

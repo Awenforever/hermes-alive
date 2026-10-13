@@ -30,7 +30,8 @@ class ActionDelegationStore:
         return current.astimezone(timezone.utc)
 
     def grant(self, *, subject, actor, policy_event_id, route_binding_id,
-              action_kinds, maximum_sensitivity, expires_at, operation_id, now=None):
+              action_kinds, maximum_sensitivity, expires_at, operation_id, now=None,
+              minimum_interval_seconds=3600, max_starts_per_24h=3):
         current, expiry = self._utc(now), self._utc(expires_at)
         if (actor != subject or not subject or not policy_event_id or not route_binding_id
                 or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}', operation_id)
@@ -40,9 +41,14 @@ class ActionDelegationStore:
         if not kinds or not set(kinds) <= {'share', 'ask'}:
             raise ActionDelegationError('delegation supports only share/ask communication')
         sensitivity = Sensitivity(maximum_sensitivity)
+        if (type(minimum_interval_seconds) is not int or not 0 <= minimum_interval_seconds <= 86400
+                or type(max_starts_per_24h) is not int or not 1 <= max_starts_per_24h <= 100):
+            raise ActionDelegationError('invalid delegated start cadence')
         payload = {'operation_id': operation_id, 'policy_event_id': policy_event_id,
             'route_binding_id': route_binding_id, 'capability': 'hermes.channel.send',
             'action_kinds': kinds, 'maximum_sensitivity': sensitivity.value,
+            'minimum_interval_seconds': minimum_interval_seconds,
+            'max_starts_per_24h': max_starts_per_24h,
             'expires_at': expiry.isoformat(), 'quality_qualified': False}
         payload['integrity_authenticator'] = self.protector.authenticate_json('action.delegation.v1', payload)
         return self.journal.append(EventEnvelope(event_id='action.delegation:' + operation_id,
@@ -64,9 +70,14 @@ class ActionDelegationStore:
             observed_at=current, causation_id=delegation_event_id, payload=payload))
 
     def permits(self, delegation_event_id, *, subject, policy_event_id, route_binding_id,
-                capability, action_kind, sensitivity, now=None):
+                capability, action_kind, sensitivity, now=None, connection=None):
         """Read-only check, safe inside existing writer transactions."""
-        record = self.journal.get(str(delegation_event_id))
+        def read(event_id):
+            if connection is None:
+                return self.journal.get(event_id)
+            row = connection.execute('SELECT * FROM experience_events WHERE event_id=?', (event_id,)).fetchone()
+            return self.journal._record(row) if row is not None else None
+        record = read(str(delegation_event_id))
         if record is None:
             return False
         event = record.event
@@ -81,7 +92,7 @@ class ActionDelegationStore:
                 and event.observed_at <= current < event.expires_at
                 and event.expires_at == datetime.fromisoformat(payload['expires_at'])
                 and self.protector.verify_json('action.delegation.v1', payload, authenticator)
-                and self.journal.get(event.event_id + ':revoked') is None
+                and read(event.event_id + ':revoked') is None
                 and payload['policy_event_id'] == policy_event_id
                 and payload['route_binding_id'] == route_binding_id
                 and payload['capability'] == capability == 'hermes.channel.send'

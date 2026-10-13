@@ -528,7 +528,7 @@ class DeliberationProjection:
         for index, record in enumerate(self.journal.iter_replay(after_sequence=start), start=1):
             if record.event.event_type in {"deliberation.framed", "deliberation.selected"}:
                 decisions.append(self.apply(record))
-            self.journal.advance_checkpoint(self.CHECKPOINT, record.sequence)
+            self.journal.advance_checkpoint(self.CHECKPOINT, record.sequence, coalesce=True)
             if index >= limit:
                 break
         return decisions
@@ -545,7 +545,7 @@ class DeliberationProjection:
         ):
             if record.event.event_type == "deliberation.framed":
                 decisions.append(self.apply(record))
-            self.journal.advance_checkpoint(self.FRAME_CHECKPOINT, record.sequence)
+            self.journal.advance_checkpoint(self.FRAME_CHECKPOINT, record.sequence, coalesce=True)
             if index >= limit:
                 break
         return decisions

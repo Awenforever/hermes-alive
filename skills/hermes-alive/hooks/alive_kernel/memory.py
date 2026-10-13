@@ -605,7 +605,7 @@ class MemoryProjection:
                 decisions.append(self.apply(record))
             elif record.event.event_type == "memory.forgotten":
                 self._apply_forgetting(record)
-            self.journal.advance_checkpoint(self.CHECKPOINT, record.sequence)
+            self.journal.advance_checkpoint(self.CHECKPOINT, record.sequence, coalesce=True)
         return decisions
 
     def _apply_forgetting(self, record: JournalRecord) -> None:

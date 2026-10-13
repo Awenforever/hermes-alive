@@ -36,7 +36,8 @@ class CognitionLearningReader:
             while self.journal.checkpoint(projection.CHECKPOINT) < target:
                 before = self.journal.checkpoint(projection.CHECKPOINT)
                 projection.project_new(limit=1000)
-                if self.journal.checkpoint(projection.CHECKPOINT) <= before:
+                after = self.journal.checkpoint(projection.CHECKPOINT)
+                if after < target and after <= before:
                     raise ValueError('learning evidence projection made no progress')
         values = []
         for estimate in self.learning.estimates(subject=subject, clearance=clearance):

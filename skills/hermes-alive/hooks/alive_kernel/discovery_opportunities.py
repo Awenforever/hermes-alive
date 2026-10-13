@@ -550,7 +550,8 @@ class DiscoveryOpportunityIngestor:
         while self.journal.checkpoint(self.agenda.CHECKPOINT) < target:
             before = self.journal.checkpoint(self.agenda.CHECKPOINT)
             self.agenda.project_new(limit=1000)
-            if self.journal.checkpoint(self.agenda.CHECKPOINT) <= before:
+            after = self.journal.checkpoint(self.agenda.CHECKPOINT)
+            if after < target and after <= before:
                 raise DiscoveryOpportunityError("agenda evidence projection made no progress")
         now = datetime.now(timezone.utc)
         values = []

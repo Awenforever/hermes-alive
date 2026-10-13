@@ -9,7 +9,7 @@ import hashlib
 import json
 from pathlib import Path
 import sqlite3
-from typing import Iterator
+from typing import Callable, Iterator
 
 from .events import EventEnvelope
 
@@ -131,12 +131,22 @@ class ExperienceJournal:
     def _hash(canonical_json: str) -> str:
         return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
-    def append(self, event: EventEnvelope) -> AppendResult:
-        canonical = event.canonical_json()
-        digest = self._hash(canonical)
+    def append(self, event: EventEnvelope | Callable[[sqlite3.Connection], EventEnvelope], *,
+               precondition: Callable[[sqlite3.Connection], None] | None = None) -> AppendResult:
+        """Append once, optionally checking an internal condition under the writer lock.
+
+        An internal event factory may timestamp a fact under the writer lock.
+        Factories/preconditions must not project,
+        acquire another writer or perform external I/O. Identical replay does not
+        reconsume a resource; conflicts still fail before checking the condition.
+        """
         with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
+                if callable(event):
+                    event = event(connection)
+                canonical = event.canonical_json()
+                digest = self._hash(canonical)
                 existing = connection.execute(
                     "SELECT sequence, canonical_json, integrity_hash "
                     "FROM experience_events WHERE event_id=?",
@@ -153,6 +163,8 @@ class ExperienceJournal:
                     connection.execute("COMMIT")
                     return AppendResult(int(existing["sequence"]), event, False)
 
+                if precondition is not None:
+                    precondition(connection)
                 cursor = connection.execute(
                     """
                     INSERT INTO experience_events(
@@ -354,7 +366,12 @@ class ExperienceJournal:
             ).fetchone()
             return int(row["last_sequence"]) if row else 0
 
-    def advance_checkpoint(self, consumer_name: str, sequence: int) -> int:
+    def advance_checkpoint(self, consumer_name: str, sequence: int, *, coalesce: bool = False) -> int:
+        """Acknowledge an applied prefix; optionally accept another worker's later ack.
+
+        Strict by default. Projection workers may coalesce only after applying the
+        record idempotently. Coalescing never lowers the stored watermark.
+        """
         name = consumer_name.strip()
         if not name:
             raise ValueError("consumer_name is required")
@@ -376,6 +393,9 @@ class ExperienceJournal:
                 ).fetchone()
                 current = int(current_row["last_sequence"]) if current_row else 0
                 if sequence < current:
+                    if coalesce:
+                        connection.execute("COMMIT")
+                        return current
                     raise ValueError("checkpoint cannot move backwards")
                 connection.execute(
                     """

@@ -4,6 +4,7 @@
 All user/model/host fixtures are synthetic. No transport is called or qualified.
 """
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
@@ -72,6 +73,8 @@ async def scenario(root, mode, custom_context=False):
             route_binding_id='other-route' if mode == 'delegated-wrong-route' else route,
             action_kinds=('ask',) if mode == 'delegated-wrong-kind' else ('share',),
             maximum_sensitivity=Sensitivity.PUBLIC if mode == 'delegated-wrong-clearance' else Sensitivity.PRIVATE,
+            minimum_interval_seconds=0 if mode.startswith('delegated-concurrent') else 3600,
+            max_starts_per_24h=1 if mode == 'delegated-concurrent-cadence' else 3,
             expires_at=datetime.now(timezone.utc) + timedelta(hours=1), operation_id='delegation')
     expression = None
     expressed_text = 'You might like this free repair recording; the notice is unverified. https://example.invalid/repair'
@@ -157,6 +160,31 @@ async def scenario(root, mode, custom_context=False):
     outbox.reconcile()
     lease = outbox.acquire(worker_id='synthetic-worker')
     assert lease is not None
+    if mode.startswith('delegated-concurrent'):
+        second = outcomes.append_attempt(authorization_event_id=decision.event_id,
+            selection_event_id=selected.selection_event_id, candidate_id=decision.candidate_id,
+            executor='hermes.channel.send', idempotency_key='synthetic-attempt-2',
+            actor='system:synthetic-test', subject=owner, attempt_id='attempt-2')
+        assert outcomes.apply(second).outcome == 'recorded'
+        outbox.reconcile()
+        second_lease = outbox.acquire(worker_id='synthetic-worker-2')
+        assert second_lease is not None
+        def start(item):
+            try:
+                worker = DispatchOutbox(journal, content_vault=coordinator.vault)
+                execution = worker.begin_execution(item, clearance=Sensitivity.PRIVATE)
+                worker.validate_execution_for_launch(execution)
+                return execution
+            except DispatchOutboxError as exc:
+                assert 'budget exhausted' in str(exc), str(exc)
+                return None
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            results = list(workers.map(start, (lease, second_lease)))
+        expected_starts = 1 if mode == 'delegated-concurrent-cadence' else 2
+        assert sum(result is not None for result in results) == expected_starts
+        assert len(journal.read(event_type='dispatch.started')) == expected_starts
+        assert not journal.read(event_type='delivery.succeeded')
+        return
     if mode.endswith('before-begin'):
         invalidate()
         try:
@@ -206,7 +234,8 @@ async def main(root):
         await scenario(root / mode, mode)
     for mode in ('delegated-clean', 'delegated-revoke-before-authorize', 'delegated-revoke-before-begin',
                  'delegated-revoke-before-launch', 'delegated-revoke-replay', 'delegated-wrong-route',
-                 'delegated-wrong-kind', 'delegated-wrong-clearance'):
+                 'delegated-wrong-kind', 'delegated-wrong-clearance', 'delegated-concurrent-cadence',
+                 'delegated-concurrent-allowed'):
         await scenario(root / mode, mode)
 
 

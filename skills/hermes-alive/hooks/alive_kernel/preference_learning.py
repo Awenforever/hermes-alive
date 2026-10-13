@@ -518,7 +518,7 @@ class PreferenceLearningProjection:
         for index, record in enumerate(self.journal.iter_replay(after_sequence=start), start=1):
             if record.event.event_type in {"preference.observed", "preference.retracted"}:
                 decisions.append(self.apply(record))
-            self.journal.advance_checkpoint(self.CHECKPOINT, record.sequence)
+            self.journal.advance_checkpoint(self.CHECKPOINT, record.sequence, coalesce=True)
             if index >= limit:
                 break
         return decisions

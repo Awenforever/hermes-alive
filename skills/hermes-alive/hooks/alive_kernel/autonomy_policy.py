@@ -386,7 +386,7 @@ class AutonomyPolicyProjection:
         ):
             if record.event.event_type == "autonomy.policy_changed":
                 decisions.append(self.apply(record))
-            self.journal.advance_checkpoint(self.CHECKPOINT, record.sequence)
+            self.journal.advance_checkpoint(self.CHECKPOINT, record.sequence, coalesce=True)
             if index >= limit:
                 break
         return decisions

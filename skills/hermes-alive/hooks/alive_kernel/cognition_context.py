@@ -39,7 +39,8 @@ class CognitionContextReader:
         while self.journal.checkpoint(self.memory.CHECKPOINT) < target:
             before = self.journal.checkpoint(self.memory.CHECKPOINT)
             self.memory.project_new(limit=1000)
-            if self.journal.checkpoint(self.memory.CHECKPOINT) <= before:
+            after = self.journal.checkpoint(self.memory.CHECKPOINT)
+            if after < target and after <= before:
                 raise ValueError("memory context projection made no progress")
         accepted = []
         for item in self.memory.retrieve(subject=subject, clearance=clearance, limit=512,

@@ -8,7 +8,7 @@ persisting plaintext candidate content.
 from __future__ import annotations
 
 from contextlib import closing
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 import hashlib
 from pathlib import Path
@@ -113,6 +113,51 @@ class DispatchOutbox:
             raise DispatchOutboxError("dispatch selection inputs are no longer current") from exc
         except ValueError as exc:
             raise DispatchOutboxError("dispatch expression is no longer current") from exc
+
+    def _check_delegated_cadence(self, connection, authorization, current):
+        """Reserve via the same journal transaction as the authenticated start.
+
+        Count consumed starts (including uncertain launches), never infer delivery
+        or usefulness. A new grant or route must not reset the owner's history.
+        """
+        delegation_id = authorization.event.payload.get("delegation_event_id")
+        if not delegation_id:
+            return
+        from .action_delegation import ActionDelegationStore
+        permit = authorization.event.payload
+        if not ActionDelegationStore(self.journal).permits(str(delegation_id),
+                subject=authorization.event.subject, policy_event_id=permit.get("policy_event_id"),
+                route_binding_id=permit.get("route_binding_id"), capability=permit.get("capability"),
+                action_kind=permit.get("delegated_action_kind"), sensitivity=authorization.event.sensitivity,
+                now=current, connection=connection):
+            raise DispatchOutboxError("delegation unavailable at cadence boundary")
+        grant = self.journal._record(connection.execute(
+            "SELECT * FROM experience_events WHERE event_id=?", (delegation_id,)).fetchone())
+        interval = grant.event.payload.get("minimum_interval_seconds")
+        maximum = grant.event.payload.get("max_starts_per_24h")
+        if (type(interval) is not int or not 0 <= interval <= 86400
+                or type(maximum) is not int or not 1 <= maximum <= 100):
+            raise DispatchOutboxError("delegation cadence is unavailable")
+        history = []
+        for row in connection.execute(
+                "SELECT * FROM experience_events WHERE subject=? AND event_type='dispatch.started' AND observed_at>?",
+                (authorization.event.subject, (current - timedelta(days=1)).isoformat())):
+            record = self.journal._record(row)
+            payload = self._authenticated_start_payload(record)
+            if payload is None or not payload.get("delegation_event_id"):
+                continue
+            if (record.event.source != "alive.dispatch" or record.event.actor != "system:alive-dispatch"
+                    or payload.get("cadence_reserved_at") != record.event.observed_at.isoformat()
+                    or record.event.event_id != self._start_event_id(
+                        str(payload.get("dispatch_id")), int(payload.get("lease_generation", -1)))):
+                raise DispatchOutboxError("delegated cadence history is invalid")
+            history.append(record.event.observed_at)
+        if len(history) >= maximum:
+            raise DispatchOutboxError("delegated rolling-day start budget exhausted")
+        if any(stamp > current for stamp in history):
+            raise DispatchOutboxError("delegated cadence clock regressed")
+        if history and current - max(history) < timedelta(seconds=interval):
+            raise DispatchOutboxError("delegated minimum start interval not reached")
 
     def _authorization_route(
         self,
@@ -1242,6 +1287,8 @@ class DispatchOutbox:
             "host_snapshot_event_id": route_binding.snapshot_event_id,
             "lease_generation": int(row["lease_generation"]),
             "external_result_observed": False,
+            "delegation_event_id": authorization.event.payload.get("delegation_event_id"),
+            "cadence_reserved_at": current.isoformat(),
         }
         start_payload["integrity_authenticator"] = self.protector.authenticate_json(
             "dispatch.start.v1", start_payload
@@ -1260,8 +1307,22 @@ class DispatchOutbox:
             sensitivity=Sensitivity(row["sensitivity"]),
             payload=start_payload,
         )
+        def build_start(_connection):
+            # Timestamp at writer-lock admission, not before an unbounded wait.
+            # A caller-supplied synthetic clock remains explicit and reproducible.
+            nonlocal current, start_event
+            current = self._utc(now)
+            reserved_payload = dict(start_payload)
+            reserved_payload.pop("integrity_authenticator", None)
+            reserved_payload["cadence_reserved_at"] = current.isoformat()
+            reserved_payload["integrity_authenticator"] = self.protector.authenticate_json(
+                "dispatch.start.v1", reserved_payload)
+            start_event = replace(start_event, occurred_at=current, observed_at=current,
+                                  payload=reserved_payload)
+            return start_event
         try:
-            appended = self.journal.append(start_event)
+            appended = self.journal.append(build_start,
+                precondition=lambda connection: self._check_delegated_cadence(connection, authorization, current))
         except EventConflictError as exc:
             raise DispatchOutboxError(
                 "dispatch start identity was already consumed"
@@ -1341,7 +1402,8 @@ class DispatchOutbox:
         while self.journal.checkpoint(self.autonomy.CHECKPOINT) < target_sequence:
             before = self.journal.checkpoint(self.autonomy.CHECKPOINT)
             self.autonomy.project_new()
-            if self.journal.checkpoint(self.autonomy.CHECKPOINT) <= before:
+            after = self.journal.checkpoint(self.autonomy.CHECKPOINT)
+            if after < target_sequence and after <= before:
                 raise DispatchOutboxError("authority projection made no progress")
         lease = execution.lease
         start = self.journal.get(execution.start_event_id)
