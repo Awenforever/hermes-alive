@@ -50,6 +50,18 @@ class SourceSupportReceipt:
 
 
 class SourceSupportReviewer:
+    max_tokens = 2500
+
+    @property
+    def review_prompt(self):
+        return PROMPT
+
+    def parse_findings(self, text, snapshot):
+        return self.findings(text)
+
+    def validate_stored_findings(self, findings, snapshot):
+        return self.findings(json.dumps(findings))
+
     def __init__(self, journal, *, content_vault=None, context_vault=None):
         self.journal = journal
         self.interpreter = OpportunitySynthesizer(journal, content_vault=content_vault,
@@ -79,7 +91,7 @@ class SourceSupportReviewer:
                     or payload['generator_model'] != generated.actual_model
                     or payload['snapshot_digest'] != start.event.payload['snapshot_digest']
                     or payload['prompt_digest'] != start.event.payload['prompt_digest']
-                    or payload['prompt_digest'] != hashlib.sha256(PROMPT.encode()).hexdigest()
+                    or payload['prompt_digest'] != hashlib.sha256(self.review_prompt.encode()).hexdigest()
                     or self.vault.digest_json(data) != payload['snapshot_digest']
                     or not payload['reviewer_domain'] or not payload['generator_domain']
                     or payload['reviewer_domain'] == payload['generator_domain']
@@ -91,7 +103,7 @@ class SourceSupportReviewer:
                 expected_purpose='opportunity.source-support', expected_sensitivity=Sensitivity(clearance))
             if self.vault.digest_json(retained) != ref.digest or retained['snapshot'] != data:
                 return None
-            findings = self.findings(json.dumps(retained['findings']))
+            findings = self.validate_stored_findings(retained['findings'], data)
             if findings['verdict'] != payload['verdict']:
                 return None
             return findings
@@ -160,7 +172,7 @@ class SourceSupportReviewer:
         if not generator_domain:
             raise SourceSupportError('generator independence domain is unknown')
         digest = self.vault.digest_json(snapshot)
-        prompt_digest = hashlib.sha256(PROMPT.encode()).hexdigest()
+        prompt_digest = hashlib.sha256(self.review_prompt.encode()).hexdigest()
         prefix = 'opportunity.source-support:' + operation_id
         if self.journal.get(prefix + ':started') is not None:
             raise SourceSupportError('source-support operation already attempted')
@@ -176,19 +188,19 @@ class SourceSupportReviewer:
         try:
             route = {}
             response = await asyncio.wait_for(call(task='alive_source_support', model=reviewer_model,
-                messages=[{'role':'system','content':PROMPT},{'role':'user',
+                messages=[{'role':'system','content':self.review_prompt},{'role':'user',
                     'content':json.dumps(snapshot, ensure_ascii=False)}], temperature=0,
-                max_tokens=2500, timeout=40, route_info=route), timeout=50)
+                max_tokens=self.max_tokens, timeout=40, route_info=route), timeout=50)
             current, result = self.snapshot(subject=subject, interpretation_id=interpretation_id,
                                              candidate_id=candidate_id, clearance=clearance)
             if (self.vault.digest_json(current)!=digest or result!=generated
-                    or hashlib.sha256(PROMPT.encode()).hexdigest()!=prompt_digest):
+                    or hashlib.sha256(self.review_prompt.encode()).hexdigest()!=prompt_digest):
                 raise SourceSupportError('source-review context changed during model wait')
             text, model, provider = SemanticComparator._response(response, route)
             domain = resolve_domain(model)
             if not domain or domain==generator_domain or model==generated.actual_model:
                 raise SourceSupportError('source reviewer is not independent')
-            findings = self.findings(text)
+            findings = self.parse_findings(text, snapshot)
             bundle = ContentReference.from_event_payload(self.journal.get(generated.receipt_event_id).event.payload['content'])
             ref = self.vault.put_json({'snapshot':snapshot,'findings':findings}, subject=subject,
                 purpose='opportunity.source-support', sensitivity=Sensitivity(clearance),

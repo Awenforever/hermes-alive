@@ -55,9 +55,15 @@ class OpportunityExpressionStore(SemanticReviewStore):
                 if e.startswith('opportunity.synthesis:') and e.endswith(':completed'))
             receipt = self.journal.get(completed)
             expiry = ContentReference.from_event_payload(receipt.event.payload['content']).retention_until
+            original_start = self.journal.get(receipt.event.causation_id)
+            if (original_start is None or original_start.event.subject != subject
+                    or original_start.event.event_type != 'opportunity.synthesis_started'):
+                raise SemanticReviewError('original interpretation input is unavailable')
+            # Current ranking is for new search, not revalidation of retained intent.
             active = OpportunitySynthesizer(self.journal, content_vault=self.content_vault,
                 context_vault=self.context_vault).reader.active_evidence(
-                    subject=subject, clearance=source.event.sensitivity, limit=8)
+                    subject=subject, clearance=source.event.sensitivity, limit=8,
+                    observation_event_ids=tuple(original_start.event.payload['observation_event_ids']))
             original_url = next(item.content['url'] for item in active
                                 if item.agenda_item_id == candidate.agenda_item_id)
             text = str(contract.operation['text'])

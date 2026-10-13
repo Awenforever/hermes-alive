@@ -22,6 +22,13 @@ the runtime default; do not accumulate ineffective prompts or relabel to pass.
 Next separate material verifiable claims from tentative/conversational content
 and audit extraction coverage and labels before relying on support verdicts.
 
+ADR-0074 adds opt-in inspectable unit/quotation accounting. Its actual retained
+candidate review passed lexical coverage, but the model classified a compound
+advisory/factual ending only by primary function. Material-assertion extraction
+remains unproven; no support gate is qualified. The same turn repaired a reproduced
+expression-window defect: unrelated higher-priority discovery could otherwise
+displace a valid original source and silently block the selected intent.
+
 ### Prior finding: evidence lifetime through selection
 
 ADR-0065 records a reproduced gap: withdrawal of an explicit profile during
@@ -2330,3 +2337,64 @@ For each material change:
   support and accounting contracts both pass, log SHA256
   `877c30347ceba083c441c08f651986c75f530c351f1ccd09ad570cd35c8da328`.
   Later documentation/manifests are not part of that runtime/test snapshot.
+
+### 2026-10-13 — Claim-accounting diagnostic and useful expression continuity
+
+- Added opt-in `claim_support.py`, sharing the existing source review lifecycle
+  rather than duplicating retention, scope, async freshness or one-attempt logic.
+  Whole-message default unchanged; claim mode does not grant send permission.
+  Exact text/reference coverage is structurally checked, but semantic extraction,
+  entailment and real-world truth remain explicitly unproven (ADR 0074).
+- One retained-candidate logical call, one observed HTTP 200, actual
+  `claude-haiku-4-5` / `custom:ustc`. Five units (two verifiable claims, one inference,
+  two recommendations); aggregate supported, lexical coverage true, semantic
+  coverage false. The compound ending was classified advisory/not_applicable,
+  exposing primary-function versus embedded-assertion accounting, not proving
+  that the original author's negative label is correct or incorrect.
+- Cumulative logical calls 41; observed async HTTP requests 51. Generation calls
+  zero, selection calls zero, external sends zero. No public model hardcoding,
+  primary/fallback changes, private conversation read, new key or wmw action.
+- Reproduced a real expression failure after twelve priority-1.0 unrelated
+  observations displaced the original priority-0.5 source from the current window.
+  Explicit window-exclusion assertion passes; pre-fix expression raised source
+  unavailable despite valid original interpretation. Resolve pinned original
+  inputs throughout expression instead of searching the newly ranked window.
+- Immutable runtime/test input tree `950dc9c4824f6386e7d2c9c54802b5d0ebc1d7b3`,
+  archive SHA256 `1ec36fd70e65ad5e5d0fa18d7972e85a5d306d4115e6ab7dd6200d619a19575d`.
+  `alive-claim-support-live-20261013-r1`: exit zero, start
+  `2026-10-13T12:31:55.954228872Z`, finish `2026-10-13T12:32:21.601828712Z`;
+  log SHA256 `4df9c0aa746d5fa23504066ba7413fcabb524fda8457a2c2318514bf1ddba391`,
+  report SHA256 `eb03b7c226f0a348e7e97a4542f8d386bb5778815eb510a9f97623a05b21c2ce`.
+  Retained owned NAS `model-only-claim-support-20261013-r1/results/report.json`,
+  private Windows `../work/alive-claim-support-report-20261013-r1.json`.
+- Network-none `alive-claim-support-offline-20261013-r1`: exit zero, start
+  `2026-10-13T12:31:56.138871979Z`, finish `2026-10-13T12:32:13.144268955Z`;
+  log SHA256 `8ed758cd42b521c798172c12890b93c18bc95fc13f428d2c388638f23ebe9dfc`.
+  Claim scope/deletion/fence/quotation/coverage contracts, whole-review contract
+  and opportunity-expression regression pass. Fake role/support results are not
+  independent semantic quality evidence. Later added the same ranking displacement
+  during render/review waits; final-code coverage is recorded separately.
+- Windows support/claim/accounting tests and original expression suite pass.
+  Later final-code targeted checks at all three ranking boundaries pass. Existing
+  withdrawn-profile, erased-source and superseded-intent semantics remain required;
+  current intent is not frozen forever or restored after genuine invalidation.
+- Terminal jobs confirmed before removing and root-verifying absence of the owned
+  model export, isolated config and backups. Production running/start remains
+  `2026-10-11T07:43:25.630569081Z`; no production deploy/restart/activation or send.
+- Next critical path: inspect embedded material assertions independent of discourse
+  function, then connect support/expression with current policy and attributed
+  outcomes. Do not let further structure checks or synthetic pilots replace the
+  full continuous behavior, migration, install/lifecycle and production gates.
+- Final runtime/test snapshot `0e4590098d4105a657c563d56050f4eda866664c`, archive
+  SHA256 `92d5dd8b96d4609eec7570bd7ed303abb3406583bc7e0f88973676ab656102f6`.
+  Network-none `alive-claim-support-offline-20261013-r2`: exit zero, start
+  `2026-10-13T12:39:51.034256978Z`, finish `2026-10-13T12:40:12.025230901Z`;
+  log SHA256 `5ac0b0388a4b61345065c76a9a2eb6537d4c353fe0cf7c8ee79a5be5b7118a58`.
+  All four focused suites pass, including all twelve expression scenarios and
+  all three high-priority-window boundaries. Later docs/manifests are not that
+  snapshot. No whole-repository runtime, installed gateway or production acceptance
+  is inferred from these contracts.
+- Before future admission, still audit unambiguous review terminal history and
+  current policy at the final action boundary. Neither a support receipt nor an
+  inspectable quotation ledger can supply missing user authority or repair a
+  semantically disputed label. No automatic-delivery gate is enabled by this turn.

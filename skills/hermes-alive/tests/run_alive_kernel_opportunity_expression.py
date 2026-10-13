@@ -53,6 +53,17 @@ async def scenario(root, mode, owner='user:test'):
     selected = await coordinator.plan_with_model(cycle_id='cycle', subject=owner,
         candidates=draft.candidates, policy_context=PolicyContext(can_interrupt=True), call=choose)
     original_frame = journal.get(selected.frame_event_id).event.canonical_json()
+    def add_ranked_noise():
+        for index in range(12):
+            reader.ingest(DiscoveryCandidate(source='synthetic', title=f'Unrelated {index}',
+                summary='new source unrelated to the selected repair draft',
+                url=f'https://example.invalid/new-source-{index}',
+                priority_hint=1.0,
+                observed_at=datetime.now(timezone.utc)), subject=owner)
+        assert source.observation_event_id not in {item.observation_event_id for item in
+            reader.active_evidence(subject=owner, clearance=journal.get(source.observation_event_id).event.sensitivity)}
+    if mode == 'unrelated-window-before-expression':
+        add_ranked_noise()
     store = OpportunityExpressionStore(journal, content_vault=reader.vault)
     meaning = store.define_for_selection(selection_event_id=selected.selection_event_id, subject=owner)
     before = journal.last_sequence()
@@ -94,10 +105,14 @@ async def scenario(root, mode, owner='user:test'):
             elif mode == 'unrelated-during-render':
                 reader.ingest(DiscoveryCandidate(source='synthetic', title='Unrelated', summary='new source',
                     url='https://example.invalid/new-source', observed_at=datetime.now(timezone.utc)), subject=owner)
+            elif mode == 'unrelated-window-during-render':
+                add_ranked_noise()
         else:
             if mode == 'unrelated-during-review':
                 reader.ingest(DiscoveryCandidate(source='synthetic', title='Unrelated', summary='new source',
                     url='https://example.invalid/new-source', observed_at=datetime.now(timezone.utc)), subject=owner)
+            elif mode == 'unrelated-window-during-review':
+                add_ranked_noise()
             text = json.dumps({'atom_reviews': [{'atom_id': 'proposed-message', 'preserved': True, 'risks': []}],
                 'added_claims_detected': False, 'speech_act_preserved': True,
                 'protected_literals_preserved': True})
@@ -113,7 +128,9 @@ async def scenario(root, mode, owner='user:test'):
         assert not journal.read(event_type='message.model_candidate')
     else:
         assert mode in ('unchanged','ask','withdraw-after-review','probe-fixture',
-                        'unrelated-during-render','unrelated-during-review') and len(calls) == 2
+                        'unrelated-during-render','unrelated-during-review',
+                        'unrelated-window-before-expression','unrelated-window-during-render',
+                        'unrelated-window-during-review') and len(calls) == 2
         assert compared.review.assessment.eligible_for_shadow_comparison
         assert not compared.review.assessment.safe_for_automatic_delivery
         if mode == 'withdraw-after-review':
@@ -129,7 +146,9 @@ async def scenario(root, mode, owner='user:test'):
 async def main(root):
     for mode in ('unchanged','ask','withdraw-during-render','erase-during-render',
                  'superseded-during-render','withdraw-after-review','foreign-owner',
-                 'unrelated-during-render','unrelated-during-review'):
+                 'unrelated-during-render','unrelated-during-review',
+                 'unrelated-window-before-expression','unrelated-window-during-render',
+                 'unrelated-window-during-review'):
         await scenario(root / mode, mode)
 
 

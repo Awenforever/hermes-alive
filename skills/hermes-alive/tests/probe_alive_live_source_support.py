@@ -10,6 +10,7 @@ import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'hooks'))
 from alive_kernel import ExperienceJournal,Sensitivity
 from alive_kernel.source_support import SourceSupportReviewer
+from alive_kernel.claim_support import ClaimSupportReviewer
 from alive_kernel.semantic_comparator import SemanticComparator
 
 
@@ -17,7 +18,8 @@ async def exercise(args):
     from agent.auxiliary_client import async_call_llm
     import httpx
     args.output.mkdir(parents=True,exist_ok=False)
-    reviewer=SourceSupportReviewer(ExperienceJournal(args.journal))
+    claim_accounting=bool(getattr(args,'claim_accounting',False))
+    reviewer=(ClaimSupportReviewer if claim_accounting else SourceSupportReviewer)(ExperienceJournal(args.journal))
     generated=reviewer.interpreter.load_completed(subject='user:synthetic',operation_id=args.interpretation_id)
     if len(generated.candidates)!=1:
         raise ValueError('probe requires one retained synthetic candidate')
@@ -27,7 +29,8 @@ async def exercise(args):
     if any(s['provenance_metadata']['collector']!='synthetic-public-fixture' for s in snapshot['evidence']):
         raise ValueError('only explicit synthetic public discovery is permitted')
     report={'logical_calls':0,'observed_async_http':[],'sends':0,'delivery_qualified':False,
-            'generation_calls':0,'selection_model_calls':0}
+            'generation_calls':0,'selection_model_calls':0,
+            'review_method':'claim-accounting' if claim_accounting else 'whole-message'}
     original=httpx.AsyncClient.send
     old_logging=logging.root.manager.disable
     logging.disable(logging.CRITICAL)
@@ -60,7 +63,8 @@ async def exercise(args):
     httpx.AsyncClient.send=send
     try:
         receipt=await reviewer.run(subject='user:synthetic',interpretation_id=args.interpretation_id,
-            candidate_id=candidate.action.candidate_id,operation_id='synthetic-source-support:'+args.reviewer_family,
+            candidate_id=candidate.action.candidate_id,
+            operation_id=('synthetic-claim-accounting:' if claim_accounting else 'synthetic-source-support:')+args.reviewer_family,
             call=call,resolve_domain=domain)
         findings=reviewer.verify_current(receipt.event_id,subject='user:synthetic',
             interpretation_id=args.interpretation_id,candidate_id=candidate.action.candidate_id)
@@ -86,4 +90,5 @@ if __name__=='__main__':
     parser.add_argument('--interpretation-id',required=True)
     parser.add_argument('--reviewer-family',choices=('claude','qwen','glm','gemini','gpt'),required=True)
     parser.add_argument('--output',type=Path,required=True)
+    parser.add_argument('--claim-accounting',action='store_true')
     asyncio.run(exercise(parser.parse_args()))
