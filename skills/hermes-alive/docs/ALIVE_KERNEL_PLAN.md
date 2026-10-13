@@ -2150,3 +2150,57 @@ For each material change:
   `2026-10-13T09:35:11.819180508Z`, finish `2026-10-13T09:35:13.752499805Z`,
   log SHA256 `b4ffbd3156ac87c413ece4e7e0c2b8c94e4081366940cf2d79ffc2f4ef746cae`.
   No later runtime/test edits; later plan/manifest changes are not that input tree.
+
+### 2026-10-13 — Actual learning input contrast identifies source-support gap
+
+- Clean `b8829e93abddb88af6767be91c8f0caab4260819` rechecked. Added an explicit
+  opt-in three-call synthetic learning probe and an offline accounting/input
+  contract. Probe builds its own initially empty journal and public synthetic
+  discovery/profile, not a production chat or real user's feedback. It refuses
+  reuse of the same spent journal even with another output directory.
+- Real `deepseek-flash` / `custom:ustc`: three logical calls, three observed async
+  HTTP 200 responses. Baseline no-advice draft 408 characters; weak learned-concise
+  signal draft 280; explicit detailed request with advice still present draft 607.
+  All proposed one SHARE, rejected_count zero, authority NONE. No selection model
+  call, authorization of generated content or external dispatch. Synthetic prior
+  attempt/feedback fixtures are not delivered actions or actual human outcomes.
+- Directionally consistent with advice consideration and explicit-request priority,
+  NOT a causal/stochastic comparison, measured benefit, lasting adaptation or
+  acceptance. Inputs/raw outputs retained in synthetic-only private report to
+  support diagnosis, not hidden provider failures or repeated paid regeneration.
+- ADR 0071: source support is distinct from faithful rewriting. The detailed
+  draft adds an unsupported absolute zero-loss assurance from no signup/money cost.
+  Later meaning fidelity could preserve that flawed original perfectly. Baseline
+  exposes the synthetic source label, which may be appropriate fake-data disclosure
+  here; do not infer a real production leak or blindly strip provenance/test caveats.
+  Future review must distinguish input roles and permit grounded tentative reasoning
+  and useful compression rather than require copying or add keyword filters.
+- Cumulative logical model calls twenty-three; observed asynchronous HTTP requests
+  33. Existing authorization remains synthetic/public/isolation only; no new keys,
+  changed main/fallback, private conversation reads or channel sends.
+- Immutable input tree `64afb657a358993edbdeca0db35e52dbc4d947c8`, archive SHA256
+  `2009e9db15d6a2a98b64425edd98c9915daed31ca49631a5f358377e76f6c389`.
+  `alive-live-learning-20261013-r1`: exit zero, start
+  `2026-10-13T09:43:44.529478792Z`, finish `2026-10-13T09:44:53.272629159Z`;
+  log SHA256 `489c0c56aeec8e28fc93ab04b174f6847f33ac6b261701b7cc21dd5e9304f1ba`,
+  report SHA256 `7b2a863f05629cdf58351b39a74c45f4a09dbe00881c43f0dd25f73dcc7bd8cf`.
+  Retained NAS report under owned scratch
+  `/tmp/hermes-alive-installed-RJbQNAiD/model-only-live-learning-20261013-r1/results/report.json`,
+  private Windows copy `../work/alive-live-learning-report-20261013-r1.json`.
+- Network-disabled Linux `alive-live-learning-contract-offline-20261013-r1` exit
+  zero, start `2026-10-13T09:43:44.676088069Z`, finish
+  `2026-10-13T09:43:46.394444836Z`; log SHA256
+  `8935175ba3cc43cdda4088d50dac707185aca1fefba680fb91f46a580b36bbc6`.
+  Windows same contract passes: changed advice/explicit inputs, failed calls counted,
+  bounded raw response retention, NONE authority and spent-journal refusal.
+- Removed owned credential/config exports/backups after terminal confirmation;
+  synthetic evidence retained. Production running/start unchanged
+  `2026-10-11T07:43:25.630569081Z`. No production deploy/restart, release, activation,
+  real-user exposure or installation/lifecycle acceptance occurred.
+- Next critical path: independent source-support review of these retained proposals
+  and fresh diagnostic semantic-review examples, then eligibility/policy/outcome
+  integration. No source-support runtime or gate was implemented in this pilot;
+  do not mark that gap closed merely because this architecture direction is recorded.
+- Full Windows current-code regression: 49 kernel files, 48 PASS, one absent-Hermes
+  hook SKIP, zero failures. Only test/probe/docs artifacts changed in this turn;
+  this does not qualify a published install, real gateway cycle or production use.
