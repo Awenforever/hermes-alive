@@ -80,6 +80,27 @@ class OpportunityExpressionStore(SemanticReviewStore):
         return 'selected-opportunity:' + self.content_vault.digest_json(
             {'selection_event_id': selection_event_id})[:40]
 
+    def action_contract_for_expression(self, *, expression_event_id,
+                                       selection_event_id, subject, as_of=None):
+        """Resolve exact proposed wording, never infer approval from a review.
+
+        The caller must require explicit confirmation of this expression event.
+        Model fidelity assessments are not qualified automatic delivery gates.
+        """
+        header = self.journal.get(expression_event_id)
+        selection = self.journal.get(selection_event_id)
+        if (header is None or selection is None
+                or header.event.subject != subject or selection.event.subject != subject
+                or header.event.sensitivity != selection.event.sensitivity):
+            raise SemanticReviewError('expression scope unavailable')
+        candidate = self.resolve_model_candidate(expression_event_id, as_of=as_of)
+        if candidate is None or candidate.selection_event_id != selection_event_id:
+            raise SemanticReviewError('expression is unavailable or belongs to another intent')
+        return parse_action_contract({'schema_version': 1,
+            'capability': 'hermes.channel.send',
+            'operation': {'text': candidate.text, 'format': 'markdown'}},
+            capability='hermes.channel.send'), candidate.expires_at
+
     def define_for_selection(self, *, selection_event_id, subject):
         source, stored, atom, expiry = self._selected_draft(selection_event_id, subject)
         message_id = self._message_id(selection_event_id)

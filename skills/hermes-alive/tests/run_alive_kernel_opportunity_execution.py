@@ -19,6 +19,8 @@ from alive_kernel import (ActionAuthority, AutonomyPolicyProjection, CognitionCy
     SendTimeAuthorizer, Sensitivity)
 from alive_kernel_testkit import install_terminal_route
 from alive_kernel.content_vault import ContentVault
+from alive_kernel.opportunity_expression import OpportunityExpressionStore
+from alive_kernel.action_authorization import ActionAuthorizationError
 
 
 def response(value):
@@ -62,9 +64,21 @@ async def scenario(root, mode, custom_context=False):
     assert policy.apply(policy.append_update(subject=owner, actor=owner, expected_revision=0,
         enabled=True, context=PolicyContext(can_interrupt=True), operation_id='policy')).outcome == 'recorded'
     route = install_terminal_route(journal, subject=owner, content_vault=coordinator.vault)
+    expression = None
+    expressed_text = 'You might like this free repair recording; the notice is unverified. https://example.invalid/repair'
+    if mode.startswith('expression'):
+        expressions = OpportunityExpressionStore(journal, content_vault=coordinator.vault,
+                                                context_vault=context_vault)
+        meaning = expressions.define_for_selection(selection_event_id=selected.selection_event_id, subject=owner)
+        expression = expressions.record_model_candidate(selection_event_id=selected.selection_event_id,
+            meaning_event_id=meaning.event.event_id, subject=owner, text=expressed_text,
+            renderer_execution_id='synthetic-expression', renderer_model='synthetic-renderer',
+            renderer_independence_domain='synthetic-family')
+    confirmation_payload = {'synthetic': True, 'authorizes_selection_event_id': selected.selection_event_id}
+    if expression is not None and mode != 'expression-unconfirmed':
+        confirmation_payload['authorizes_expression_event_id'] = expression.event_id
     confirmation = journal.append(EventEnvelope(event_type='conversation.inbound', source='synthetic',
-        actor=owner, subject=owner, payload={'synthetic': True,
-        'authorizes_selection_event_id': selected.selection_event_id}))
+        actor=owner, subject=owner, payload=confirmation_payload))
     authorizer = SendTimeAuthorizer(journal, content_vault=coordinator.vault, route_binding_id=route,
                                    context_vault=context_vault)
     def invalidate():
@@ -81,12 +95,34 @@ async def scenario(root, mode, custom_context=False):
         invalidate()
     decision = authorizer.evaluate(selection_event_id=selected.selection_event_id, subject=owner,
         capability='hermes.channel.send', operation_id='authorize',
-        confirmation_event_id=confirmation.event.event_id)
+        confirmation_event_id=confirmation.event.event_id,
+        expression_event_id=expression.event_id if expression else None)
+    if mode == 'expression-unconfirmed':
+        assert not decision.authorized and 'exact_expression_confirmation_required' in decision.reasons
+        assert not journal.read(event_type='action.attempted')
+        return
     if mode.endswith('before-authorize'):
         assert not decision.authorized, 'stale generated inputs were authorized'
         assert not journal.read(event_type='action.attempted')
         return
     assert decision.authorized, decision.reasons
+    if mode == 'expression':
+        try:
+            authorizer.evaluate(selection_event_id=selected.selection_event_id, subject=owner,
+                capability='hermes.channel.send', operation_id='authorize',
+                confirmation_event_id=confirmation.event.event_id)
+        except ActionAuthorizationError:
+            pass
+        else:
+            raise AssertionError('authorization operation silently changed from expression to original draft')
+    if mode == 'replay-after-forget':
+        memory.forget_item(pref.proposal_id, actor=owner, request_id='forget-replay')
+        replay = authorizer.evaluate(selection_event_id=selected.selection_event_id, subject=owner,
+            capability='hermes.channel.send', operation_id='authorize',
+            confirmation_event_id=confirmation.event.event_id)
+        assert not replay.authorized and 'selection_inputs_not_current' in replay.reasons
+        assert replay.event_id == decision.event_id
+        return
     outcomes = OutcomeProjection(journal, content_vault=coordinator.vault)
     attempt = outcomes.append_attempt(authorization_event_id=decision.event_id,
         selection_event_id=selected.selection_event_id, candidate_id=decision.candidate_id,
@@ -106,6 +142,15 @@ async def scenario(root, mode, custom_context=False):
             return
         raise AssertionError('stale generated inputs crossed the start boundary')
     execution = outbox.begin_execution(lease, clearance=Sensitivity.PRIVATE)
+    if mode == 'expression-erased-before-launch':
+        header = journal.get(expression.event_id)
+        coordinator.vault.erase_item(header.event.payload['content']['content_id'])
+        try:
+            outbox.validate_execution_for_launch(execution)
+        except DispatchOutboxError:
+            assert len(journal.read(event_type='dispatch.started')) == 1
+            return
+        raise AssertionError('erased expression launched from retained executable copy')
     if mode.endswith('before-launch'):
         invalidate()
         try:
@@ -115,7 +160,13 @@ async def scenario(root, mode, custom_context=False):
             return
         raise AssertionError('stale generated inputs passed the launch boundary')
     outbox.validate_execution_for_launch(execution)
-    assert execution.content['operation']['text'].startswith('Free repair recording.')
+    if expression:
+        assert execution.content['operation']['text'] == expressed_text
+        original = coordinator.deliberation.inspect(journal.get(selected.selection_event_id).event.payload['frame_id'],
+                                                    clearance=Sensitivity.PRIVATE)
+        assert dict(original.candidate_contents)[generated.candidates[0].action.content_id]['operation']['text'].startswith('Free repair recording.')
+    else:
+        assert execution.content['operation']['text'].startswith('Free repair recording.')
     assert len(journal.read(event_type='dispatch.started')) == 1
     assert not journal.read(event_type='delivery.succeeded')
     assert not journal.read(event_type='dispatch.externally_started')
@@ -127,6 +178,8 @@ async def main(root):
         await scenario(root / mode, mode)
     for mode in ('clean', 'forget-before-authorize', 'forget-before-begin', 'forget-before-launch'):
         await scenario(root / ('custom-' + mode), mode, custom_context=True)
+    for mode in ('expression', 'expression-unconfirmed', 'expression-erased-before-launch', 'replay-after-forget'):
+        await scenario(root / mode, mode)
 
 
 if __name__ == '__main__':

@@ -2452,3 +2452,26 @@ For each material change:
   outcomes remain incomplete. A pre-launch read is not atomic with delivery.
   Continue the full long-term agenda/memory/adaptation, migration/rollback and
   production acceptance scope; do not count structural regressions as real sends.
+
+### 2026-10-13 — Exact confirmed expression enters the execution chain
+
+- ADR 0077 connects retained natural expression to a destination-free executable
+  contract without modifying the original selected frame. Authorization binds
+  both expression and derivative content identities; attempt/outbox projection
+  resolves that exact contract, and start/pre-launch recheck the original expression.
+- This is limited to original USER_CONFIRMED authority and later exact owner
+  confirmation of both selection and expression. Review results do not grant
+  automatic delivery. The required autonomous delegation/quality path remains
+  open; do not substitute repeated user approvals for the long-term product goal.
+- Cached authorization recovery now revalidates original input freshness and
+  expression binding. Operation reuse cannot switch expression identity. Historical
+  records remain intact when the recovered view is denied.
+- Synthetic tests cover changed exact wording through attempt/outbox/start/launch
+  checks, preserved original draft, missing exact confirmation, original expression
+  erasure despite a retained executable copy, and withdrawal before permit replay.
+  These are local structural fixtures, not external delivery or ten-call acceptance.
+- No provider calls, private chats, external sends or production configuration
+  changes. Source-support/semantic qualification and pragmatic mixed assertions
+  remain unresolved. Next continue the user-delegated quality/admission path and
+  trusted host/outcome attribution, plus derived-copy forgetting and the full
+  persistent agenda/memory/adaptation, portability and rollback requirements.

@@ -98,8 +98,21 @@ class DispatchOutbox:
                     str(authorization.event.payload.get("selection_event_id") or ""),
                     owner=str(authorization.event.subject),
                     sensitivity=authorization.event.sensitivity)
+            expression_id = authorization.event.payload.get("expression_event_id")
+            if expression_id:
+                from .opportunity_expression import OpportunityExpressionStore
+                expressed, _expiry = OpportunityExpressionStore(self.journal,
+                    content_vault=self.vault, context_vault=self.context_vault).action_contract_for_expression(
+                        expression_event_id=str(expression_id),
+                        selection_event_id=str(authorization.event.payload["selection_event_id"]),
+                        subject=str(authorization.event.subject))
+                if not self.protector.verify_json("action.contract.v1", expressed.to_document(),
+                        authorization.event.payload.get("action_contract_binding")):
+                    raise DispatchOutboxError("expression differs from authorized content")
         except DeliberationContextChanged as exc:
             raise DispatchOutboxError("dispatch selection inputs are no longer current") from exc
+        except ValueError as exc:
+            raise DispatchOutboxError("dispatch expression is no longer current") from exc
 
     def _authorization_route(
         self,
@@ -745,9 +758,10 @@ class DispatchOutbox:
                     if candidate is None or candidate.content_id is None:
                         continue
                     contract_valid = True
+                    executable_content_id = str(authorization.event.payload.get("executable_content_id") or candidate.content_id)
                     try:
                         contract_document = self.vault.resolve_json(
-                            candidate.content_id,
+                            executable_content_id,
                             expected_subject=str(row["subject"]),
                             expected_purpose="deliberation.candidate",
                             expected_sensitivity=Sensitivity(row["sensitivity"]),
@@ -861,7 +875,7 @@ class DispatchOutbox:
                             row["executor"],
                             row["idempotency_key"],
                             row["subject"],
-                            candidate.content_id,
+                            executable_content_id,
                             row["sensitivity"],
                             state,
                             execute_by.isoformat(),

@@ -148,6 +148,7 @@ class SendTimeAuthorizer:
         confirmation_event_id: str | None,
         route_binding_id: str | None,
         permit_ttl_seconds: float,
+        expression_event_id: str | None,
     ) -> ActionAuthorizationDecision | None:
         record = self.journal.get(f"action.authorization:{operation}")
         if record is None:
@@ -167,6 +168,7 @@ class SendTimeAuthorizer:
             or payload.get("policy_event_id") != policy_event_id
             or payload.get("policy_revision") != policy_revision
             or payload.get("confirmation_event_id") != confirmation_event_id
+            or payload.get("expression_event_id") != expression_event_id
             or payload.get("route_binding_id") != route_binding_id
             or payload.get("permit_ttl_seconds") != permit_ttl_seconds
             or payload.get("action_contract_version") != 1
@@ -202,6 +204,27 @@ class SendTimeAuthorizer:
                 if route_reasons:
                     authorized = False
                     reasons = (*reasons, *route_reasons)
+        if authorized:
+            from .deliberation_synthesis import DeliberationSynthesizer, DeliberationContextChanged
+            from .semantic_review import SemanticReviewError
+            try:
+                DeliberationSynthesizer(self.journal,
+                    content_vault=self.deliberation.content_vault,
+                    context_vault=self.context_vault).validate_selection_sources(
+                        selection_event_id, owner=subject, sensitivity=event.sensitivity)
+                if expression_event_id is not None:
+                    from .opportunity_expression import OpportunityExpressionStore
+                    expressed, _expiry = OpportunityExpressionStore(self.journal,
+                        content_vault=self.deliberation.content_vault,
+                        context_vault=self.context_vault).action_contract_for_expression(
+                            expression_event_id=expression_event_id,
+                            selection_event_id=selection_event_id, subject=subject, as_of=now)
+                    if not self.receipt_protector.verify_json("action.contract.v1",
+                            expressed.to_document(), payload.get("action_contract_binding")):
+                        raise SemanticReviewError("retained expression binding changed")
+            except (DeliberationContextChanged, SemanticReviewError):
+                authorized = False
+                reasons = (*reasons, "selection_inputs_not_current")
         return ActionAuthorizationDecision(
             operation,
             event.event_id,
@@ -223,6 +246,7 @@ class SendTimeAuthorizer:
         capability: str,
         operation_id: str | None = None,
         confirmation_event_id: str | None = None,
+        expression_event_id: str | None = None,
         route_binding_id: str | None = None,
         now: datetime | None = None,
         permit_ttl: timedelta = timedelta(seconds=30),
@@ -240,6 +264,10 @@ class SendTimeAuthorizer:
         if not _EVENT_ID_RE.fullmatch(str(selection_event_id).strip()):
             raise ActionAuthorizationError("invalid selection event identity")
         selection_event_id = str(selection_event_id).strip()
+        if expression_event_id is not None:
+            expression_event_id = str(expression_event_id).strip()
+            if not _EVENT_ID_RE.fullmatch(expression_event_id):
+                raise ActionAuthorizationError("invalid expression event identity")
         if confirmation_event_id is not None:
             confirmation_event_id = str(confirmation_event_id).strip()
             if not _EVENT_ID_RE.fullmatch(confirmation_event_id):
@@ -290,6 +318,7 @@ class SendTimeAuthorizer:
             confirmation_event_id=confirmation_event_id,
             route_binding_id=route_binding_id,
             permit_ttl_seconds=permit_ttl_seconds,
+            expression_event_id=expression_event_id,
         )
         if existing is not None:
             return existing
@@ -303,6 +332,7 @@ class SendTimeAuthorizer:
         candidate = None
         stored = None
         action_contract_binding: str | None = None
+        executable_content_id: str | None = None
         route_binding_event_id: str | None = None
         host_snapshot_event_id: str | None = None
         route_binding_authenticator: str | None = None
@@ -379,6 +409,33 @@ class SendTimeAuthorizer:
             content_document = dict(stored.candidate_contents).get(
                 str(candidate.content_id)
             ) if stored is not None and candidate.content_id is not None else None
+            if expression_event_id is not None:
+                from .opportunity_expression import OpportunityExpressionStore
+                from .semantic_review import SemanticReviewError
+                confirmation = self.journal.get(str(confirmation_event_id)) if confirmation_event_id else None
+                expression_header = self.journal.get(expression_event_id)
+                if (candidate.authority is not ActionAuthority.USER_CONFIRMED
+                        or confirmation is None or expression_header is None
+                        or confirmation.event.event_type != "conversation.inbound"
+                        or confirmation.event.actor != owner or confirmation.event.subject != owner
+                        or confirmation.sequence <= expression_header.sequence
+                        or confirmation.event.payload.get("authorizes_expression_event_id") != expression_event_id):
+                    reasons.append("exact_expression_confirmation_required")
+                else:
+                    try:
+                        expressed, expiry = OpportunityExpressionStore(self.journal,
+                            content_vault=self.deliberation.content_vault,
+                            context_vault=self.context_vault).action_contract_for_expression(
+                                expression_event_id=expression_event_id,
+                                selection_event_id=selection_event_id, subject=owner, as_of=current)
+                        content_document = expressed.to_document()
+                        reference = self.deliberation.content_vault.put_json(content_document,
+                            subject=owner, purpose="deliberation.candidate", sensitivity=sensitivity,
+                            retention_until=expiry, content_id="expression-action:" +
+                            self.deliberation.content_vault.digest_json({'event_id': expression_event_id})[:40])
+                        executable_content_id = reference.content_id
+                    except SemanticReviewError:
+                        reasons.append("expression_not_current")
             try:
                 contract = parse_action_contract(
                     content_document,
@@ -466,6 +523,8 @@ class SendTimeAuthorizer:
             "gate_event_id": gate_event_id,
             "agenda_item_id": getattr(candidate, "agenda_item_id", None),
             "confirmation_event_id": confirmation_event_id,
+            "expression_event_id": expression_event_id,
+            "executable_content_id": executable_content_id,
             "route_binding_id": route_binding_id,
             "route_binding_event_id": route_binding_event_id,
             "host_snapshot_event_id": host_snapshot_event_id,

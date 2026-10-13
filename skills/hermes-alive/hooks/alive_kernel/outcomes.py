@@ -535,7 +535,7 @@ class OutcomeProjection:
             )
         try:
             contract_document = self.content_vault.resolve_json(
-                str(candidate.content_id),
+                str(authorization.event.payload.get("executable_content_id") or candidate.content_id),
                 expected_subject=str(selection["subject"]),
                 expected_purpose="deliberation.candidate",
                 expected_sensitivity=Sensitivity(selection["frame_sensitivity"]),
