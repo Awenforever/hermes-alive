@@ -2,9 +2,24 @@
 
 Status: active
 
-Last reviewed: 2026-10-13
+Last reviewed: 2026-10-14
 
-### Current finding: independence does not establish source support
+### Current finding: learned advice must retain its semantic evidence
+
+ADR-0084/0085 record actual feedback interpretations, a failed initial contract
+and bounded model recovery without automatic learning permission. ADR-0086's
+different-family review finds three interpretations acceptable, but warns about
+permission versus enthusiasm and temporary availability versus lasting preference.
+This is diagnostic evidence, not semantic ground truth or qualified usefulness.
+
+The existing learned-advice bridge dropped encrypted rationale while transmitting
+polarity/masses. It now carries canonical source-linked notes with qualifications
+and unchanged weights/authority. Next measure whether these notes improve model
+decisions on fresh counterfactual scenarios rather than assuming richer context
+is better; then qualify tentative feedback integration and longitudinal benefit.
+This does not supersede the expression/source-support or real host-chain gates.
+
+### Prior finding: independence does not establish source support
 
 ADR-0072 records a real different-family reviewer accepting the retained draft's
 unsupported zero-loss guarantee. Source-support review exists in bounded shadow
@@ -2666,3 +2681,21 @@ For each material change:
   including incomplete-output integration. Continue the full long-term memory,
   agenda/adaptation, authenticated host, expression, forgetting/migration/rollback,
   portable lifecycle and production acceptance scope. Recovery is not yet runtime-wired.
+
+### 2026-10-14 — Preserve evidence meaning across learned context, ADR 0086
+
+- Different-family Qwen3.5 review considers recovered boundary, deferral and question
+  interpretations acceptable but flags permission/enthusiasm and timing ambiguity.
+  No confirmed per-example error is patched; review agreement is not ground truth.
+- Found that weighted estimates/context discarded encrypted rationale. Canonical
+  validated rationale/source/origin/direction notes now reach opportunity cognition;
+  masses and authority are unchanged, original qualifications are not truncated.
+- Synthetic regressions distinguish three same-polarity meanings and assert notes
+  in the model input, plus existing owner/clearance/erasure/withdrawal defenses.
+- Actual call totals 58 logical / 70 observed HTTP attempts; review terminal and
+  credentials absent, production start unchanged. No new preference, real send,
+  private read, model setting or wmw change. No production preference changes;
+  synthetic tests still create authored fixture observations. Full acceptance remains open.
+- Next measure counterfactual operational benefit, integrate bounded tentative
+  feedback only after utility qualification, and continue full host/expression,
+  long-term memory/agenda/adaptation, forgetting/migration/rollback and portability.

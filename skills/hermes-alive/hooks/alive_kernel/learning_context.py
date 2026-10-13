@@ -4,7 +4,7 @@ import json
 
 from .outcomes import OutcomeProjection
 from .reflection import ReflectionProjection
-from .preference_learning import PreferenceLearningProjection, PreferenceContentStatus
+from .preference_learning import PreferenceLearningProjection, PreferenceContentStatus, PreferenceEvidenceNote
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,11 +16,16 @@ class LearnedCognitionEvidence:
     support_mass: float
     opposition_mass: float
     evidence_event_ids: tuple[str, ...]
+    evidence_notes: tuple[PreferenceEvidenceNote, ...] = ()
 
     def to_prompt(self):
         return {'axis': self.axis, 'key': self.key, 'option': self.option,
             'support_mass': self.support_mass, 'opposition_mass': self.opposition_mass,
-            'evidence_event_ids': list(self.evidence_event_ids), 'advisory_only': True}
+            'evidence_event_ids': list(self.evidence_event_ids), 'advisory_only': True,
+            'mass_semantics': 'bounded evidence support/opposition for the named option, not enthusiasm or action permission',
+            'evidence_notes': [{'observation_event_id': 'preference.observation:' + note.observation_id,
+                'source_event_id': note.source_event_id, 'origin': note.origin,
+                'direction': note.direction, 'rationale': note.rationale} for note in self.evidence_notes]}
 
 
 class CognitionLearningReader:
@@ -45,7 +50,8 @@ class CognitionLearningReader:
                 continue
             value = LearnedCognitionEvidence(estimate.target_digest, estimate.axis.value,
                 estimate.key, estimate.option, estimate.support_mass, estimate.opposition_mass,
-                tuple('preference.observation:' + item for item in estimate.evidence_ids))
+                tuple('preference.observation:' + item for item in estimate.evidence_ids),
+                estimate.evidence_notes)
             if len(json.dumps(value.to_prompt(), ensure_ascii=False)) > 1500:
                 continue
             values.append(value)

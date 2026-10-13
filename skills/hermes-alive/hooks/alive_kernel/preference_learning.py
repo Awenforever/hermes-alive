@@ -102,6 +102,15 @@ class PreferenceSignalProposal:
 
 
 @dataclass(frozen=True, slots=True)
+class PreferenceEvidenceNote:
+    observation_id: str
+    source_event_id: str
+    origin: str
+    direction: str
+    rationale: str
+
+
+@dataclass(frozen=True, slots=True)
 class PreferenceEstimate:
     target_digest: str
     axis: PreferenceAxis | None
@@ -113,6 +122,7 @@ class PreferenceEstimate:
     opposition_mass: float
     evidence_ids: tuple[str, ...]
     expires_at: datetime
+    evidence_notes: tuple[PreferenceEvidenceNote, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -563,6 +573,7 @@ class PreferenceLearningProjection:
                 ),
             ).fetchall()
             grouped: dict[str, list[sqlite3.Row]] = {}
+            notes: dict[str, PreferenceEvidenceNote] = {}
             for row in rows:
                 original = self.journal.get(row["event_id"])
                 if original is None or original.event.event_type != "preference.observed" or any(
@@ -598,11 +609,17 @@ class PreferenceLearningProjection:
                             or self.content_vault.digest_json({name: retained[name]
                                 for name in ("axis", "key", "option")}) != row["target_digest"]):
                         continue
+                    rationale = retained.get("rationale")
+                    if not isinstance(rationale, str) or not rationale.strip():
+                        continue
                 except (ContentUnavailableError, ContentIntegrityError, KeyError, ValueError):
                     # Forgotten/unavailable observations cannot contribute hidden
                     # support mass through a still-readable representative.
                     continue
                 grouped.setdefault(row["target_digest"], []).append(row)
+                notes[row["observation_id"]] = PreferenceEvidenceNote(
+                    row["observation_id"], row["source_event_id"], row["origin"],
+                    row["direction"], rationale)
             estimates: list[PreferenceEstimate] = []
             for target_digest, evidence in sorted(grouped.items()):
                 support = min(
@@ -651,6 +668,7 @@ class PreferenceLearningProjection:
                         support, oppose,
                         tuple(row["observation_id"] for row in evidence),
                         max(datetime.fromisoformat(row["expires_at"]) for row in evidence),
+                        tuple(notes[row["observation_id"]] for row in evidence),
                     )
                 )
             return estimates

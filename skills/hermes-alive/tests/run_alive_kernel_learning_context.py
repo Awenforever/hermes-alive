@@ -23,7 +23,7 @@ from alive_kernel.content_vault import ContentVault
 from alive_kernel_testkit import install_action_authorization, install_exploration_gate
 
 
-def seed(journal, owner, direction, *, message_text='synthetic prior message'):
+def seed(journal, owner, direction, *, message_text='synthetic prior message', rationale='synthetic authored feedback'):
     deliberation = DeliberationProjection(journal)
     outcomes = OutcomeProjection(journal)
     ReflectionProjection(journal)
@@ -66,7 +66,7 @@ def seed(journal, owner, direction, *, message_text='synthetic prior message'):
     proposal = PreferenceSignalProposal(subject=owner, axis=PreferenceAxis.PRESENTATION,
         key='message_length', option='concise', direction=direction,
         origin=PreferenceSignalOrigin.EXPLICIT_FEEDBACK, source_id='feedback:' + owner,
-        source_event_id=outcome.event.event_id, rationale='synthetic authored feedback', weight=.25,
+        source_event_id=outcome.event.event_id, rationale=rationale, weight=.25,
         expires_at=datetime.now(timezone.utc)+timedelta(days=10), observation_id='signal:' + owner)
     observed = learning.append_observation(proposal, actor='system:test')
     assert learning.apply(observed).outcome == 'recorded'
@@ -80,10 +80,29 @@ async def exercise(root):
     reader = CognitionLearningReader(journal)
     context = reader.read(subject='user:one', clearance=Sensitivity.PRIVATE)
     assert len(context)==1 and context[0].support_mass==.25 and context[0].opposition_mass==0
+    prompt = context[0].to_prompt()
+    assert prompt['evidence_notes'] == [{'observation_event_id': 'preference.observation:signal:user:one',
+        'source_event_id': 'outcome.record:feedback:user:one', 'origin': 'explicit_feedback',
+        'direction': 'support', 'rationale': 'synthetic authored feedback'}]
+    assert 'not enthusiasm or action permission' in prompt['mass_semantics']
     foreign = reader.read(subject='user:two', clearance=Sensitivity.PRIVATE)
     assert len(foreign)==1 and foreign[0].support_mass==0 and foreign[0].opposition_mass==.25
     assert reader.read(subject='user:missing', clearance=Sensitivity.PRIVATE)==()
     assert reader.read(subject='user:one', clearance=Sensitivity.PUBLIC)==()
+    # Meaning is not recoverable from polarity alone. Preserve the complete
+    # authored basis rather than synthesizing enthusiasm, permanence or permission.
+    semantic_journal = ExperienceJournal(root/'semantic-notes.sqlite3')
+    meanings = ('允许继续，不表示喜欢或要求增加频率。',
+                '这次会议期间不要打扰，不代表所有工作时间都禁止。',
+                '用户只在核对事实，没有表达对主题的喜恶。')
+    for index, rationale in enumerate(meanings):
+        owner = 'user:meaning-' + str(index)
+        seed(semantic_journal, owner, PreferenceDirection.SUPPORT, rationale=rationale)
+        notes_reader = CognitionLearningReader(semantic_journal)
+        value, = notes_reader.read(subject=owner, clearance=Sensitivity.PRIVATE)
+        assert value.to_prompt()['evidence_notes'][0]['rationale'] == rationale
+        assert value.support_mass == .25 and value.opposition_mass == 0
+        assert len(value.to_prompt()['evidence_notes']) == len(value.evidence_event_ids)
     with closing(reader.learning._connect()) as connection:
         connection.execute('UPDATE preference_observations_v1 SET content_id=? WHERE observation_id=?',
             ('preference-observation:signal:user:two', own.observation_id))
@@ -104,6 +123,7 @@ async def exercise(root):
         data=json.loads(kw['messages'][1]['content'])
         calls.append(data)
         assert data['learned_advisory'][0]['advisory_only']
+        assert data['learned_advisory'][0]['evidence_notes'][0]['rationale'] == 'synthetic authored feedback'
         assert 'user:two' not in kw['messages'][1]['content']
         if len(calls)==2:
             request=EventEnvelope(event_type='conversation.inbound', source='synthetic-public-fixture',
