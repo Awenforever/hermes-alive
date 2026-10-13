@@ -45,6 +45,7 @@ from .discovery_opportunities import (
     DiscoveryIngestResult,
     DiscoveryOpportunityError,
     DiscoveryOpportunityIngestor,
+    OpportunityEvidence,
     DiscoveryProjectionRecord,
     DiscoveryShadowReport,
     candidate_from_legacy,
@@ -179,6 +180,9 @@ from .cognition_cycle import (
     CognitionCyclePreparation,
     CognitionCycleResult,
     CycleCandidate,
+)
+from .opportunity_synthesis import (
+    OpportunitySynthesizer, OpportunitySynthesisError, OpportunitySynthesisResult,
 )
 from .deliberation import (
     ActionAuthority,
@@ -344,6 +348,10 @@ __all__ = [
     "CandidateRejection",
     "CognitionCycleCoordinator",
     "CognitionCyclePreparation",
+    "OpportunityEvidence",
+    "OpportunitySynthesizer",
+    "OpportunitySynthesisError",
+    "OpportunitySynthesisResult",
     "CognitionCycleError",
     "CognitionCycleResult",
     "ContentErasedError",

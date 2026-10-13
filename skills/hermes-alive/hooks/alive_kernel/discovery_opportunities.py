@@ -23,6 +23,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from .agenda import (
     AgendaAuthority,
+    AgendaContentStatus,
     AgendaDecision,
     AgendaItemKind,
     AgendaProjection,
@@ -37,7 +38,7 @@ from .content_vault import (
     ContentVault,
 )
 from .event_store import EventConflictError, ExperienceJournal, JournalRecord
-from .events import EventEnvelope, Sensitivity, _thaw_json
+from .events import EventEnvelope, Sensitivity, _freeze_json, _thaw_json
 from .privacy import LocalIdentityProtector
 
 
@@ -201,6 +202,15 @@ class DiscoveryProjectionRecord:
     observation_event_id: str
     agenda_item_id: str
     sequence: int
+
+
+@dataclass(frozen=True, slots=True)
+class OpportunityEvidence:
+    agenda_item_id: str
+    observation_event_id: str
+    expires_at: datetime
+    sensitivity: Sensitivity
+    content: Any = field(repr=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -509,6 +519,59 @@ class DiscoveryOpportunityIngestor:
         if self._row_authenticator(row) != row["row_authenticator"]:
             raise DiscoveryOpportunityError("discovery projection is corrupt")
         return DiscoveryProjectionRecord(**self._row_document(row))
+
+    def active_evidence(self, *, subject: str, clearance: Sensitivity,
+                        limit: int = 8) -> tuple[OpportunityEvidence, ...]:
+        """Read authenticated current discovery content, scoped before LIMIT.
+
+        The caller supplies a Hermes-authorized principal, never a model-proposed
+        identity. This is not a cross-user administration view or a fetch API.
+        """
+        owner = _bounded(subject, "subject", 128, required=True)
+        if not _IDENTITY_RE.fullmatch(owner) or not 1 <= limit <= 32:
+            raise DiscoveryOpportunityError("invalid evidence subject or limit")
+        target = self.journal.last_sequence()
+        while self.journal.checkpoint(self.agenda.CHECKPOINT) < target:
+            before = self.journal.checkpoint(self.agenda.CHECKPOINT)
+            self.agenda.project_new(limit=1000)
+            if self.journal.checkpoint(self.agenda.CHECKPOINT) <= before:
+                raise DiscoveryOpportunityError("agenda evidence projection made no progress")
+        now = datetime.now(timezone.utc)
+        values = []
+        items = self.agenda.list_items(
+            subject=owner, kinds=(AgendaItemKind.OPPORTUNITY,),
+            states=(AgendaState.ACTIVE,), clearance=clearance, as_of=now, limit=1000,
+        )
+        for item in items:
+            if item.content_status is not AgendaContentStatus.AVAILABLE:
+                continue
+            observation_id = str(item.details.get("observation_event_id") or "")
+            record = self.journal.get(observation_id)
+            if (record is None or record.event.subject != owner
+                    or item.source_event_ids != (observation_id,)
+                    or record.event.sensitivity != item.sensitivity
+                    or record.event.expires_at is None or record.event.expires_at <= now
+                    or not self._valid_observation(record)
+                    or record.event.payload.get("agenda_item_id") != item.item_id):
+                continue
+            current = self.current(str(record.event.payload["entity_fingerprint"]))
+            if current is None or current.observation_event_id != observation_id:
+                continue
+            try:
+                ref = ContentReference.from_event_payload(record.event.payload["content"])
+                content = self.vault.resolve_json(
+                    ref.content_id, expected_subject=owner,
+                    expected_purpose="discovery.observation", expected_sensitivity=item.sensitivity,
+                )
+            except (ContentUnavailableError, ContentIntegrityError):
+                continue
+            values.append(OpportunityEvidence(
+                item.item_id, observation_id, record.event.expires_at,
+                item.sensitivity, _freeze_json(content),
+            ))
+            if len(values) == limit:
+                break
+        return tuple(values)
 
     def _append_idempotent(self, event: EventEnvelope) -> tuple[JournalRecord, bool]:
         existing = self.journal.get(event.event_id)

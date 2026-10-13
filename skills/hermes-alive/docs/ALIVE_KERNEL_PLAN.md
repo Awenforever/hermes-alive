@@ -1570,3 +1570,60 @@ For each material change:
   Started `2026-10-13T05:36:22.379471833Z`, finished
   `2026-10-13T05:36:28.264430342Z`. Current-source tests in the prepared core
   environment are not a current-package/console/live-provider admission claim.
+
+### 2026-10-13 — Source meaning can produce tentative candidates
+
+- ADR-0062 adds owner-scoped, authenticated discovery interpretation through an
+  explicitly supplied Hermes model capability. It can propose zero to four drafts
+  and reasoned model judgments; it cannot grant itself authority or send.
+- Evidence is revalidated after inference. Accepted drafts are encrypted; durable
+  receipts preserve actual model identity and structural failures without raw
+  source text or provider exception bodies. Cancellation fences repeat spending.
+- Independent Windows suite: 38 kernel files, 37 PASS, one explicit missing-Hermes
+  runtime hook SKIP, zero failures. These callbacks are deterministic, not live
+  provider quality evidence. The live probe is separate and opt-in.
+- The user authorized a bounded synthetic live experiment: at most six logical
+  calls, no private conversations, no channel sends or production configuration
+  changes. Existing configured primary and official fallback remain Hermes-owned.
+  Actual execution/results must be recorded separately; permission is not a pass.
+- Profile-memory retrieval, useful persistent commitments, real user policy and
+  budgets, semantic/human review, live orchestration and production canary remain
+  open. This does not complete the goal or authorize experimental deployment.
+- Network-disabled NAS/Linux source contracts passed in
+  `alive-opportunity-20261013-r1`, exit zero, five tests (interpretation, agenda,
+  discovery, composed model cycle and recovery). Immutable input tree
+  `b2b4f56774fea73c5601c5290cf9be48abb69a50`, archive SHA256
+  `ae4b545284d91ac13a1aea4899deff8af5d8f99b728eb8f5a8bc14f4d045fc2c`.
+  Retained `opportunity-r1.log` SHA256
+  `8bba31a756fa680664c0a673b46c37b0be044560f79205a060963f4a96c0bbfd`.
+  Started `2026-10-13T06:11:02.944106325Z`, finished
+  `2026-10-13T06:11:08.740047759Z`. This is source qualification, not public
+  installed-package or full platform qualification.
+- Explicit live synthetic experiment `alive-live-opportunity-20261013-r2`
+  finished exit zero at `2026-10-13T06:13:54.428237163Z` (started
+  `2026-10-13T06:13:10.029821502Z`). Three logical interpretation calls used
+  nine observed async HTTP attempts: six USTC attempts had no recorded HTTP
+  response; three configured official DeepSeek fallbacks returned 200, with
+  returned model `deepseek-flash`. This does not establish a USTC permission
+  failure or production route outage; this experiment used the host proxy.
+- All three cases returned zero candidates (grounded community notice with
+  unknown user interest/location, unverified rumor, injected source commands).
+  No candidate was rejected, no selector call occurred, no action was attempted
+  and no message was sent. Silence is consistent with unknown usefulness, but
+  the experiment does NOT qualify useful proactive behavior or the live selector.
+  The interpreter lacks evidenced user-interest context; prioritize trusted
+  profile-memory integration and paired positive/negative semantic experiments,
+  rather than forcing output or embedding installation-specific interests.
+- Initial live bootstrap attempt failed before inference because the test helper
+  imported PyYAML, whereas current Hermes uses `hermes_yaml`. Corrected only the
+  private bootstrap to write JSON (valid YAML); no dependency or production
+  configuration was changed. Three of the initially allowed six logical calls
+  have been used; do not silently restart a fresh six-call budget on continuation.
+- Retained synthetic-only report SHA256
+  `f749ccd6e3f983b91559a9edb8837bd6bddf503a4f8f0dc1ee563adde2d59ee8`
+  and `live-opportunity-r2.log` SHA256
+  `67412138fe71abfa92396acd0e541bec22e747de1ef5b74c1ed11dcd92cc88c0`.
+  Removed the isolated credential export, temporary model configuration and its
+  auto-generated configuration backup after the process terminated; original
+  production credentials remain unchanged. Production gateway remained running
+  with unchanged start time `2026-10-11T07:43:25.630569081Z`.

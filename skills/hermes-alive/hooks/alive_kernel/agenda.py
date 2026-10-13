@@ -659,6 +659,8 @@ class AgendaProjection:
         states: Iterable[AgendaState] = (AgendaState.ACTIVE, AgendaState.SNOOZED),
         as_of: datetime | None = None,
         limit: int = 100,
+        subject: str | None = None,
+        kinds: Iterable[AgendaItemKind] | None = None,
     ) -> list[AgendaRecord]:
         clearance = Sensitivity(clearance)
         allowed = _SENSITIVITY_ORDER[: _SENSITIVITY_ORDER.index(clearance) + 1]
@@ -666,18 +668,30 @@ class AgendaProjection:
         if not selected_states or not 1 <= limit <= 1000:
             raise AgendaValidationError("states and a valid limit are required")
         now = _utc(as_of or datetime.now(timezone.utc), "as_of")
+        extra = ""
+        extra_parameters: list[Any] = []
+        if subject is not None:
+            extra += " AND subject=?"
+            extra_parameters.append(_identity(subject, "subject"))
+        if kinds is not None:
+            selected_kinds = tuple(dict.fromkeys(AgendaItemKind(value) for value in kinds))
+            if not selected_kinds:
+                return []
+            extra += f" AND kind IN ({','.join('?' for _ in selected_kinds)})"
+            extra_parameters.extend(value.value for value in selected_kinds)
         query = f"""
             SELECT * FROM agenda_items_v1
             WHERE state IN ({','.join('?' for _ in selected_states)})
               AND sensitivity IN ({','.join('?' for _ in allowed)})
               AND (available_at IS NULL OR available_at <= ?)
               AND (expires_at IS NULL OR expires_at > ?)
+              {extra}
             ORDER BY CASE WHEN due_at IS NULL THEN 1 ELSE 0 END,
                      due_at ASC, priority DESC, created_at ASC
             LIMIT ?
         """
         parameters = [*(value.value for value in selected_states), *(v.value for v in allowed)]
-        parameters.extend((now.isoformat(), now.isoformat(), limit))
+        parameters.extend((now.isoformat(), now.isoformat(), *extra_parameters, limit))
         with closing(self._connect()) as connection:
             return [self._record(connection, row) for row in connection.execute(query, parameters)]
 
