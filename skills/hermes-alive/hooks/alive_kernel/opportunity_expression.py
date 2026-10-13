@@ -74,7 +74,14 @@ class OpportunityExpressionStore(SemanticReviewStore):
             raise SemanticReviewError('original opportunity draft expired')
         atom = SemanticAtom('proposed-message', SemanticAtomKind.PROPOSED_CONTENT,
                             text, evidence, literals)
-        return source, stored, atom, expiry
+        atoms = (atom,)
+        if original_url and original_url not in text:
+            # Immutable selected wording remains the first atom. Provenance is
+            # supplied by the host from canonical evidence, never guessed by the
+            # renderer or conditional on the drafting model remembering a link.
+            atoms += (SemanticAtom('source-link', SemanticAtomKind.LINK,
+                                   original_url, evidence, (original_url,)),)
+        return source, stored, atoms, expiry
 
     def _message_id(self, selection_event_id):
         return 'selected-opportunity:' + self.content_vault.digest_json(
@@ -102,7 +109,7 @@ class OpportunityExpressionStore(SemanticReviewStore):
             capability='hermes.channel.send'), candidate.expires_at
 
     def define_for_selection(self, *, selection_event_id, subject):
-        source, stored, atom, expiry = self._selected_draft(selection_event_id, subject)
+        source, stored, atoms, expiry = self._selected_draft(selection_event_id, subject)
         message_id = self._message_id(selection_event_id)
         event_id = 'message.meaning:' + message_id
         existing = self.journal.get(event_id)
@@ -113,7 +120,7 @@ class OpportunityExpressionStore(SemanticReviewStore):
         now = datetime.now(timezone.utc)
         speech = (MessageSpeechAct.SHARE if stored.selection.candidate.action_kind is ActionKind.SHARE
                   else MessageSpeechAct.ASK)
-        document = MeaningDocument(message_id, subject, speech, (atom,), now,
+        document = MeaningDocument(message_id, subject, speech, atoms, now,
             min(expiry, now + timedelta(hours=1)), source.event.sensitivity)
         record = self.meanings.define(document, actor='system:alive-opportunity-expression', observed_at=now)
         self._selection_context(selection_event_id=selection_event_id,
@@ -121,7 +128,7 @@ class OpportunityExpressionStore(SemanticReviewStore):
         return record
 
     def _selection_context(self, *, selection_event_id, meaning_event_id, subject, observed_at):
-        source, stored, atom, expiry = self._selected_draft(selection_event_id, subject)
+        source, stored, atoms, expiry = self._selected_draft(selection_event_id, subject)
         message_id = self._message_id(selection_event_id)
         record = self.journal.get(meaning_event_id)
         # Scope checked before decrypting retained meaning.
@@ -138,7 +145,7 @@ class OpportunityExpressionStore(SemanticReviewStore):
         speech = (MessageSpeechAct.SHARE if stored.selection.candidate.action_kind is ActionKind.SHARE
                   else MessageSpeechAct.ASK)
         if (document.message_id != message_id or document.subject != subject
-                or document.speech_act is not speech or document.atoms != (atom,)
+                or document.speech_act is not speech or document.atoms != atoms
                 or document.expires_at > expiry
                 or document.created_at < source.event.observed_at
                 or observed_at < document.created_at or observed_at >= document.expires_at):

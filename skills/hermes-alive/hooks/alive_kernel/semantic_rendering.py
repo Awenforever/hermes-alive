@@ -103,13 +103,17 @@ class SemanticAtom:
         kind = SemanticAtomKind(self.kind)
         if not _ATOM_ID_RE.fullmatch(atom_id):
             raise SemanticRenderingError("invalid atom_id")
-        maximum_text = 1600 if kind is SemanticAtomKind.PROPOSED_CONTENT else _MAX_ATOM_CHARS
+        # Discovery accepts canonical source URLs up to 4096 characters. Keeping
+        # source provenance must not quietly truncate a valid long URL.
+        maximum_text = (4096 if kind is SemanticAtomKind.LINK else
+                        1600 if kind is SemanticAtomKind.PROPOSED_CONTENT else _MAX_ATOM_CHARS)
         if not text or len(text) > maximum_text:
             raise SemanticRenderingError("semantic atom text is empty or too long")
         if not evidence or any(not _ID_RE.fullmatch(item) for item in evidence):
             raise SemanticRenderingError("semantic atom requires valid evidence")
         if len(literals) > 16 or any(
-            len(value) > (1600 if kind is SemanticAtomKind.PROPOSED_CONTENT else _MAX_LITERAL_CHARS)
+            len(value) > (4096 if kind is SemanticAtomKind.LINK else
+                          1600 if kind is SemanticAtomKind.PROPOSED_CONTENT else _MAX_LITERAL_CHARS)
             or value not in text for value in literals
         ):
             raise SemanticRenderingError("protected literal is invalid or absent")

@@ -22,10 +22,13 @@ def response(text, model='actual/synthetic'):
 
 
 async def scenario(root, mode, owner='user:test'):
+    missing_link_modes = ('missing-link', 'drop-required-link', 'long-missing-link')
+    source_url = ('https://example.invalid/' + 'x' * 3900 if mode == 'long-missing-link'
+                  else 'https://example.invalid/repair')
     journal = ExperienceJournal(root / 'experience.sqlite3')
     reader = DiscoveryOpportunityIngestor(journal)
     source = reader.ingest(DiscoveryCandidate(source='synthetic-public-fixture', title='Repair',
-        summary='Community repair workshop, attendance unknown.', url='https://example.invalid/repair',
+        summary='Community repair workshop, attendance unknown.', url=source_url,
         observed_at=datetime.now(timezone.utc)), subject=owner)
     memory = MemoryProjection(journal)
     inbound = EventEnvelope(event_type='conversation.inbound', source='synthetic',
@@ -38,7 +41,8 @@ async def scenario(root, mode, owner='user:test'):
     async def generate(**kw):
         return response(json.dumps({'candidates': [{'agenda_item_id': source.agenda_item_id,
             'kind': 'ask' if mode == 'ask' else 'share',
-            'text': 'Want details? https://example.invalid/repair' if mode == 'ask' else
+            'text': 'Community repair workshop, attendance unknown.' if mode in missing_link_modes else
+                    'Want details? https://example.invalid/repair' if mode == 'ask' else
                     'Community repair workshop, attendance unknown. https://example.invalid/repair',
             'topic': 'repair', 'dimensions': {name: {'value': .1 if name in
             ('risk','interruption_cost','urgency') else .9, 'reason': 'synthetic judgment'}
@@ -72,7 +76,13 @@ async def scenario(root, mode, owner='user:test'):
     assert journal.last_sequence() == before
     document = store.meanings.resolve(meaning.event.event_id)
     assert document.atoms[0].kind is SemanticAtomKind.PROPOSED_CONTENT
-    assert document.atoms[0].protected_literals == ('https://example.invalid/repair',)
+    if mode in missing_link_modes:
+        assert not document.atoms[0].protected_literals and len(document.atoms) == 2
+        assert document.atoms[1].kind is SemanticAtomKind.LINK
+        assert document.atoms[1].protected_literals == (source_url,)
+        assert document.atoms[0].text == draft.candidates[0].content['operation']['text']
+    else:
+        assert document.atoms[0].protected_literals == ('https://example.invalid/repair',)
     assert meaning.event.payload['truth_claimed'] is False
     assert meaning.event.payload['evidence_entailment_proven'] is False
     assert document.speech_act.value == ('ask' if mode == 'ask' else 'share')
@@ -90,7 +100,9 @@ async def scenario(root, mode, owner='user:test'):
         if kw['task'] == 'alive_semantic_render':
             prompt = json.loads(kw['messages'][1]['content'])
             assert prompt['meaning']['atoms'][0]['kind'] == 'proposed_content'
-            text, model = document.atoms[0].text, 'synthetic-renderer'
+            text, model = '\n'.join(atom.text for atom in document.atoms), 'synthetic-renderer'
+            if mode == 'drop-required-link':
+                text = document.atoms[0].text
             if mode == 'withdraw-during-render':
                 memory.forget_item(pref.proposal_id, actor=owner, request_id='withdraw')
             elif mode == 'erase-during-render':
@@ -113,7 +125,7 @@ async def scenario(root, mode, owner='user:test'):
                     url='https://example.invalid/new-source', observed_at=datetime.now(timezone.utc)), subject=owner)
             elif mode == 'unrelated-window-during-review':
                 add_ranked_noise()
-            text = json.dumps({'atom_reviews': [{'atom_id': 'proposed-message', 'preserved': True, 'risks': []}],
+            text = json.dumps({'atom_reviews': [{'atom_id': atom.atom_id, 'preserved': True, 'risks': []} for atom in document.atoms],
                 'added_claims_detected': False, 'speech_act_preserved': True,
                 'protected_literals_preserved': True})
             model = 'synthetic-reviewer'
@@ -124,10 +136,10 @@ async def scenario(root, mode, owner='user:test'):
             meaning_event_id=meaning.event.event_id, subject=owner, call=express,
             resolve_domain=lambda provider, model: model, operation_id='express')
     except SemanticReviewError:
-        assert mode in ('withdraw-during-render','erase-during-render','superseded-during-render') and len(calls) == 1
+        assert mode in ('withdraw-during-render','erase-during-render','superseded-during-render','drop-required-link') and len(calls) == 1
         assert not journal.read(event_type='message.model_candidate')
     else:
-        assert mode in ('unchanged','ask','withdraw-after-review','probe-fixture',
+        assert mode in ('unchanged','ask','withdraw-after-review','probe-fixture','missing-link','long-missing-link',
                         'unrelated-during-render','unrelated-during-review',
                         'unrelated-window-before-expression','unrelated-window-during-render',
                         'unrelated-window-during-review') and len(calls) == 2
@@ -145,6 +157,7 @@ async def scenario(root, mode, owner='user:test'):
 
 async def main(root):
     for mode in ('unchanged','ask','withdraw-during-render','erase-during-render',
+                 'missing-link','drop-required-link','long-missing-link',
                  'superseded-during-render','withdraw-after-review','foreign-owner',
                  'unrelated-during-render','unrelated-during-review',
                  'unrelated-window-before-expression','unrelated-window-during-render',

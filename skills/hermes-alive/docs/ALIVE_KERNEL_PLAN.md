@@ -6,6 +6,17 @@ Last reviewed: 2026-10-14
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0088/0089 add source-linked reasoned abstention and explicit unassessed coverage,
+not executable silence or preference learning. First replication has five valid
+results and one invalid JSON failure; its history is retained. ADR-0090's fresh
+three-context paired experiment structurally completes six calls but finds a
+missing source URL and questionable conservative/pragmatic explanations. One
+blinded Qwen diagnostic overlooks those concerns and fails strict parsing due to
+a code fence; it is not a semantic admission gate. Canonical provenance now enters
+expression independently of whether the drafting model remembered its URL. Direct
+original-draft delivery still requires its own provenance contract. Next qualify
+per-decision/source semantics and the useful end-to-end path, not just formatting.
+
 ADR-0084/0085 record actual feedback interpretations, a failed initial contract
 and bounded model recovery without automatic learning permission. ADR-0086's
 different-family review finds three interpretations acceptable, but warns about
@@ -2764,3 +2775,21 @@ For each material change:
   feedback integration. Full host, expression, layered/external memory, sustained
   agenda/adaptation, forgetting/migration/rollback, portable lifecycle and production
   acceptance remain required; no deployment or real send in this exploration.
+
+### 2026-10-14 — Fresh contexts, blind diagnostic and canonical link binding, ADR 0090
+
+- New opaque paired contexts cover narrow interest, unknown eligibility and
+  untrusted source instructions. Six structural completions preserve useful
+  drafts and skips; utility/source entailment and note superiority remain unproven.
+- A different-family blind diagnostic misses engineering concerns and emits a
+  code-fenced response rejected by strict parsing. Keep that failure, not a green gate.
+- Found a source-link hole: expression only protected URLs already in drafts.
+  Canonical provenance now forms a separate LINK atom when omitted, without
+  mutating the selected frame/draft or inferring authority. Long URLs retain exact
+  discovery bounds, and renderer omissions fail before semantic review.
+- Totals 83 actual logical / 95 observed HTTP attempts. Both inference containers
+  terminal, credentials removed and verified absent; production unchanged.
+- Next validate fresh source/decision semantics and all selected delivery paths,
+  then useful attributed outcomes and bounded feedback learning. Retain the full
+  memory/agenda/adaptation, authenticated host, forgetting/migration/rollback,
+  portability and production acceptance scope; no production deploy or real send.

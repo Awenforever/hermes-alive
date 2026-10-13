@@ -10,7 +10,7 @@ from types import ModuleType, SimpleNamespace
 from unittest.mock import patch
 
 import httpx
-from probe_alive_live_advice_pairs import exercise, CASES, DISCRIMINATING_CASES
+from probe_alive_live_advice_pairs import exercise, CASES, DISCRIMINATING_CASES, SEMANTIC_CASES
 
 
 async def check(root):
@@ -79,6 +79,23 @@ async def check(root):
             assert all(case['id'] not in json.dumps(arm['input']) for case in DISCRIMINATING_CASES)
             assert {o['agenda_item_id'] for o in arm['input']['opportunities']} == {
                 pair['relevant_agenda_item_id'], pair['advertisement_agenda_item_id']}
+    old_logging = logging.root.manager.disable
+    try:
+        with patch.dict(sys.modules, {'agent': package, 'agent.auxiliary_client': auxiliary}), \
+             patch.object(httpx.AsyncClient, 'send', forbidden):
+            await exercise(SimpleNamespace(output=root/'semantic', model=None, scenario_set='semantic'))
+    finally:
+        logging.disable(old_logging)
+    report = json.loads((root/'semantic/report.json').read_text(encoding='utf-8'))
+    assert report['logical_calls'] == 6 and len(seen) == 18 and report['observed_async_http'] == []
+    for pair, case in zip(report['pairs'], SEMANTIC_CASES):
+        assert pair['matched_inputs_except_notes_and_clock']
+        for arm in pair['arms']:
+            assert arm['completed'] and arm['no_new_preference_signals'] and arm['no_external_dispatch']
+            assert len(arm['input']['user_context']) == 2 and len(arm['input']['opportunities']) == 2
+            assert all(c['id'] not in json.dumps(arm['input']) for c in SEMANTIC_CASES)
+            assert {pair[role + '_agenda_item_id'] for role, _ in case['sources']} == {
+                item['agenda_item_id'] for item in arm['input']['opportunities']}
 
 
 if __name__ == '__main__':
