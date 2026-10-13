@@ -226,6 +226,21 @@ def main() -> int:
             payload={"structural": True},
         )
         journal.append(approval)
+        for foreign_actor in ("user:other", "model:test"):
+            foreign_input = replace(approval, event_id=f"review:foreign:{foreign_actor}", actor=foreign_actor)
+            journal.append(foreign_input)
+            for operation in (ReflectionReview.ACCEPT, ReflectionReview.REJECT):
+                foreign_review = reflections.append_review(
+                    valid.reflection_id, operation, source_event_id=foreign_input.event_id,
+                    actor=foreign_actor, subject="user:test",
+                    operation_id=f"foreign:{foreign_actor}:{operation.value}",
+                )
+                decision = reflections.apply(foreign_review)
+                assert decision.reason == "review_authority_invalid", decision
+        with closing(reflections._connect()) as connection:
+            connection.execute("UPDATE reflections_v1 SET state='accepted' WHERE reflection_id=?",
+                               (valid.reflection_id,))
+        assert reflections.list_reflections(clearance=Sensitivity.PRIVATE)[0].state is ReflectionState.PROPOSED
         accepted_event = reflections.append_review(
             valid.reflection_id,
             ReflectionReview.ACCEPT,
@@ -237,6 +252,10 @@ def main() -> int:
         assert reflections.apply(accepted_event).outcome == ReflectionState.ACCEPTED.value
         accepted = reflections.list_reflections(clearance=Sensitivity.PRIVATE)
         assert accepted[0].state is ReflectionState.ACCEPTED
+        with closing(reflections._connect()) as connection:
+            connection.execute("UPDATE reflections_v1 SET state='proposed' WHERE reflection_id=?",
+                               (valid.reflection_id,))
+        assert reflections.list_reflections(clearance=Sensitivity.PRIVATE) == accepted
         with closing(reflections._connect()) as connection:
             connection.execute("INSERT INTO reflection_evidence_v1 VALUES (?, ?)",
                                (valid.reflection_id, "outcome:reflection-copy"))
@@ -269,7 +288,14 @@ def main() -> int:
             subject="user:test",
             operation_id="retract-test",
         )
+        # Withdrawal is effective from canonical owner input even before a
+        # delayed projector handles it, and stale accepted caches cannot undo it.
+        assert reflections.list_reflections(clearance=Sensitivity.PRIVATE) == []
         assert reflections.apply(retract_event).outcome == ReflectionState.RETRACTED.value
+        with closing(reflections._connect()) as connection:
+            connection.execute("UPDATE reflections_v1 SET state='accepted' WHERE reflection_id=?",
+                               (valid.reflection_id,))
+        assert reflections.list_reflections(clearance=Sensitivity.PRIVATE) == []
         retracted = reflections.list_reflections(
             clearance=Sensitivity.PRIVATE,
             states=(ReflectionState.RETRACTED,),

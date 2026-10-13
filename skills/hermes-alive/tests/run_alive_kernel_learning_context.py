@@ -128,6 +128,12 @@ async def exercise(root):
     else:
         raise AssertionError('withdrawn advice accepted after model wait')
     assert reader.read(subject='user:one',clearance=Sensitivity.PRIVATE)==()
+    # A stale restored projection must not revive withdrawn advice or its old
+    # completed model interpretation. Canonical withdrawal remains authoritative.
+    with closing(reader.learning._connect()) as connection:
+        connection.execute("UPDATE preference_observations_v1 SET state='active' WHERE observation_id=?",
+                           (own.observation_id,))
+    assert reader.read(subject='user:one',clearance=Sensitivity.PRIVATE)==()
     try:
         interpreter.load_completed(subject='user:one',operation_id='learned')
     except OpportunitySynthesisError:

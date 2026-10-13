@@ -22,6 +22,7 @@ from .content_vault import (
 from .event_store import EventConflictError, ExperienceJournal, JournalRecord
 from .events import EventEnvelope, Sensitivity
 from .outcomes import OutcomeKind, OutcomeProjection
+from .owner_review import owner_review_source
 
 
 class ReflectionValidationError(ValueError):
@@ -52,6 +53,13 @@ class ReflectionReview(StrEnum):
     ACCEPT = "accept"
     REJECT = "reject"
     RETRACT = "retract"
+
+
+_REVIEW_TRANSITIONS = {
+    (ReflectionState.PROPOSED, ReflectionReview.ACCEPT): ReflectionState.ACCEPTED,
+    (ReflectionState.PROPOSED, ReflectionReview.REJECT): ReflectionState.REJECTED,
+    (ReflectionState.ACCEPTED, ReflectionReview.RETRACT): ReflectionState.RETRACTED,
+}
 
 
 class ReflectionContentStatus(StrEnum):
@@ -422,6 +430,8 @@ class ReflectionProjection:
             return self._decision(
                 connection, event, "rejected", "evidence_insufficient_for_reflection", reflection_id
             )
+        if not self._basis_supports_review(self.journal, connection, self.journal.get(event.event_id)):
+            return self._decision(connection, event, "rejected", "reflection_basis_invalid", reflection_id)
         try:
             self.content_vault.resolve_json(
                 content.content_id,
@@ -514,6 +524,8 @@ class ReflectionProjection:
         if row is None:
             return self._decision(connection, event, "rejected", "unknown_reflection", None)
         if (
+            owner_review_source(self.journal, event, proposal_event) is None
+            or
             source is None
             or proposal_event is None
             or source.sequence <= proposal_event.sequence
@@ -527,16 +539,18 @@ class ReflectionProjection:
             return self._decision(
                 connection, event, "rejected", "review_authority_invalid", reflection_id
             )
-        current = ReflectionState(row["state"])
+        canonical = self.verified_state(
+            self.journal, connection, reflection_id, event.subject,
+            before_sequence=self.journal.get(event.event_id).sequence,
+        )
+        if canonical is None:
+            return self._decision(connection, event, "rejected", "outcome_evidence_invalid", reflection_id)
+        current = canonical[0]
         if review is ReflectionReview.ACCEPT and not self.outcome_evidence_valid(
             self.journal, connection, reflection_id, event.subject
         ):
             return self._decision(connection, event, "rejected", "outcome_evidence_invalid", reflection_id)
-        transition = {
-            (ReflectionState.PROPOSED, ReflectionReview.ACCEPT): ReflectionState.ACCEPTED,
-            (ReflectionState.PROPOSED, ReflectionReview.REJECT): ReflectionState.REJECTED,
-            (ReflectionState.ACCEPTED, ReflectionReview.RETRACT): ReflectionState.RETRACTED,
-        }.get((current, review))
+        transition = _REVIEW_TRANSITIONS.get((current, review))
         if transition is None:
             return self._decision(
                 connection, event, "rejected", "invalid_review_transition", reflection_id
@@ -565,6 +579,92 @@ class ReflectionProjection:
             ),
         )
         return self._decision(connection, event, transition.value, f"user_{review.value}", reflection_id)
+
+    @staticmethod
+    def _basis_supports_review(journal, connection, proposal):
+        if proposal is None:
+            return False
+        event = proposal.event
+        ids = tuple(event.payload.get("evidence_outcome_ids", ()))
+        if not ids or len(ids) != len(set(ids)):
+            return False
+        records = [journal.get(f"outcome.record:{item}") for item in ids]
+        if any(
+            record is None or record.sequence >= proposal.sequence
+            or record.event.observed_at > event.observed_at
+            or record.event.subject != event.subject
+            or list(Sensitivity).index(record.event.sensitivity) > list(Sensitivity).index(event.sensitivity)
+            or not OutcomeProjection.canonical_evidence_valid_for(journal, connection, record)
+            for record in records
+        ):
+            return False
+        kinds = {record.event.payload["kind"] for record in records}
+        repeated = len({record.event.payload["attempt_id"] for record in records}) >= 2
+        return bool(
+            event.causation_id == records[-1].event.event_id
+            and (kinds & _EXPLICIT_EVIDENCE or (kinds <= _REPEATED_EVIDENCE and repeated))
+        )
+
+    @staticmethod
+    def verified_state(journal, connection, reflection_id, subject, *, before_sequence=None):
+        """Recover owner control from immutable reviews, including pending retracts.
+
+        Materialized states/transitions are recovery aids, not approval evidence.
+        Return (state, latest valid review event id), or None for an invalid basis.
+        This reads no private prose and grants no permission to act.
+        """
+        row = connection.execute("SELECT * FROM reflections_v1 WHERE reflection_id=?",
+                                 (reflection_id,)).fetchone()
+        proposal = journal.get(row["proposal_event_id"]) if row else None
+        if proposal is None or proposal.event.event_type != "reflection.proposed":
+            return None
+        event = proposal.event
+        try:
+            reference = ContentReference.from_event_payload(event.payload["content"])
+            ReflectionScope(event.payload["scope"])
+            ReflectionAuthority(event.payload["authority"])
+            evidence = {item[0] for item in connection.execute(
+                "SELECT outcome_id FROM reflection_evidence_v1 WHERE reflection_id=?", (reflection_id,))}
+            if (
+                event.subject != subject or row["subject"] != subject
+                or event.payload.get("reflection_id") != reflection_id
+                or any(event.payload.get(field) != row[field] for field in ("scope", "model", "authority"))
+                or reference.content_id != row["content_id"]
+                or reference.sensitivity != event.sensitivity
+                or event.sensitivity.value != row["sensitivity"]
+                or event.confidence != row["confidence"]
+                or event.expires_at is None or event.expires_at.isoformat() != row["expires_at"]
+                or event.expires_at <= event.observed_at
+                or event.expires_at - event.observed_at > ReflectionProjection.MAX_HORIZON
+                or event.observed_at.isoformat() != row["created_at"]
+                or evidence != set(event.payload["evidence_outcome_ids"])
+                or not ReflectionProjection.outcome_evidence_valid(journal, connection, reflection_id, subject)
+                or not ReflectionProjection._basis_supports_review(journal, connection, proposal)
+            ):
+                return None
+        except (KeyError, TypeError, ValueError):
+            return None
+        state, latest = ReflectionState.PROPOSED, None
+        reviews = connection.execute(
+            "SELECT event_id FROM experience_events WHERE subject=? AND event_type='reflection.reviewed' "
+            "AND sequence>? AND (? IS NULL OR sequence<?) "
+            "AND json_extract(canonical_json, '$.payload.reflection_id')=? ORDER BY sequence",
+            (subject, proposal.sequence, before_sequence, before_sequence, reflection_id),
+        ).fetchall()
+        for item in reviews:
+            record = journal.get(item["event_id"])
+            if record is None or owner_review_source(journal, record.event, proposal) is None:
+                continue
+            try:
+                review = ReflectionReview(record.event.payload["review"])
+            except (KeyError, ValueError):
+                continue
+            transition = _REVIEW_TRANSITIONS.get((state, review))
+            if transition is None or (review is ReflectionReview.ACCEPT and
+                                      record.event.observed_at >= event.expires_at):
+                continue
+            state, latest = transition, record.event.event_id
+        return state, latest
 
     def project_new(self, *, limit: int = 1000) -> list[ReflectionProjectionDecision]:
         decisions: list[ReflectionProjectionDecision] = []
@@ -611,16 +711,14 @@ class ReflectionProjection:
         current = as_of or datetime.now(timezone.utc)
         if current.tzinfo is None or current.utcoffset() is None:
             raise ReflectionValidationError("as_of must be timezone-aware")
-        placeholders_state = ",".join("?" for _ in selected_states)
         placeholders_sensitivity = ",".join("?" for _ in allowed)
-        parameters = [*(value.value for value in selected_states)]
-        parameters.extend(value.value for value in allowed)
+        parameters = [value.value for value in allowed]
         parameters.append(current.astimezone(timezone.utc).isoformat())
         with closing(self._connect()) as connection:
             rows = connection.execute(
                 f"""
                 SELECT * FROM reflections_v1
-                WHERE state IN ({placeholders_state})
+                WHERE 1=1
                   AND sensitivity IN ({placeholders_sensitivity})
                   AND expires_at > ?
                 ORDER BY created_at, reflection_id
@@ -629,8 +727,10 @@ class ReflectionProjection:
             ).fetchall()
             records: list[ReflectionRecord] = []
             for row in rows:
-                if not self.outcome_evidence_valid(self.journal, connection, row["reflection_id"], row["subject"]):
+                verified = self.verified_state(self.journal, connection, row["reflection_id"], row["subject"])
+                if verified is None or verified[0] not in selected_states:
                     continue
+                latest = self.journal.get(verified[1] or row["proposal_event_id"])
                 sensitivity = Sensitivity(row["sensitivity"])
                 try:
                     details = self.content_vault.resolve_json(
@@ -658,9 +758,9 @@ class ReflectionProjection:
                         row["reflection_id"], row["subject"], ReflectionScope(row["scope"]),
                         details, row["content_id"], status, evidence, float(row["confidence"]),
                         datetime.fromisoformat(row["expires_at"]), row["model"],
-                        ReflectionAuthority(row["authority"]), ReflectionState(row["state"]),
+                        ReflectionAuthority(row["authority"]), verified[0],
                         sensitivity, datetime.fromisoformat(row["created_at"]),
-                        datetime.fromisoformat(row["updated_at"]),
+                        latest.event.observed_at,
                     )
                 )
             return records

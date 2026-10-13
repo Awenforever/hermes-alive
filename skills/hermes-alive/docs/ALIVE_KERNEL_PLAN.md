@@ -2569,3 +2569,20 @@ For each material change:
 - Continue actual content-linked authenticated feedback, longitudinal utility,
   natural expression qualification and the full memory/agenda/adaptation,
   forgetting/migration/rollback/portable lifecycle and production acceptance scope.
+
+### 2026-10-13 — Owner-controlled learning recovery, ADR 0082
+
+- Baseline `188ab23` actually accepted another person's reflection approval and
+  preference withdrawal. Shared personal-owner causal validation now rejects both,
+  including model principals, without blocking genuine owner controls.
+- Current reflection and preference advice recover owner control from canonical
+  events rather than restored accepted/active cache flags. Pending valid withdrawals
+  already suppress advice; later projection acknowledgement does not grant authority.
+- Derived reflection signals cannot outlive their original basis. Five local suites
+  pass, including cognitive prompt/recovery invalidation of a withdrawn observation.
+- No actual model call/send, production restart/configuration, private chat, other
+  plugin or wmw change. Production still running with start
+  `2026-10-11T07:43:25.630569081Z`; logical model calls remain 43, async HTTP attempts 55.
+- Continue semantic/authenticated content-linked feedback and utility validation,
+  expression qualification and the original full long-term memory/agenda/adaptation,
+  forgetting/migration/rollback/portable lifecycle and production acceptance scope.

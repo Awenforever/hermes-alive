@@ -226,7 +226,7 @@ def main() -> int:
             source_id=reflection.reflection_id,
             source_event_id=accepted.event.event_id,
             rationale="A bounded counter-signal for test coverage.",
-            weight=0.15, expires_at=now + timedelta(days=60),
+            weight=0.15, expires_at=now + timedelta(days=180),
         )
         reflected_record = learning.append_observation(
             reflected_signal, actor="system:learning"
@@ -238,6 +238,8 @@ def main() -> int:
             assert learning.estimates(subject="user:test", clearance=Sensitivity.PRIVATE) == []
             assert reflections.list_reflections(clearance=Sensitivity.PRIVATE) == []
         assert learning.estimates(subject="user:test", clearance=Sensitivity.PRIVATE)
+        assert learning.estimates(subject="user:test", clearance=Sensitivity.PRIVATE,
+                                  as_of=now + timedelta(days=70))[0].opposition_mass == 0.15
         expired_source_estimate = learning.estimates(
             subject="user:test", clearance=Sensitivity.PRIVATE, as_of=now + timedelta(days=91)
         )[0]
@@ -313,6 +315,20 @@ def main() -> int:
         assert round(estimate.probability, 6) == round(2.25 / 4.25, 6)
         assert estimate.evidence_ids == (explicit_signal.observation_id,)
 
+        for foreign_actor in ("user:other", "model:test"):
+            foreign_retract_source = EventEnvelope(
+                event_id=f"retract:foreign:{foreign_actor}", event_type="conversation.inbound",
+                source="test.channel", actor=foreign_actor, subject="user:test", payload={},
+            )
+            journal.append(foreign_retract_source)
+            foreign_retract = learning.append_retraction(
+                explicit_signal.observation_id, source_event_id=foreign_retract_source.event_id,
+                actor=foreign_actor, subject="user:test", operation_id=f"foreign:{foreign_actor}",
+            )
+            decision = learning.apply(foreign_retract)
+            assert decision.reason == "retraction_authority_invalid", decision
+        assert learning.estimates(subject="user:test", clearance=Sensitivity.PRIVATE)[0] == estimate
+
         retract_signal_message = EventEnvelope(
             event_id="retract-signal:preference-test",
             event_type="conversation.inbound", source="test.channel",
@@ -324,7 +340,11 @@ def main() -> int:
             source_event_id=retract_signal_message.event_id,
             actor="user:test", subject="user:test", operation_id="signal-test",
         )
+        assert learning.estimates(subject="user:test", clearance=Sensitivity.PRIVATE) == []
         assert learning.apply(retract_signal).outcome == "retracted"
+        with closing(learning._connect()) as connection:
+            connection.execute("UPDATE preference_observations_v1 SET state='active' WHERE observation_id=?",
+                               (explicit_signal.observation_id,))
         assert learning.estimates(subject="user:test", clearance=Sensitivity.PRIVATE) == []
 
         learning.rebuild(batch_size=2)

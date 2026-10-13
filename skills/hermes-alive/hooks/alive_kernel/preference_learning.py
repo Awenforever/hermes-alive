@@ -24,6 +24,7 @@ from .event_store import EventConflictError, ExperienceJournal, JournalRecord
 from .events import EventEnvelope, Sensitivity
 from .outcomes import OutcomeKind, OutcomeProjection
 from .reflection import ReflectionState, ReflectionProjection
+from .owner_review import owner_review_source
 
 
 class PreferenceLearningError(ValueError):
@@ -332,6 +333,7 @@ class PreferenceLearningProjection:
         origin: PreferenceSignalOrigin,
         source_id: str,
         source_event_id: str,
+        *, as_of: datetime | None = None,
     ) -> bool:
         if event.causation_id != source_event_id:
             return False
@@ -367,24 +369,14 @@ class PreferenceLearningProjection:
         row = connection.execute(
             "SELECT * FROM reflections_v1 WHERE reflection_id=?", (source_id,)
         ).fetchone()
-        transition = connection.execute(
-            """
-            SELECT caused_by_event_id FROM reflection_transitions_v1
-            WHERE reflection_id=? AND to_state=?
-            ORDER BY transition_id DESC LIMIT 1
-            """,
-            (source_id, ReflectionState.ACCEPTED.value),
-        ).fetchone()
+        verified = ReflectionProjection.verified_state(self.journal, connection, source_id, event.subject)
         return bool(
             row
-            and transition
-            and ReflectionProjection.outcome_evidence_valid(self.journal, connection, source_id, event.subject)
+            and verified == (ReflectionState.ACCEPTED, source_event_id)
             and row["subject"] == event.subject
             and _SENSITIVITY_ORDER.index(Sensitivity(row["sensitivity"]))
             <= _SENSITIVITY_ORDER.index(event.sensitivity)
-            and row["state"] == ReflectionState.ACCEPTED.value
-            and transition["caused_by_event_id"] == source_event_id
-            and datetime.fromisoformat(row["expires_at"]) > event.observed_at
+            and datetime.fromisoformat(row["expires_at"]) > (as_of or event.observed_at)
         )
 
     def _apply_observation(
@@ -489,6 +481,8 @@ class PreferenceLearningProjection:
         if row is None:
             return self._decision(connection, event, "rejected", "unknown_observation", None)
         if (
+            owner_review_source(self.journal, event, proposal_event) is None
+            or
             source is None
             or proposal_event is None
             or source.sequence <= proposal_event.sequence
@@ -502,7 +496,9 @@ class PreferenceLearningProjection:
             return self._decision(
                 connection, event, "rejected", "retraction_authority_invalid", observation_id
             )
-        if row["state"] == PreferenceSignalState.RETRACTED.value:
+        if self._has_owner_retraction(
+            connection, proposal_event, before_sequence=self.journal.get(event.event_id).sequence
+        ):
             return self._decision(
                 connection, event, "deduplicated", "already_retracted", observation_id
             )
@@ -555,22 +551,14 @@ class PreferenceLearningProjection:
             rows = connection.execute(
                 f"""
                 SELECT p.* FROM preference_observations_v1 p
-                LEFT JOIN reflections_v1 r
-                  ON p.origin=? AND r.reflection_id=p.source_id
-                WHERE p.state=? AND p.expires_at>?
+                WHERE p.expires_at>?
                   AND p.sensitivity IN ({placeholders})
-                  AND (p.origin<>? OR (r.state=? AND r.expires_at>?))
                   AND p.subject=?
                 ORDER BY p.rowid
                 """,
                 (
-                    PreferenceSignalOrigin.ACCEPTED_REFLECTION.value,
-                    PreferenceSignalState.ACTIVE.value,
                     current.astimezone(timezone.utc).isoformat(),
                     *(value.value for value in allowed),
-                    PreferenceSignalOrigin.ACCEPTED_REFLECTION.value,
-                    ReflectionState.ACCEPTED.value,
-                    current.astimezone(timezone.utc).isoformat(),
                     subject,
                 ),
             ).fetchall()
@@ -586,6 +574,8 @@ class PreferenceLearningProjection:
                     or original.event.expires_at.isoformat() != row["expires_at"]
                 ):
                     continue
+                if self._has_owner_retraction(connection, original):
+                    continue
                 try:
                     ref = ContentReference.from_event_payload(original.event.payload["content"])
                 except (KeyError, ValueError, TypeError):
@@ -597,6 +587,7 @@ class PreferenceLearningProjection:
                 if not self._source_valid(
                     connection, original.event, PreferenceSignalOrigin(row["origin"]),
                     row["source_id"], row["source_event_id"],
+                    as_of=current,
                 ):
                     continue
                 try:
@@ -663,3 +654,18 @@ class PreferenceLearningProjection:
                     )
                 )
             return estimates
+
+    def _has_owner_retraction(self, connection, original, *, before_sequence=None):
+        """Canonical owner withdrawals override active/retracted cache flags."""
+        rows = connection.execute(
+            "SELECT event_id FROM experience_events WHERE subject=? AND event_type='preference.retracted' "
+            "AND sequence>? AND (? IS NULL OR sequence<?) "
+            "AND json_extract(canonical_json, '$.payload.observation_id')=? ORDER BY sequence",
+            (original.event.subject, original.sequence, before_sequence, before_sequence,
+             original.event.payload["observation_id"]),
+        ).fetchall()
+        return any(
+            (record := self.journal.get(row["event_id"])) is not None
+            and owner_review_source(self.journal, record.event, original) is not None
+            for row in rows
+        )
