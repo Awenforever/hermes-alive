@@ -12,6 +12,7 @@ from typing import Any
 from .action_contract import parse_action_contract
 from .cognition_cycle import CycleCandidate
 from .cognition_context import CognitionContextReader
+from .content_vault import ContentReference
 from .deliberation import (
     ActionAuthority, ActionCandidate, ActionKind, AssessmentBasis,
     DecisionDimensions, DimensionAssessment, SideEffect,
@@ -79,14 +80,20 @@ class OpportunitySynthesizer:
         self.context_reader = CognitionContextReader(journal, content_vault=context_vault)
 
     def _candidates(self, document: Any, evidence: tuple, operation: str,
-                    receipt_id: str, authority: ActionAuthority, context: tuple = ()) -> tuple[tuple, tuple, int]:
+                    receipt_id: str, authority: ActionAuthority, context: tuple = (),
+                    indices: tuple[int, ...] | None = None) -> tuple[tuple, tuple, int, tuple]:
         if (not isinstance(document, dict) or set(document) != {"candidates"}
                 or not isinstance(document["candidates"], list)
                 or len(document["candidates"]) > 4):
             raise OpportunitySynthesisError("invalid opportunity candidate envelope")
         sources = {item.agenda_item_id: item for item in evidence}
-        accepted, drafts = [], []
-        for index, raw in enumerate(document["candidates"]):
+        if indices is None:
+            indices = tuple(range(len(document["candidates"])))
+        if (len(indices) != len(document["candidates"]) or len(set(indices)) != len(indices)
+                or any(type(i) is not int or not 0 <= i < 4 for i in indices)):
+            raise OpportunitySynthesisError("invalid proposal identity indices")
+        accepted, drafts, accepted_indices = [], [], []
+        for index, raw in zip(indices, document["candidates"]):
             try:
                 if (not isinstance(raw, dict) or set(raw) != {
                         "agenda_item_id", "kind", "text", "topic", "dimensions"}
@@ -126,10 +133,72 @@ class OpportunitySynthesizer:
                     action, contract.to_document(), raw["topic"], str(source.content["source"]),
                 ))
                 drafts.append(raw)
+                accepted_indices.append(index)
             except (KeyError, TypeError, ValueError):
                 # One malformed/unsupported proposal cannot erase other proposals.
                 continue
-        return tuple(accepted), tuple(drafts), len(document["candidates"]) - len(accepted)
+        return tuple(accepted), tuple(drafts), len(document["candidates"]) - len(accepted), tuple(accepted_indices)
+
+    def load_completed(self, *, subject: str, operation_id: str,
+                       authority: ActionAuthority = ActionAuthority.NONE,
+                       clearance: Sensitivity = Sensitivity.PRIVATE) -> OpportunitySynthesisResult:
+        """Recover retained drafts without inference or restoring stale permission.
+
+        Requiring fresh host authority is intentional. This is neither a resume
+        of an interrupted provider call nor a selection/send authorization.
+        """
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}", operation_id):
+            raise OpportunitySynthesisError("invalid opportunity operation")
+        authority, clearance = ActionAuthority(authority), Sensitivity(clearance)
+        start = self.journal.get(f"opportunity.synthesis:{operation_id}:started")
+        receipt = self.journal.get(f"opportunity.synthesis:{operation_id}:completed")
+        failed = self.journal.get(f"opportunity.synthesis:{operation_id}:failed")
+        if start is None or receipt is None or failed is not None:
+            raise OpportunitySynthesisError("opportunity operation has no unambiguous completion")
+        for record, kind in ((start, "started"), (receipt, "completed")):
+            if (record.event.event_type != "opportunity.synthesis_" + kind
+                    or record.event.subject != subject or record.event.sensitivity is not clearance
+                    or record.event.source != "alive.opportunity-synthesis"
+                    or record.event.actor != "system:alive-interpreter"):
+                raise OpportunitySynthesisError("opportunity recovery scope mismatch")
+        if receipt.event.causation_id != start.event.event_id:
+            raise OpportunitySynthesisError("opportunity completion has wrong cause")
+        if authority is not ActionAuthority.NONE and authority.value != start.event.payload.get("host_authority"):
+            raise OpportunitySynthesisError("recovery cannot upgrade original host authority")
+        evidence = self.reader.active_evidence(subject=subject, clearance=clearance, limit=8)
+        context = self.context_reader.read(subject=subject, clearance=clearance)
+        if (tuple(e.observation_event_id for e in evidence) != tuple(start.event.payload.get("observation_event_ids", ()))
+                or tuple(c.proposal_event_id for c in context) != tuple(start.event.payload.get("context_proposal_event_ids", ()))):
+            raise OpportunitySynthesisError("opportunity recovery evidence is no longer current")
+        try:
+            ref = ContentReference.from_event_payload(receipt.event.payload["content"])
+            if (ref.content_id != f"opportunity-proposals:{operation_id}" or ref.sensitivity is not clearance
+                    or ref.retention_until is None or ref.retention_until <= datetime.now(timezone.utc)):
+                raise OpportunitySynthesisError("opportunity bundle outside recovery retention/scope")
+            bundle = self.vault.resolve_json(ref.content_id, expected_subject=subject,
+                        expected_purpose="opportunity.candidates", expected_sensitivity=clearance)
+            if self.vault.digest_json(bundle) != ref.digest:
+                raise OpportunitySynthesisError("opportunity bundle digest mismatch")
+            count, rejected = receipt.event.payload["candidate_count"], receipt.event.payload["rejected_count"]
+            if type(count) is not int or not 0 <= count <= 4 or type(rejected) is not int or not 0 <= rejected <= 4-count:
+                raise OpportunitySynthesisError("invalid completed counts")
+            indices = bundle.get("proposal_indices")
+            if indices is None:
+                # Old accepted-only bundles lost original positions after a
+                # partial rejection. Never silently create different identities.
+                if rejected:
+                    raise OpportunitySynthesisError("legacy partial bundle lacks stable proposal identities")
+                indices = tuple(range(count))
+            candidates, _, invalid, _ = self._candidates({"candidates": bundle["proposals"]},
+                evidence, operation_id, receipt.event.event_id, authority, context, tuple(indices))
+            if invalid or len(candidates) != count:
+                raise OpportunitySynthesisError("completed proposals no longer valid")
+            model = receipt.event.payload["actual_model"]
+            if not isinstance(model, str) or not model:
+                raise OpportunitySynthesisError("completed model attribution unavailable")
+            return OpportunitySynthesisResult(model, candidates, receipt.event.event_id, rejected)
+        except Exception:
+            raise OpportunitySynthesisError("retained opportunity completion is not recoverable") from None
 
     async def run(self, *, subject: str, operation_id: str, call: ModelCaller,
                   requested_model: str | None = None,
@@ -191,11 +260,11 @@ class OpportunitySynthesizer:
                 raise OpportunitySynthesisError("opportunity response exceeds boundary")
             document = json.loads(content, parse_constant=_reject_constant,
                                   object_pairs_hook=_unique_object)
-            candidates, drafts, rejected = self._candidates(
+            candidates, drafts, rejected, indices = self._candidates(
                 document, evidence, operation_id, receipt_id, authority, context,
             )
             bundle = self.vault.put_json(
-                {"proposals": list(drafts)}, subject=subject,
+                {"proposals": list(drafts), "proposal_indices": list(indices)}, subject=subject,
                 purpose="opportunity.candidates", sensitivity=Sensitivity(clearance),
                 content_id=f"opportunity-proposals:{operation_id}",
                 retention_until=min(item.expires_at for item in evidence),

@@ -1726,3 +1726,47 @@ For each material change:
   changes. Preserve the six already-used calls as historical accounting; do not
   erase them on restart. Continue with explicit small-batch budgets, causal
   receipts and transport retry accounting rather than blind repeated inference.
+
+### 2026-10-13 — Recover the paid candidate, then deliberate
+
+- ADR-0064 adds explicit completed-candidate recovery without inference, journal
+  append, automatic permission restoration, selection or send. Recovery checks
+  current source/profile scope, retained encrypted contents and causal receipts.
+- Fixed original-index loss after partial rejection. New bundles preserve IDs;
+  old zero-rejection bundles are unambiguous, whereas old partial bundles fail
+  explicitly without deleting history or silently regenerating different intent.
+- Deterministic recovery contract passed: rejected-first identity preservation,
+  real attribution/counts, restart/repeat loading, default permission downgrade,
+  scope/authority/incomplete refusal, bundle erasure and profile withdrawal.
+- Live synthetic probe reused the existing actual candidate from the previous
+  paid experiment. Zero interpretation calls, one selector call, USTC HTTP 200,
+  actual response model `deepseek-flash`, choice SHARE, no action attempt or send.
+  Only the test process excluded USTC from its proxy path. Production network and
+  configuration were unchanged; prior isolated ConnectErrors are not evidence of
+  production provider unavailability. Seven cumulative logical live calls used.
+- Natural presentation and semantic fidelity, durable selection recovery, fresh
+  evidence binding through later stages, outcomes, production user-policy wiring,
+  live canary and human longitudinal usefulness are still open. One successful
+  selection is not useful exposure, delivery, feedback or production acceptance.
+- Windows suite: 41 kernel files, 40 PASS, one absent-Hermes hook SKIP, zero
+  failures. Linux network-disabled recovery/opportunity/context contracts passed
+  in `alive-opportunity-recovery-20261013-r1`, exit zero; started
+  `2026-10-13T06:53:58.917568439Z`, finished
+  `2026-10-13T06:54:01.595747478Z`. Source input tree
+  `80bed4f891682b4c16cc74b3e0b290d253e265f4`, archive SHA256
+  `a4a89f861a03aaeb18c6f06451a6999bb653e10cf891236b56f2607b6cf09ad6`.
+  Retained `opportunity-recovery-r1.log` SHA256
+  `0435b88f67228fe1f39f5c5464c4e26b49cd644b20fbf6c484b6e4b10de7976f`.
+- Live test `alive-live-recovery-20261013-r1` used the same source input and the
+  previous retained synthetic journal, started `2026-10-13T06:53:59.259758767Z`,
+  finished `2026-10-13T06:54:20.356771956Z`, exit zero. Report SHA256
+  `73a6214b7a7787bf6451faebd2d31e41d6f83fe181f0a0763b42c9a21fe8f91f`;
+  `live-recovery-r1.log` SHA256
+  `f07749f886a60655c62aaaac34459fab49d0c5b73e8f5c1037fbbc839a377d2d`.
+  Initial extraction and later selection came from different configured provider
+  routes; both correctly returned model name `deepseek-flash`. No regenerated
+  interpretation or external dispatch occurred. These are source/core-runtime
+  experiments, not admitted installation or complete behavior qualification.
+- Removed this run's isolated credential export, configuration and generated
+  configuration backup. Production continued with unchanged start time
+  `2026-10-11T07:43:25.630569081Z`; no gateway restart/deployment occurred.
