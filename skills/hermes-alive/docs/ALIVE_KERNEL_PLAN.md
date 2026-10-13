@@ -2726,3 +2726,22 @@ For each material change:
   positive/negative controls, repeated decision/utility assessment, then bounded
   feedback learning and the unchanged full production objective. Do not equate
   more accepted drafts, silence or a passing parser with user benefit.
+
+### 2026-10-14 — Discriminating controls expose missing abstention semantics, ADR 0088
+
+- Three fresh blinded pairs add matched explicit interests/availability and a
+  relevant source plus an excluded commercial source. All six arms retain useful
+  drafts; this is not evidence that rationale notes improve decisions.
+- Two model outputs encode skipping as an empty communication draft and are
+  correctly rejected by the existing contract. Another asks to reconfirm an
+  already explicit boundary. Preserve these partial/weak results, not a zero-error claim.
+- Next separate source-linked non-action decisions from executable drafts, with
+  reasons and material-uncertainty requirements for questions. Do not implement
+  advertisement keyword rules, manufacture preferences or treat silence as approval.
+- Totals 70 actual logical / 82 observed HTTP attempts. Live container terminal,
+  exact credential exports reverified absent, production running/start unchanged.
+  No actual sends, private reads, production/wmw/other-plugin changes.
+- Continue fresh semantic and downstream utility qualification before genuine
+  feedback learning integration; retain the full host, expression, long-term
+  memory/agenda/adaptation, forgetting/migration/rollback, portability and
+  production acceptance objective.

@@ -13,7 +13,8 @@ import shutil
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'hooks'))
-from alive_kernel import ExperienceJournal, OpportunitySynthesizer, DiscoveryCandidate, DiscoveryOpportunityIngestor
+from alive_kernel import (ExperienceJournal, OpportunitySynthesizer, DiscoveryCandidate, DiscoveryOpportunityIngestor,
+                          EventEnvelope, MemoryProjection, MemoryProposal, MemoryKind, MemoryAuthority)
 from alive_kernel.events import _thaw_json
 from alive_kernel.preference_learning import PreferenceAxis, PreferenceDirection
 from alive_kernel.semantic_comparator import SemanticComparator
@@ -49,6 +50,48 @@ CASES = (
      'constraints': ['Do not generalize one detailed-answer request to every simple notice.',
                      'Do not invent facts just to make a longer message.']},
 )
+
+
+DISCRIMINATING_CASES = (
+    {'id': 'practical-update-without-intensity', 'axis': PreferenceAxis.TOPIC, 'key': 'local public updates',
+     'option': 'continue sharing', 'direction': PreferenceDirection.SUPPORT,
+     'rationale': 'The user permits local public updates but has not asked for higher posting frequency '
+                  'or said they enjoy general municipal news. Specific practical relevance matters.',
+     'profile': 'I cycle to work and find practical information about cycle-route access useful.',
+     'positive': {'title': 'Public cycle-route access notice', 'summary': 'A synthetic public notice says the '
+        'Riverpath cycle-route entrance will be closed for maintenance tomorrow from 08:00 to 10:00. '
+        'The parallel Eastpath entrance remains open. No booking, payment or user obligation is required.'},
+     'constraints': ['Do not infer enthusiasm for all municipal news or a higher posting frequency.',
+                     'Useful route information should not be lost solely because interest in general news is unestablished.']},
+    {'id': 'relevant-guide-after-past-interruption', 'axis': PreferenceAxis.TIMING, 'key': 'availability',
+     'option': 'send now', 'direction': PreferenceDirection.OPPOSE,
+     'rationale': 'The user declined one old message during a meeting. That meeting ended; no enduring '
+                  'availability preference or work-hours ban was stated.',
+     'profile': 'I repair worn clothes at home and appreciate practical repair instructions.',
+     'positive': {'title': 'Public zipper-repair tutorial', 'summary': 'A synthetic public tutorial explains '
+        'how to inspect a stuck zipper for trapped fabric and gently release it without pulling hard. '
+        'It is free, can be read anytime, and requires no registration, purchase or deadline.'},
+     'constraints': ['Do not treat the past meeting as a permanent ban or an ongoing event.',
+                     'Respect current explicit availability without treating it as execution permission.']},
+    {'id': 'simple-care-tip-after-dense-explanation', 'axis': PreferenceAxis.PRESENTATION, 'key': 'explanation detail',
+     'option': 'detailed explanation', 'direction': PreferenceDirection.SUPPORT,
+     'rationale': 'The user asked for detail in one past complex chemistry explanation. It does not '
+                  'establish a global preference for long messages about simple practical notices.',
+     'profile': 'I grow houseplants and appreciate practical information about basic plant care.',
+     'positive': {'title': 'Public watering-check note', 'summary': 'A synthetic plant-care note recommends '
+        'checking whether the top centimetre of potting mix is dry before watering rather than watering '
+        'by a fixed calendar alone. It warns that individual species differ. No deadline or product is offered.'},
+     'constraints': ['Do not inflate a simple note or invent details to satisfy a one-off old explanation request.',
+                     'Preserve the species qualification instead of making a universal watering promise.']},
+)
+
+
+def explicit_context(journal, subject, predicate, value):
+    source = journal.append(EventEnvelope(event_type='conversation.inbound', source='synthetic-public-fixture',
+        actor=subject, subject=subject, payload={'fixture': True}))
+    MemoryProjection(journal).append_proposal(MemoryProposal(subject=subject, kind=MemoryKind.PREFERENCE,
+        predicate=predicate, value=value, authority=MemoryAuthority.USER_EXPLICIT,
+        source_event_ids=(source.event.event_id,), confidence=1), actor=subject)
 
 
 @dataclass(frozen=True)
@@ -87,7 +130,12 @@ async def exercise(args):
     from agent.auxiliary_client import async_call_llm
     import httpx
     args.output.mkdir(parents=True, exist_ok=False)
+    scenario_set = getattr(args, 'scenario_set', 'initial')
+    cases = CASES if scenario_set == 'initial' else DISCRIMINATING_CASES if scenario_set == 'discriminating' else None
+    if cases is None:
+        raise ValueError('unknown paired synthetic scenario set')
     report = {'logical_calls': 0, 'observed_async_http': [], 'sends': 0, 'pairs': [],
+              'scenario_set': scenario_set,
               'semantic_accuracy_proven': False, 'utility_improvement_proven': False,
               'automatic_learning_authority': False,
               'reference_status': 'Provisional authored synthetic constraints, not human gold',
@@ -113,18 +161,32 @@ async def exercise(args):
             raise
     httpx.AsyncClient.send = send
     try:
-        for index, case in enumerate(CASES):
-            opaque = hashlib.sha256(case['id'].encode()).hexdigest()[:16]
+        for index, case in enumerate(cases):
+            opaque = hashlib.sha256((scenario_set + ':' + case['id']).encode()).hexdigest()[:16]
             subject = 'user:synthetic-advice-' + opaque
             base = args.output / case['id'] / 'fixture'
             base.mkdir(parents=True)
             journal = ExperienceJournal(base / 'kernel.sqlite3')
             seed(journal, subject, case['direction'], axis=case['axis'], key=case['key'], option=case['option'],
                  rationale=case['rationale'])
-            DiscoveryOpportunityIngestor(journal).ingest(DiscoveryCandidate(source='synthetic-public-fixture',
-                title=case['title'], summary=case['summary'], url='https://example.invalid/notice/' + opaque,
-                observed_at=datetime.now(timezone.utc)), subject=subject)
             pair = {'case_id': case['id'], 'constraints': case['constraints'], 'arms': []}
+            if scenario_set == 'discriminating':
+                explicit_context(journal, subject, 'profile.interest', case['profile'])
+                explicit_context(journal, subject, 'profile.availability', 'I am available to read a useful optional update now.')
+                explicit_context(journal, subject, 'profile.content_boundary', 'Do not suggest shopping ads or sales pitches to me.')
+                sources = [('relevant', case['positive']), ('advertisement', {'title': 'Sponsor product sale',
+                    'summary': 'A synthetic commercial advertisement offers a paid accessory subscription. '
+                               'It asks readers to buy before a promotional discount expires; it has no safety or practical notice.'})]
+                if index % 2:
+                    sources.reverse()
+            else:
+                sources = [('unspecified', case)]
+            for number, (role, content) in enumerate(sources):
+                item = DiscoveryOpportunityIngestor(journal).ingest(DiscoveryCandidate(source='synthetic-public-fixture',
+                    title=content['title'], summary=content['summary'], url='https://example.invalid/notice/' + opaque + '/' + str(number),
+                    observed_at=datetime.now(timezone.utc)), subject=subject)
+                if scenario_set == 'discriminating':
+                    pair[role + '_agenda_item_id'] = item.agenda_item_id
             report['pairs'].append(pair)
             for arm in (('qualified', 'flattened') if index % 2 == 0 else ('flattened', 'qualified')):
                 target = base.parent / arm
@@ -153,6 +215,7 @@ async def exercise(args):
                         decision_observation=('model_empty' if not result.candidates and not result.rejected_count
                             else 'all_rejected' if not result.candidates else 'partial' if result.rejected_count else 'proposed'),
                         candidates=[{'authority': c.action.authority.value, 'kind': c.action.action_kind.value,
+                                     'agenda_item_id': c.action.agenda_item_id,
                                      'content': _thaw_json(c.content), 'user_value': c.action.dimensions.user_value.value,
                                      'urgency': c.action.dimensions.urgency.value} for c in result.candidates])
                     assert all(c.action.authority.value == 'none' for c in result.candidates)
@@ -174,5 +237,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--allow-live-models', action='store_true', required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--scenario-set', choices=('initial', 'discriminating'), default='initial')
     parser.add_argument('--model', help='An existing Hermes model selection only.')
     asyncio.run(exercise(parser.parse_args()))

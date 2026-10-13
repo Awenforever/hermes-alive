@@ -10,7 +10,7 @@ from types import ModuleType, SimpleNamespace
 from unittest.mock import patch
 
 import httpx
-from probe_alive_live_advice_pairs import exercise, CASES
+from probe_alive_live_advice_pairs import exercise, CASES, DISCRIMINATING_CASES
 
 
 async def check(root):
@@ -60,6 +60,25 @@ async def check(root):
     assert report['pairs'][0]['arms'][1]['decision_observation'] == 'all_rejected'
     assert report['pairs'][0]['arms'][0]['model_proposal_count'] == 0
     assert report['pairs'][0]['arms'][1]['model_proposal_count'] == 1
+    old_logging = logging.root.manager.disable
+    try:
+        with patch.dict(sys.modules, {'agent': package, 'agent.auxiliary_client': auxiliary}), \
+             patch.object(httpx.AsyncClient, 'send', forbidden):
+            await exercise(SimpleNamespace(output=root/'discriminating', model=None, scenario_set='discriminating'))
+    finally:
+        logging.disable(old_logging)
+    report = json.loads((root/'discriminating/report.json').read_text(encoding='utf-8'))
+    assert report['logical_calls'] == 6 and len(seen) == 12 and report['observed_async_http'] == []
+    assert report['scenario_set'] == 'discriminating' and not report['utility_improvement_proven']
+    for pair in report['pairs']:
+        assert pair['matched_inputs_except_notes_and_clock']
+        assert pair['relevant_agenda_item_id'] != pair['advertisement_agenda_item_id']
+        for arm in pair['arms']:
+            assert arm['completed'] and arm['no_new_preference_signals'] and arm['no_external_dispatch']
+            assert len(arm['input']['user_context']) == 3 and len(arm['input']['opportunities']) == 2
+            assert all(case['id'] not in json.dumps(arm['input']) for case in DISCRIMINATING_CASES)
+            assert {o['agenda_item_id'] for o in arm['input']['opportunities']} == {
+                pair['relevant_agenda_item_id'], pair['advertisement_agenda_item_id']}
 
 
 if __name__ == '__main__':
