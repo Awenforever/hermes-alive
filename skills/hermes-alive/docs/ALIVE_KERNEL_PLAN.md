@@ -2072,3 +2072,81 @@ For each material change:
   absent-Hermes hook SKIP, zero failures. Linux evidence above exercises the same
   runtime/test code tree before this later plan entry and manifest regeneration;
   it is not a current public-GitHub installation or authenticated channel canary.
+
+### 2026-10-13 — Evidenced feedback becomes an advisory cognition input
+
+- Rechecked clean `ba3460175eedb82ae4287168e19d69617c3d2cfa`. Inspection found
+  learning estimates had no cognition consumer: the records could not inform a
+  later opportunity interpretation. The estimates API also lacked a required
+  principal and could combine different subjects' evidence on the same target.
+  Before connecting it to model input, added owner scoping and retained-content
+  authentication, not a permissive global query fallback.
+- ADR 0070: estimates now require subject, filter it before grouping/decryption,
+  check original observation type/row identity/sensitivity/content ID, full
+  retained-content digest and target digest, and exclude unavailable/erased
+  observations from support/opposition mass. A readable representative cannot
+  preserve hidden influence from another forgotten observation.
+- New `CognitionLearningReader` advances outcome/reflection/learning projections
+  in dependency order and reads at most eight retained owner-scoped advice entries,
+  each at most 1500 serialized characters. It does not extract feedback from text,
+  manufacture preferences, call models or send. Existing canonical attribution
+  rejects ordinary replies and delivery outcomes as preference-signal sources.
+- Opportunity interpretation now sees advice separately from explicit memory.
+  Prompt instructions mark it tentative, not calibrated probability, user fact,
+  explicit preference or authority. Support/opposition and signal-event provenance
+  are available for relevance judgment; generated candidate dimensions carry those
+  event IDs. Host authorization remains independently supplied/default NONE.
+- Start receipts bind a private HMAC of the advice snapshot. Model post-await
+  validation and completed-draft recovery recheck it; existing selection/expression
+  guards therefore reject withdrawn/erased/expired/changed advice too. Old receipts
+  lacking the field recover only with empty current advice, not retroactive hints.
+- Synthetic causal composition test uses two owners with opposite feedback on
+  the same target. Scoped estimates/prompt input stay separate; unknown owner and
+  public clearance reveal no private advice. A tampered projected content ID is
+  ignored. Erasure of one owner's observation removes its mass without changing
+  the other. Advice reaches interpretation and its dimension provenance; withdrawal
+  during the model call and later completed-proposal recovery fail closed.
+  The prior authorization/attempt/outcome and interpreter are authored fixtures,
+  not real delivery, real-model quality, actual human benefit or production learning.
+- Linux network-disabled initial input tree `afcccc0cc8e6522fc217c784c01a399f0375c84a`,
+  archive SHA256 `3284d85474fa3163d956306133529136741892a06e2c9006428fb51c27b4dbdd`.
+  `alive-learning-context-offline-20261013-r1` exit zero, start
+  `2026-10-13T09:24:55.692755897Z`, finish `2026-10-13T09:25:14.966453294Z`.
+  Subsequently made the estimates API principal mandatory (instead of optional)
+  and updated its callers; local affected tests reran successfully.
+- Required-principal-stage Linux immutable runtime/test input tree
+  `f1da339c8949014998d359415c96ff1a8c4f5c0c`, archive SHA256
+  `05a969a29a7632f1a771a407644ad5ac25595b361fabe117b2fe09d4d07baf77`.
+  `alive-learning-context-offline-20261013-r2`: exit zero, start
+  `2026-10-13T09:29:31.579001021Z`, finish `2026-10-13T09:29:49.823618312Z`;
+  learning-context, preference-learning, source-epoch, recovery and expression pass.
+  Both marker-log SHA256 values are
+  `54f3dc6cdc095fb8e13f018af10fb14a50695fe071498ba85653b229cf49a6a2`;
+  identical markers do not assert identical input generations.
+- Windows source-suite run: 48 files, 47 PASS, one absent-Hermes hook SKIP, zero
+  failures. The required-principal API/caller edit occurred during that run, so
+  it is not a single immutable input qualification; both affected tests were also
+  run against that stage's source, with Linux snapshot qualification as above.
+- No real model calls added; cumulative logical calls twenty/observed async HTTP
+  30. Production still running, unchanged start `2026-10-11T07:43:25.630569081Z`.
+  No production upgrade/restart, model/auth/config change, channel exposure,
+  published release or lifecycle/install qualification. No credentials exported.
+- Next: real-model handling of fresh synthetic feedback, reviewer protocol
+  reliability and source entailment; meaningful utility/outcome feedback, current
+  gateway/consent bridge and longitudinal adaptation. Complete source forgetting
+  and derivative retention remain open; this test does not prove those globally.
+  Natural expression still uses explicit presentation settings; learned styles
+  are not silently activated. Do not equate an input bridge with production-ready
+  learning or count synthetic ledger attempts as delivered actions.
+- A subsequent boundary check kept custom typed-memory storage separate from
+  established learning/outcome storage: configuring `context_vault` no longer
+  implicitly relocates their retained content. Added a custom-memory-vault
+  composition test and an explicit assertion that erased reflected advice no
+  longer contributes opposition mass through a readable explicit-feedback target.
+  Both affected tests reran on Windows and in immutable Linux input tree
+  `a9849e326c6801cb818fb4a418fae0c5b7aac0f9`, archive SHA256
+  `dee322a7cfb2abe0891b2c3c252a03589472d6deb6025e58dc4c95da0df26f3e`.
+  `alive-learning-context-offline-20261013-r3`: exit zero, start
+  `2026-10-13T09:35:11.819180508Z`, finish `2026-10-13T09:35:13.752499805Z`,
+  log SHA256 `b4ffbd3156ac87c413ece4e7e0c2b8c94e4081366940cf2d79ffc2f4ef746cae`.
+  No later runtime/test edits; later plan/manifest changes are not that input tree.

@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from enum import StrEnum
 from pathlib import Path
 import math
+import re
 import sqlite3
 from typing import Any
 from uuid import uuid4
@@ -540,13 +541,16 @@ class PreferenceLearningProjection:
         return decisions
 
     def estimates(
-        self, *, clearance: Sensitivity, as_of: datetime | None = None
+        self, *, subject: str, clearance: Sensitivity, as_of: datetime | None = None,
     ) -> list[PreferenceEstimate]:
         allowed = list(Sensitivity)[: list(Sensitivity).index(Sensitivity(clearance)) + 1]
         current = as_of or datetime.now(timezone.utc)
         if current.tzinfo is None or current.utcoffset() is None:
             raise PreferenceLearningError("as_of must be timezone-aware")
         placeholders = ",".join("?" for _ in allowed)
+        if not isinstance(subject, str) or not re.fullmatch(
+                r"[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}", subject):
+            raise PreferenceLearningError("invalid preference estimate subject")
         with closing(self._connect()) as connection:
             rows = connection.execute(
                 f"""
@@ -556,6 +560,7 @@ class PreferenceLearningProjection:
                 WHERE p.state=? AND p.expires_at>?
                   AND p.sensitivity IN ({placeholders})
                   AND (p.origin<>? OR (r.state=? AND r.expires_at>?))
+                  AND p.subject=?
                 ORDER BY p.rowid
                 """,
                 (
@@ -566,12 +571,13 @@ class PreferenceLearningProjection:
                     PreferenceSignalOrigin.ACCEPTED_REFLECTION.value,
                     ReflectionState.ACCEPTED.value,
                     current.astimezone(timezone.utc).isoformat(),
+                    subject,
                 ),
             ).fetchall()
             grouped: dict[str, list[sqlite3.Row]] = {}
             for row in rows:
                 original = self.journal.get(row["event_id"])
-                if original is None or any(
+                if original is None or original.event.event_type != "preference.observed" or any(
                     original.event.payload.get(field) != row[field]
                     for field in ("observation_id", "origin", "source_id", "source_event_id",
                                   "target_digest", "direction", "weight")
@@ -580,10 +586,30 @@ class PreferenceLearningProjection:
                     or original.event.expires_at.isoformat() != row["expires_at"]
                 ):
                     continue
+                try:
+                    ref = ContentReference.from_event_payload(original.event.payload["content"])
+                except (KeyError, ValueError, TypeError):
+                    continue
+                if (ref.content_id != row["content_id"]
+                        or original.event.sensitivity.value != row["sensitivity"]
+                        or ref.sensitivity != original.event.sensitivity):
+                    continue
                 if not self._source_valid(
                     connection, original.event, PreferenceSignalOrigin(row["origin"]),
                     row["source_id"], row["source_event_id"],
                 ):
+                    continue
+                try:
+                    retained = self.content_vault.resolve_json(ref.content_id,
+                        expected_subject=original.event.subject, expected_purpose="preference.observation",
+                        expected_sensitivity=original.event.sensitivity)
+                    if (self.content_vault.digest_json(retained) != ref.digest
+                            or self.content_vault.digest_json({name: retained[name]
+                                for name in ("axis", "key", "option")}) != row["target_digest"]):
+                        continue
+                except (ContentUnavailableError, ContentIntegrityError, KeyError, ValueError):
+                    # Forgotten/unavailable observations cannot contribute hidden
+                    # support mass through a still-readable representative.
                     continue
                 grouped.setdefault(row["target_digest"], []).append(row)
             estimates: list[PreferenceEstimate] = []
@@ -609,6 +635,9 @@ class PreferenceLearningProjection:
                             expected_purpose="preference.observation",
                             expected_sensitivity=sensitivity,
                         )
+                        target = {name: details[name] for name in ("axis", "key", "option")}
+                        if self.content_vault.digest_json(target) != target_digest:
+                            raise ContentIntegrityError("preference target digest mismatch")
                         axis = PreferenceAxis(details["axis"])
                         key, option = str(details["key"]), str(details["option"])
                         status = PreferenceContentStatus.AVAILABLE

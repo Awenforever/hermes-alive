@@ -137,7 +137,7 @@ def main() -> int:
         assert "message_length" not in explicit_record.event.canonical_json()
         assert "concise" not in explicit_record.event.canonical_json()
         assert learning.apply(explicit_record).outcome == "recorded"
-        estimate = learning.estimates(clearance=Sensitivity.PRIVATE)[0]
+        estimate = learning.estimates(subject="user:test", clearance=Sensitivity.PRIVATE)[0]
         assert round(estimate.probability, 6) == round(2.25 / 4.25, 6)
         assert estimate.support_mass == 0.25
 
@@ -209,14 +209,14 @@ def main() -> int:
             reflected_signal, actor="system:learning"
         )
         assert learning.apply(reflected_record).outcome == "recorded"
-        estimate = learning.estimates(clearance=Sensitivity.PRIVATE)[0]
+        estimate = learning.estimates(subject="user:test", clearance=Sensitivity.PRIVATE)[0]
         assert round(estimate.probability, 6) == round(2.25 / 4.4, 6)
         with patch.object(OutcomeProjection, "user_attribution_valid_for", return_value=False):
-            assert learning.estimates(clearance=Sensitivity.PRIVATE) == []
+            assert learning.estimates(subject="user:test", clearance=Sensitivity.PRIVATE) == []
             assert reflections.list_reflections(clearance=Sensitivity.PRIVATE) == []
-        assert learning.estimates(clearance=Sensitivity.PRIVATE)
+        assert learning.estimates(subject="user:test", clearance=Sensitivity.PRIVATE)
         expired_source_estimate = learning.estimates(
-            clearance=Sensitivity.PRIVATE, as_of=now + timedelta(days=91)
+            subject="user:test", clearance=Sensitivity.PRIVATE, as_of=now + timedelta(days=91)
         )[0]
         assert expired_source_estimate.evidence_ids == (explicit_signal.observation_id,)
         # Emulate old accepted/learned caches built from an unlinked inbound.
@@ -257,21 +257,22 @@ def main() -> int:
             assert learning.apply(observation).outcome == "recorded"
         assert "legacy:reflection" not in {item.reflection_id for item in
                                             reflections.list_reflections(clearance=Sensitivity.PRIVATE)}
-        assert learning.estimates(clearance=Sensitivity.PRIVATE)[0].support_mass == 0.25
+        assert learning.estimates(subject="user:test", clearance=Sensitivity.PRIVATE)[0].support_mass == 0.25
         assert journal.get(proposal.event.event_id) and journal.get(observation.event.event_id)
         with closing(learning._connect()) as connection:
             connection.execute("UPDATE preference_observations_v1 SET weight=99 WHERE observation_id=?",
                                (explicit_signal.observation_id,))
-        assert learning.estimates(clearance=Sensitivity.PRIVATE)[0].support_mass == 0
+        assert learning.estimates(subject="user:test", clearance=Sensitivity.PRIVATE)[0].support_mass == 0
         with closing(learning._connect()) as connection:
             connection.execute("UPDATE preference_observations_v1 SET weight=? WHERE observation_id=?",
                                (explicit_signal.weight, explicit_signal.observation_id))
         learning.content_vault.erase_item(
             f"preference-observation:{reflected_signal.observation_id}"
         )
-        estimate = learning.estimates(clearance=Sensitivity.PRIVATE)[0]
+        estimate = learning.estimates(subject="user:test", clearance=Sensitivity.PRIVATE)[0]
         assert estimate.content_status is PreferenceContentStatus.AVAILABLE
         assert estimate.key == "message_length"
+        assert estimate.support_mass == 0.25 and estimate.opposition_mass == 0
 
         retraction_message = EventEnvelope(
             event_id="retract-reflection:preference-test",
@@ -285,7 +286,7 @@ def main() -> int:
             actor="user:test", subject="user:test", operation_id="retract-preference-test",
         )
         reflections.apply(retract_reflection)
-        estimate = learning.estimates(clearance=Sensitivity.PRIVATE)[0]
+        estimate = learning.estimates(subject="user:test", clearance=Sensitivity.PRIVATE)[0]
         assert round(estimate.probability, 6) == round(2.25 / 4.25, 6)
         assert estimate.evidence_ids == (explicit_signal.observation_id,)
 
@@ -301,10 +302,10 @@ def main() -> int:
             actor="user:test", subject="user:test", operation_id="signal-test",
         )
         assert learning.apply(retract_signal).outcome == "retracted"
-        assert learning.estimates(clearance=Sensitivity.PRIVATE) == []
+        assert learning.estimates(subject="user:test", clearance=Sensitivity.PRIVATE) == []
 
         learning.rebuild(batch_size=2)
-        assert learning.estimates(clearance=Sensitivity.PRIVATE) == []
+        assert learning.estimates(subject="user:test", clearance=Sensitivity.PRIVATE) == []
 
     print("HERMES_ALIVE_KERNEL_PREFERENCE_LEARNING_OK")
     return 0
