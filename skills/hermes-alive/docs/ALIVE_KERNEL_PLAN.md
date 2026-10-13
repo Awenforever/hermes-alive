@@ -1955,3 +1955,69 @@ For each material change:
   outcomes, including checking that new unrelated discoveries do not unnecessarily
   invalidate otherwise current opportunities; that potential coupling is not yet
   reproduced or resolved and must not be presented as a proven defect.
+
+### 2026-10-13 — Reviewer calibration exposes an unresolved invalid verdict
+
+- Implemented ADR 0068: eight newly authored public synthetic examples, two
+  faithful rewrites and six semantic corruptions; original runtime review prompt
+  and parser, whole-proposed-content representation, no exact-literal answer
+  shortcuts. Expected answers/categories are outside model prompts. This is a
+  pilot, not independent human gold, factual entailment or delivery qualification.
+- Actual configured `claude-haiku-4-5` reviewed all eight with eight logical calls
+  and eight observed async HTTP 200 responses. Two faithful cases accepted, five
+  damaged cases rejected, one invalid findings result (`SemanticReviewError`) for
+  the untrusted-candidate-instruction example. Zero observed unsafe acceptances
+  among valid verdicts is NOT eight error-free cases. Invalid rate is 1/8; the
+  invalid case cannot be counted as correct semantic detection or injection
+  resistance. No raw response was retained by the original immutable pilot, so
+  the exact cause is unknown. Do not invent it from the exception class.
+- Added bounded raw-response/error-stage retention for FUTURE synthetic-only
+  pilot reports; never runtime/private-user journals. Offline tests cover labels
+  kept out of prompts, all-accept detection (six unsafe acceptances), family
+  mismatch, provider failures, contradictory atom verdict preservation as invalid,
+  call accounting and duplicate-spend fences. No normalization of invalid output
+  and no keyword patch to obtain a passing score. The spent fixture/family must
+  not be rerun under a fresh output path.
+- Cumulative real logical calls: twenty; observed asynchronous HTTP requests: 30.
+  The first carrier exited before the probe/model stage due to missing carrier
+  `HERMES_HOME` for PM-owned environment selection; zero model calls there.
+  After checking no journal/report existed, removed only its owned empty profile
+  config/directory and launched a corrected carrier using the existing managed
+  environment. No production core/environment changes were required.
+- Immutable live/offline input tree `aaf8627680e8b470db0f52e62030153d7281c2f7`,
+  archive SHA256 `336e54e5be7944dc21a9d197d8363259e39188c6bf82505f8daf5b238537bdb1`.
+  `alive-live-review-calibration-20261013-r1`: exit one before model calls,
+  start `2026-10-13T08:46:41.279264557Z`, finish `2026-10-13T08:46:42.302302234Z`,
+  log SHA256 `c530e68d2d89ab6d20bc71bdd150eddc9d460fe73bae127b4be25b0fdccfe48a`.
+  Corrected `alive-live-review-calibration-20261013-r2`: exit zero (report written,
+  not all verdicts valid), start `2026-10-13T08:48:05.123131216Z`, finish
+  `2026-10-13T08:49:10.296997692Z`; log SHA256
+  `598384d5a175cf0912450c943eb49d3a4a22fe2c40170d298e60b7f136f542e9`,
+  report SHA256 `86d7775f8fa4d61c231ba0fc8139e5259e03a4c2dea2efdb6606a3868bb0cb29`.
+  Report retained under owned scratch
+  `/tmp/hermes-alive-installed-RJbQNAiD/model-only-review-calibration-20261013-r1/results/report.json`.
+  Windows private copy: `../work/alive-review-calibration-report-20261013-r1.json`.
+- Linux network-disabled `alive-review-calibration-offline-20261013-r1` exit zero,
+  start `2026-10-13T08:46:42.222838072Z`, finish `2026-10-13T08:46:42.753704663Z`;
+  log SHA256 `7f5db0aa9a21b32e1dea5e4050543bb20ac233a9f93035a934b3d90bff53e7c2`.
+  This original generation predates the added invalid-response diagnostics test;
+  do not claim that later coverage was exercised by this old Linux run.
+- Removed the isolated model export, profile config and generated config backups
+  after confirmed terminal states. Synthetic reports/journal retained. Production
+  still running, unchanged start `2026-10-11T07:43:25.630569081Z`; no channel sends,
+  model/config mutation, restart, release or installation qualification.
+- Next: fresh non-repeated diagnostic examples if needed, general review protocol
+  reliability and source entailment; scoped opportunity invalidation reproduction;
+  useful authorized outcomes and longitudinal feedback. Do not let additional
+  review tests replace the larger Alive objective or claim production readiness.
+- Full Windows regression: 47 kernel files, 46 PASS, one absent-Hermes hook SKIP,
+  zero failures. Subsequently reran the modified calibration contract locally and
+  under current PM-owned Linux Python with network disabled: invalid raw findings
+  retained without acceptance, and an unrelated existing journal refused before
+  any call or appended fixture. No additional real-model calls in these tests.
+  Updated offline input tree `0085acf7f23782015d2d0b7726a04fa58232bba6`, archive
+  SHA256 `92e7343ec89acd48903a18f83b9b531e3207567928ceb4ef22cdfac3bdd47629`.
+  `alive-review-calibration-offline-20261013-r2`: exit zero, start
+  `2026-10-13T08:55:37.364274545Z`, finish `2026-10-13T08:55:37.911896929Z`,
+  log SHA256 `7f5db0aa9a21b32e1dea5e4050543bb20ac233a9f93035a934b3d90bff53e7c2`.
+  Same PASS-marker log hash as r1 does not mean identical input trees or coverage.
