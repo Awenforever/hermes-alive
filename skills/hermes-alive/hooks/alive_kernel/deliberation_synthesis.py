@@ -67,6 +67,7 @@ class DeliberationSynthesizer:
         journal: ExperienceJournal,
         *,
         content_vault: ContentVault | None = None,
+        context_vault: ContentVault | None = None,
     ) -> None:
         self.journal = journal
         self.vault = content_vault or ContentVault(
@@ -75,6 +76,7 @@ class DeliberationSynthesizer:
         )
         self.deliberation = DeliberationProjection(journal, content_vault=self.vault)
         self.exploration = ExplorationProjection(journal, content_vault=self.vault)
+        self.context_vault = context_vault
 
     @staticmethod
     def _response(response: Any) -> tuple[str, str]:
@@ -253,6 +255,7 @@ class DeliberationSynthesizer:
                 and current_gate == gate
                 and current_selection == selection_event_id
             )
+            self.validate_candidate_sources(stored.frame.candidates, dict(stored.candidate_contents), owner, sensitivity)
         except Exception as exc:
             raise DeliberationContextChanged(
                 "deliberation context changed while awaiting the model"
@@ -261,6 +264,50 @@ class DeliberationSynthesizer:
             raise DeliberationContextChanged(
                 "deliberation context changed while awaiting the model"
             )
+
+    def validate_candidate_sources(self, candidates: Any, contents: Mapping,
+                                   owner: str, sensitivity: Sensitivity) -> None:
+        """Do not treat a retained frame copy as current source/profile evidence."""
+        # Local import avoids the coordinator/interpreter module dependency cycle.
+        from .opportunity_synthesis import OpportunitySynthesizer
+
+        interpreter = None
+        recovered = {}
+        for candidate in candidates:
+            if candidate.dimensions is None:
+                if candidate.candidate_id.startswith("opportunity-candidate:"):
+                    raise DeliberationContextChanged("generated candidate has no evidence")
+                continue
+            receipts = {e for name in (
+                "user_value", "urgency", "novelty", "confidence", "interruption_cost", "risk")
+                for e in getattr(candidate.dimensions, name).evidence_event_ids
+                if e.startswith("opportunity.synthesis:") and e.endswith(":completed")}
+            if not receipts and not candidate.candidate_id.startswith("opportunity-candidate:"):
+                continue
+            if len(receipts) != 1:
+                raise DeliberationContextChanged("generated candidate has ambiguous provenance")
+            receipt_id = next(iter(receipts))
+            receipt = self.journal.get(receipt_id)
+            if receipt is None or tuple(Sensitivity).index(receipt.event.sensitivity) > tuple(Sensitivity).index(sensitivity):
+                raise DeliberationContextChanged("generated candidate provenance scope unavailable")
+            if receipt.event.subject != owner:
+                raise DeliberationContextChanged("generated candidate provenance owner mismatch")
+            if interpreter is None:
+                interpreter = OpportunitySynthesizer(self.journal, content_vault=self.vault,
+                                                       context_vault=self.context_vault)
+            key = (receipt_id, candidate.authority)
+            if key not in recovered:
+                operation = receipt_id.removeprefix("opportunity.synthesis:").removesuffix(":completed")
+                try:
+                    result = interpreter.load_completed(subject=owner, operation_id=operation,
+                        authority=candidate.authority, clearance=receipt.event.sensitivity)
+                except Exception:
+                    raise DeliberationContextChanged("generated candidate evidence is no longer current") from None
+                recovered[key] = {item.action.candidate_id: item for item in result.candidates}
+            source = recovered[key].get(candidate.candidate_id)
+            if (source is None or source.action != candidate
+                    or _thaw_json(source.content) != _thaw_json(contents.get(candidate.content_id))):
+                raise DeliberationContextChanged("generated candidate differs from retained evidence")
 
     async def run(
         self,

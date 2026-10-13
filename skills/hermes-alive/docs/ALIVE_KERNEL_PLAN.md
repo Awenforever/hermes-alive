@@ -4,6 +4,17 @@ Status: active
 
 Last reviewed: 2026-10-13
 
+### Current finding: evidence lifetime through selection
+
+ADR-0065 records a reproduced gap: withdrawal of an explicit profile during
+model selection did not invalidate the retained frame. Generated candidates now
+revalidate their original discovery/profile evidence before frame creation and
+at selector call/return boundaries. This preserves useful positive selection,
+not blanket silence. The source-epoch regression covers eight synthetic cases;
+this is not production, dispatch, natural-expression or human-usefulness proof.
+Further real-model calls are authorized without a total-count cap, within the
+unchanged isolated synthetic/public-only, no-send, no-production-change scope.
+
 Current phase: Phase 5 — faculty migration in bounded shadow mode
 
 Working branch: `feat/alive-kernel-3`
@@ -1770,3 +1781,27 @@ For each material change:
 - Removed this run's isolated credential export, configuration and generated
   configuration backup. Production continued with unchanged start time
   `2026-10-11T07:43:25.630569081Z`; no gateway restart/deployment occurred.
+
+### 2026-10-13 — Original evidence survives no longer than its sources
+
+- Reproduced a stale SHARE after explicit profile withdrawal during model
+  selection. ADR-0065 binds generated candidate recovery through frame creation
+  and selector call/return boundaries, rather than trusting retained copies.
+- Eight source-epoch cases pass, including unchanged positive SHARE, rejection
+  before frame copying for a foreign owner or relabeled candidate, and no retry
+  after withdrawal. No action attempts or model network calls in this regression.
+- Windows: 42 kernel test files, 41 PASS, one absent-Hermes hook SKIP, zero
+  failures. This does not replace admitted-plugin or real gateway qualification.
+- Network-disabled Linux container `alive-source-epoch-20261013-r1` ran the
+  source-epoch, model-cycle, deliberation-synthesis, opportunity-synthesis and
+  opportunity-recovery contracts against the selected managed Python. All pass;
+  terminal exit zero, start `2026-10-13T07:19:02.780374652Z`, finish
+  `2026-10-13T07:19:07.617486574Z`. Immutable source input tree
+  `a2ab8c253582e9b02a293ac43be36f3ed68058dc`, archive SHA256
+  `d39b44e2cad19a900dd194a255d390913c56e3ddcb195dcc7a633f2a75a195c6`.
+  Retained `source-epoch-r1.log` SHA256
+  `d357656bc8f581c47af8ebad9bb6bc2eae0242a5dcaaf2fe19da581e47ca087c`.
+- No additional live model calls this step; cumulative logical count remains
+  seven. Production running/start time unchanged. Version, release branch and
+  public installation defaults were not changed. Natural presentation, further
+  source lifetime binding, actual outcomes and installation/canary gates remain.

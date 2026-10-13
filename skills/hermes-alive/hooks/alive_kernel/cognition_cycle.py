@@ -107,6 +107,7 @@ class CognitionCycleCoordinator:
         journal: ExperienceJournal,
         *,
         content_vault: ContentVault | None = None,
+        context_vault: ContentVault | None = None,
     ) -> None:
         self.journal = journal
         self.vault = content_vault or ContentVault(
@@ -117,6 +118,7 @@ class CognitionCycleCoordinator:
             journal, content_vault=self.vault
         )
         self.exploration = ExplorationProjection(journal, content_vault=self.vault)
+        self.context_vault = context_vault
 
     def _identifier(self, namespace: str, cycle_id: str, suffix: str = "") -> str:
         digest = self.vault.digest_json(
@@ -164,6 +166,13 @@ class CognitionCycleCoordinator:
         if total_content > self.MAX_TOTAL_CONTENT_CHARS:
             raise CognitionCycleError("cycle candidate content exceeds the total boundary")
         sensitivity = Sensitivity(sensitivity)
+        # Check derived evidence before copying private candidate text into a new
+        # frame; later await-bound checks alone would be too late for owner scope.
+        DeliberationSynthesizer(self.journal, content_vault=self.vault,
+                               context_vault=self.context_vault).validate_candidate_sources(
+            tuple(item.action for item in values),
+            {str(item.action.content_id): item.content for item in values}, owner, sensitivity,
+        )
         frame_id = self._identifier("cycle-frame", cycle)
         actor = "system:alive-coordinator"
         try:
@@ -298,7 +307,7 @@ class CognitionCycleCoordinator:
         if prepared.gate.admissible_ids == (prepared.frame.silence_id,):
             return self._close_silence(prepared)
         result = await DeliberationSynthesizer(
-            self.journal, content_vault=self.vault,
+            self.journal, content_vault=self.vault, context_vault=self.context_vault,
         ).run(
             frame_id=prepared.frame.frame_id,
             gate_event_id=prepared.exploration_event_id,
