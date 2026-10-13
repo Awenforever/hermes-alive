@@ -46,6 +46,10 @@ async def exercise(root):
     reviewer = FacetedClaimSupportReviewer(journal)
     cid = generated.candidates[0].action.candidate_id
     snapshot, _ = reviewer.snapshot(subject='user:test', interpretation_id='generate', candidate_id=cid)
+    # Diagnose assertions in the actual source-presented communication; treating
+    # the pre-presentation draft as the entire candidate would omit its link.
+    text = snapshot['candidate']['text']
+    assert text.endswith('[来源](<https://example.invalid/repair>)')
     base = findings(text)
     for function in ('statement','recommendation','question','social'):
         value = deepcopy(base)

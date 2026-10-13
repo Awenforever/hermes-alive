@@ -49,6 +49,16 @@ async def exercise(root):
     cid = generated.candidates[0].action.candidate_id
     snapshot, _ = reviewer.snapshot(subject='user:test', interpretation_id='generate', candidate_id=cid)
     base = findings()
+    # Source presentation is part of the actual candidate, not the raw model
+    # draft. Complete lexical accounting must also cover the host-added link.
+    presented = snapshot['candidate']['text']
+    assert presented.startswith(text)
+    suffix = presented[len(text):].strip()
+    assert suffix == '[来源](<https://example.invalid/repair>)'
+    base['units'].append({'text':suffix, 'role':'verifiable_claim', 'support':'supported',
+        'evidence':[{'source':'discovery', 'index':0, 'field':'url',
+            'quote':'https://example.invalid/repair'}], 'reason':'Canonical provenance link.'})
+    text = presented
     parsed = account_claims(json.dumps(base), snapshot)
     assert parsed['verdict'] == 'supported' and parsed['lexical_coverage_complete']
     assert not parsed['semantic_coverage_proven']

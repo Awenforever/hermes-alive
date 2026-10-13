@@ -6,6 +6,14 @@ Last reviewed: 2026-10-14
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0094 binds source review to exact final expression, current intent and actual
+renderer, with expression-limited retention and no inherited draft approval or
+delivery authority. Actual retained Chinese reviews both complete but still give
+coarse positive reasons; attribution/materiality judgment remains unqualified.
+The widened regression exposes old claim/facet fixtures omitting ADR-0091's source
+presentation. Fixtures now cover the full candidate; coverage guards stay strict.
+Cumulative actual calls: 95 logical / 107 observed async HTTP attempts.
+
 ADR-0093 independently reviews both retained ADR-0092 drafts using actual Qwen3.5
 calls, without regenerating them. Both report supported, but the bicycle review
 collapses source-backed summary and model-originated suggestions. This does not
