@@ -188,6 +188,10 @@ corrections are represented rather than overwritten.
 - [x] Join candidate framing, active-agenda validation, exploration and a
   durable selection in one crash-safe coordinator that always closes with
   deterministic silence and has no model/channel/tool side effects (ADR-0020).
+  - ADR-0061 separates idempotent preparation from explicit audit silence and
+    opt-in model deliberation. The latter composes the existing selector without
+    action execution; event-to-candidate interpretation and live orchestration
+    are not complete merely because this internal composition passes.
 - [x] Separate selected intent from send-time authority. Short-lived structural
   permits now recheck latest state, current policy, active user authority,
   evidence and the exact Hermes capability without executing (ADR-0022).
@@ -1534,3 +1538,35 @@ For each material change:
   Started `2026-10-12T18:35:45.103235009Z`, finished
   `2026-10-12T18:35:49.962114724Z`. This is current source in the prepared core
   environment, not a new admitted-package/console/live-provider qualification.
+
+### 2026-10-13 — Coordinator can deliberate, not just force silence
+
+- The integrated coordinator previously ended every cycle in fixed safe silence;
+  the model selector lived outside it. Added independent `prepare` and opt-in
+  `plan_with_model` stages (ADR-0061), preserving the explicit audit-only API.
+- Combined discovery ingestion, active encrypted opportunity, framing,
+  exploration, model selection and ordered restart recovery in a new contract.
+  Model-selected initiative and model-selected silence retain actual response
+  attribution; policy-only silence spends no model call. The model callback is
+  deterministic; no real provider, channel or tool is invoked by this fixture.
+- Historical audit baseline inspection no longer mistakes a later model choice
+  for the old silence receipt, and cannot overwrite it. Route/output failure is
+  recorded as failure, not converted into a fictitious successful selection.
+- This closes the coordinator/selector composition gap, not real event-to-candidate
+  generation, user-policy integration, budgeted live scheduling, semantic quality,
+  longitudinal usefulness or delivery. Production remains unchanged and legacy
+  runtime retirement remains gated on those still-open requirements.
+- Independent Windows source suite: 37 kernel test files, 36 PASS, one explicit
+  absent-Hermes-runtime HookRegistry SKIP, zero failures. No live model inference
+  or real user-benefit judgment is included in that result.
+- Network-disabled NAS/Linux source/runtime qualification also passed in
+  `alive-model-cycle-20261013-r1`: model-cycle, audit cycle, selector, recovery
+  and shadow contracts, terminal exit zero. Reused audited core-managed runtime;
+  no dependencies were redownloaded and no production mounts were present.
+  Input tree `4bc26583d198478f74307c14a43bfcab69b33b8a`, archive SHA256
+  `ae22763f3612d27829fe699b4ac09f7735f6908c22b87c8f638b24d011a86ee9`.
+  Owned-scratch log `model-cycle-r1.log`, SHA256
+  `e6354d4b93b4fbf316948aa7c5eb21c9ba5dbcd77d916beca0ed730cc06d7231`.
+  Started `2026-10-13T05:36:22.379471833Z`, finished
+  `2026-10-13T05:36:28.264430342Z`. Current-source tests in the prepared core
+  environment are not a current-package/console/live-provider admission claim.

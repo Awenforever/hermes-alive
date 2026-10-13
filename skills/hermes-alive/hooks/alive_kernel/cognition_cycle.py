@@ -1,4 +1,4 @@
-"""Crash-safe cognition-cycle planning with deterministic safe silence."""
+"""Durable cognition framing and opt-in, non-executing model deliberation."""
 
 from __future__ import annotations
 
@@ -11,10 +11,13 @@ from .content_vault import ContentIntegrityError, ContentVault
 from .deliberation import (
     ActionCandidate,
     ActionKind,
+    DeliberationFrame,
     PolicyContext,
     SelectionProposal,
     ValidatedSelection,
+    validate_selection,
 )
+from .deliberation_synthesis import DeliberationSynthesizer, ModelCaller
 from .deliberation_store import DeliberationProjection
 from .event_store import ExperienceJournal
 from .events import Sensitivity, _freeze_json, _thaw_json
@@ -78,6 +81,18 @@ class CognitionCycleResult:
     selection_event_id: str
     gate: ExplorationGateResult
     selection: ValidatedSelection
+    model_receipt_event_ids: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class CognitionCyclePreparation:
+    cycle_id: str
+    subject: str
+    sensitivity: Sensitivity
+    frame_event_id: str
+    exploration_event_id: str
+    frame: DeliberationFrame
+    gate: ExplorationGateResult
 
 
 class CognitionCycleCoordinator:
@@ -109,7 +124,7 @@ class CognitionCycleCoordinator:
         )
         return f"{namespace}:{digest[:40]}"
 
-    def plan_safe_silence(
+    def prepare(
         self,
         *,
         cycle_id: str,
@@ -120,8 +135,8 @@ class CognitionCycleCoordinator:
         sensitivity: Sensitivity = Sensitivity.PRIVATE,
         causation_id: str | None = None,
         correlation_id: str | None = None,
-    ) -> CognitionCycleResult:
-        """Record the full cycle and close it with a no-side-effect selection."""
+    ) -> CognitionCyclePreparation:
+        """Persist candidate framing and exploration without forcing a choice."""
 
         cycle = str(cycle_id).strip()
         owner = str(subject).strip()
@@ -212,39 +227,87 @@ class CognitionCycleCoordinator:
             raise CognitionCycleError(
                 f"exploration gate was not admitted: {evaluation_decision.reason}"
             )
+        return CognitionCyclePreparation(
+            cycle, owner, sensitivity, frame_record.event.event_id,
+            evaluation_record.event.event_id, frame, gate,
+        )
 
-        selection_id = self._identifier("cycle-selection", cycle)
-        selection_record = self.deliberation.append_selection(
-            SelectionProposal(
-                frame_id=frame.frame_id,
-                candidate_id=frame.silence_id,
-                model=self.SAFE_SILENCE_MODEL,
-                rationale=(
-                    "The cycle is audit-only; no model or operator has authorized "
-                    "an external action."
-                ),
+    def plan_safe_silence(self, **cycle_parameters: Any) -> CognitionCycleResult:
+        """Close an audit-only cycle; return its exact baseline, not newer intent."""
+        prepared = self.prepare(**cycle_parameters)
+        return self._close_silence(prepared)
+
+    def _close_silence(self, prepared: CognitionCyclePreparation) -> CognitionCycleResult:
+        frame = prepared.frame
+        proposal = SelectionProposal(
+            frame_id=frame.frame_id,
+            candidate_id=frame.silence_id,
+            model=self.SAFE_SILENCE_MODEL,
+            rationale=(
+                "The cycle is audit-only; no model or operator has authorized "
+                "an external action."
             ),
-            actor=actor,
-            subject=owner,
-            sensitivity=sensitivity,
+        )
+        selection_id = self._identifier("cycle-selection", prepared.cycle_id)
+        baseline_id = f"deliberation.selection:{selection_id}"
+        if (self.journal.get(baseline_id) is None
+                and self.deliberation.latest_selection_event_id(frame.frame_id) is not None):
+            raise CognitionCycleError(
+                "cycle already has a selection; use a separate audit cycle"
+            )
+        selection_record = self.deliberation.append_selection(
+            proposal,
+            actor="system:alive-coordinator",
+            subject=prepared.subject,
+            sensitivity=prepared.sensitivity,
             selection_id=selection_id,
-            exploration_gate_event_id=evaluation_record.event.event_id,
+            exploration_gate_event_id=prepared.exploration_event_id,
         )
         selection_decision = self.deliberation.apply(selection_record)
         if selection_decision.outcome != "validated":
             raise CognitionCycleError(
                 f"safe-silence selection was not admitted: {selection_decision.reason}"
             )
-        stored = self.deliberation.inspect(frame.frame_id, clearance=sensitivity)
-        if stored is None or stored.selection is None:
+        stored = self.deliberation.inspect(frame.frame_id, clearance=prepared.sensitivity)
+        if stored is None:
             raise CognitionCycleError("durable cycle selection is unavailable")
-        if stored.selection.candidate.action_kind is not ActionKind.SILENCE:
-            raise CognitionCycleError("audit-only cycle selected an external action")
+        # A later model selection does not change the historical baseline receipt.
+        # Do not mistake latest-selection inspection for this exact selection.
+        selected = validate_selection(stored.frame, proposal)
         return CognitionCycleResult(
-            cycle,
-            frame_record.event.event_id,
-            evaluation_record.event.event_id,
+            prepared.cycle_id,
+            prepared.frame_event_id,
+            prepared.exploration_event_id,
             selection_record.event.event_id,
-            gate,
-            stored.selection,
+            prepared.gate,
+            selected,
+        )
+
+    async def plan_with_model(
+        self, *, call: ModelCaller, requested_model: str | None = None,
+        operation_id: str | None = None, attempts: int = 2,
+        **cycle_parameters: Any,
+    ) -> CognitionCycleResult:
+        """Opt-in shadow planning only: never authorize, dispatch or activate memory.
+
+        Routing belongs to the supplied Hermes capability. Model failures propagate
+        with durable receipts; they are not reported as a successful silent choice.
+        Reusing a started operation is refused, including after cancellation.
+        """
+        prepared = self.prepare(**cycle_parameters)
+        if prepared.gate.admissible_ids == (prepared.frame.silence_id,):
+            return self._close_silence(prepared)
+        result = await DeliberationSynthesizer(
+            self.journal, content_vault=self.vault,
+        ).run(
+            frame_id=prepared.frame.frame_id,
+            gate_event_id=prepared.exploration_event_id,
+            subject=prepared.subject, sensitivity=prepared.sensitivity,
+            call=call, requested_model=requested_model, attempts=attempts,
+            operation_id=operation_id or self._identifier("cycle-model", prepared.cycle_id),
+        )
+        return CognitionCycleResult(
+            prepared.cycle_id, prepared.frame_event_id, prepared.exploration_event_id,
+            result.selection_event_id, prepared.gate, result.selection,
+            result.receipt_event_ids,
         )

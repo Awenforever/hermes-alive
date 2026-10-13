@@ -176,6 +176,7 @@ from .consolidation_evaluation import (
 from .cognition_cycle import (
     CognitionCycleCoordinator,
     CognitionCycleError,
+    CognitionCyclePreparation,
     CognitionCycleResult,
     CycleCandidate,
 )
@@ -342,6 +343,7 @@ __all__ = [
     "AssessmentBasis",
     "CandidateRejection",
     "CognitionCycleCoordinator",
+    "CognitionCyclePreparation",
     "CognitionCycleError",
     "CognitionCycleResult",
     "ContentErasedError",
