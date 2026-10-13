@@ -20,6 +20,7 @@ from .deliberation import (
 from .deliberation_synthesis import DeliberationSynthesizer, ModelCaller
 from .discovery_opportunities import DiscoveryOpportunityIngestor
 from .event_store import EventConflictError, ExperienceJournal
+from .model_json import parse_model_json
 from .events import EventEnvelope, Sensitivity
 
 
@@ -66,17 +67,6 @@ def _present_source(text: str, url: str, policy: str) -> str:
         return text
     link = f"[来源](<{url}>)" if not any(c in url for c in "<>\r\n") else f"来源：{url}"
     return f"{text}\n\n{link}"
-
-
-def _reject_constant(_value: str) -> None:
-    raise OpportunitySynthesisError("non-finite model JSON")
-
-
-def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-    value = dict(pairs)
-    if len(value) != len(pairs):
-        raise OpportunitySynthesisError("duplicate model JSON fields")
-    return value
 
 
 _PROMPT = """Interpret the supplied discovery opportunities for Hermes Alive.
@@ -377,8 +367,7 @@ class OpportunitySynthesizer:
             content, model = DeliberationSynthesizer._response(response)
             if len(content) > 32_000:
                 raise OpportunitySynthesisError("opportunity response exceeds boundary")
-            document = json.loads(content, parse_constant=_reject_constant,
-                                  object_pairs_hook=_unique_object)
+            document = parse_model_json(content)
             candidates, drafts, rejected, indices = self._candidates(
                 document, evidence, operation_id, receipt_id, authority, context, learning=learning,
                 source_presentation=self._SOURCE_PRESENTATION,

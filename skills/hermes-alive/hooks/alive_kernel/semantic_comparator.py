@@ -12,6 +12,7 @@ from uuid import uuid4
 
 from .events import EventEnvelope
 from .presentation import PresentationProjection
+from .model_json import parse_model_json
 from .semantic_rendering import deterministic_text, serialize_meaning
 from .semantic_review import (
     AtomReview, IndependentSemanticReview, ReviewerKind, SemanticReviewError,
@@ -113,15 +114,8 @@ class SemanticComparator:
 
     @staticmethod
     def _findings(text: str) -> dict[str, Any]:
-        def unique_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-            result: dict[str, Any] = {}
-            for key, value in pairs:
-                if key in result:
-                    raise SemanticReviewError("duplicate review JSON key")
-                result[key] = value
-            return result
         try:
-            value = json.loads(text, object_pairs_hook=unique_pairs)
+            value = parse_model_json(text, max_chars=256000)
         except (ValueError, TypeError) as exc:
             raise SemanticReviewError("review is not strict JSON") from exc
         required = {"atom_reviews", "added_claims_detected",

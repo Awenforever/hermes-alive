@@ -9,6 +9,7 @@ from .content_vault import ContentReference
 from .events import EventEnvelope, Sensitivity, _thaw_json
 from .opportunity_synthesis import OpportunitySynthesizer
 from .semantic_comparator import SemanticComparator
+from .model_json import parse_model_json
 
 
 class SourceSupportError(ValueError):
@@ -147,12 +148,10 @@ class SourceSupportReviewer:
 
     @staticmethod
     def findings(text):
-        def unique(pairs):
-            value = dict(pairs)
-            if len(value) != len(pairs):
-                raise SourceSupportError('duplicate source-review keys')
-            return value
-        value = json.loads(text, object_pairs_hook=unique)
+        try:
+            value = parse_model_json(text)
+        except ValueError:
+            raise SourceSupportError('source review is not strict finite JSON') from None
         if not isinstance(value, dict) or set(value) != {
                 'verdict','unsupported_claims','uncertainties','reason'}:
             raise SourceSupportError('incomplete source-support verdict')

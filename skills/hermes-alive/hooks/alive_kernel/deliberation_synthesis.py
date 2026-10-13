@@ -96,8 +96,9 @@ class DeliberationSynthesizer:
     @staticmethod
     def _selection_document(content: str) -> tuple[str, str]:
         try:
-            document = json.loads(content)
-        except (TypeError, json.JSONDecodeError) as exc:
+            from .model_json import parse_model_json
+            document = parse_model_json(content)
+        except (TypeError, ValueError) as exc:
             raise DeliberationSynthesisError("model output is not strict JSON") from exc
         if not isinstance(document, Mapping) or set(document) != {
             "candidate_id",

@@ -6,6 +6,24 @@ Last reviewed: 2026-10-14
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0093 independently reviews both retained ADR-0092 drafts using actual Qwen3.5
+calls, without regenerating them. Both report supported, but the bicycle review
+collapses source-backed summary and model-originated suggestions. This does not
+establish attribution fidelity or qualify admission. The expression itself also
+needs source-aware assessment; do not confuse English draft review with Chinese
+expression review. Preserve this ambiguity and test provenance boundaries rather
+than stack word-specific rules or assume a longer diagnostic prompt is superior.
+Cumulative actual calls: 93 logical / 105 observed async HTTP attempts.
+
+ADR-0092 composes two fresh actual interpretation-selection-expression-review
+chains. Both select shares; one fidelity review is shadow-eligible but explicitly
+not safe for delivery, the other fails on a JSON code fence. Interpretation can
+add source-absent practical details, and fidelity to a generated draft cannot
+prove fidelity to sources. Next compose/evaluate source support separately, not
+tyre/video keyword rules. Shared bounded JSON transport normalization now accepts
+one complete JSON fence without changing values or supplying missing fields;
+original failures remain failures. This is not semantic qualification or fallback.
+
 ADR-0088/0089 add source-linked reasoned abstention and explicit unassessed coverage,
 not executable silence or preference learning. First replication has five valid
 results and one invalid JSON failure; its history is retained. ADR-0090's fresh
@@ -2817,3 +2835,21 @@ For each material change:
   attributed outcomes and bounded feedback. Continue the full host, layered/external
   memory, sustained agenda/adaptation, physical forgetting, migration/rollback,
   portable lifecycle and production acceptance objective.
+
+### 2026-10-14 — Actual composed shadow chain and strict JSON transport, ADR 0092
+
+- Eight actual calls across two fresh public synthetic contexts cover interpretation,
+  selection, expression and configured cross-family fidelity review. One chain's
+  review is shadow-eligible, never delivery-safe; the other fails fenced JSON parsing.
+- Found the critical distinction: generated practical additions can survive fidelity
+  review without being sourced. Next evaluate selected draft/source support separately,
+  allowing explicitly tentative useful reasoning without pretending it is sourced fact.
+- Four adjacent stages share finite/unique/bounded JSON decoding with exact outer
+  fence normalization, not bracket repair, schema defaults or model-failure rendering.
+  Explicit nesting limits replace reliance on machine recursion settings.
+- Totals 91 actual logical / 103 observed HTTP attempts; live container terminal,
+  all five temporary model/profile exports removed and verified absent. Production
+  start unchanged; no private read, actual send, learning or configuration change.
+- Continue useful end-to-end attribution/learning plus the full host, layered/external
+  memory, sustained agenda/adaptation, physical forgetting, migration/rollback,
+  portable lifecycle and production acceptance scope. No production deployment.
