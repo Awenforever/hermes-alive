@@ -2745,3 +2745,22 @@ For each material change:
   feedback learning integration; retain the full host, expression, long-term
   memory/agenda/adaptation, forgetting/migration/rollback, portability and
   production acceptance objective.
+
+### 2026-10-14 — Separate source non-action from cycle silence, ADR 0089
+
+- Opportunity results now retain encrypted, source-linked reasons for abstention,
+  independent of executable drafts. Missing decisions remain unassessed; malformed,
+  foreign, duplicate or contradictory skips are counted separately, not invented.
+- Recovery rechecks source/context/learning freshness and encrypted bundle integrity.
+  No skip becomes user dislike, learned evidence, dispatch or action permission.
+- Seven isolated Linux suites pass, with Windows synthesis/recovery/abstention and
+  paired-probe checks. Actual replication: five of six calls structurally complete
+  with useful drafts and reasoned skips; the first emits invalid JSON and stays failed.
+  No reconfirmation questions in valid results; no blind semantic or utility proof.
+- Totals 76 actual logical / 88 observed HTTP attempts. Credentials removed and
+  verified absent after terminal state; production running/start unchanged.
+- Next qualify fresh decision contexts and source support, consider bounded
+  model-driven contract recovery without retroactive success, then genuine tentative
+  feedback integration. Full host, expression, layered/external memory, sustained
+  agenda/adaptation, forgetting/migration/rollback, portable lifecycle and production
+  acceptance remain required; no deployment or real send in this exploration.

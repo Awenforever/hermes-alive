@@ -211,8 +211,15 @@ async def exercise(args):
                     result = await interpreter.run(subject=subject, operation_id='paired-advice:' + arm,
                         requested_model=args.model, call=call, timeout_seconds=55)
                     item.update(completed=True, rejected_count=result.rejected_count, receipt_event_id=result.receipt_event_id,
+                        abstentions=[{'agenda_item_id': a.agenda_item_id,
+                                      'observation_event_id': a.observation_event_id, 'reason': a.reason}
+                                     for a in result.abstentions],
+                        rejected_abstention_count=result.rejected_abstention_count,
+                        unassessed_agenda_item_ids=list(result.unassessed_agenda_item_ids),
                         model_proposal_count=len(result.candidates) + result.rejected_count,
-                        decision_observation=('model_empty' if not result.candidates and not result.rejected_count
+                        decision_observation=('partial' if result.rejected_abstention_count
+                            else 'reasoned_abstention' if result.abstentions and not result.candidates and not result.rejected_count
+                            else 'model_empty' if not result.candidates and not result.rejected_count
                             else 'all_rejected' if not result.candidates else 'partial' if result.rejected_count else 'proposed'),
                         candidates=[{'authority': c.action.authority.value, 'kind': c.action.action_kind.value,
                                      'agenda_item_id': c.action.agenda_item_id,
