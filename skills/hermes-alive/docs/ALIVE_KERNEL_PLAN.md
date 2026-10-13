@@ -2525,3 +2525,29 @@ For each material change:
   qualified delivery/outcomes and longitudinal benefit; do not mistake frequency
   safety for useful cognition or reduce the full memory/agenda/adaptation,
   forgetting/migration/rollback/portable lifecycle and production acceptance scope.
+
+### 2026-10-13 — Orthogonal discourse/assertion diagnostic; live result unavailable
+
+- ADR 0080 addresses the representation issue behind the mixed recommendation
+  observed in ADR 0074: main discourse function no longer exempts separately
+  recorded material assertions. Exact segments and anchored assertion facets reuse
+  existing evidence/epistemic validation. No default method or automatic gate changes.
+- Synthetic tests pass for unsupported assertions across all discourse functions,
+  malformed/orphan references and encrypted recovery. A deliberately omitted-claim
+  case remains semantically unproved. Lexical completeness is not extraction accuracy.
+  Existing claim/source suites and three network-none NAS focused suites pass.
+- Two bounded live experiments against the retained public synthetic draft, on
+  already configured Haiku then Sonnet review lanes, both end with ReadTimeout/
+  outer TimeoutError and no findings. No empirical semantic improvement is claimed.
+  Exactly two started/two failed/zero completed review records are retained. No
+  regeneration or send occurred. ADR records immutable inputs, reports and times.
+- Cumulative logical calls now 43; observed async HTTP attempts 55, including
+  timeout and no-terminal-status attempts. Exact temporary credential/config exports were removed
+  only after confirmed terminal processes and verified absent as root. Production
+  running/start unchanged `2026-10-11T07:43:25.630569081Z`; no production model,
+  channel, authorization, other-plugin or wmw changes.
+- Do not tune per-message patches or count service failures as algorithm success.
+  Continue semantic qualification when a configured route is available, alongside
+  authenticated feedback/onboarding, actual delivery/attributed outcomes and the
+  full long-term memory/agenda/adaptation, forgetting/migration/rollback and portable
+  production acceptance requirements. The overall goal remains active.
