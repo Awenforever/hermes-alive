@@ -1657,3 +1657,72 @@ For each material change:
   Started `2026-10-13T06:26:00.720779041Z`, finished
   `2026-10-13T06:26:04.227637420Z`. This uses the prepared core-managed runtime,
   not installed-package or real-model qualification of this new revision.
+
+### 2026-10-13 — Bounded live profile experiment, not acceptance
+
+- Added explicit probe scenario selection, a 1-6 logical-call cap, synthetic
+  explicit profile seeding and optional selection of the isolated profile's
+  configured fallback. Candidate drafts are serializable with separate dimension
+  reasons. Budget exhaustion skips selection honestly, rather than claiming a
+  completed decision or invoking another model. Default CI never invokes providers.
+- Offline composed-probe contract passed: three simulated calls produce a draft,
+  selector choice and negative-case silence; one-call mode cannot invoke selection.
+  These are fixture results, not real-model semantic evidence.
+- Live paired attempt `alive-live-context-20261013-r1`, input tree
+  `396ef6b5c171e18daf6bb9b823f6c345b5fa4a0a`, archive SHA256
+  `2d71d1557166d735239bde7fc8f6624054ab7c00b66fed5177f03a6ae1cdf80e`,
+  used two logical calls, both failed. Five observed async requests: four USTC
+  ConnectErrors and one official DeepSeek RemoteProtocolError. Terminal exit zero
+  only means the probe wrote its failure report, NOT successful inference.
+  Started `2026-10-13T06:31:01.379287957Z`, finished
+  `2026-10-13T06:31:40.780594486Z`. Report SHA256
+  `e8d05caefc9a6eaee988023ac267848d024175e7be82762531d31897f0242f07`;
+  `live-context-r1.log` SHA256
+  `9ae7d31f0641767ce2ed49dc3f6bfb89b506ac57129585b9ce88965492f2fbb2`.
+- Non-model HTTP checks confirmed the relay running and both direct/proxied
+  official endpoint reachable (401 without credentials). This is not proof of
+  reliable model transport or a basis to alter production routes.
+- Final remaining authorized call explicitly selected the configured official
+  fallback in `alive-live-context-final-20261013-r1`, input tree
+  `75b7965d59cbb2c199b2f8c22a1a9aa3c86a1d97`, archive SHA256
+  `9d50969b251f96292b8d62a8259da8a755aad8276b59fa053fc4906365880742`.
+  One logical interpretation call, two observed HTTP attempts (RemoteProtocolError
+  followed by 200), actual response model `deepseek-flash`, terminal exit zero.
+  Started `2026-10-13T06:34:37.787521620Z`, finished
+  `2026-10-13T06:35:07.961159916Z`. Report SHA256
+  `acef41f4e1093b4eb06fe92bb05377fa64306f4752cef355c3535e5bb26fb8eb`;
+  `live-context-final-r1.log` SHA256
+  `7853bd7b21df69744d780d5b9cf46af1f2e771292acbbad81db577ec36d50934`.
+- Produced one repair-recording candidate grounded in the synthetic explicit
+  interest and online preference, retaining the source link, lack of deadline and
+  uncertainty. No candidate rejected. Value 0.85, confidence 0.6 and urgency 0.1
+  are model judgments, not observed outcomes. Wording remains explanatory rather
+  than a qualified natural proactive voice. Live selection was deliberately NOT
+  run because the budget was exhausted; no attempt or send occurred.
+- Total authorized spend is now six logical calls, sixteen observed async HTTP
+  attempts across experiments. No further live calls without renewed permission.
+  Removed both runs' isolated credential exports, configuration and generated
+  configuration backups after terminal verification. Production remained running
+  with unchanged start `2026-10-11T07:43:25.630569081Z`.
+- Next: durable completed-candidate recovery without re-spending, grounded intent
+  through real policy/presentation/outcome stages, paired semantic review and
+  longitudinal human usefulness. Do not treat one draft or transport success as
+  full cognition, presentation, production or installation qualification.
+- Windows suite: 40 kernel files, 39 PASS, one absent-Hermes hook SKIP, zero
+  failures; subsequently reran the affected probe contract after preserving
+  configured fallback endpoint/key overrides and isolating preflight setup.
+- Network-disabled Linux probe contract passed in
+  `alive-probe-contract-20261013-r1`, terminal exit zero. Input tree
+  `8249bd3cc21662293dc0a48328ff7f23b4d98b91`, archive SHA256
+  `d9332f48901e7c52ba0d30e61c84c1064ef6b04106b525f56495d1915d04e31a`,
+  retained `probe-contract-r1.log` SHA256
+  `446927f05222776e513763daefa4235e39b7e1b9f85d8ed6732c8bca7f43cceb`.
+  Started `2026-10-13T06:39:15.274265090Z`, finished
+  `2026-10-13T06:39:16.176126903Z`. Provider/network capability is mocked;
+  this checks probe orchestration and accounting, not provider reliability.
+- Requested renewed permission; user explicitly allowed further isolated model
+  calls without a total-count limit. The unchanged scope is synthetic public
+  scenarios, no private chats, no channel sends and no production configuration
+  changes. Preserve the six already-used calls as historical accounting; do not
+  erase them on restart. Continue with explicit small-batch budgets, causal
+  receipts and transport retry accounting rather than blind repeated inference.
