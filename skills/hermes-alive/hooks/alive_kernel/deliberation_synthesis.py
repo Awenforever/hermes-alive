@@ -265,6 +265,46 @@ class DeliberationSynthesizer:
                 "deliberation context changed while awaiting the model"
             )
 
+    def validate_selection_sources(self, selection_event_id: str, *,
+                                   owner: str, sensitivity: Sensitivity) -> None:
+        """Recheck original generated inputs without granting execution authority.
+
+        Call outside journal writer transactions: evidence readers may project
+        newly observed withdrawals into the same database.
+        """
+        selection = self.journal.get(selection_event_id)
+        if (selection is None or selection.event.event_type != "deliberation.selected"
+                or selection.event.subject != owner
+                or tuple(Sensitivity).index(selection.event.sensitivity)
+                > tuple(Sensitivity).index(sensitivity)):
+            raise DeliberationContextChanged("selection scope unavailable")
+        frame_id = str(selection.event.payload.get("frame_id") or "")
+        frame = self.journal.get(f"deliberation.frame:{frame_id}")
+        if (frame is None or frame.event.event_type != "deliberation.framed"
+                or frame.event.subject != owner
+                or tuple(Sensitivity).index(frame.event.sensitivity)
+                > tuple(Sensitivity).index(sensitivity)):
+            raise DeliberationContextChanged("selection frame scope unavailable")
+        try:
+            target = self.journal.last_sequence()
+            while self.journal.checkpoint(self.deliberation.CHECKPOINT) < target:
+                before = self.journal.checkpoint(self.deliberation.CHECKPOINT)
+                self.deliberation.project_new()
+                if self.journal.checkpoint(self.deliberation.CHECKPOINT) <= before:
+                    raise DeliberationContextChanged("selection projection stalled")
+            stored = self.deliberation.inspect(frame_id, clearance=sensitivity)
+            if (stored is None or stored.selection is None
+                    or self.deliberation.latest_selection_event_id(frame_id) != selection_event_id
+                    or stored.selection.candidate.candidate_id
+                    != selection.event.payload.get("candidate_id")):
+                raise DeliberationContextChanged("selection no longer current")
+            self.validate_candidate_sources((stored.selection.candidate,),
+                dict(stored.candidate_contents), owner, sensitivity)
+        except DeliberationContextChanged:
+            raise
+        except Exception as exc:
+            raise DeliberationContextChanged("selection inputs unavailable") from exc
+
     def validate_candidate_sources(self, candidates: Any, contents: Mapping,
                                    owner: str, sensitivity: Sensitivity) -> None:
         """Do not treat a retained frame copy as current source/profile evidence."""

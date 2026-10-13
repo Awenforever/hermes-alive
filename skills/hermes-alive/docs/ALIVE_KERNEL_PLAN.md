@@ -2428,3 +2428,27 @@ For each material change:
   current-policy/admission/dispatch/attributed-outcome chain. Do not count a recovered
   review as permission, manufacture a new operation to hide interrupted history,
   or replace the actual continuous behavior and production gates with more guards.
+
+### 2026-10-13 — Original input lifetime at the action boundary
+
+- ADR 0076 records an actual synthetic execution failure: forgetting a generation
+  profile input after selection still allowed send-time authorization. Original
+  event existence and retained candidate copies were insufficient.
+- Shared selected-source recovery now runs at authorization, before consuming an
+  execution start, and immediately before trusted launch. Checks remain outside
+  writer transactions, validate scope before frame resolution, and preserve the
+  original pinned input window. Separate context vaults are supported explicitly.
+- Twelve local synthetic opportunity execution cases pass, including clean and
+  unrelated-ranking positive controls, forgetting/erasure at three boundaries,
+  and separate-profile-vault recovery. Authorization, CLI execution bridge,
+  dispatch evidence projection and dispatch migration regressions also pass.
+  These fixtures use explicit test-host authority and exact later confirmation,
+  not automatic permission or a qualified external transport.
+- No real model calls or sends. Read-only NAS inspection confirms production
+  running with unchanged start `2026-10-11T07:43:25.630569081Z`. No production,
+  other-plugin, wmw, model, authorization, channel or proxy configuration changes.
+- Still required: reviewed expression must become the exact executable contract;
+  semantic mixed-unit assessment, trusted launch and independently observed
+  outcomes remain incomplete. A pre-launch read is not atomic with delivery.
+  Continue the full long-term agenda/memory/adaptation, migration/rollback and
+  production acceptance scope; do not count structural regressions as real sends.

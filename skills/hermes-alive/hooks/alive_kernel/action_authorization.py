@@ -74,8 +74,10 @@ class SendTimeAuthorizer:
         *,
         content_vault: ContentVault | None = None,
         route_binding_id: str | None = None,
+        context_vault: ContentVault | None = None,
     ) -> None:
         self.journal = journal
+        self.context_vault = context_vault
         self.deliberation = DeliberationProjection(
             journal, content_vault=content_vault
         )
@@ -362,6 +364,14 @@ class SendTimeAuthorizer:
                 reasons.append("selection_from_future")
 
         if candidate is not None:
+            from .deliberation_synthesis import DeliberationSynthesizer, DeliberationContextChanged
+            try:
+                DeliberationSynthesizer(self.journal,
+                    content_vault=self.deliberation.content_vault,
+                    context_vault=self.context_vault).validate_selection_sources(
+                        selection_event_id, owner=owner, sensitivity=sensitivity)
+            except DeliberationContextChanged:
+                reasons.append("generated_inputs_not_current")
             if candidate.action_kind is ActionKind.SILENCE:
                 reasons.append("silence_not_executable")
             if self._required_capability(candidate.side_effect) != capability:

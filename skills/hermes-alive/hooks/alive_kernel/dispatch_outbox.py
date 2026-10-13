@@ -76,8 +76,10 @@ class DispatchOutbox:
         journal: ExperienceJournal,
         *,
         content_vault: ContentVault | None = None,
+        context_vault: ContentVault | None = None,
     ) -> None:
         self.journal = journal
+        self.context_vault = context_vault
         self.path = Path(journal.path)
         self.vault = content_vault or ContentVault(
             self.path.parent / "content-vault",
@@ -87,6 +89,17 @@ class DispatchOutbox:
         self.autonomy = AutonomyPolicyProjection(journal)
         self.host = HostCapabilityProjection(journal, content_vault=self.vault)
         self._initialize()
+
+    def _validate_selection_inputs(self, authorization: JournalRecord) -> None:
+        from .deliberation_synthesis import DeliberationSynthesizer, DeliberationContextChanged
+        try:
+            DeliberationSynthesizer(self.journal, content_vault=self.vault,
+                context_vault=self.context_vault).validate_selection_sources(
+                    str(authorization.event.payload.get("selection_event_id") or ""),
+                    owner=str(authorization.event.subject),
+                    sensitivity=authorization.event.sensitivity)
+        except DeliberationContextChanged as exc:
+            raise DispatchOutboxError("dispatch selection inputs are no longer current") from exc
 
     def _authorization_route(
         self,
@@ -1194,6 +1207,7 @@ class DispatchOutbox:
                 "dispatch route is not authorized: " + ",".join(route_reasons)
             )
         route = self.host.resolve_route(route_binding)
+        self._validate_selection_inputs(authorization)
         start_payload: dict[str, object] = {
             "dispatch_id": str(row["dispatch_id"]),
             "attempt_id": str(row["attempt_id"]),
@@ -1336,6 +1350,7 @@ class DispatchOutbox:
             authorization, subject=lease.subject, capability=lease.capability, now=current)
         if binding is None:
             raise DispatchOutboxError("launch route is no longer authorized: " + ",".join(reasons))
+        self._validate_selection_inputs(authorization)
         contract = parse_action_contract(execution.content, capability=lease.capability)
         if (not self.protector.verify_json(
                 "action.contract.v1", contract.to_document(),
