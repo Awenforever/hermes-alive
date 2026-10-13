@@ -1627,3 +1627,33 @@ For each material change:
   auto-generated configuration backup after the process terminated; original
   production credentials remain unchanged. Production gateway remained running
   with unchanged start time `2026-10-11T07:43:25.630569081Z`.
+
+### 2026-10-13 — Explicit profile evidence reaches interpretation
+
+- ADR-0063 connects bounded typed memory to opportunity interpretation. Owner,
+  original proposal/source provenance and value digest are checked; inferred,
+  forged, foreign, expired and unavailable records are not explicit user context.
+- Model-wait revalidation now includes context. Withdrawal during inference
+  prevents completion; context never grants action authority. Dimension evidence
+  records cite supplied profile events without plaintext in the journal.
+- New deterministic context contract passed, including revocation during the
+  model wait. Existing opportunity synthesis contract passed with absent context.
+  No additional live model calls or production changes were made this revision.
+- Still required: paired live positive/negative relevance tests (three remaining
+  approved logical calls), purpose/consent integration, legitimate reviewed and
+  migrated profile provenance, trusted ingress, generalized retrieval, meaningful
+  ongoing commitments and longitudinal human usefulness. Do not count this as
+  production or semantic-quality acceptance.
+- Windows regression: 39 kernel files, 38 PASS, one explicit absent-Hermes hook
+  SKIP, zero failures. Subsequently corrected independent discovery/memory vault
+  selection and reran both affected contracts successfully. A shared custom vault
+  is now an explicit host choice, not an implicit migration or assumed layout.
+- Network-disabled Linux container `alive-context-20261013-r1` passed context,
+  opportunity, typed-memory and composed-model-cycle contracts, terminal exit zero.
+  Input tree `fb2238f19ba2f692be577ef865e63018b12b90cc`, archive SHA256
+  `60492f00811f3fd95c2e32cd35c8c78d8155e977c157915941287cadf6607e38`;
+  retained `context-r1.log` SHA256
+  `99cdc728fd868d58ce1d4a7a59699cddbd8f33dab99d8e685ddded916440bcbb`.
+  Started `2026-10-13T06:26:00.720779041Z`, finished
+  `2026-10-13T06:26:04.227637420Z`. This uses the prepared core-managed runtime,
+  not installed-package or real-model qualification of this new revision.
