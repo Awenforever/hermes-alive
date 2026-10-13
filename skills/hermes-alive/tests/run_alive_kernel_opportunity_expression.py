@@ -47,7 +47,12 @@ async def scenario(root, mode, owner='user:test'):
             'topic': 'repair', 'dimensions': {name: {'value': .1 if name in
             ('risk','interruption_cost','urgency') else .9, 'reason': 'synthetic judgment'}
             for name in ('user_value','urgency','novelty','confidence','risk','interruption_cost')}}]}))
-    interpreter = OpportunitySynthesizer(journal, content_vault=reader.vault)
+    class HistoricalFixtureSynthesizer(OpportunitySynthesizer):
+        # Reproduce historical model-only completions; not a product installation
+        # setting or permission to silently change an already selected message.
+        _SOURCE_PRESENTATION = 'model_text_v1'
+    interpreter_type = HistoricalFixtureSynthesizer if mode in missing_link_modes else OpportunitySynthesizer
+    interpreter = interpreter_type(journal, content_vault=reader.vault)
     draft = await interpreter.run(subject=owner, operation_id='interpret', call=generate,
                                   authority=ActionAuthority.USER_DELEGATED)
     async def choose(**kw):

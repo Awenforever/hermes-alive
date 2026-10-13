@@ -48,7 +48,8 @@ async def scenario(root, mode, custom_context=False):
     memory.append_proposal(pref, actor=owner)
     async def generate(**kwargs):
         return response({'candidates': [{'agenda_item_id': source.agenda_item_id, 'kind': 'share',
-            'text': 'Free repair recording. Notice unverified. https://example.invalid/repair',
+            'text': 'Free repair recording. Notice unverified.' if mode in ('source-provenance', 'expression-source-provenance')
+                    else 'Free repair recording. Notice unverified. https://example.invalid/repair',
             'topic': 'repair', 'dimensions': {name: {'value': .1 if name in
             ('risk','urgency','interruption_cost') else .9, 'reason': 'synthetic judgment'}
             for name in ('user_value','urgency','novelty','confidence','risk','interruption_cost')}}]})
@@ -62,6 +63,10 @@ async def scenario(root, mode, custom_context=False):
     coordinator = CognitionCycleCoordinator(journal, context_vault=context_vault)
     selected = await coordinator.plan_with_model(cycle_id='cycle', subject=owner,
         candidates=generated.candidates, policy_context=PolicyContext(can_interrupt=True), call=choose)
+    original_frame_bytes = journal.get(selected.frame_event_id).event.canonical_json()
+    if mode in ('source-provenance', 'expression-source-provenance'):
+        assert generated.candidates[0].content['operation']['text'] == (
+            'Free repair recording. Notice unverified.\n\n[来源](<https://example.invalid/repair>)')
     policy = AutonomyPolicyProjection(journal)
     assert policy.apply(policy.append_update(subject=owner, actor=owner, expected_revision=0,
         enabled=True, context=PolicyContext(can_interrupt=True), operation_id='policy')).outcome == 'recorded'
@@ -212,6 +217,10 @@ async def scenario(root, mode, custom_context=False):
             return
         raise AssertionError('stale generated inputs passed the launch boundary')
     outbox.validate_execution_for_launch(execution)
+    assert journal.get(selected.frame_event_id).event.canonical_json() == original_frame_bytes
+    assert 'https://example.invalid/repair' in execution.content['operation']['text']
+    if mode == 'source-provenance':
+        assert execution.content == generated.candidates[0].content
     if expression:
         assert execution.content['operation']['text'] == expressed_text
         original = coordinator.deliberation.inspect(journal.get(selected.selection_event_id).event.payload['frame_id'],
@@ -225,7 +234,7 @@ async def scenario(root, mode, custom_context=False):
 
 
 async def main(root):
-    for mode in ('clean','unrelated-ranking','forget-before-authorize','erase-before-authorize',
+    for mode in ('clean','source-provenance','expression-source-provenance','unrelated-ranking','forget-before-authorize','erase-before-authorize',
                  'forget-before-begin','erase-before-begin','forget-before-launch','erase-before-launch'):
         await scenario(root / mode, mode)
     for mode in ('clean', 'forget-before-authorize', 'forget-before-begin', 'forget-before-launch'):

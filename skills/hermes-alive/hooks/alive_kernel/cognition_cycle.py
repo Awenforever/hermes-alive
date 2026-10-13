@@ -8,11 +8,13 @@ import re
 from typing import Any, Iterable
 
 from .content_vault import ContentIntegrityError, ContentVault
+from .action_contract import ActionContractError, parse_action_contract
 from .deliberation import (
     ActionCandidate,
     ActionKind,
     DeliberationFrame,
     PolicyContext,
+    SideEffect,
     SelectionProposal,
     ValidatedSelection,
     validate_selection,
@@ -41,6 +43,7 @@ class CycleCandidate:
     mode: ExplorationMode = ExplorationMode.EXPLOIT
 
     MAX_CONTENT_CHARS = 4_000
+    MAX_CHANNEL_CONTENT_CHARS = 12_256  # 12000-char channel text plus bounded envelope.
 
     def __post_init__(self) -> None:
         if self.action.action_kind is ActionKind.SILENCE:
@@ -59,9 +62,20 @@ class CycleCandidate:
             )
         except (TypeError, ValueError) as exc:
             raise CognitionCycleError("cycle content must be finite JSON") from exc
+        maximum = self.MAX_CONTENT_CHARS
+        if self.action.side_effect is SideEffect.COMMUNICATION:
+            try:
+                parse_action_contract(normalized, capability='hermes.channel.send')
+            except ActionContractError:
+                pass
+            else:
+                # Typed channel contracts have an existing larger text budget.
+                # Generic content stays bounded at 4000, and frame/prompt limits
+                # remain unchanged. This is not recipient or execution authority.
+                maximum = self.MAX_CHANNEL_CONTENT_CHARS
         if len(
             json.dumps(normalized, ensure_ascii=False, separators=(",", ":"))
-        ) > self.MAX_CONTENT_CHARS:
+        ) > maximum:
             raise CognitionCycleError("cycle candidate content is too large")
         object.__setattr__(self, "content", _freeze_json(normalized))
         topic = str(self.topic).strip()

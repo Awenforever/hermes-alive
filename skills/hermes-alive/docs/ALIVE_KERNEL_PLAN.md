@@ -13,8 +13,12 @@ three-context paired experiment structurally completes six calls but finds a
 missing source URL and questionable conservative/pragmatic explanations. One
 blinded Qwen diagnostic overlooks those concerns and fails strict parsing due to
 a code fence; it is not a semantic admission gate. Canonical provenance now enters
-expression independently of whether the drafting model remembered its URL. Direct
-original-draft delivery still requires its own provenance contract. Next qualify
+expression independently of whether the drafting model remembered its URL.
+ADR-0091 now also fixes provenance in newly minted original-draft contracts before
+selection/confirmation, preserving original wording and historical contract policies.
+Typed channel capacity and separate wording/source atoms avoid rejecting ordinary
+valid long provenance. Historical pending contracts/lifecycle remain unqualified.
+Next qualify
 per-decision/source semantics and the useful end-to-end path, not just formatting.
 
 ADR-0084/0085 record actual feedback interpretations, a failed initial contract
@@ -2793,3 +2797,23 @@ For each material change:
   then useful attributed outcomes and bounded feedback learning. Retain the full
   memory/agenda/adaptation, authenticated host, forgetting/migration/rollback,
   portability and production acceptance scope; no production deploy or real send.
+
+### 2026-10-14 — Provenance before selection/confirmation, ADR 0091
+
+- New source-aware original contracts bind exact provenance before user approval,
+  while encrypted model wording and explicit presentation-policy versions preserve
+  audit/recovery. No post-confirmation append or rewriting of historical contracts.
+- Broader long-source tests expose generic candidate and model-atom capacity
+  mismatches. Typed validated channel envelopes use bounded channel capacity;
+  generic/frame/prompt caps remain. Expression reads original accepted wording
+  and a separate canonical LINK atom, rather than treating formatting as model speech.
+- Component and authorization/outbox fixtures prove exact contract/frame continuity,
+  not genuine host authorization/delivery. Six cached synthetic replays require
+  explicit new-key source-ID remapping; one gains a link and none infer permission.
+  Original failed exact-ID replay stays recorded, not migration/recovery proof.
+- Actual model counts remain 83 logical / 95 observed HTTP attempts. No new model
+  export, private read, actual send or production/wmw/other-plugin change.
+- Next qualify source/decision semantics and natural expression, then useful
+  attributed outcomes and bounded feedback. Continue the full host, layered/external
+  memory, sustained agenda/adaptation, physical forgetting, migration/rollback,
+  portable lifecycle and production acceptance objective.

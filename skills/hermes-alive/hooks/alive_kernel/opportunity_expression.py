@@ -66,7 +66,20 @@ class OpportunityExpressionStore(SemanticReviewStore):
                     observation_event_ids=tuple(original_start.event.payload['observation_event_ids']))
             original_url = next(item.content['url'] for item in active
                                 if item.agenda_item_id == candidate.agenda_item_id)
-            text = str(contract.operation['text'])
+            ref = ContentReference.from_event_payload(receipt.event.payload['content'])
+            bundle = self.content_vault.resolve_json(ref.content_id, expected_subject=subject,
+                expected_purpose='opportunity.candidates', expected_sensitivity=source.event.sensitivity)
+            if self.content_vault.digest_json(bundle) != ref.digest:
+                raise SemanticReviewError('original model proposal bundle changed')
+            operation = completed.removeprefix('opportunity.synthesis:').removesuffix(':completed')
+            indices = bundle.get('proposal_indices', tuple(range(len(bundle['proposals']))))
+            original = next(raw for index, raw in zip(indices, bundle['proposals'])
+                if 'opportunity-candidate:' + self.content_vault.digest_json(
+                    {'operation': operation, 'index': index})[:40] == candidate.candidate_id)
+            # Source-aware action presentation can exceed the 1600-character model
+            # wording budget. Keep the original wording and canonical link as
+            # separate atoms, not one oversized alleged model utterance.
+            text = original['text']
             literals = (original_url,) if original_url and original_url in text else ()
         except Exception:
             raise SemanticReviewError('original opportunity evidence is unavailable') from None

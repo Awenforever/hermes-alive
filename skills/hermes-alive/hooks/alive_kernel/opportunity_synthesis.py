@@ -49,6 +49,23 @@ class OpportunitySynthesisResult:
 
 _DIMENSIONS = ("user_value", "urgency", "novelty", "confidence", "interruption_cost", "risk")
 _MAX_DIMENSION_REASON = 512  # Align with DimensionAssessment; do not truncate explanation.
+_SOURCE_PRESENTATIONS = {"model_text_v1", "canonical_source_v1"}
+
+
+def _present_source(text: str, url: str, policy: str) -> str:
+    """Compose provenance before selection/confirmation, never at launch time.
+
+    Original model wording remains retained separately. Angle destination syntax
+    preserves parentheses in ordinary Markdown URLs. Unrepresentable destinations
+    stay exact plain text rather than being shortened or replaced with guesses.
+    This is provenance presentation, not a model-failure fallback or truth proof.
+    """
+    if policy not in _SOURCE_PRESENTATIONS:
+        raise OpportunitySynthesisError("unknown source presentation policy")
+    if policy == "model_text_v1" or url in text:
+        return text
+    link = f"[来源](<{url}>)" if not any(c in url for c in "<>\r\n") else f"来源：{url}"
+    return f"{text}\n\n{link}"
 
 
 def _reject_constant(_value: str) -> None:
@@ -102,6 +119,8 @@ Return only JSON: {"abstentions":[{"agenda_item_id":"supplied ID","reason":"why 
 class OpportunitySynthesizer:
     """Unscheduled interpretation with an explicit, trusted host model capability."""
 
+    _SOURCE_PRESENTATION = "canonical_source_v1"
+
     def __init__(self, journal: ExperienceJournal, *, content_vault: Any = None,
                  context_vault: Any = None) -> None:
         self.journal = journal
@@ -117,7 +136,10 @@ class OpportunitySynthesizer:
 
     def _candidates(self, document: Any, evidence: tuple, operation: str,
                     receipt_id: str, authority: ActionAuthority, context: tuple = (),
-                    indices: tuple[int, ...] | None = None, learning: tuple = ()) -> tuple[tuple, tuple, int, tuple]:
+                    indices: tuple[int, ...] | None = None, learning: tuple = (),
+                    source_presentation: str = "model_text_v1") -> tuple[tuple, tuple, int, tuple]:
+        if source_presentation not in _SOURCE_PRESENTATIONS:
+            raise OpportunitySynthesisError("unknown source presentation policy")
         if (not isinstance(document, dict) or set(document) not in (
                 {"candidates"}, {"candidates", "abstentions"})
                 or not isinstance(document["candidates"], list)
@@ -159,7 +181,8 @@ class OpportunitySynthesizer:
                     ))
                 contract = parse_action_contract({
                     "schema_version": 1, "capability": "hermes.channel.send",
-                    "operation": {"text": raw["text"], "format": "markdown"},
+                    "operation": {"text": _present_source(raw["text"], str(source.content["url"]),
+                                                            source_presentation), "format": "markdown"},
                 }, capability="hermes.channel.send")
                 identity = self.vault.digest_json({"operation": operation, "index": index})[:40]
                 action = ActionCandidate(
@@ -269,7 +292,8 @@ class OpportunitySynthesizer:
                     raise OpportunitySynthesisError("legacy partial bundle lacks stable proposal identities")
                 indices = tuple(range(count))
             candidates, _, invalid, _ = self._candidates({"candidates": bundle["proposals"]},
-                evidence, operation_id, receipt.event.event_id, authority, context, tuple(indices), learning)
+                evidence, operation_id, receipt.event.event_id, authority, context, tuple(indices), learning,
+                source_presentation=bundle.get("source_presentation", "model_text_v1"))
             if invalid or len(candidates) != count:
                 raise OpportunitySynthesisError("completed proposals no longer valid")
             abstentions, invalid_abstentions = self._abstentions(
@@ -357,11 +381,13 @@ class OpportunitySynthesizer:
                                   object_pairs_hook=_unique_object)
             candidates, drafts, rejected, indices = self._candidates(
                 document, evidence, operation_id, receipt_id, authority, context, learning=learning,
+                source_presentation=self._SOURCE_PRESENTATION,
             )
             abstentions, rejected_abstentions = self._abstentions(
                 document.get("abstentions", []), evidence, document["candidates"])
             bundle = self.vault.put_json(
                 {"proposals": list(drafts), "proposal_indices": list(indices),
+                 "source_presentation": self._SOURCE_PRESENTATION,
                  "abstentions": [{"agenda_item_id": a.agenda_item_id, "reason": a.reason}
                                  for a in abstentions]}, subject=subject,
                 purpose="opportunity.candidates", sensitivity=Sensitivity(clearance),
