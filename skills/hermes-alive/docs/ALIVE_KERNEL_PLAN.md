@@ -2586,3 +2586,22 @@ For each material change:
 - Continue semantic/authenticated content-linked feedback and utility validation,
   expression qualification and the original full long-term memory/agenda/adaptation,
   forgetting/migration/rollback/portable lifecycle and production acceptance scope.
+
+### 2026-10-13 — Semantic feedback stage, no preference authority, ADR 0083
+
+- Previous feedback tests began with manually interpreted targets. New opt-in
+  FeedbackSynthesizer interprets an original complete consented owner reply against
+  its preceding delivery and exact signed executed text. Hermes still owns routing.
+- Several topic/presentation/timing/interruption hypotheses can remain separate,
+  with original quotes, situational/durable/uncertain scope and unresolved meanings.
+  It writes no preference weights, approved reflection, profile fact, job or message.
+- Synthetic tests cover consent/delivery/time/truncation bounds, model-wait withdrawal,
+  erased evidence recovery, private receipt storage and spent IDs. A wrong meaning
+  with a valid quote deliberately remains structurally admissible: actual semantic
+  quality is unproved, and automatic learning authority is always false.
+- No real model call/send, private chat, production configuration/restart, other
+  plugin or wmw change. Logical calls remain 43, async HTTP attempts 55.
+- Next: genuine public-scenario model/independent-review qualification and bounded
+  tentative learning integration, not per-example keyword patches. Real ingress,
+  complete input capture and derived-copy forgetting remain open alongside the full
+  long-term cognition, memory, migration, lifecycle and production acceptance scope.
