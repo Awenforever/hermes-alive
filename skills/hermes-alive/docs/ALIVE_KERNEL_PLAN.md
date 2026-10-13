@@ -2643,3 +2643,26 @@ For each material change:
 - Next: bounded model-driven contract recovery and independent assessment of
   partial results, followed by tentative learning utility qualification and the
   unchanged full host, expression, memory, agenda, portability and production scope.
+
+### 2026-10-14 — One-shot model-driven feedback recovery, ADR 0085
+
+- New opt-in recovery consumes canonical partial receipts, only reconsidering
+  rejected indexes. Accepted parent units remain untouched. Explicit abstention
+  and unsupported replacements remain visible; no semantic defaults are invented.
+- One journaled recovery per parent, including failure/cancellation, with consent,
+  source integrity, expiry and attribution rechecked after model wait and on use.
+  Fake regressions cover concurrent/repeated attempts, invalid target indexes,
+  erasure/withdrawal during wait, source erasure recovery and provider-secret exclusion.
+- Initial probe setup exposed diagnostic-wording versus receipt-identity confusion;
+  fixed by original raw digest binding. First actual model recovery exposed a redundant
+  mandatory outer reason. Removed this duplicated requirement for non-null signals,
+  retaining all evidence/signal fields and explicit explanations for abstention.
+- An explicit fresh-copy repeat structurally recovers three units on one main-model
+  call. Original partial and failed-recovery histories remain unchanged. Eight isolated
+  offline suites pass; not semantic proof, independent review or ten clean full calls.
+- Actual model totals 57 logical / 69 observed async HTTP attempts; all temporary
+  recovery model exports absent, production unchanged and no real channel send.
+- Next: independent semantic assessment and bounded tentative learning utility,
+  including incomplete-output integration. Continue the full long-term memory,
+  agenda/adaptation, authenticated host, expression, forgetting/migration/rollback,
+  portable lifecycle and production acceptance scope. Recovery is not yet runtime-wired.
