@@ -13,6 +13,15 @@ the miss and calibrate claim/evidence reasoning on fresh diverse cases, not a
 phrase blacklist or a regenerated cleaner draft. Recorded source timing and an
 atomic start-insertion fence now strengthen the review contract, not its judgment.
 
+ADR-0073 adds an important correction: a paired method comparison explicitly
+examined that closing and still interpreted it pragmatically as a suggestion.
+Thus it is not established that the model merely skipped it, or that our authored
+negative label is independently correct. Eight broad diagnostic cases matched
+expectations, but the paired study did not show method superiority. Baseline stays
+the runtime default; do not accumulate ineffective prompts or relabel to pass.
+Next separate material verifiable claims from tentative/conversational content
+and audit extraction coverage and labels before relying on support verdicts.
+
 ### Prior finding: evidence lifetime through selection
 
 ADR-0065 records a reproduced gap: withdrawal of an explicit profile during
@@ -2264,3 +2273,60 @@ For each material change:
   log SHA256 `3cd79c45e92ae9bef2e4583dee76e4c0c0051b64e63d5b80e5ece541ad54d723`.
   Snapshot includes final runtime/tests, not the later documentation/manifests;
   this focused contract is not a whole-repository manifest or install acceptance.
+
+### 2026-10-13 — Source-support calibration and a negative method comparison
+
+- ADR 0073 records eight predeclared diagnostic cases, then four fixed-candidate
+  paired method cases (eight further calls). Expected labels/category names were
+  withheld from prompts; failures, wrong-family fallbacks, invalid findings and
+  label disagreements are separate, and raw bounded synthetic outputs are retained.
+- All sixteen actual calls: `claude-haiku-4-5` / `custom:ustc`, sixteen observed
+  async HTTP 200. Cumulative logical calls 40; observed async HTTP requests 50.
+  No primary/fallback edits, new credentials, private chats, generation calls or
+  external dispatch. Eight diagnostic expectations matched; both methods disagreed
+  on the retained closing. No method superiority, causal learning, human gold,
+  zero-error end-to-end round, production qualification or benefit is claimed.
+- The exact retained candidate and source excerpt were compared with the existing
+  private learning report before the comparison. Other context values were carried
+  into a diagnostic envelope; it is not asserted identical to the old live snapshot.
+  The positive and other-domain negative counterparts are authored, not improved
+  model generations. Counterbalanced single samples are not stochastic calibration.
+- Initial diagnostic immutable input tree `e3b4f6c8b0dddd3021b2d17eb26afbdf425e11dd`,
+  archive SHA256 `00e630a0dc43b5e2c6ece3c36370c9f716c75d499007f673a5b35a7426d81e4c`.
+  `alive-source-calibration-live-20261013-r1`: exit zero, start
+  `2026-10-13T12:05:21.206371959Z`, finish `2026-10-13T12:06:40.446289724Z`;
+  log SHA256 `b248378cd8bc6a2e038e6dd48da1cda7f894d3dd153f986ab50d4a874590a615`.
+  Report SHA256 `976f299bd5784f60b97ebf07f581452dfdbe77d169ec923a1ac326b503892b79`.
+  Network-none accounting test container same suffix: exit zero, start
+  `2026-10-13T12:05:21.3380874Z`, finish `2026-10-13T12:05:22.033709294Z`,
+  log SHA256 `06a00283f8884797527305d11e6c58a785d22bf7ff26df639e16c062371e56c9`.
+- Comparison immutable input tree `8e7eaf2a3c66db8fd092ff72158a29eb7b98ae82`,
+  archive SHA256 `f46304dd3581dd21d957fcf1336e972356e70da824cebcdeecbd01296f84a230`.
+  `alive-source-calibration-live-20261013-r2`: exit zero, start
+  `2026-10-13T12:11:25.606414349Z`, finish `2026-10-13T12:13:06.353000212Z`;
+  log SHA256 `2bc4dffb69705a9f6aad8f3cbd1d3a7d8f4030213206e528528b11a251f88ee9`.
+  Report SHA256 `a8e27fa25be1567305c3ac739481803ff09e56727de6982364e1ffa1ecf0c850`.
+  Network-none support/accounting tests same suffix: exit zero, start
+  `2026-10-13T12:11:25.749184673Z`, finish `2026-10-13T12:11:29.046168698Z`,
+  log SHA256 `877c30347ceba083c441c08f651986c75f530c351f1ccd09ad570cd35c8da328`.
+- Reports retained under owned NAS scratch `model-only-source-calibration-20261013-r1/results/`
+  and `model-only-source-calibration-20261013-r2/results/`; private Windows copies
+  `../work/alive-source-calibration-report-20261013-r1.json` and `-r2.json`.
+  Historical `unsafe_acceptances` is author-label disagreement, not an unsafe send.
+  Later code renames it without rewriting reports or labels. A longer method showed
+  no superiority and was moved to tests, leaving baseline runtime behavior. These
+  later changes are not the r1/r2 immutable inputs; focused final-code tests follow.
+- Both jobs confirmed terminal before removing each owned model export/config and
+  backup. Production remains running, start `2026-10-11T07:43:25.630569081Z`;
+  no production restart, install, release, wmw change or real-user message occurred.
+- Final-code focused Windows support and calibration/accounting tests pass. Also
+  verified both compared prompt strings have exactly the recorded live SHA256
+  after relocating the unproven method out of runtime. No broad current-code suite
+  or actual gateway acceptance is inferred from these focused contracts.
+- Final network-none Linux input tree `7ff7d71fd7dd67cbb02f1f4fe286022a6d4c3deb`,
+  archive SHA256 `c17fda5349f9dec8d8332524079b758e8bd8cafd03b8c592a145dbc8ee6dcfb7`.
+  `alive-source-calibration-offline-20261013-r3`: exit zero, start
+  `2026-10-13T12:17:56.026869926Z`, finish `2026-10-13T12:17:58.618595483Z`;
+  support and accounting contracts both pass, log SHA256
+  `877c30347ceba083c441c08f651986c75f530c351f1ccd09ad570cd35c8da328`.
+  Later documentation/manifests are not part of that runtime/test snapshot.

@@ -12,6 +12,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'hooks'))
 from alive_kernel import (ExperienceJournal,DiscoveryCandidate,DiscoveryOpportunityIngestor,
                          OpportunitySynthesizer)
 from alive_kernel.source_support import SourceSupportReviewer,SourceSupportError
+import alive_kernel.source_support as support_module
 
 
 async def exercise(root,mode):
@@ -70,6 +71,13 @@ async def exercise(root,mode):
             candidate_id=candidate_id)['verdict']==mode
         assert reviewer.verify_current(receipt.event_id,subject='user:other',interpretation_id='generate',
             candidate_id=candidate_id) is None
+        original_prompt=support_module.PROMPT
+        try:
+            support_module.PROMPT += '\nSynthetic method version change.'
+            assert reviewer.verify_current(receipt.event_id,subject='user:test',interpretation_id='generate',
+                candidate_id=candidate_id) is None
+        finally:
+            support_module.PROMPT=original_prompt
         reader.vault.erase_item(journal.get(source.observation_event_id).event.payload['content']['content_id'])
         assert reviewer.verify_current(receipt.event_id,subject='user:test',interpretation_id='generate',
             candidate_id=candidate_id) is None
