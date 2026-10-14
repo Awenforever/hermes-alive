@@ -137,7 +137,7 @@ class TransportPublisherBridge:
                     or type(row['seq']) is not int or row['seq'] <= previous
                     or row['seq'] > page['high_water_sequence']
                     or not _digest(row['occurrence_id']) or not _digest(row['client_reference'])
-                    or row['phase'] not in ('queued','acknowledged')
+                    or row['phase'] not in ('queued','acknowledged','withdrawn')
                     or type(row['observed_at']) not in (int,float) or not math.isfinite(row['observed_at'])
                     or not event.observed_at.timestamp() <= row['observed_at'] <= current.timestamp()
                     or row['occurrence_id'] != hashlib.sha256((row['client_reference'] + ':' + row['phase']).encode()).hexdigest()):
@@ -164,3 +164,78 @@ class TransportPublisherBridge:
         return {'records':tuple(results), 'next_sequence':previous,
             'available':page['available'], 'coverage_uncertain':True,
             'complete_inventory_proven':False, 'external_delivery_proven':False}
+
+    async def withdraw_paused(self,binding_event_id,*,publisher,route,now=None):
+        """Withdraw only this user's explicitly paused, historically bound work.
+
+        This asks the host; never edits FIFO or promises recall of in-flight IO.
+        No implicit pause can be inferred from model prose, silence or availability.
+        """
+        current = self.outbox._utc(now)
+        binding,payload,_ = self._qualified_binding(binding_event_id,publisher,route,current)
+        policy = self.outbox.autonomy.current(binding.event.subject)
+        if policy is None or policy.enabled or policy.updated_at < binding.event.observed_at:
+            raise DispatchOutboxError('explicit current owner pause required for withdrawal')
+        policy_record = self.journal.get(policy.event_id)
+        policy_payload = _thaw_json(policy_record.event.payload) if policy_record else {}
+        policy_signature = policy_payload.pop('integrity_authenticator',None)
+        if (policy_record is None or policy_record.event.event_type != 'autonomy.policy_changed'
+                or policy_record.event.source != 'hermes.command.alive'
+                or policy_record.event.actor != binding.event.subject or policy_record.event.subject != binding.event.subject
+                or policy_record.event.observed_at < binding.event.observed_at
+                or policy_record.event.sensitivity.value != 'private'
+                or policy_payload.get('enabled') is not False or policy_payload.get('revision') != policy.revision
+                or not self.outbox.autonomy.protector.verify_json('autonomy.policy.v1',policy_payload,policy_signature)):
+            raise DispatchOutboxError('pause projection lacks canonical owner authority')
+        found_current = False
+        for candidate in self.journal.iter_reverse(event_types=('autonomy.policy_changed',),
+                subject=binding.event.subject,max_records=1000):
+            if candidate.event.event_id == policy.event_id:
+                found_current = True
+                break
+            later_payload = _thaw_json(candidate.event.payload)
+            later_signature = later_payload.pop('integrity_authenticator',None)
+            if (candidate.event.source == 'hermes.command.alive'
+                    and candidate.event.actor == binding.event.subject
+                    and candidate.event.subject == binding.event.subject
+                    and candidate.event.sensitivity.value == 'private'
+                    and self.outbox.autonomy.protector.verify_json('autonomy.policy.v1',later_payload,later_signature)):
+                raise DispatchOutboxError('newer owner policy command requires current-state reconciliation')
+        if not found_current:
+            raise DispatchOutboxError('bounded canonical pause history unavailable')
+        cancel = getattr(publisher.adapter,'_hermes_transport_withdraw_binding_v1',None)
+        filename = inspect.getsourcefile(cancel) if callable(cancel) else None
+        if filename is None or hashlib.sha256(Path(filename).read_bytes()).hexdigest() != publisher.source_digest:
+            raise DispatchOutboxError('qualified host withdrawal interface required')
+        request_payload = {'binding_event_id':binding_event_id,'policy_event_id':policy.event_id,
+            'publisher_epoch':payload['publisher_epoch'],'delivery_authority_granted':False}
+        identity = self.protector.authenticate_json('transport.publisher.withdrawal.identity.v1',request_payload)
+        request = self._append(event_id='transport-withdrawal:'+identity,
+            kind='transport.publisher.withdrawal_requested',cause=binding_event_id,
+            subject=binding.event.subject,sensitivity=binding.event.sensitivity,payload=request_payload,now=current)
+        result_id = request.event.event_id + ':result'
+        existing = self.journal.get(result_id)
+        if existing is not None:
+            existing_payload = _thaw_json(existing.event.payload)
+            signature = existing_payload.pop('integrity_authenticator',None)
+            if (not self.protector.verify_json('transport.publisher.withdrawal_reported.v1',existing_payload,signature)
+                    or any(existing_payload.get(key) != value for key,value in request_payload.items())
+                    or any(existing_payload.get(key) is not False for key in ('external_delivery_proven','complete_inventory_proven','external_recall_proven'))):
+                raise DispatchOutboxError('withdrawal replay differs from canonical request')
+            # A prior report is history, not proof that a restored host database
+            # still carries its deny. Reassert the idempotent host request; never
+            # infer recall or add another send from this recovery.
+            await cancel(route['chat_id'],payload['transport_binding'])
+            return self._append(event_id=result_id,kind='transport.publisher.withdrawal_reported',
+                cause=request.event.event_id,subject=binding.event.subject,sensitivity=binding.event.sensitivity,
+                payload=existing_payload,now=current)
+        result = await cancel(route['chat_id'],payload['transport_binding'])
+        if (set(result) != {'removed_count','observation_available','already_sent_possible','external_recall_proven'}
+                or type(result['removed_count']) is not int or not 0 <= result['removed_count'] <= 500
+                or type(result['observation_available']) is not bool
+                or result['already_sent_possible'] is not True or result['external_recall_proven'] is not False):
+            raise DispatchOutboxError('withdrawal report exceeds qualified contract')
+        return self._append(event_id=result_id,kind='transport.publisher.withdrawal_reported',
+            cause=request.event.event_id,subject=binding.event.subject,sensitivity=binding.event.sensitivity,
+            payload={**result,**request_payload,'external_delivery_proven':False,'complete_inventory_proven':False},
+            now=self.outbox._utc(now))

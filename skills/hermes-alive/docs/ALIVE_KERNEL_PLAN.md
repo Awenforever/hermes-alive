@@ -33,6 +33,16 @@ core/queue edits or production changes follow from this permission.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+ADR-0128 connects explicit canonical owner pause to an enhance-owned withdrawal
+interface (development `6b9b41f`). Windows and Linux actual-SDK synthetic IO prove
+scoped pending removal, unrelated FIFO preservation, persistent deny/new-submit
+suppression, in-flight partial ACK honesty, forged/stale policy refusal and deny
+reassertion after simulated restore loss. Alive never edits FIFO or promises recall.
+Not yet an automatic pause command: qualify cross-thread control, failure/capacity,
+deadlines, migration and bounded subscriber lifetime; then meaningful autonomous
+scheduling/feedback/longitudinal utility and portable production acceptance.
+No production activation or enhance final release follows from this development.
+
 ADR-0127 qualifies four composed failure cases in Windows/fake and Linux/actual
 SDK synthetic IO: original error, caller cancellation after queue acceptance,
 publication-table failure after IO and user pause immediately before launch.
