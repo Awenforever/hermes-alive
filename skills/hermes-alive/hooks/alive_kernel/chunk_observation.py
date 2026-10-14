@@ -33,13 +33,16 @@ class OwnedChunkObserver:
         self.observation_failed = self.capacity_exceeded = False
         self.unscoped_same_chat_calls = self.restoration_conflicted = False
         self._entered = False
+        self._closed = self.active = False
+        self._inflight_owned = 0
+        self.closed_with_pending_calls = False
 
     @property
     def observations(self):
         return tuple(self._observations)
 
     async def __aenter__(self):
-        if self._entered or getattr(self.adapter, '_alive_owned_chunk_observer', None) is not None:
+        if self._closed or self._entered or getattr(self.adapter, '_alive_owned_chunk_observer', None) is not None:
             raise ValueError('observer already installed or reused')
         self.task = asyncio.current_task()
         if self.task is None:
@@ -55,17 +58,22 @@ class OwnedChunkObserver:
             scoped = asyncio.current_task() is self.task and kwargs.get('chat_id') == self.route['chat_id']
             if not scoped and kwargs.get('chat_id') == self.route['chat_id']:
                 self.unscoped_same_chat_calls = True
+            if scoped:
+                self._inflight_owned += 1
             try:
                 result = await original(*args, **kwargs)
             except asyncio.CancelledError:
-                if scoped:
+                if scoped and self.active:
                     self.cancellations += 1
                 raise
             except BaseException:
-                if scoped:
+                if scoped and self.active:
                     self.failures += 1
                 raise
-            if scoped:
+            finally:
+                if scoped:
+                    self._inflight_owned -= 1
+            if scoped and self.active:
                 try:
                     identifier = kwargs.get('client_id')
                     if (result is not None or not isinstance(identifier, str)
@@ -93,7 +101,14 @@ class OwnedChunkObserver:
         return self
 
     async def __aexit__(self, exc_type, exc, traceback):
+        if self._closed:
+            return False
+        self._closed = True
+        self.closed_with_pending_calls = self._inflight_owned > 0
         self.active = False
+        if not self._entered:
+            self.adapter = None
+            return False
         if vars(self.adapter).get('_send_text_chunk') is self.wrapper:
             if self._had_instance_method:
                 self.adapter._send_text_chunk = self._prior_instance_method

@@ -33,6 +33,13 @@ core/queue edits or production changes follow from this permission.
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0120 reproduces/fixes late observer publication after unload during suspended
+IO and makes repeated close safe. Post-await active checks, explicit pending-close
+coverage and finally-owned counters preserve original return/error/cancellation.
+Windows and Linux barriers/stock-adapter synthetic-IO regression pass. Queued
+worker ownership and durable attempt-scoped publication are still unqualified;
+continue them without rewriting FIFO, then integrate feedback and live runtime.
+
 ADR-0119 adds a research-only owned chunk observer: identical delegation, no
 FIFO/token/retry ownership, own-task/route capture, anonymous bounded references,
 fail-open metadata and ownership-safe restoration. Windows contracts and actual

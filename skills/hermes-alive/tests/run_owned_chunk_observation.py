@@ -28,6 +28,11 @@ async def exercise(root):
                                        context_token='PRIVATE_TOKEN', client_id=identifier)
     observer = observe()
     async with observer:
+        try:
+            async with observe():
+                pass
+        except ValueError: pass
+        else: raise AssertionError('second owner replaced an installed observer')
         assert await send('one') is None
         await asyncio.create_task(send('other-task'))
         await send('other-chat', 'elsewhere')
@@ -76,7 +81,41 @@ async def exercise(root):
     else: raise AssertionError('unqualified hook installation allowed')
 
 
+async def unload_during_send(root):
+    protector = LocalIdentityProtector(root / 'unload.key')
+    route = {'platform':'weixin', 'profile':'synthetic', 'chat_id':'chat', 'thread_id':None}
+    for mode in ('return', 'error', 'cancel'):
+        entered, release = asyncio.Event(), asyncio.Event()
+        class DelayedAdapter:
+            async def _send_text_chunk(self, **kwargs):
+                entered.set()
+                await release.wait()
+                if mode == 'error': raise RuntimeError('original error')
+                if mode == 'cancel': raise asyncio.CancelledError()
+        adapter = DelayedAdapter()
+        observer = OwnedChunkObserver(adapter, protector=protector, subject='user:test',
+                                      route=route, qualified=True)
+        async def owner():
+            await observer.__aenter__()
+            return await adapter._send_text_chunk(chat_id='chat', client_id='pending',
+                chunk='PRIVATE_BODY', context_token='PRIVATE_TOKEN')
+        pending = asyncio.create_task(owner())
+        await entered.wait()
+        await observer.__aexit__(None, None, None)
+        assert '_send_text_chunk' not in vars(adapter)
+        release.set()
+        try: await pending
+        except RuntimeError as exc: assert mode == 'error' and str(exc) == 'original error'
+        except asyncio.CancelledError: assert mode == 'cancel'
+        else: assert mode == 'return'
+        assert not observer.observations, 'late return published after unload'
+        assert observer.closed_with_pending_calls and observer._inflight_owned == 0
+        assert observer.failures == observer.cancellations == 0
+        await observer.__aexit__(None, None, None)  # Context-finally may close again.
+
+
 if __name__ == '__main__':
     with tempfile.TemporaryDirectory(prefix='alive-chunk-observer-') as folder:
         asyncio.run(exercise(Path(folder)))
+        asyncio.run(unload_during_send(Path(folder)))
     print('HERMES_ALIVE_OWNED_CHUNK_OBSERVATION_OK')
