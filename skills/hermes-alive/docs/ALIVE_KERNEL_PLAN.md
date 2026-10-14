@@ -33,6 +33,14 @@ core/queue edits or production changes follow from this permission.
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0114 composes current expression with existing send-time authorization and
+one stable action attempt. Missing/exact confirmation, no implicit provider or
+attempt duplication, and canonical policy withdrawal pass Windows/isolated Linux.
+No transport was launched. The existing exact-expression confirmation restriction
+is NOT a final autonomous product: next implement explicitly scoped/revocable
+natural-expression delegation without expanding existing grants or treating
+model reviews as permission, then compose host delivery and attributed feedback.
+
 ADR-0113 composes current planning and natural expression/review. Silence has no
 expression calls; completed recovery revalidates original evidence and consumes
 no provider budget. An injected crash after the native comparison but before the

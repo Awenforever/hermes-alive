@@ -15,7 +15,7 @@ from alive_kernel.expression_runtime import ExpressionRuntime, ExpressionRuntime
 from alive_kernel.semantic_review import SemanticReviewError
 
 
-async def scenario(root, mode):
+async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.USER_DELEGATED):
     journal = ExperienceJournal(root / 'experience.sqlite3')
     reader = DiscoveryOpportunityIngestor(journal)
     source = reader.ingest(DiscoveryCandidate(source='synthetic public fixture', title='Repair workshop',
@@ -60,7 +60,7 @@ async def scenario(root, mode):
     def domain(provider, model):
         return 'synthetic-render-family' if model.endswith('/renderer') else 'synthetic-review-family'
     params = dict(operation_id='one', subject='user:test', policy_context=PolicyContext(can_interrupt=True),
-        call=call, authority=ActionAuthority.USER_DELEGATED, resolve_domain=domain, language='en')
+        call=call, authority=authority, resolve_domain=domain, language='en')
     class InterruptedCommitRuntime(ExpressionRuntime):
         def _bound_record(self, event_id, kind, *args):
             if kind == 'expression.runtime_completed':
@@ -100,6 +100,8 @@ async def scenario(root, mode):
         raise AssertionError('completed expression spent on provider again')
     assert await ExpressionRuntime(ExperienceJournal(journal.path)).run(**{**params, 'call': forbidden}) == result
     assert journal.last_sequence() == before
+    if return_ready:
+        return journal, params, result
     if mode != 'silence':
         assert 'https://example.invalid/workshop' in result.text
         try:
