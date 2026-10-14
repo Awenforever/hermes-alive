@@ -33,6 +33,14 @@ core/queue edits or production changes follow from this permission.
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0115 adds explicitly signed natural-expression delegation, default disabled.
+Historical grants never expand. Current owner/policy/route/kind/sensitivity/expiry
+and revocation checks apply at authorization, permit replay and start/launch;
+existing cadence tests remain green. Windows and isolated Linux prove synthetic
+preparation/revocation contracts, not external transport or model quality.
+Next compose actual Hermes delivery and authenticated opt-in user onboarding,
+then attributable feedback and longitudinal utility. No production change.
+
 ADR-0114 composes current expression with existing send-time authorization and
 one stable action attempt. Missing/exact confirmation, no implicit provider or
 attempt duplication, and canonical policy withdrawal pass Windows/isolated Linux.

@@ -104,7 +104,8 @@ class OpportunityExpressionStore(SemanticReviewStore):
                                        selection_event_id, subject, as_of=None):
         """Resolve exact proposed wording, never infer approval from a review.
 
-        The caller must require explicit confirmation of this expression event.
+        The caller must require exact confirmation or a current explicit grant
+        covering natural expression, through the send-time authorizer.
         Model fidelity assessments are not qualified automatic delivery gates.
         """
         header = self.journal.get(expression_event_id)

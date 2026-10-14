@@ -129,7 +129,8 @@ class DispatchOutbox:
                 subject=authorization.event.subject, policy_event_id=permit.get("policy_event_id"),
                 route_binding_id=permit.get("route_binding_id"), capability=permit.get("capability"),
                 action_kind=permit.get("delegated_action_kind"), sensitivity=authorization.event.sensitivity,
-                now=current, connection=connection):
+                now=current, connection=connection,
+                natural_expression=bool(permit.get("expression_event_id"))):
             raise DispatchOutboxError("delegation unavailable at cadence boundary")
         grant = self.journal._record(connection.execute(
             "SELECT * FROM experience_events WHERE event_id=?", (delegation_id,)).fetchone())
@@ -179,7 +180,8 @@ class DispatchOutbox:
                     subject=subject, policy_event_id=payload.get("policy_event_id"),
                     route_binding_id=payload.get("route_binding_id"), capability=capability,
                     action_kind=payload.get("delegated_action_kind"),
-                    sensitivity=authorization.event.sensitivity, now=now):
+                    sensitivity=authorization.event.sensitivity, now=now,
+                    natural_expression=bool(payload.get("expression_event_id"))):
                 return None, ("delegation_not_current",)
         binding_id = str(payload.get("route_binding_id") or "")
         binding, reasons = self.host.execution_binding(

@@ -233,7 +233,8 @@ class SendTimeAuthorizer:
                     subject=subject, policy_event_id=policy_event_id,
                     route_binding_id=route_binding_id, capability=capability,
                     action_kind=payload.get("delegated_action_kind"),
-                    sensitivity=event.sensitivity, now=now):
+                    sensitivity=event.sensitivity, now=now,
+                    natural_expression=expression_event_id is not None):
                 authorized = False
                 reasons = (*reasons, "delegation_not_current")
         return ActionAuthorizationDecision(
@@ -433,12 +434,20 @@ class SendTimeAuthorizer:
                 from .semantic_review import SemanticReviewError
                 confirmation = self.journal.get(str(confirmation_event_id)) if confirmation_event_id else None
                 expression_header = self.journal.get(expression_event_id)
-                if (candidate.authority is not ActionAuthority.USER_CONFIRMED
+                confirmed_expression = not (candidate.authority is not ActionAuthority.USER_CONFIRMED
                         or confirmation is None or expression_header is None
                         or confirmation.event.event_type != "conversation.inbound"
                         or confirmation.event.actor != owner or confirmation.event.subject != owner
                         or confirmation.sequence <= expression_header.sequence
-                        or confirmation.event.payload.get("authorizes_expression_event_id") != expression_event_id):
+                        or confirmation.event.payload.get("authorizes_expression_event_id") != expression_event_id)
+                from .action_delegation import ActionDelegationStore
+                delegated_expression = (candidate.authority is ActionAuthority.USER_DELEGATED
+                    and delegation_event_id is not None
+                    and ActionDelegationStore(self.journal).permits(delegation_event_id,
+                        subject=owner, policy_event_id=policy_event_id, route_binding_id=route_binding_id,
+                        capability=capability, action_kind=candidate.action_kind,
+                        sensitivity=sensitivity, now=current, natural_expression=True))
+                if not confirmed_expression and not delegated_expression:
                     reasons.append("exact_expression_confirmation_required")
                 else:
                     try:
@@ -527,7 +536,8 @@ class SendTimeAuthorizer:
                     if not ActionDelegationStore(self.journal).permits(delegation_event_id,
                             subject=owner, policy_event_id=policy_event_id,
                             route_binding_id=route_binding_id, capability=capability,
-                            action_kind=candidate.action_kind, sensitivity=sensitivity, now=current):
+                            action_kind=candidate.action_kind, sensitivity=sensitivity, now=current,
+                            natural_expression=expression_event_id is not None):
                         reasons.append("delegation_not_current")
                 elif agenda_record is None or agenda_record.authority not in {
                     AgendaAuthority.USER_EXPLICIT,
