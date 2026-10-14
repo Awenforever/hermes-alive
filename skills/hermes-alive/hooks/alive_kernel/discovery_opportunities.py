@@ -413,8 +413,14 @@ class DiscoveryOpportunityIngestor:
             raise DiscoveryOpportunityError("batch_size must be between 1 and 10000")
         watermark = self.journal.last_sequence()
         indexed = 0
-        while self.projection_checkpoint() < watermark:
+        while True:
             checkpoint = self.projection_checkpoint()
+            # Observe completion and choose the replay cursor from the same
+            # checkpoint read. Another projector may have reached the watermark
+            # between two reads; an empty replay at that new cursor is success,
+            # not evidence loss. The commit-time comparison still fences writers.
+            if checkpoint >= watermark:
+                break
             records = []
             for record in self.journal.iter_replay(after_sequence=checkpoint, batch_size=batch_size):
                 if record.sequence > watermark:

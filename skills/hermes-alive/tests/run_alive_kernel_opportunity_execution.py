@@ -30,7 +30,7 @@ def response(value):
         message=SimpleNamespace(content=json.dumps(value)))])
 
 
-async def scenario(root, mode, custom_context=False):
+async def scenario(root, mode, custom_context=False, *, transport_route=None, return_ready=False):
     journal = ExperienceJournal(root / 'journal.sqlite3')
     owner = 'user:test'
     reader = DiscoveryOpportunityIngestor(journal)
@@ -70,7 +70,8 @@ async def scenario(root, mode, custom_context=False):
     policy = AutonomyPolicyProjection(journal)
     assert policy.apply(policy.append_update(subject=owner, actor=owner, expected_revision=0,
         enabled=True, context=PolicyContext(can_interrupt=True), operation_id='policy')).outcome == 'recorded'
-    route = install_terminal_route(journal, subject=owner, content_vault=coordinator.vault)
+    route = install_terminal_route(journal, subject=owner, content_vault=coordinator.vault,
+                                   route_document=transport_route)
     delegation = None
     if mode.startswith('delegated'):
         delegation = ActionDelegationStore(journal).grant(subject=owner, actor=owner,
@@ -165,6 +166,10 @@ async def scenario(root, mode, custom_context=False):
     outbox.reconcile()
     lease = outbox.acquire(worker_id='synthetic-worker')
     assert lease is not None
+    if return_ready:
+        assert mode == 'expression' and expression is not None
+        assert not journal.read(event_type='dispatch.started')
+        return journal, outbox, lease, expression, expressed_text
     if mode.startswith('delegated-concurrent'):
         second = outcomes.append_attempt(authorization_event_id=decision.event_id,
             selection_event_id=selected.selection_event_id, candidate_id=decision.candidate_id,

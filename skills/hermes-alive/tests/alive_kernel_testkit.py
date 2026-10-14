@@ -79,6 +79,7 @@ def install_terminal_route(
     *,
     subject: str,
     content_vault=None,
+    route_document=None,
 ) -> str:
     """Install one explicit test-only route backed by a terminal receipt API."""
 
@@ -120,7 +121,7 @@ def install_terminal_route(
         subject=subject,
         capability="hermes.channel.send",
         snapshot_event_id=snapshot.event_id,
-        route={
+        route=route_document if route_document is not None else {
             "platform": "test",
             "profile": "default",
             "chat_id": f"test-chat:{subject}",

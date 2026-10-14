@@ -219,7 +219,9 @@ def run(core: Path, *, full_bootstrap: bool = False) -> list[dict]:
                 {"platform": "alivefixture", "profile": "fixture", "chat_id": chat, "thread_id": None},
                 profile_id="fixture", hermes_home=profile, observe_profile_home=lambda: profile,
                 extract_media=lambda text: ([], text), resolve_target=lambda p, r: (r, None, None))
-            executable = Path(sys.executable).resolve()
+            # Preserve a managed venv entry rather than following it to the base
+            # interpreter, which can lose the actual host dependency environment.
+            executable = Path(sys.executable).absolute()
             artifacts = [executable, *(core / path for path in (
                 "hermes_cli/plugins.py", "hermes_cli/send_cmd.py", "tools/registry.py",
                 "tools/send_message_tool.py"))]

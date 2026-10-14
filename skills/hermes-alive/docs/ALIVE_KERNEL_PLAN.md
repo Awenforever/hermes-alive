@@ -6,6 +6,22 @@ Last reviewed: 2026-10-14
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0096 tracks the enlarged execution regression's genuine concurrency failure.
+Two separately read discovery checkpoints can mistake another worker's completed
+prefix for lost evidence. Controlled thread scheduling reproduces it before the
+fix; a single per-iteration checkpoint now supplies both completion and cursor,
+while real missing replay still rejects execution. Stress counts/failed batches
+are retained rather than excused by passing individual reruns. No model calls.
+
+ADR-0095 joins exact expression confirmation, real kernel authorization/outbox and
+actual Hermes command-handler execution against a disposable local fixture sink.
+Success/reject/partial/skip preserve body and single-start behavior, without
+turning source uncertainty into authority or CLI reports into delivery success.
+The composed test exposes a managed-venv symlink defect in the test launcher;
+lexical interpreter entries now preserve dependencies. Genuine user ingress,
+host capability observation and external delivery/feedback remain unqualified.
+No additional real model calls; totals remain 95 logical / 107 HTTP attempts.
+
 ADR-0094 binds source review to exact final expression, current intent and actual
 renderer, with expression-limited retention and no inherited draft approval or
 delivery authority. Actual retained Chinese reviews both complete but still give
