@@ -33,6 +33,16 @@ core/queue edits or production changes follow from this permission.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+ADR-0123 tests the exact production enhance queue source with synthetic IO:
+outer normal return can mean merely queued, while same-task deferred drain bypasses
+the outer observer. This is not a FIFO defect. Direct observation now refuses that
+known queued seam before consuming the execution start; Windows and Linux confirm
+the gap/refusal and stock-SDK direct regression. Integrate a transport-owned durable
+attempt-bound receipt publisher (immediate/deferred/expiry), not task inheritance
+or a competing queue. Never activate the stock-only observation seam on production
+enhance or infer delivery from queued acceptance. Final enhance cleanup remains
+after Alive; autonomous-loop and longitudinal acceptance are still outstanding.
+
 ADR-0122 connects prepared planning/expression/authorization to an explicitly
 qualified stock-adapter call with closed trace publication in finally. Success,
 error/cancel and publication failure pass Windows/fake IO and Linux/actual SDK

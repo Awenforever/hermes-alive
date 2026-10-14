@@ -9,6 +9,17 @@ from dataclasses import dataclass
 import re
 
 
+def require_direct_chunk_boundary(adapter):
+    """Reject a known submission/queue seam before consuming any send authority.
+
+    Qualification remains the operator's responsibility for other implementations.
+    A queue accepting a chunk normally is not a physical acknowledgement, and its
+    later drain may bypass this method entirely. Never unwrap/take over that FIFO.
+    """
+    if getattr(adapter, '_hermes_wechat_v021_pending_queue', None) is not None:
+        raise ValueError('deferred transport requires its own qualified receipt publisher')
+
+
 @dataclass(frozen=True, slots=True)
 class ChunkReturnObservation:
     ordinal: int
@@ -53,6 +64,7 @@ class OwnedChunkObserver:
         return self._attempt_binding
 
     async def __aenter__(self):
+        require_direct_chunk_boundary(self.adapter)
         if self._closed or self._entered or getattr(self.adapter, '_alive_owned_chunk_observer', None) is not None:
             raise ValueError('observer already installed or reused')
         self.task = asyncio.current_task()

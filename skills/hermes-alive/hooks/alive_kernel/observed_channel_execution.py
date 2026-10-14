@@ -7,7 +7,7 @@ to this exact profile/adapter; current shared FIFO-worker tracing is unqualified
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from .chunk_observation import OwnedChunkObserver
+from .chunk_observation import OwnedChunkObserver, require_direct_chunk_boundary
 from .cli_send_contract import compile_text_cli_plan
 
 
@@ -32,6 +32,7 @@ async def execute_observed_text_once(outbox, lease, *, adapter, clearance,
     """
     if qualified is not True or not callable(getattr(adapter, '_send_text_chunk', None)):
         raise ValueError('qualified adapter observation seam required')
+    require_direct_chunk_boundary(adapter)
     execution = outbox.begin_execution(lease, clearance=clearance, now=clock())
     plan = compile_text_cli_plan(execution.content, execution.route,
         profile_id=profile_id, hermes_home=hermes_home, resolve_target=resolve_target,

@@ -45,6 +45,16 @@ async def exercise(root, mode, core=None):
     params = dict(adapter=adapter, clearance=Sensitivity.PRIVATE, profile_id='synthetic',
         hermes_home=home, resolve_target=lambda p,t:(t,None,None), extract_media=lambda text:([],text),
         observe_profile_home=lambda:home, qualified=True)
+    if mode == 'deferred-seam':
+        adapter._hermes_wechat_v021_pending_queue = object()
+        try:
+            await runtime.execute_prepared_with_adapter(prepared, lease, **params)
+        except ValueError as exc:
+            assert str(exc) == 'deferred transport requires its own qualified receipt publisher'
+        else:
+            raise AssertionError('deferred seam consumed an execution lease')
+        assert adapter.calls == 0 and not journal.read(event_type='dispatch.started')
+        return
     if mode == 'publication-failure':
         def broken(*args, **kwargs): raise OSError('PRIVATE_STORAGE_ERROR')
         outbox.record_chunk_observation = broken
@@ -90,6 +100,6 @@ if __name__ == '__main__':
         from run_host_admitted_inbound_probe import forbid_network
         sys.addaudithook(forbid_network)
     with tempfile.TemporaryDirectory(prefix='alive-observed-execution-') as folder:
-        for mode in ('success','error','cancel','publication-failure'):
+        for mode in ('success','error','cancel','publication-failure','deferred-seam'):
             asyncio.run(exercise(Path(folder) / mode, mode, args.hermes_root))
     print('HERMES_ALIVE_OBSERVED_CHANNEL_EXECUTION_OK')
