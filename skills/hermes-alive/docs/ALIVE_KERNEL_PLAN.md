@@ -6,6 +6,14 @@ Last reviewed: 2026-10-14
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0103 corrects an overly broad ingress assumption: the actual native
+post_gateway_admission SDK supplies full event text and stable inbound IDs,
+where agent hooks supply truncated previews. Real isolated registration/dispatch
+passes; quote-target metadata is absent and the helper test is not actual gateway
+authorization proof. Named-file provenance matches a clean pinned upstream tree;
+_hmwa names alone are not evidence of custom patches. Next compose consented
+native observation/target attribution, not more assumptions about message previews.
+
 ADR-0102 extends cleanup ownership across watcher replacement and startup recovery
 using their real shared OS lock. Busy is not completed maintenance or permission
 to send; lock-file presence and cancellation are not live/terminal evidence.

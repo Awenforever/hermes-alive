@@ -1,0 +1,3 @@
+name: alive-admission-fixture
+version: 0.0.1
+description: Test-only admitted-event observer; no sends or real user data.
