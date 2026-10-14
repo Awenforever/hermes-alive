@@ -6,6 +6,14 @@ Last reviewed: 2026-10-14
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0106 tests a bounded, in-memory metadata handoff through actual pre-dispatch
+and post-admission SDK hooks. Synthetic auth/quote/bot and real rewrite directives
+work or fail closed as intended without a core patch. The actual Alive runtime
+does not register the experiment. Real multiplex/cache scoping, busy/replay,
+physical cleanup and canonical delivered-target mapping still need qualification
+before attributed feedback can use it. Do not confuse quote metadata with
+delivery proof, human consent, learned benefit or the full Alive objective.
+
 ADR-0105 exercises actual Hermes authorization/pairing admission before native
 capture: default deny, approval, revoke and rejected routes are verified with
 synthetic local state. It also demonstrates that authorized bots can reach the

@@ -17,7 +17,7 @@ import tempfile
 from run_host_admitted_inbound_probe import forbid_network
 
 
-async def run():
+async def run(metadata_fixture=False):
     from gateway.config import GatewayConfig, Platform
     from gateway.pairing import PairingStore
     from gateway.platforms.event import MessageEvent
@@ -42,13 +42,18 @@ async def run():
     source = SessionSource(platform=Platform.TELEGRAM, chat_id='synthetic-chat',
                            chat_type='group', user_id='synthetic-user')
     event = MessageEvent(source=source, message_id='synthetic-unknown-1',
-                         text='Synthetic full admission text ' + 'x' * 1200)
+                         text='Synthetic full admission text ' + 'x' * 1200,
+                         reply_to_message_id='synthetic-outbound-1', reply_to_is_own_message=True)
     assert runner._is_user_authorized_for_source(source) is False
     assert await runner._hm_admit_event(event) is None
     assert not journal_path.exists()
+    assert not (profile / 'synthetic-metadata.jsonl').exists()
     code = runner.pairing_store.generate_code('telegram', 'synthetic-user')
     assert code and runner.pairing_store.approve_code('telegram', code)['user_id'] == 'synthetic-user'
     assert runner._is_user_authorized_for_source(source) is True
+    # Resent messages have a fresh transport identity. Reusing the denied
+    # event ID must not retroactively promote its pre-auth metadata.
+    event.message_id = 'synthetic-approved-2'
     admitted = await runner._hm_admit_event(event)
     assert admitted is not None and admitted[2] is False
     # Deliberately compose only the actual admission gates and public consumer
@@ -60,10 +65,18 @@ async def run():
     journal = ExperienceJournal(journal_path)
     captured = journal.read(event_type='conversation.admitted')
     assert len(captured) == 1 and captured[0].event.payload['erasable_content_stored'] is False
+    expected_human_captures = 1
+    if metadata_fixture:
+        rewritten = MessageEvent(source=source, message_id='synthetic-rewrite-3', text='synthetic-rewrite',
+            reply_to_message_id='synthetic-outbound-2', reply_to_is_own_message=True)
+        rewrite_admitted = await runner._hm_admit_event(rewritten)
+        assert rewrite_admitted is not None and rewrite_admitted[0].text == 'synthetic rewritten by fixture'
+        assert await run_post_admission_hook(runner, rewrite_admitted[0], rewrite_admitted[1], 'synthetic-session') == (False, None)
+        expected_human_captures = 2
     other = SessionSource(platform=Platform.TELEGRAM, chat_id='synthetic-chat',
                           chat_type='group', user_id='synthetic-other-user')
     assert await runner._hm_admit_event(MessageEvent(source=other, text='synthetic foreign', message_id='other-1')) is None
-    assert len(journal.read(event_type='conversation.admitted')) == 1
+    assert len(journal.read(event_type='conversation.admitted')) == expected_human_captures
     rejected_route = SessionSource(platform=Platform.TELEGRAM, chat_id='synthetic-chat',
         chat_type='group', user_id='synthetic-user', profile_route_rejected=True)
     assert await runner._hm_admit_event(MessageEvent(source=rejected_route, text='synthetic rejected route',
@@ -71,7 +84,7 @@ async def run():
     assert runner.pairing_store.revoke('telegram', 'synthetic-user') is True
     assert runner._is_user_authorized_for_source(source) is False
     assert await runner._hm_admit_event(event) is None
-    assert len(journal.read(event_type='conversation.admitted')) == 1
+    assert len(journal.read(event_type='conversation.admitted')) == expected_human_captures
     # Authorized is not synonymous with human/paired. The SDK's native source
     # snapshot currently drops this bot bit; do not certify human feedback.
     os.environ['TELEGRAM_ALLOW_BOTS'] = 'all'
@@ -84,15 +97,23 @@ async def run():
     assert 'is_bot' not in bot_source.to_dict()
     assert await run_post_admission_hook(runner, bot_admitted[0], bot_admitted[1], 'synthetic-bot-session') == (False, None)
     captures = journal.read(event_type='conversation.admitted')
-    assert len(captures) == 2
+    assert len(captures) == expected_human_captures + 1
     assert all(row.event.payload['learning_authority_granted'] is False for row in captures)
     assert all(row.event.payload['principal_kind'] == 'not_exposed_by_host' for row in captures)
+    if metadata_fixture:
+        metadata = [json.loads(line) for line in (profile / 'synthetic-metadata.jsonl').read_text().splitlines()]
+        assert len(metadata) == 3
+        assert metadata[0] == {'is_bot':False, 'quoted_message_id':'synthetic-outbound-1',
+                               'quote_is_own_message':True}
+        assert metadata[1] is None
+        assert metadata[2] == {'is_bot':True, 'quoted_message_id':None, 'quote_is_own_message':False}
     os.environ.pop('TELEGRAM_ALLOW_BOTS')
     assert not journal.read(event_type='outcome.recorded')
     return {'actual_auth_gates':True, 'actual_pairing_store':True,
-            'authorized_human_source_structural_captures':1, 'unauthorized_captures':0,
+            'authorized_human_source_structural_captures':expected_human_captures, 'unauthorized_captures':0,
             'revocation_enforced':True, 'rejected_route_blocked':True,
             'authorized_bot_capture':True, 'native_bot_marker_available':False,
+            'experimental_metadata_handoff':metadata_fixture,
             'full_gateway_session_path':False, 'external_paired_transport':False,
             'sends':0, 'model_calls':0}
 
@@ -101,12 +122,21 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--hermes-root', required=True, type=Path)
     parser.add_argument('--alive-root', required=True, type=Path)
+    parser.add_argument('--metadata-fixture', action='store_true')
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='alive-host-auth-') as directory:
         profile = Path(directory).resolve()
         shutil.copytree(args.alive_root.resolve(strict=True), profile / 'plugins/hermes-alive',
                         ignore=shutil.ignore_patterns('.git', '__pycache__'))
-        (profile / 'config.yaml').write_text(json.dumps({'plugins':{'enabled':['hermes-alive']}}))
+        enabled = ['hermes-alive']
+        if args.metadata_fixture:
+            fixture = Path(__file__).parent / 'fixtures/admission-metadata-observer'
+            installed = profile / 'plugins/alive-metadata-fixture'
+            shutil.copytree(fixture, installed)
+            shutil.copy2(args.alive_root / 'skills/hermes-alive/hooks/alive_kernel/admission_metadata.py',
+                         installed / 'cache.py')
+            enabled.append('alive-metadata-fixture')
+        (profile / 'config.yaml').write_text(json.dumps({'plugins':{'enabled':enabled}}))
         (profile / '.env').write_text('')
         # The disposable host's admission may not inherit an ambient allow-all.
         for key in tuple(os.environ):
@@ -124,7 +154,7 @@ def main():
             try: operation()
             except RuntimeError: pass
             else: raise AssertionError('authorization-probe effect barrier failed')
-        print(json.dumps(asyncio.run(run())))
+        print(json.dumps(asyncio.run(run(args.metadata_fixture))))
     print('HERMES_ALIVE_HOST_INGRESS_AUTHORIZATION_PROBE_OK')
 
 
