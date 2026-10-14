@@ -16,6 +16,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'hooks'))
 from alive_kernel import AutonomyPolicyProjection,ExperienceJournal,PolicyContext,Sensitivity
 from alive_kernel.action_delegation import ActionDelegationStore
 from alive_kernel.autonomous_cycle_runtime import AutonomousCycleRuntime
+from alive_kernel.autonomous_host_runtime import AutonomousHostRuntime
 from alive_kernel.transport_publisher_bridge import QualifiedReceiptPublisher
 from alive_kernel_testkit import install_terminal_route
 from run_alive_kernel_expression_runtime import scenario
@@ -74,6 +75,13 @@ async def test(root,enhance,core):
     silence = await reopened.cycle(subject=owner,operation_id='silence-one',
         expression_parameters={**expression,'call':silent},resolve_binding=resolve)
     assert silence.disposition=='silence' and len(journal.read(event_type='action.attempt'))==before
+    host = AutonomousHostRuntime(reopened,subject=owner,configuration_id='synthetic-shadow')
+    hosted = await host.run(build_parameters=lambda:{'expression_parameters':{**expression,'call':silent},
+        'resolve_binding':resolve},stop=asyncio.Event(),max_cycles=2,interval_seconds=0)
+    assert hosted['completed_cycles']==2 and hosted['exit_reason']=='budget'
+    assert len(journal.read(event_type='autonomous.host.closed'))==2
+    assert all(record.event.payload['disposition']=='silence' for record in journal.read(event_type='autonomous.host.closed'))
+    assert len(journal.read(event_type='action.attempt'))==before
     current = policies.current(owner)
     assert policies.apply(policies.append_update(subject=owner,actor=owner,expected_revision=current.revision,
         enabled=False,context=PolicyContext(can_interrupt=False),operation_id='pause')).outcome=='recorded'

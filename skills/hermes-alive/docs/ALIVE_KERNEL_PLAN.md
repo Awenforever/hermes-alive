@@ -2,7 +2,7 @@
 
 Status: active
 
-Last reviewed: 2026-10-14
+Last reviewed: 2026-10-15
 
 ### Delivery milestones and ownership (user clarification, 2026-10-14)
 
@@ -32,6 +32,15 @@ Alive is complete. Record evidence and scope such fixes separately; no speculati
 core/queue edits or production changes follow from this permission.
 
 ### Current integration milestone: delivery evidence and attributed feedback
+
+ADR-0131 adds explicit bounded host lifetime and authenticated owner/lane-scoped
+cycle allocation/progress. Windows/Linux host-state tests prove reopen, completion,
+budget, stop/external cancellation cleanup and configuration/mode/owner isolation.
+Actual composed modules plus native-SDK/synthetic-IO test two host-driven silence
+cycles without another action attempt. No gateway daemon is registered; qualify
+process ownership, unresolved-intent/novelty/cost controls, blocking work, public
+lifecycle and paired migration before activation. Real-model longitudinal utility
+and the full feedback/memory/agenda/portable/production requirements remain open.
 
 ADR-0130 composes reconciliation/current user policy with planning/expression,
 authorization and once-only publisher submission in a host-invoked cycle. New exact
