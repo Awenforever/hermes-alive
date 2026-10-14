@@ -33,6 +33,17 @@ core/queue edits or production changes follow from this permission.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+ADR-0125 binds the qualified enhance publisher to a canonical Alive attempt/start
+and composes prepared execution with once-only queued submission and local report
+ingestion. Windows/fake and Linux/actual-SDK synthetic IO prove replay/scope,
+reopen/late ACK and exact multi-chunk association without outcomes/reauthorization.
+The initial Linux single-bubble test assumption was disproved; the corrected
+oracle checks every host-defined chunk, not changed transport behavior. These
+are SQLite reports, not cryptographically authenticated remote delivery or feedback.
+Next qualify consumer lifetime, writer/performance and adversarial send failures,
+then finality/ambiguity, feedback and the full useful autonomous loop. No production
+activation or enhance release; keep direct-observer refusal and portable acceptance.
+
 ADR-0124 develops a host-owned durable queue-submission/physical-ack producer on
 enhance's separate `feat/alive-transport-evidence` branch (`ff80ccb`), not release
 or production. Windows and Linux actual-SDK/synthetic-IO prove scoped two-binding
