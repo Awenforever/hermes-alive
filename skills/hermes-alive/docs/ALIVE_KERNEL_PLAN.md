@@ -33,6 +33,14 @@ core/queue edits or production changes follow from this permission.
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0112 adds a real PlanningRuntime composition from retained discovery through
+model interpretation to current intent/silence. Reopened completed operations
+reuse evidence and selections, incomplete provider stages do not silently retry,
+and changed host policy/model/authority is refused. Windows and isolated Linux
+pass controlled planning/cancel/recovery contracts. The watcher does not invoke
+it yet; next compose expression and authorization without adding a channel FIFO,
+then prove delivery/feedback and longitudinal model quality. Production unchanged.
+
 ADR-0111 returns to the autonomous-loop milestone with four reopened planning
 cycles: no advice/silence, synthetic feedback/share proposal, explicit boundary/
 silence, withdrawal/silence. Actual projections and cognition preserve scope,
