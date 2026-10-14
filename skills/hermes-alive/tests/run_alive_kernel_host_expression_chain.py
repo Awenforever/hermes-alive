@@ -23,7 +23,7 @@ from alive_kernel.expression_support import ExpressionSourceSupportReviewer
 from run_alive_kernel_opportunity_execution import scenario
 from run_host_transport_command_probe import CHILD
 
-async def exercise(core, root, mode):
+async def exercise(core, root, mode, *, runtime_prepare=None):
     profile = root / 'profile'
     profile.mkdir(parents=True)
     fixtures = Path(__file__).parent / 'fixtures/transport-platform'
@@ -32,8 +32,13 @@ async def exercise(core, root, mode):
         'gateway':{'platforms':{'alivefixture':{'enabled':True, 'extra':{'mode':mode}}}}}
     (profile / 'config.yaml').write_text(json.dumps(config))
     route = {'platform':'alivefixture', 'profile':'fixture', 'chat_id':'fixture-chat', 'thread_id':None}
-    journal, outbox, lease, expression, expected = await scenario(root / 'kernel', 'expression',
-        transport_route=route, return_ready=True)
+    if runtime_prepare is None:
+        journal, outbox, lease, expression, expected = await scenario(root / 'kernel', 'expression',
+            transport_route=route, return_ready=True)
+        interpretation, prepared, runtime = 'generate', None, None
+    else:
+        journal, outbox, lease, expression, expected, interpretation, prepared, runtime = await runtime_prepare(
+            root / 'kernel', route)
     reviewer = ExpressionSourceSupportReviewer(journal)
     async def review(**kw):
         snapshot = json.loads(kw['messages'][1]['content'])
@@ -43,11 +48,11 @@ async def exercise(core, root, mode):
             message=SimpleNamespace(content=json.dumps({'verdict':'uncertain',
                 'unsupported_claims':[], 'uncertainties':['Synthetic source is unverified.'],
                 'reason':'Diagnostic fixture, not factuality qualification.'})))])
-    support = await reviewer.run(subject=lease.subject, interpretation_id='generate',
+    support = await reviewer.run(subject=lease.subject, interpretation_id=interpretation,
         candidate_id=expression.event_id, operation_id='source-review', call=review,
         resolve_domain=lambda model:model)
     assert reviewer.verify_current(support.event_id, subject=lease.subject,
-        interpretation_id='generate', candidate_id=expression.event_id)['verdict'] == 'uncertain'
+        interpretation_id=interpretation, candidate_id=expression.event_id)['verdict'] == 'uncertain'
     assert not support.safe_for_automatic_delivery
     # The fixture has separately supplied exact user confirmation. The review
     # cannot authorize anything; uncertainty is not silently turned into support.
@@ -84,7 +89,17 @@ async def exercise(core, root, mode):
         # Preserve the actual command's structured report and inner exit code.
         # Wrapper instrumentation is not itself a Hermes send result.
         return json.dumps(report['result']), report['exit_code']
-    observation = execute_text_cli_once(outbox, lease, clearance=Sensitivity.PRIVATE,
+    if runtime:
+        from dataclasses import replace
+        try:
+            runtime.execute_prepared_with_cli(prepared, replace(lease, attempt_id='synthetic-other-attempt'))
+        except DispatchOutboxError:
+            pass
+        else:
+            raise AssertionError('foreign attempt lease reached the runtime host seam')
+        assert not reports and not journal.read(event_type='dispatch.started')
+    executor = (lambda box, item, **kwargs: runtime.execute_prepared_with_cli(prepared, item, **kwargs)) if runtime else execute_text_cli_once
+    observation = executor(outbox, lease, clearance=Sensitivity.PRIVATE,
         profile_id='fixture', hermes_home=profile, observe_profile_home=lambda:profile,
         resolve_target=lambda platform, target:(target,None,None),
         extract_media=lambda text:([],text), launch=launch)
@@ -97,7 +112,7 @@ async def exercise(core, root, mode):
         'skip':'skip_reported','reject':'error_reported'}[mode]
     assert observation.observation.event.payload['report_kind'] == expected_kind
     try:
-        execute_text_cli_once(outbox, lease, clearance=Sensitivity.PRIVATE,
+        executor(outbox, lease, clearance=Sensitivity.PRIVATE,
             profile_id='fixture', hermes_home=profile, observe_profile_home=lambda:profile,
             resolve_target=lambda platform,target:(target,None,None), extract_media=lambda text:([],text), launch=launch)
     except DispatchOutboxError:

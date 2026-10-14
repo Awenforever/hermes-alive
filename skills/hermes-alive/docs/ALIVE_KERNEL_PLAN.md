@@ -33,6 +33,14 @@ core/queue edits or production changes follow from this permission.
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0116 composes discovery/planning/expression/delegation/preparation with the
+actual Hermes send command in an isolated local-sink harness. Exact wording,
+success/reject/partial/skip reports, foreign-lease rejection and single launch
+pass; old host-expression regressions pass too. Actual command observation is
+not external delivery, canonical target feedback or user benefit. Next integrate
+delivery/history/feedback, authenticated controls and bounded scheduling, then
+actual model/channel and portable production qualification. No production change.
+
 ADR-0115 adds explicitly signed natural-expression delegation, default disabled.
 Historical grants never expand. Current owner/policy/route/kind/sensitivity/expiry
 and revocation checks apply at authorization, permit replay and start/launch;

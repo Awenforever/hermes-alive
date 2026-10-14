@@ -25,6 +25,7 @@ manufactures them from model output or reviews, nor falls back to another body.
 
     def __init__(self, journal, *, content_vault=None, context_vault=None):
         self.journal = journal
+        self.context_vault = context_vault
         self.expression = ExpressionRuntime(journal, content_vault=content_vault,
                                              context_vault=context_vault)
         self.vault = self.expression.planning.synth.vault
@@ -68,3 +69,24 @@ manufactures them from model output or reviews, nor falls back to another body.
         if projected.outcome != 'recorded':
             raise ValueError('authorized runtime attempt was not admitted')
         return SendPreparationResult(expressed, decision, attempt.event.event_id)
+
+    def execute_prepared_with_cli(self, prepared, lease, **host_parameters):
+        """Consume this exact attempt through the qualified host CLI seam once.
+
+        Host callbacks are operator capabilities, never model-selected code.
+        Observations remain reports; this method cannot claim actual delivery.
+        """
+        from .cli_execution import execute_text_cli_once
+        from .dispatch_outbox import DispatchOutbox, DispatchOutboxError
+        attempt = self.journal.get(prepared.attempt_event_id) if prepared.attempt_event_id else None
+        if (prepared.authorization is None or not prepared.authorization.authorized
+                or attempt is None
+                or prepared.attempt_event_id != 'action.attempt:' + lease.attempt_id
+                or lease.subject != attempt.event.subject):
+            raise DispatchOutboxError('lease does not belong to the prepared attempt')
+        if (attempt.event.payload.get('authorization_event_id') != prepared.authorization.event_id
+                or attempt.event.payload.get('selection_event_id') != prepared.expression.planning.selection_event_id):
+            raise DispatchOutboxError('prepared attempt differs from canonical authorization')
+        return execute_text_cli_once(DispatchOutbox(self.journal, content_vault=self.vault,
+            context_vault=self.context_vault),
+            lease, **host_parameters)
