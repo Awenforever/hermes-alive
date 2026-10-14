@@ -6,6 +6,14 @@ Last reviewed: 2026-10-14
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0104 adds opt-in native full-input observation with canonical retention
+consent, encrypted erasable text, stable replay and writer-time revocation checks.
+Actual SDK discovery exposes/fixes an embedded-import defect hidden by local
+hook paths. Native input remains distinct from an agent turn or attributed
+feedback; ordinary dialogue is never consumed. Quote/owner/profile qualification
+and useful longitudinal feedback integration, not merely callback presence, are
+the next milestones. Production and public releases remain unchanged.
+
 ADR-0103 corrects an overly broad ingress assumption: the actual native
 post_gateway_admission SDK supplies full event text and stable inbound IDs,
 where agent hooks supply truncated previews. Real isolated registration/dispatch

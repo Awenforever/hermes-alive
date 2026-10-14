@@ -71,7 +71,7 @@ def main() -> int:
             plugin = _load_plugin()
             context = FakePluginContext()
             plugin.register(context)
-            assert set(context.hooks) == {"post_tool_call"}
+            assert set(context.hooks) == {"post_tool_call", "post_gateway_admission"}
             assert set(context.cli) == {"alive"}
             callback = context.hooks["post_tool_call"]
             values = {

@@ -107,7 +107,8 @@ def main() -> int:
         # never the working tree metadata.
         if args.installed_profile is None:
             installed_plugin.mkdir(parents=True)
-            for name in ("__init__.py", "plugin_cli.py", "tool_receipt_bridge.py", "plugin.yaml"):
+            for name in ("__init__.py", "plugin_cli.py", "tool_receipt_bridge.py",
+                         "admitted_inbound_bridge.py", "plugin.yaml"):
                 shutil.copy2(repo_root / name, installed_plugin / name)
             shutil.copytree(
                 skill_root, installed_plugin / "skills" / "hermes-alive"

@@ -20,7 +20,7 @@ def forbid_network(event, args):
         if not isinstance(address, tuple) or address[0] not in ('127.0.0.1','::1'):
             raise RuntimeError('external effects forbidden in admission probe')
 
-async def run():
+async def run(alive_root=None):
     from hermes_cli.plugins import discover_plugins, has_hook
     from gateway.run_inbound_consumer import run_post_admission_hook
     discover_plugins()
@@ -49,7 +49,40 @@ async def run():
     # imply truncated text, quotation availability or new user authority.
     assert 'telemetry_schema_version' in rows[0]
     assert 'reply_to_message_id' not in rows[0] and 'reply_to_text' not in rows[0]
-    return {'callbacks':len(rows),'full_text_characters':len(rows[0]['text']),
+    alive_captures = 0
+    if alive_root is not None:
+        shared = profile / 'plugin-data/hermes-alive/runtime'
+        assert not (shared / 'kernel/experience.sqlite3').exists()
+        os.environ['HERMES_ALIVE_KERNEL_SHADOW_ENABLED'] = 'true'
+        event.message_id = 'synthetic-native-1'
+        event.text = text
+        assert await run_post_admission_hook(runner, event, source, 'synthetic-session') == (False, None)
+        # A separate internal import reads the same persisted consent/state;
+        # the actual registered plugin owns observation, not a patched callback.
+        sys.path.insert(0, str(alive_root / 'skills/hermes-alive/hooks'))
+        from alive_kernel.event_store import ExperienceJournal
+        from alive_kernel.content_vault import ContentVault
+        from alive_kernel.events import Sensitivity
+        from alive_kernel.privacy import LocalIdentityProtector
+        from alive_kernel.retention import RetentionProjection
+        root = shared / 'kernel'
+        journal = ExperienceJournal(root / 'experience.sqlite3')
+        first = journal.read(event_type='conversation.admitted')
+        assert len(first) == 1 and first[0].event.payload['erasable_content_stored'] is False
+        subject = LocalIdentityProtector(root / 'identity.key').pseudonym('user', 'synthetic-user')
+        vault = ContentVault(root / 'content-vault', backup_root=root / 'content-backups')
+        RetentionProjection(journal, content_vault=vault).append_consent(subject=subject, actor=subject,
+            enabled=True, retention_days=2, directions=('inbound',), sensitivity=Sensitivity.PRIVATE)
+        event.message_id = 'synthetic-native-2'
+        assert await run_post_admission_hook(runner, event, source, 'synthetic-session') == (False, None)
+        captures = journal.read(event_type='conversation.admitted')
+        assert len(captures) == 2
+        retained = captures[-1].event.payload['content']
+        assert vault.resolve_json(retained['content_id'], expected_subject=subject,
+            expected_purpose='conversation.inbound', expected_sensitivity=Sensitivity.PRIVATE)['text'] == text
+        assert not journal.read(event_type='outcome.recorded')
+        alive_captures = len(captures)
+    return {'callbacks':len(rows),'alive_native_captures':alive_captures,'full_text_characters':len(rows[0]['text']),
         'stable_message_id_present':True, 'quote_metadata_present':False,
         'actual_gateway_admission_proven':False,'external_delivery_proven':False,
         'sends':0,'model_calls':0}
@@ -57,13 +90,22 @@ async def run():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--hermes-root', required=True, type=Path)
+    parser.add_argument('--alive-root', type=Path)
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='alive-admission-probe-') as directory:
         profile = Path(directory).resolve()
         fixture = Path(__file__).parent / 'fixtures/admission-observer'
         shutil.copytree(fixture, profile / 'plugins/alive-admission-fixture')
-        (profile / 'config.yaml').write_text(json.dumps({'plugins':{'enabled':['alive-admission-fixture']}}))
+        enabled = ['alive-admission-fixture']
+        if args.alive_root:
+            args.alive_root = args.alive_root.resolve(strict=True)
+            shutil.copytree(args.alive_root, profile / 'plugins/hermes-alive',
+                            ignore=shutil.ignore_patterns('.git', '__pycache__'))
+            enabled.append('hermes-alive')
+        (profile / 'config.yaml').write_text(json.dumps({'plugins':{'enabled':enabled}}))
         os.environ['HERMES_HOME'] = str(profile)
+        os.environ.pop('HERMES_ALIVE_SHARED_DIR', None)
+        os.environ['HERMES_ALIVE_KERNEL_SHADOW_ENABLED'] = 'false'
         os.environ['HERMES_BUNDLED_PLUGINS'] = str(profile / 'empty-bundled')
         sys.path.insert(0, str(args.hermes_root.resolve(strict=True)))
         sys.addaudithook(forbid_network)
@@ -72,5 +114,5 @@ if __name__ == '__main__':
             try: operation()
             except RuntimeError: pass
             else: raise AssertionError('admission-probe external-effect barrier failed')
-        print(json.dumps(asyncio.run(run())))
+        print(json.dumps(asyncio.run(run(args.alive_root))))
     print('HERMES_ALIVE_HOST_ADMITTED_INBOUND_PROBE_OK')

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+from importlib.machinery import ModuleSpec
 import hashlib
 import logging
 import os
@@ -25,8 +26,8 @@ def _shared_dir() -> Path:
     return get_hermes_home() / "plugin-data" / "hermes-alive" / "runtime"
 
 
-@lru_cache(maxsize=1)
-def _kernel_module():
+@lru_cache(maxsize=2)
+def _kernel_module(module_name="tool_receipts"):
     """Load this exact kernel build without mutating global ``sys.path``.
 
     The content-derived package name prevents an in-process plugin refresh from
@@ -48,21 +49,17 @@ def _kernel_module():
     package_name = f"hermes_alive_embedded_kernel_{digest.hexdigest()[:16]}"
     package = sys.modules.get(package_name)
     if package is None:
-        spec = importlib.util.spec_from_file_location(
-            package_name,
-            root / "__init__.py",
-            submodule_search_locations=[str(root)],
-        )
-        if spec is None or spec.loader is None:
-            raise RuntimeError("Hermes Alive embedded kernel is unavailable")
+        # Observers need their relative dependencies, not the convenience
+        # facade that imports every subsystem (including installed-hook-only
+        # recovery helpers). A namespace isolates this build without executing
+        # unrelated startup code or borrowing another checkout's sys.path.
+        spec = ModuleSpec(package_name, loader=None, is_package=True)
+        spec.submodule_search_locations = [str(root)]
         package = importlib.util.module_from_spec(spec)
         sys.modules[package_name] = package
-        try:
-            spec.loader.exec_module(package)
-        except Exception:
-            sys.modules.pop(package_name, None)
-            raise
-    return importlib.import_module(f"{package_name}.tool_receipts")
+    if module_name not in {"tool_receipts", "admitted_inbound"}:
+        raise ValueError("unknown embedded observer module")
+    return importlib.import_module(f"{package_name}.{module_name}")
 
 
 def _shadow_enabled() -> bool:
