@@ -6,6 +6,14 @@ Last reviewed: 2026-10-14
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0107 finds actual profile-manager separation breaks the instance-local
+handoff. A task-private, runtime-home-bound research handoff restores scoped SDK
+delivery without a global identity pool or core patch. Actual loop timers and
+task teardown clear state; empty scheduling contexts avoid retaining profile
+secrets, and consumed callbacks are removed. Synthetic pinned identity is not
+live routing/auth/session proof. The actual Alive runtime is still not connected
+to this experiment; canonical target mapping and real lifecycle are next.
+
 ADR-0106 tests a bounded, in-memory metadata handoff through actual pre-dispatch
 and post-admission SDK hooks. Synthetic auth/quote/bot and real rewrite directives
 work or fail closed as intended without a core patch. The actual Alive runtime
