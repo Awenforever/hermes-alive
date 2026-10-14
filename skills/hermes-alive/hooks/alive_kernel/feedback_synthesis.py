@@ -11,6 +11,7 @@ import re
 from .action_contract import parse_action_contract
 from .content_vault import ContentReference, ContentVault
 from .deliberation import deserialize_frame
+from .delivered_history import DeliveredHistoryStore
 from .events import EventEnvelope, Sensitivity
 from .outcomes import OutcomeKind, OutcomeProjection
 from .semantic_comparator import SemanticComparator
@@ -65,11 +66,12 @@ class FeedbackSynthesizer:
     Principal equality and shaped receipts do not qualify real gateway ingress.
     """
 
-    def __init__(self, journal, *, content_vault=None):
+    def __init__(self, journal, *, content_vault=None, context_vault=None):
         self.journal = journal
         self.vault = content_vault or ContentVault(journal.path.parent / "content-vault",
                                                   backup_root=journal.path.parent / "content-backups")
         self.outcomes = OutcomeProjection(journal, content_vault=self.vault)
+        self.context_vault = context_vault
 
     def _consent(self, subject, kind):
         records = tuple(self.journal.iter_reverse(event_types=(kind,), subject=subject, max_records=1))
@@ -123,6 +125,9 @@ class FeedbackSynthesizer:
                 or not isinstance(feedback.get("text"), str) or not 1 <= len(feedback["text"]) <= 8000):
             raise FeedbackSynthesisError("retained feedback integrity unavailable")
         deliveries = []
+        histories = []
+        history_store = DeliveredHistoryStore(self.journal, content_vault=self.vault,
+            context_vault=self.context_vault)
         for item in self.outcomes.outcomes(attempt_id, clearance=clearance):
             if item.kind is not OutcomeKind.DELIVERY_SUCCEEDED:
                 continue
@@ -132,40 +137,51 @@ class FeedbackSynthesizer:
                     and attempt.sequence < receipt.sequence < source.sequence
                     and receipt.event.observed_at <= source.event.observed_at):
                 deliveries.append(receipt)
+                history = history_store.for_delivery(subject=subject,
+                    delivery_outcome_event_id=recorded.event.event_id, clearance=clearance)
+                if history is not None:
+                    histories.append(history)
         if not deliveries:
             raise FeedbackSynthesisError("feedback target was not proven delivered")
+        if len(histories) > 1:
+            raise FeedbackSynthesisError('feedback target has ambiguous delivered history')
         authorization = self.journal.get(attempt.event.payload["authorization_event_id"])
         if authorization is None or authorization.event.subject != subject:
             raise FeedbackSynthesisError("original action authorization unavailable")
-        frame_record = self.journal.get("deliberation.frame:" + authorization.event.payload["frame_id"])
-        if frame_record is None or frame_record.event.subject != subject or frame_record.event.sensitivity != clearance:
-            raise FeedbackSynthesisError("original action frame unavailable")
-        frame_ref = ContentReference.from_event_payload(frame_record.event.payload["content"])
-        frame_doc = self.vault.resolve_json(frame_ref.content_id, expected_subject=subject,
-            expected_purpose="deliberation.frame", expected_sensitivity=clearance)
-        if self.vault.digest_json(frame_doc) != frame_ref.digest:
-            raise FeedbackSynthesisError("original action frame changed")
-        frame, _ = deserialize_frame(frame_doc)
-        candidate = next((item for item in frame.candidates
-                          if item.candidate_id == attempt.event.payload["candidate_id"]), None)
-        if candidate is None:
-            raise FeedbackSynthesisError("original action candidate unavailable")
-        content_id = authorization.event.payload.get("executable_content_id") or candidate.content_id
-        contract = parse_action_contract(self.vault.resolve_json(content_id, expected_subject=subject,
-            expected_purpose="deliberation.candidate", expected_sensitivity=clearance), capability="hermes.channel.send")
-        if not self.outcomes.receipt_protector.verify_json("action.contract.v1", contract.to_document(),
-                                                         authorization.event.payload.get("action_contract_binding")):
-            raise FeedbackSynthesisError("delivered content binding unavailable")
+        if histories:
+            content_id, delivered_text = histories[0]['content_id'], histories[0]['text']
+        else:
+            frame_record = self.journal.get("deliberation.frame:" + authorization.event.payload["frame_id"])
+            if frame_record is None or frame_record.event.subject != subject or frame_record.event.sensitivity != clearance:
+                raise FeedbackSynthesisError("original action frame unavailable")
+            frame_ref = ContentReference.from_event_payload(frame_record.event.payload["content"])
+            frame_doc = self.vault.resolve_json(frame_ref.content_id, expected_subject=subject,
+                expected_purpose="deliberation.frame", expected_sensitivity=clearance)
+            if self.vault.digest_json(frame_doc) != frame_ref.digest:
+                raise FeedbackSynthesisError("original action frame changed")
+            frame, _ = deserialize_frame(frame_doc)
+            candidate = next((item for item in frame.candidates
+                              if item.candidate_id == attempt.event.payload["candidate_id"]), None)
+            if candidate is None:
+                raise FeedbackSynthesisError("original action candidate unavailable")
+            content_id = authorization.event.payload.get("executable_content_id") or candidate.content_id
+            contract = parse_action_contract(self.vault.resolve_json(content_id, expected_subject=subject,
+                expected_purpose="deliberation.candidate", expected_sensitivity=clearance), capability="hermes.channel.send")
+            if not self.outcomes.receipt_protector.verify_json("action.contract.v1", contract.to_document(),
+                                                             authorization.event.payload.get("action_contract_binding")):
+                raise FeedbackSynthesisError("delivered content binding unavailable")
+            delivered_text = contract.operation['text']
         data = {"outcome_event_id": outcome_event_id, "source_event_id": source.event.event_id,
                 "attempt_event_id": attempt.event.event_id, "delivery_event_ids": [r.event.event_id for r in deliveries],
                 "retention_consent_event_id": retention.event.event_id,
                 "learning_consent_event_id": learning.event.event_id,
-                "delivered_text": contract.operation["text"], "feedback_text": feedback["text"],
+                "delivered_text": delivered_text, "feedback_text": feedback["text"],
                 "feedback_content_id": reference.content_id, "executed_content_id": content_id,
                 "observed_at": source.event.observed_at.isoformat()}
         if len(json.dumps(data, ensure_ascii=False)) > 24000:
             raise FeedbackSynthesisError("feedback context exceeds bounded prompt")
-        return data, reference.retention_until
+        until = min(reference.retention_until, histories[0]['retention_until']) if histories else reference.retention_until
+        return data, until
 
     @staticmethod
     def findings(text, snapshot):

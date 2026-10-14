@@ -6,6 +6,15 @@ Last reviewed: 2026-10-14
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0099 connects exact, canonically delivery-linked history under prior outbound
+consent to feedback snapshots after executable expiry. Independent history cannot
+grant resend or learning permission. Fixed action/context vault dependencies cover
+custom profile storage and explicit forgetting; history verification erases an
+invalid derivative, but immediate live cascade/maintenance is not yet connected.
+Next qualify actual host capture/receipt production and proactive forgetting, then
+useful attributed learning; do not treat synthetic receipts as provider proof.
+No extra real model calls; cumulative totals remain 95 logical / 107 HTTP attempts.
+
 ADR-0098 identifies a prerequisite for delivered-history retention: automatic
 expiry and explicit forgetting previously shared item tombstones. Expiry now
 records a distinct cause using unchanged physical erasure/backup completion;
