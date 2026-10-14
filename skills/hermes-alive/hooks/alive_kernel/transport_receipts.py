@@ -5,7 +5,7 @@ external effect, human attention or benefit. Unknown fields are not persisted.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 import json
 
@@ -23,10 +23,31 @@ class CliReport:
     kind: CliReportKind
     exit_code: int | None
     json_object: bool
+    reported_message_id: str | None = field(default=None, repr=False)
 
     def to_document(self) -> dict:
         return {"report_kind": self.kind.value, "exit_code": self.exit_code,
                 "json_object": self.json_object, "external_delivery_proven": False}
+
+
+def reported_message_reference(protector, route, message_id):
+    """Scoped report identity, not a delivery/quote/whole-bubble proof.
+
+    Never normalize opaque IDs or persist them raw. The same opaque ID on another
+    channel/profile/chat/thread must not associate another owner's feedback.
+    """
+    from collections.abc import Mapping
+    if (not isinstance(message_id, str) or not 1 <= len(message_id) <= 512
+            or message_id != message_id.strip()
+            or any(ord(c) < 32 or ord(c) == 127 or 0xD800 <= ord(c) <= 0xDFFF for c in message_id)):
+        return None
+    message_id.encode('utf-8')
+    if (not isinstance(route, Mapping) or set(route) != {'platform', 'profile', 'chat_id', 'thread_id'}
+            or any(not isinstance(route[k], str) or not route[k] for k in ('platform', 'profile', 'chat_id'))
+            or (route['thread_id'] is not None and not isinstance(route['thread_id'], str))):
+        raise ValueError('report message identity requires an exact host route')
+    return protector.authenticate_json('cli_report.message_ref.v1',
+        {'route': dict(route), 'message_id': message_id})
 
 
 def _unique_object(pairs):
@@ -73,5 +94,10 @@ def classify_cli_report(stdout: str, exit_code: int | None) -> CliReport:
     if error:
         return CliReport(CliReportKind.ERROR_REPORTED, code, True)
     if code == 0 and payload.get("success") is True:
-        return CliReport(CliReportKind.SUCCESS_REPORTED, code, True)
+        identifier = payload.get('message_id')
+        if (not isinstance(identifier, str) or not 1 <= len(identifier) <= 512
+                or identifier != identifier.strip()
+                or any(ord(c) < 32 or ord(c) == 127 or 0xD800 <= ord(c) <= 0xDFFF for c in identifier)):
+            identifier = None
+        return CliReport(CliReportKind.SUCCESS_REPORTED, code, True, identifier)
     return unknown

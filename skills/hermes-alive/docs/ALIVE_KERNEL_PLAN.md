@@ -33,6 +33,13 @@ core/queue edits or production changes follow from this permission.
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0117 measures the actual generic chunk helper returning only the last message
+ID. CLI observations now retain only scoped anonymous report references, explicitly
+not complete bubble inventory, delivery proof or canonical quote targets. Windows
+parsing/scope tests and Linux host/cadence regressions pass. Do not promote these
+reports into delivered history or inferred feedback. Next qualify actual outbound
+receipt capture and owner/quote binding; production/queue behavior unchanged.
+
 ADR-0116 composes discovery/planning/expression/delegation/preparation with the
 actual Hermes send command in an isolated local-sink harness. Exact wording,
 success/reject/partial/skip reports, foreign-lease rejection and single launch

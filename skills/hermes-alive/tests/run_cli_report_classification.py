@@ -3,9 +3,12 @@
 import json
 from pathlib import Path
 import sys
+import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "hooks"))
 from alive_kernel.transport_receipts import CliReportKind as Kind, classify_cli_report
+from alive_kernel.transport_receipts import reported_message_reference
+from alive_kernel.privacy import LocalIdentityProtector
 
 
 def main():
@@ -36,6 +39,20 @@ def main():
         assert classify_cli_report(text, 0).kind is Kind.UNKNOWN
     crash = classify_cli_report('{}', 0xC0000005)
     assert crash.kind is Kind.UNKNOWN and crash.exit_code == 0xC0000005
+    route = {'platform': 'synthetic', 'profile': 'test', 'chat_id': 'chat', 'thread_id': None}
+    with tempfile.TemporaryDirectory() as directory:
+        protector = LocalIdentityProtector(Path(directory) / 'identity.key')
+        report = classify_cli_report('{"success":true,"message_id":"private-message-id"}', 0)
+        assert report.reported_message_id == 'private-message-id'
+        assert 'private-message-id' not in repr(report) + json.dumps(report.to_document())
+        ref = reported_message_reference(protector, route, report.reported_message_id)
+        assert len(ref) == 64 and 'private-message-id' not in ref
+        for key in route:
+            assert reported_message_reference(protector, {**route, key:'another'}, report.reported_message_id) != ref
+        for invalid in ('', ' id', 'id\n', 123, 'x'*513, '\ud800'):
+            assert classify_cli_report(json.dumps({'success':True,'message_id':invalid}), 0).reported_message_id is None
+            assert reported_message_reference(protector, route, invalid) is None
+        assert classify_cli_report('{"success":true,"skipped":true,"message_id":"id"}', 0).reported_message_id is None
     for text in ("x" * 65537, "界" * 22000, "invalid\ud800"):
         try:
             classify_cli_report(text, 0)

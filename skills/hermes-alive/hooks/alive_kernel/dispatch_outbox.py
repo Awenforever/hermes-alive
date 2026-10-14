@@ -1456,7 +1456,7 @@ class DispatchOutbox:
         This is local provenance of an observation, not a host delivery receipt.
         Incomplete/error/skip reports cannot close the lease or train outcomes.
         """
-        from .transport_receipts import classify_cli_report
+        from .transport_receipts import classify_cli_report, reported_message_reference
 
         report = classify_cli_report(stdout, exit_code)
         current = self._utc(now)
@@ -1487,6 +1487,11 @@ class DispatchOutbox:
                    "lease_generation": lease.generation,
                    "stdout_fingerprint": self.protector.authenticate_json(
                        "cli_report.stdout.v1", stdout)}
+        if report.reported_message_id is not None:
+            payload['reported_message_reference'] = reported_message_reference(
+                self.protector, execution.route, report.reported_message_id)
+            payload['message_reference_scope'] = 'command_report_not_complete_bubble_inventory'
+            payload['canonical_quote_target_proven'] = False
         payload["integrity_authenticator"] = self.protector.authenticate_json(
             "transport.cli.observation.v1", payload)
         event_id = execution.start_event_id + ":cli-observation"

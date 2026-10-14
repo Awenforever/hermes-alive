@@ -23,6 +23,19 @@ from alive_kernel.expression_support import ExpressionSourceSupportReviewer
 from run_alive_kernel_opportunity_execution import scenario
 from run_host_transport_command_probe import CHILD
 
+CHUNK_CHARACTERIZATION = r'''
+# Actual upstream aggregation, controlled per-chunk sender, no network.
+import asyncio
+from tools.send_message_tool import _send_chunks
+chunk_calls = []
+async def record_chunk(text, is_last):
+    chunk_calls.append((text, is_last))
+    return {'success': True, 'message_id': 'synthetic-chunk-' + str(len(chunk_calls))}
+chunk_report = asyncio.run(_send_chunks(['first', 'second', 'third'], record_chunk))
+assert chunk_calls == [('first', False), ('second', False), ('third', True)]
+assert chunk_report == {'success': True, 'message_id': 'synthetic-chunk-3'}
+'''
+
 async def exercise(core, root, mode, *, runtime_prepare=None):
     profile = root / 'profile'
     profile.mkdir(parents=True)
@@ -72,7 +85,10 @@ async def exercise(core, root, mode, *, runtime_prepare=None):
     artifacts = [executable, *(core / path for path in (
         'hermes_cli/plugins.py','hermes_cli/send_cmd.py','tools/registry.py','tools/send_message_tool.py'))]
     pins = {path:hashlib.sha256(path.read_bytes()).hexdigest() for path in artifacts}
-    diagnostic_child = ('try:\n    exec(compile(' + repr(CHILD) + ", '<isolated-command-fixture>', 'exec'))\n"
+    characterized_child = CHILD.replace('payload = json.loads(output.getvalue())',
+        CHUNK_CHARACTERIZATION + '\npayload = json.loads(output.getvalue())')
+    assert characterized_child != CHILD
+    diagnostic_child = ('try:\n    exec(compile(' + repr(characterized_child) + ", '<isolated-command-fixture>', 'exec'))\n"
         'except BaseException as error:\n    print(type(error).__name__ + ": " + str(error))\n    raise\n')
     process = OperatorCliProcess((str(executable), '-B', '-c', diagnostic_child, str(core), str(profile), mode,
         str(Path(__file__).resolve().parents[1] / 'hooks')), profile, 'fixture', profile, env, pins, 90)
@@ -111,6 +127,15 @@ async def exercise(core, root, mode, *, runtime_prepare=None):
     expected_kind = {'success':'success_reported','partial':'partial_reported',
         'skip':'skip_reported','reject':'error_reported'}[mode]
     assert observation.observation.event.payload['report_kind'] == expected_kind
+    if mode == 'success':
+        from alive_kernel.transport_receipts import reported_message_reference
+        expected_ref = reported_message_reference(outbox.protector, observation.execution.route,
+                                                 'fixture-local-receipt')
+        assert observation.observation.event.payload['reported_message_reference'] == expected_ref
+        assert observation.observation.event.payload['canonical_quote_target_proven'] is False
+        assert 'fixture-local-receipt' not in observation.observation.event.canonical_json()
+    else:
+        assert 'reported_message_reference' not in observation.observation.event.payload
     try:
         executor(outbox, lease, clearance=Sensitivity.PRIVATE,
             profile_id='fixture', hermes_home=profile, observe_profile_home=lambda:profile,
@@ -125,7 +150,8 @@ async def exercise(core, root, mode, *, runtime_prepare=None):
     assert not journal.read(event_type='delivery.succeeded')
     assert not journal.read(event_type='preference.observed')
     return {'mode':mode, 'command_reports':1, 'local_effects':len(effects),
-        'kind':expected_kind, 'external_delivery_proven':False, 'live_model_calls':0}
+        'kind':expected_kind, 'external_delivery_proven':False, 'live_model_calls':0,
+        'actual_chunk_helper_last_id_only':True}
 
 async def main(core, root):
     return [await exercise(core, root / mode, mode) for mode in ('success','reject','partial','skip')]
