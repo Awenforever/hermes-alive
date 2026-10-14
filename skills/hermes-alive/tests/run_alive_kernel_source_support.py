@@ -34,7 +34,7 @@ async def exercise(root,mode):
     async def review(**kw):
         calls.append(kw)
         data=json.loads(kw['messages'][1]['content'])
-        assert set(data)=={'interpretation_started_at','evidence','explicit_context','learned_advisory','candidate'}
+        assert set(data)=={'interpretation_started_at','evidence','explicit_context','learned_advisory','recent_expression_history','candidate'}
         assert data['interpretation_started_at']==journal.get('opportunity.synthesis:generate:started').event.occurred_at.isoformat()
         assert 'published_at' in data['evidence'][0]
         assert data['evidence'][0]['excerpt'].endswith('unverified.')

@@ -33,6 +33,15 @@ core/queue edits or production changes follow from this permission.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+ADR-0134 real history ablation shows useful unchanged/new/correction distinction
+but repeated unsupported prior-communication/user-history claims. Prompt-only
+clarification does not qualify them. Source-support review now sees typed prior
+wording; USTC Qwen3.8 independently identifies one real error and accepts one
+grounded development, with one timeout. Next wire grounded critique/correction
+into autonomous decisions without hard-coded model dependency or whole-batch
+abort. No ten-clean-cycle or production claim; real totals 110 logical / 123
+observed async HTTP starts, zero sends, unchanged production configuration.
+
 ADR-0133 adds bounded authenticated/erasable prior wording to opportunity
 interpretation and binds its snapshot across await/recovery. Windows and isolated
 Linux synthetic tests verify context inclusion, recovery and privacy boundaries;

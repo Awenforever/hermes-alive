@@ -23,7 +23,13 @@ reasoning/recommendations are allowed. Detect unsupported facts, absolute guaran
 invented verification/completed actions, changed polarity or omitted essential caveats.
 Explicit context is evidenced user input; learned advice is tentative, not a user
 fact or permission. Provenance metadata describes collection, not additional facts
-or independent verification. Do not mistake collector codes for external authority;
+or independent verification. recent_expression_history records generated wording only;
+it cannot support claims that Hermes mentioned, sent, explained or discussed that
+wording with the user. Distinguish internal thought/draft, attempted action,
+transport observation, receipt and user feedback. Do not promote an earlier
+stage into a later one without evidence for that transition. Missing evidence
+must remain uncertainty, not a completed action or presumed shared context.
+Do not mistake collector codes for external authority;
 do not hide that a fixture is synthetic or that evidence is unverified. A request
 for detail never justifies invention. Reviewing supplied evidence cannot establish
 real-world truth or authorize delivery. Return only this JSON object:
@@ -130,6 +136,8 @@ class SourceSupportReviewer:
             observation_event_ids=tuple(start.event.payload['observation_event_ids']))
         context = self.interpreter.context_reader.read(subject=subject, clearance=clearance)
         advice = self.interpreter.learning_reader.read(subject=subject, clearance=clearance)
+        history = self.interpreter.history_reader.read(subject=subject, clearance=clearance,
+                                                     before_sequence=start.sequence)
         # The recorded start is a historical anchor, not the exact model prompt clock.
         # Never substitute today's clock into a retained review snapshot.
         data = {'interpretation_started_at': start.event.occurred_at.isoformat(),
@@ -140,6 +148,7 @@ class SourceSupportReviewer:
             'provenance_metadata':{'collector':s.content['source']}} for s in sources],
             'explicit_context':[c.to_prompt() for c in context],
             'learned_advisory':[c.to_prompt() for c in advice],
+            'recent_expression_history':[c.to_prompt() for c in history],
             'candidate':{'id':candidate_id, 'kind':candidate.action.action_kind.value,
                 'text':_thaw_json(candidate.content)['operation']['text']}}
         if len(json.dumps(data, ensure_ascii=False)) > 40000:

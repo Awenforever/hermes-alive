@@ -15,11 +15,12 @@ from alive_kernel.expression_runtime import ExpressionRuntime, ExpressionRuntime
 from alive_kernel.semantic_review import SemanticReviewError
 
 
-async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.USER_DELEGATED):
+async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.USER_DELEGATED,
+                   source_summary='Public workshop, details unverified.', draft_text=None):
     journal = ExperienceJournal(root / 'experience.sqlite3')
     reader = DiscoveryOpportunityIngestor(journal)
     source = reader.ingest(DiscoveryCandidate(source='synthetic public fixture', title='Repair workshop',
-        summary='Public workshop, details unverified.', url='https://example.invalid/workshop',
+        summary=source_summary, url='https://example.invalid/workshop',
         observed_at=datetime.now(timezone.utc)), subject='user:test')
     calls = []
     async def call(**kw):
@@ -30,7 +31,7 @@ async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.
             value = {'candidates': []}
             if mode != 'silence':
                 value['candidates'] = [{'agenda_item_id': source.agenda_item_id, 'kind': 'share',
-                    'text': 'Public workshop, details unverified.', 'topic': 'repair',
+                    'text': draft_text if draft_text is not None else source_summary, 'topic': 'repair',
                     'dimensions': {name: {'value': .1 if name in ('risk', 'urgency', 'interruption_cost')
                     else .8, 'reason': 'synthetic judgment'} for name in
                     ('user_value', 'urgency', 'novelty', 'confidence', 'risk', 'interruption_cost')}}]
