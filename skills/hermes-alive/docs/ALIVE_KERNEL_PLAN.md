@@ -33,6 +33,15 @@ core/queue edits or production changes follow from this permission.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+ADR-0124 develops a host-owned durable queue-submission/physical-ack producer on
+enhance's separate `feat/alive-transport-evidence` branch (`ff80ccb`), not release
+or production. Windows and Linux actual-SDK/synthetic-IO prove scoped two-binding
+FIFO/reopen/cross-task drain and metadata-failure/no-resend behavior; old queue
+rows retain NULL correlation. The bounded ledger denies complete delivery/quote
+proof. Next qualify publisher identity and Alive attempt-bound reconciliation,
+finality/ambiguity and feedback; preserve the direct-observer refusal. No new
+source clone/snapshot or residual test container, no production activation.
+
 ADR-0123 tests the exact production enhance queue source with synthetic IO:
 outer normal return can mean merely queued, while same-task deferred drain bypasses
 the outer observer. This is not a FIFO defect. Direct observation now refuses that
