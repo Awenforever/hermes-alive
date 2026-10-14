@@ -33,6 +33,14 @@ core/queue edits or production changes follow from this permission.
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0113 composes current planning and natural expression/review. Silence has no
+expression calls; completed recovery revalidates original evidence and consumes
+no provider budget. An injected crash after the native comparison but before the
+outer receipt recovers through authenticated retained records, not another call.
+Windows and isolated Linux pass synthetic tests; no automatic delivery authority,
+real semantic quality claim, watcher activation or production send follows.
+Next compose send-time authorization and qualified host delivery, then feedback.
+
 ADR-0112 adds a real PlanningRuntime composition from retained discovery through
 model interpretation to current intent/silence. Reopened completed operations
 reuse evidence and selections, incomplete provider stages do not silently retry,
