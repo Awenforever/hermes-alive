@@ -4,7 +4,42 @@ Status: active
 
 Last reviewed: 2026-10-14
 
+### Delivery milestones and ownership (user clarification, 2026-10-14)
+
+The delivery estimate is approximately 35%, an engineering estimate rather than
+an acceptance score. Foundations and isolated contracts are substantially built;
+the complete autonomous decision/expression/delivery/feedback loop is not yet
+integrated or qualified. Production remains on the legacy runtime. Report progress
+against these milestones, not test counts or individual interface probes:
+
+1. Integrate a useful, bounded autonomous loop in isolation with exact provenance,
+   model choice, retained memory, agenda and outcomes connected end to end.
+2. Demonstrate longitudinal usefulness and safe silence on new synthetic/public
+   scenarios, including restart, consent withdrawal and failure recovery.
+3. Qualify installation/upgrade, migration and rollback, then obtain production
+   deployment authority and complete real production acceptance.
+
+Weixin FIFO, queued-message management and context-token refresh belong to
+hermes-wechat-enhance, not Alive. Alive must use the host/channel transport
+contract and must not create a competing platform queue. Its durable action
+outbox tracks intent/evidence/recovery; it is not permission to reorder or resend
+the platform FIFO. Host ingress probes establish observation fidelity only.
+Failure with a replaced high-level worker does not prove a queue defect.
+
+The user permits repairing confirmed wechat-enhance defects discovered during
+Alive work, but its independent final acceptance/release cleanup is deferred until
+Alive is complete. Record evidence and scope such fixes separately; no speculative
+core/queue edits or production changes follow from this permission.
+
 ### Current finding: learned advice must retain its semantic evidence
+
+ADR-0110 demonstrates actual adapter bundling can rewrite quote targets while
+retaining the own-message bit; native complete text is normalized-event evidence,
+not a single wire message. A delegated public busy-handler observer sees original
+authorized inputs before merge and rejects actual shared-slot unauthorized input.
+Individual FIFO fails with the high-level worker substitute (which removed drain
+promotion), not proven bad SDK logic. Next qualify a real worker/provider seam and
+consented busy-wire provenance before feedback; production behavior is unchanged.
 
 ADR-0109 runs actual constructor/_handle_message/stop with the real Alive plugin
 and a replaced HIGH-LEVEL agent worker. Native observation, deny/slash/busy gates
