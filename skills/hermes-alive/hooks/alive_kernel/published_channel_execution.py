@@ -9,6 +9,30 @@ from pathlib import Path
 
 from .cli_send_contract import compile_text_cli_plan
 from .transport_publisher_bridge import TransportPublisherBridge
+from .opportunity_expression import OpportunityExpressionStore
+from .dispatch_outbox import DispatchOutboxError
+
+
+def _renderer_metadata(outbox, execution, text, now):
+    """Read actual body origin from canonical evidence, never host model options.
+
+    The caller first validates launch authority. A reviewed natural expression
+    must resolve to the exact sent body; deterministic bodies have no model tag.
+    """
+    attempt = outbox.journal.get('action.attempt:' + execution.lease.attempt_id)
+    authorization = outbox.journal.get(attempt.event.payload['authorization_event_id'])
+    expression_id = authorization.event.payload.get('expression_event_id')
+    if not expression_id:
+        return {}
+    store = OpportunityExpressionStore(outbox.journal, content_vault=outbox.vault,
+                                      context_vault=outbox.context_vault)
+    candidate = store.resolve_model_candidate(str(expression_id), as_of=now)
+    record = outbox.journal.get(str(expression_id))
+    if (candidate is None or record.event.subject != execution.lease.subject
+            or candidate.selection_event_id != authorization.event.payload['selection_event_id']
+            or candidate.text != text):
+        raise DispatchOutboxError('publisher body lacks canonical renderer provenance')
+    return {'model_name': candidate.renderer_model}
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,7 +65,9 @@ async def execute_published_text_once(outbox, lease, *, publisher, clearance,
     observations, error = None, None
     try:
         # Binding records provenance but does not replace fresh launch authority.
-        outbox.validate_execution_for_launch(execution, now=clock())
+        launch_time = clock()
+        outbox.validate_execution_for_launch(execution, now=launch_time)
+        metadata.update(_renderer_metadata(outbox, execution, plan.stdin_text, launch_time))
         result = await publisher.adapter.send(chat_id=execution.route['chat_id'],
             content=plan.stdin_text, metadata=metadata)
     finally:

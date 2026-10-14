@@ -33,6 +33,13 @@ core/queue edits or production changes follow from this permission.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+ADR-0132 carries canonical actual renderer origin through the publisher seam,
+checking owner/selection/exact body after fresh launch validation. Immediate and
+deferred host-defined chunks retain that model despite conflicting foreground
+turn evidence. Synthetic physical IO is not actual model or delivery proof.
+Production remains unchanged; continue real-model longitudinal usefulness,
+novelty/unresolved-intent controls and attributed feedback before activation.
+
 ADR-0131 adds explicit bounded host lifetime and authenticated owner/lane-scoped
 cycle allocation/progress. Windows/Linux host-state tests prove reopen, completion,
 budget, stop/external cancellation cleanup and configuration/mode/owner isolation.

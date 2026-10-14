@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'hooks'))
 from alive_kernel import DispatchOutbox, DispatchOutboxError, ExperienceJournal, Sensitivity
@@ -107,19 +108,20 @@ async def test(root, enhance, hermes_root=None):
         assert not DispatchEvidenceVerifier(journal,outbox.protector).verify(record,journal.get('action.attempt:' + lease.attempt_id))
 
 
-async def composed(root, enhance, hermes_root=None):
+async def composed(root, enhance, hermes_root=None, queued=True):
     from run_alive_kernel_host_runtime_chain import prepare
     from hermes_wechat_enhance.v021_bubble_footer import patch_adapter
     spec = importlib.util.spec_from_file_location('composed_fixtures', enhance / 'scripts/test-v021-bubble-footer.py')
     fixtures = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(fixtures)
     route = {'platform':'weixin','profile':'synthetic','chat_id':'peer','thread_id':None}
-    journal, outbox, lease, _, expected, _, prepared, runtime = await prepare(root/'kernel',route)
+    journal, outbox, lease, expression, expected, _, prepared, runtime = await prepare(root/'kernel',route)
     home = root/'profile'
     home.mkdir()
     os.environ['HERMES_HOME'] = str(home)
     adapter = adapter_for(fixtures,hermes_root)
-    adapter.MAX_MESSAGE_LENGTH = 10000
+    from hermes_wechat_enhance.v021_bubble_footer import FOOTER_RESERVE
+    adapter.MAX_MESSAGE_LENGTH = FOOTER_RESERVE + max(1, len(adapter.format_message(expected)) // 3)
     assert patch_adapter(adapter)
     digest = hashlib.sha256((enhance/'hermes_wechat_enhance/v021_bubble_footer.py').read_bytes()).hexdigest()
     publisher = QualifiedReceiptPublisher(adapter,digest,'synthetic',home,True)
@@ -127,19 +129,37 @@ async def composed(root, enhance, hermes_root=None):
         hermes_home=home,resolve_target=lambda p,t:(t,None,None),extract_media=lambda text:([],text),
         observe_profile_home=lambda:home)
     expected_chunks = adapter._split_text(adapter.format_message(expected))
-    adapter.fail_next = True
+    assert len(expected_chunks) > 1
+    from hermes_wechat_enhance.v021_bubble_footer import _TURN_MODELS
+    _TURN_MODELS['peer'] = ('synthetic/unrelated-chat', time.time(), True, expected)
+    adapter.fail_next = queued
     observed = await runtime.execute_prepared_with_publisher(prepared,lease,**params)
-    assert observed.adapter_result.success and not adapter.sent and not observed.external_delivery_proven
-    assert [r.event.payload['phase'] for r in observed.observations['records']] == ['queued'] * len(expected_chunks)
+    from alive_kernel.published_channel_execution import _renderer_metadata
+    count = journal.last_sequence()
+    try:
+        _renderer_metadata(outbox, observed.execution, expected + ' changed', datetime.now(timezone.utc))
+    except DispatchOutboxError:
+        pass
+    else:
+        raise AssertionError('different body borrowed renderer provenance')
+    assert journal.last_sequence() == count
+    assert observed.adapter_result.success and not observed.external_delivery_proven
+    assert bool(adapter.sent) is (not queued)
+    phase = 'queued' if queued else 'acknowledged'
+    assert [r.event.payload['phase'] for r in observed.observations['records']] == [phase] * len(expected_chunks)
     try: await runtime.execute_prepared_with_publisher(prepared,lease,**params)
     except DispatchOutboxError: pass
     else: raise AssertionError('prepared action submitted twice')
     await adapter._drain_pending('peer')
     assert [sent[1].rsplit('\n\n---\n\n',1)[0] for sent in adapter.sent] == expected_chunks
+    assert expression.renderer_model == 'synthetic/renderer'
+    assert all(sent[1].endswith('`synthetic/renderer`') for sent in adapter.sent)
     bridge = TransportPublisherBridge(DispatchOutbox(ExperienceJournal(journal.path)))
     result = bridge.ingest(observed.binding_event_id,publisher=publisher,route=route)
-    assert [r.event.payload['phase'] for r in result['records']] == ['queued'] * len(expected_chunks) + ['acknowledged'] * len(expected_chunks)
-    assert [r.event.payload['client_reference'] for r in result['records'][:len(expected_chunks)]] == [r.event.payload['client_reference'] for r in result['records'][len(expected_chunks):]]
+    phases = (['queued'] * len(expected_chunks) if queued else []) + ['acknowledged'] * len(expected_chunks)
+    assert [r.event.payload['phase'] for r in result['records']] == phases
+    if queued:
+        assert [r.event.payload['client_reference'] for r in result['records'][:len(expected_chunks)]] == [r.event.payload['client_reference'] for r in result['records'][len(expected_chunks):]]
     assert len(journal.read(event_type='dispatch.started')) == 1
     assert not journal.read(event_type='outcome.recorded')
 
@@ -155,4 +175,5 @@ if __name__ == '__main__':
         root = Path(folder)
         asyncio.run(test(root/'observations',args.enhance_root.resolve(),args.hermes_root))
         asyncio.run(composed(root/'composed',args.enhance_root.resolve(),args.hermes_root))
+        asyncio.run(composed(root/'immediate',args.enhance_root.resolve(),args.hermes_root,queued=False))
     print('HERMES_ALIVE_TRANSPORT_PUBLISHER_BRIDGE_OK')
