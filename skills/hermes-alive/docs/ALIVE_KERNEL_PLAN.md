@@ -6,6 +6,14 @@ Last reviewed: 2026-10-14
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0098 identifies a prerequisite for delivered-history retention: automatic
+expiry and explicit forgetting previously shared item tombstones. Expiry now
+records a distinct cause using unchanged physical erasure/backup completion;
+explicit requests after expiry and ambiguous legacy tombstones still count as
+forgetting. No archive is connected yet. Next bind exact historical message,
+canonical delivery evidence and outbound consent without extending execution or
+silently ignoring derivative erasure. This does not replace the full goal.
+
 ADR-0097 finds that delayed feedback depends on an approximately one-hour
 executable copy, while expired vault plaintext was still readable before erasure
 maintenance. The read boundary now denies before decryption, without extending

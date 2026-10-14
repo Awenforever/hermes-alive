@@ -582,12 +582,14 @@ class ContentVault:
             return self._erase("subject", str(subject))
 
     def _erase(self, selector_kind: str, selector_value: str) -> ErasureResult:
+        if selector_kind not in ('item', 'expiry', 'subject'):
+            raise ValueError('invalid erasure selector')
         if not selector_value:
             raise ValueError("erasure selector must not be empty")
         with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
-                if selector_kind == "item":
+                if selector_kind in ('item', 'expiry'):
                     rows = connection.execute(
                         "SELECT content_id FROM content_items WHERE content_id=?",
                         (selector_value,),
@@ -598,7 +600,7 @@ class ContentVault:
                         (selector_value,),
                     ).fetchall()
                 live_ids = [str(row["content_id"]) for row in rows]
-                ids = live_ids or ([selector_value] if selector_kind == "item" else [])
+                ids = live_ids or ([selector_value] if selector_kind in ('item', 'expiry') else [])
                 previous = connection.execute(
                     """
                     SELECT * FROM erasure_jobs
@@ -821,10 +823,24 @@ class ContentVault:
         erased = 0
         backups = 0
         for content_id in ids:
-            result = self.erase_item(content_id)
+            with self._exclusive_operation():
+                result = self._erase('expiry', content_id)
             erased += result.newly_erased
             backups += result.managed_backups_removed
         return ErasureResult(requested, erased, backups, requested == 0)
+
+    def explicit_erasure_recorded(self, content_id: str) -> bool:
+        """Check a structural dependency tombstone, without resolving plaintext.
+
+        Old item tombstones have ambiguous origin and remain explicit erasure.
+        A later explicit request after expiry must still invalidate dependents.
+        Scope/authorization is the caller's responsibility before this query.
+        """
+        with closing(self._connect()) as connection:
+            return connection.execute('''SELECT 1 FROM erasure_jobs AS jobs
+                JOIN erasure_items AS items ON items.job_id=jobs.job_id
+                WHERE items.content_id=? AND jobs.selector_kind!='expiry' LIMIT 1''',
+                (str(content_id),)).fetchone() is not None
 
     def pending_erasure_jobs(self) -> list[str]:
         with closing(self._connect()) as connection:

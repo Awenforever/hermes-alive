@@ -162,11 +162,15 @@ def main() -> None:
             resumed._aesgcm = original_decryptor
         expiry_result = resumed.erase_expired()
         require(expiry_result.newly_erased == 1, "retention erasure failed")
+        require(not resumed.explicit_erasure_recorded(expired.content_id), 'expiry was mislabelled explicit forgetting')
         try:
             resumed.resolve_json(expired.content_id)
             raise AssertionError("expired content remained available")
         except ContentErasedError:
             pass
+
+        resumed.erase_item(expired.content_id)
+        require(resumed.explicit_erasure_recorded(expired.content_id), 'explicit forgetting after expiry was lost')
 
         concurrent_base = base / "concurrent"
 
