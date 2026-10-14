@@ -2,7 +2,7 @@
 cf444ad0788f9ab925b944e4668d974fb8dc36161d3bdc8d9963b6a5021dd53f  ./README.md
 15aa69e768b45e17d71ff22155150fac4d0925ba172748432c5c8c307985e1bb  ./README_CN.md
 a3ab6cbfada2ab9a7e9e0693d376d354563e3e50f4b368f6c45e3cfa7773ba35  ./SKILL.md
-2d7585329fec16d5be891055cd0570c841dd80ac00dd7e48b964be91d737bd74  ./docs/ALIVE_KERNEL_PLAN.md
+ab165070c54e02552d5f4ad3305ea1166f2e08871707f08e0c3c9d622c79ef85  ./docs/ALIVE_KERNEL_PLAN.md
 97ab9e52cbfbc23d98822e39ecd598be1bb7ccd78395cf59aca7929a3ed98d5d  ./docs/ARCHITECTURE.md
 60a2ffe527b49c1598e8275b205985b63653270b499cdb29a2f7ab672e88fc0e  ./docs/DATA_AND_PRIVACY.md
 858c8d0089d0e8be7fbf40fe70fe162918edc43c1aa264f50fe6f07e0ce7ab1f  ./docs/DEVELOPMENT_MEMORANDUM.md
@@ -125,6 +125,7 @@ d583b4bc1224a2835137945e4f3b73de252d748b5a66a41fc3855114a80ef380  ./docs/adr/010
 892e88941254656a955c4f5c5211024afd5a1cff7f980ba3c995912040117dc7  ./docs/adr/0108-canonical-routing-and-transport-auth.md
 18b55989f67b0666bc0e9c592bb0aa2be436ac658624c38ba2bd91060d6000c3  ./docs/adr/0109-actual-gateway-dispatch-and-teardown.md
 c5e9df9ec09753067f7dd715aedfd4b1f079d7b20060bd01845216e47d6f589a  ./docs/adr/0110-adapter-bundles-and-wire-observation.md
+fedf8554c0df646cb71aefd2a1b9b61cfa3b9aa93dd2d1180473851221328d6b  ./docs/adr/0111-longitudinal-planning-through-reopened-memory.md
 4d6108e5f522390a4f9008265a2681771192c500c4c34a02179e24a238b55332  ./docs/evidence/deepseek-seed-20261012.json
 40941e141314d626c51ad4d22ccc19c76dcf4b770a85daa0881d135089fb75ea  ./docs/evidence/qwen-route-20261012.json
 460cffae94c5494e13515ab9c2dc42331e9fd14260bf4182086d5f3bd9e19114  ./hooks/HOOK.yaml
@@ -300,6 +301,7 @@ d606f097c12fe862dbc61be8a2feb07ec4419630d0d4241cdbb7d3fc136a9ad7  ./tests/run_al
 d0e92122cf5356e499d1f77b4a365b5c0b46eccc3fdd8f9b6753ded408137a3a  ./tests/run_alive_kernel_learning_context.py
 189224b5b5891c17ee879246041d3d26471b2978b86827c161e6bd64a30d7967  ./tests/run_alive_kernel_live_learning_contract.py
 946e060d1cf938eb543c36b55dc00a4aa7765048cdf8a5ec6b5f917aa05ffce7  ./tests/run_alive_kernel_live_probe_contract.py
+8a69f6e58bc19082e53db9f00973dafcc630f015f0ba29e8d1ce14d665d8563b  ./tests/run_alive_kernel_longitudinal_planning.py
 110abfd34434a09e1236c6ad1bfc06fec816122105b208d92b24c5f22b209976  ./tests/run_alive_kernel_memory.py
 e58f33c744f5f734b00c8ec83b0ba437a14185bae7ed4c6fe00bc4a278ed0095  ./tests/run_alive_kernel_model_cycle.py
 2a97332c41baa1812508b41d266e7a06302dc6df7acf0c9b8d935f9c60c84419  ./tests/run_alive_kernel_model_json.py

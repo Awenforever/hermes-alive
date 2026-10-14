@@ -33,6 +33,14 @@ core/queue edits or production changes follow from this permission.
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0111 returns to the autonomous-loop milestone with four reopened planning
+cycles: no advice/silence, synthetic feedback/share proposal, explicit boundary/
+silence, withdrawal/silence. Actual projections and cognition preserve scope,
+provenance and non-restored action authority on Windows and isolated Linux.
+Controlled model fixtures prove plumbing, not semantic judgment or user benefit.
+Next compose the runtime loop and qualify real-model longitudinal decisions;
+do not mistake another structural test for an integrated production Alive.
+
 ADR-0110 demonstrates actual adapter bundling can rewrite quote targets while
 retaining the own-message bit; native complete text is normalized-event evidence,
 not a single wire message. A delegated public busy-handler observer sees original
