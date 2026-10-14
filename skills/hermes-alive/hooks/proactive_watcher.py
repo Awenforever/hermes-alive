@@ -89,6 +89,7 @@ def _refresh_managed_runtime_env() -> None:
     module.load_managed_env(overwrite=False)
 
 DEFAULT_INTERVAL_SECONDS = 300.0
+RETENTION_MAINTENANCE_INTERVAL_SECONDS = 300.0
 ENABLED_ENV = "HERMES_PROACTIVE_PLATFORM_ENABLED"
 CHAT_ID_ENV = "HERMES_PROACTIVE_WEIXIN_CHAT_ID"
 DELIVERY_PLATFORM_ENV = "HERMES_PROACTIVE_DELIVERY_PLATFORM"
@@ -140,6 +141,10 @@ class ProactivePlatformWatcher:
         self._last_delivery_gate_reason = ""
         self._active_delivery_subject: str | None = None
         self._last_log_rotation_check = 0.0
+        self._retention_maintenance_at: float | None = None
+        self._retention_maintenance_task: asyncio.Task | None = None
+        self._retention_maintenance_ok = True
+        self._retention_maintenance_report: dict | None = None
         self.watcher_id = f"{os.getpid()}-{uuid.uuid4().hex[:8]}"
         self.started_at = datetime.now().astimezone().isoformat()
 
@@ -173,6 +178,7 @@ class ProactivePlatformWatcher:
             if remaining <= 0:
                 return
             await asyncio.sleep(min(1.0, remaining))
+            await self._maintain_retention()
             if self._discovery_once_pending():
                 return
 
@@ -185,7 +191,53 @@ class ProactivePlatformWatcher:
             logger.exception("Hermes Alive tick failed")
             return False
 
+    async def _maintain_retention(self) -> bool:
+        """Local privacy work is independent of proactive cadence/enablement.
+
+        Shield the owned task: cancelling a tick does not prove the worker thread
+        stopped, and must never launch another copy while it is still running.
+        No store on a fresh install means no implicit kernel creation or consent.
+        """
+        if not (BASE / 'kernel' / 'experience.sqlite3').is_file():
+            return True
+        now = time.monotonic()
+        task = self._retention_maintenance_task
+        if task is not None and task.cancelled():
+            self._retention_maintenance_ok = False
+            if self._retention_maintenance_report != {'completion_unknown':True}:
+                self._log('retention_maintenance_error', error='WorkerCompletionUnknown')
+                self._retention_maintenance_report = {'completion_unknown':True}
+            return False
+        if task is None:
+            if (self._retention_maintenance_at is not None
+                    and now - self._retention_maintenance_at < RETENTION_MAINTENANCE_INTERVAL_SECONDS):
+                return self._retention_maintenance_ok
+            from alive_kernel.retention_command import resume_retention_maintenance
+            self._retention_maintenance_at = now
+            task = asyncio.create_task(asyncio.to_thread(resume_retention_maintenance, BASE))
+            self._retention_maintenance_task = task
+        try:
+            report = await asyncio.shield(task)
+            self._retention_maintenance_ok = not bool(report.get('history_derivatives_unresolved', 0))
+            if report != self._retention_maintenance_report or any(report.values()):
+                self._log('retention_maintenance', **report)
+            self._retention_maintenance_report = dict(report)
+            if not self._retention_maintenance_ok:
+                logger.error('Alive proactive work paused: unresolved history erasure dependencies')
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            self._retention_maintenance_ok = False
+            self._log('retention_maintenance_error', error=type(error).__name__)
+            logger.exception('Alive proactive work paused: retention maintenance failed')
+        finally:
+            if task.done() and not task.cancelled() and self._retention_maintenance_task is task:
+                self._retention_maintenance_task = None
+        return self._retention_maintenance_ok
+
     async def _tick_impl(self, tick_id: str) -> bool:
+        if not await self._maintain_retention():
+            return False
         if not self.enabled:
             self._log("skip", tick_id=tick_id, reason="disabled")
             return False

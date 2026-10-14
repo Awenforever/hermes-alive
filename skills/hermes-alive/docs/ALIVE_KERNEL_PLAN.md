@@ -6,6 +6,14 @@ Last reviewed: 2026-10-14
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0101 connects privacy maintenance to the running watcher before send gates
+and during interval waits, independently of proactive pause/cadence. Owned task
+shielding prevents cancellation-driven duplicate workers; unknown completion or
+erasure failure blocks further proactive work. Real synthetic storage deletion
+through the watcher is tested, not just scheduler spies. Fully disabled-service
+registration, teardown, long-tick timing, transitive erasure and performance still
+need qualification. No new production task, service, consent or model call.
+
 ADR-0100 adds metadata-only history erasure to existing local retention maintenance
 and startup recovery, not just later reads. Signed ownership/storage checks guard
 deletion, and unresolved dependencies remain visible. Tests cover absent readers,

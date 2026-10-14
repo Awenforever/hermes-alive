@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from types import MethodType, SimpleNamespace
@@ -19,6 +20,11 @@ for path in (HOOKS, SCRIPTS):
         sys.path.insert(0, str(path))
 
 os.environ["HERMES_HOOK_DIR"] = str(HOOKS)
+# Own every runtime/control lock in this fixture. Inheriting the caller's Hermes
+# home can write real control locks or fail on read-only installation mounts.
+_fixture_runtime = tempfile.TemporaryDirectory(prefix='alive-sleep-policy-')
+os.environ['HERMES_HOME'] = str(Path(_fixture_runtime.name) / 'home')
+os.environ['HERMES_ALIVE_SHARED_DIR'] = str(Path(_fixture_runtime.name) / 'runtime')
 
 from circadian_sleep_quiet_policy import (
     evaluate_sleep_quiet_shadow,
