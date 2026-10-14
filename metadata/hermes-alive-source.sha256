@@ -2,7 +2,7 @@
 cf444ad0788f9ab925b944e4668d974fb8dc36161d3bdc8d9963b6a5021dd53f  ./README.md
 15aa69e768b45e17d71ff22155150fac4d0925ba172748432c5c8c307985e1bb  ./README_CN.md
 a3ab6cbfada2ab9a7e9e0693d376d354563e3e50f4b368f6c45e3cfa7773ba35  ./SKILL.md
-b0ce62e8aacb50cb1dfae92589576d2fe7d3164f8ca4b251bec54f22523b3e4e  ./docs/ALIVE_KERNEL_PLAN.md
+6af3383fd71b39fae27c9e5167bda0e8436e329fbfc9576516d02466b9e462c0  ./docs/ALIVE_KERNEL_PLAN.md
 97ab9e52cbfbc23d98822e39ecd598be1bb7ccd78395cf59aca7929a3ed98d5d  ./docs/ARCHITECTURE.md
 60a2ffe527b49c1598e8275b205985b63653270b499cdb29a2f7ab672e88fc0e  ./docs/DATA_AND_PRIVACY.md
 858c8d0089d0e8be7fbf40fe70fe162918edc43c1aa264f50fe6f07e0ce7ab1f  ./docs/DEVELOPMENT_MEMORANDUM.md
@@ -123,6 +123,7 @@ fd52b4c211b902f7ff7defc840be801336e553f8dbd64060c3f9c87cc5a655ad  ./docs/adr/010
 d583b4bc1224a2835137945e4f3b73de252d748b5a66a41fc3855114a80ef380  ./docs/adr/0106-ephemeral-admission-metadata-experiment.md
 9fc4f5b29320269b801a02c0c3a0f36d1cd806e6fc561054a43e7e5a0cdcda5b  ./docs/adr/0107-task-bound-cross-profile-metadata.md
 892e88941254656a955c4f5c5211024afd5a1cff7f980ba3c995912040117dc7  ./docs/adr/0108-canonical-routing-and-transport-auth.md
+18b55989f67b0666bc0e9c592bb0aa2be436ac658624c38ba2bd91060d6000c3  ./docs/adr/0109-actual-gateway-dispatch-and-teardown.md
 4d6108e5f522390a4f9008265a2681771192c500c4c34a02179e24a238b55332  ./docs/evidence/deepseek-seed-20261012.json
 40941e141314d626c51ad4d22ccc19c76dcf4b770a85daa0881d135089fb75ea  ./docs/evidence/qwen-route-20261012.json
 460cffae94c5494e13515ab9c2dc42331e9fd14260bf4182086d5f3bd9e19114  ./hooks/HOOK.yaml
@@ -346,6 +347,7 @@ a781e3cb19c95042ab423d22c7ceca71fcdd5d7abe047601b4fab412be6106ce  ./tests/run_de
 cc6e30b1962f1adc9af3cff2e6142382d6f26acd2b86613abbdd8bd40b2f84ba  ./tests/run_editorial_discovery_v4.py
 b19462f735a4319638631ce69e20b9564d7509c214bc7a56dd285447c76ac752  ./tests/run_editorial_quality_contract_v1.py
 f6984bb73a40f40f60a5838f9737dced4798aa28c4c9bfa05c737412ff6d1fd0  ./tests/run_host_admitted_inbound_probe.py
+b9938f00c5a88a63bdd0e8c5e9b577c7897a444fe2bea29b09ad3abd9ec11e6f  ./tests/run_host_full_dispatch_probe.py
 0ef66e8977610694a1a2c42f528f1b532d0ff2192bad6c68b880e27c766f40a2  ./tests/run_host_ingress_authorization_probe.py
 59965cd1e4811132dc1bdd62d1cb9c3118a479bd78e55949ef08644d19625e31  ./tests/run_host_metadata_profile_probe.py
 b1db2fd958bb066b7671720584661c1062b191a3eda35c13dc3b7e7120ba145e  ./tests/run_host_transport_command_probe.py

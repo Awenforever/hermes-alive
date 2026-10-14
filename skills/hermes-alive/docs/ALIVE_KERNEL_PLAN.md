@@ -6,6 +6,13 @@ Last reviewed: 2026-10-14
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0109 runs actual constructor/_handle_message/stop with the real Alive plugin
+and a replaced HIGH-LEVEL agent worker. Native observation, deny/slash/busy gates
+and error/cancel slot cleanup pass. First teardown raced background persistence;
+actual stop fixes the harness. This is not provider/history/FIFO/delivery proof,
+and the research quote handoff is still not consumed by Alive. Next qualify the
+local adapter/worker/delivery path and explicit feedback, retaining the full goal.
+
 ADR-0108 replaces the synthetic pre-pinned routing shortcut with actual receiver
 ownership, route matching, served-profile checks and home resolution. Actual
 scoped auth uses the transport's grant, not the runtime destination's allowlist;
