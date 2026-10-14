@@ -12,6 +12,9 @@ from alive_kernel import ExperienceJournal, EventEnvelope, Sensitivity, OutcomeP
 from alive_kernel.content_vault import ContentErasedError, ContentVault
 from alive_kernel.delivered_history import DeliveredHistoryStore, DeliveredHistoryError
 from alive_kernel.feedback_synthesis import FeedbackSynthesizer
+from alive_kernel.recovery import KernelRecoverySupervisor
+from alive_kernel.retention_command import resume_retention_maintenance
+from alive_kernel.events import _thaw_json
 from alive_kernel.opportunity_expression import OpportunityExpressionStore
 from alive_kernel_testkit import authenticated_dispatch_receipt
 from run_alive_kernel_opportunity_execution import scenario
@@ -23,11 +26,12 @@ def consent(journal, *, enabled=True, directions=('inbound','outbound')):
             'directions':list(directions), 'content_sensitivity':'private'}))
 
 async def exercise(root, mode):
-    journal = ExperienceJournal(root / 'kernel/journal.sqlite3')
+    runtime_layout = mode in ('startup-forget','runtime-maintenance-forget')
+    journal = ExperienceJournal(root / ('kernel/experience.sqlite3' if runtime_layout else 'kernel/journal.sqlite3'))
     consent(journal, directions=('inbound',) if mode == 'inbound-only' else ('inbound','outbound'))
     journal, outbox, lease, expression, text = await scenario(root / 'kernel', 'expression',
-        return_ready=True, custom_context=mode == 'context-forget')
-    context_vault = ContentVault(root / 'kernel/separate-profile-vault') if mode == 'context-forget' else None
+        return_ready=True, custom_context=mode == 'context-forget', runtime_layout=runtime_layout)
+    context_vault = outbox.vault if runtime_layout else ContentVault(root / 'kernel/separate-profile-vault') if mode == 'context-forget' else None
     store = DeliveredHistoryStore(journal, content_vault=outbox.vault, context_vault=context_vault)
     try:
         store.capture(subject='user:test', delivery_outcome_event_id=expression.event_id)
@@ -62,12 +66,17 @@ async def exercise(root, mode):
     else:
         raise AssertionError('foreign history disclosed')
     compiled_id = journal.get(attempt.event.payload['authorization_event_id']).event.payload['executable_content_id']
-    if mode == 'expiry':
+    if mode in ('expiry', 'expiry-maintenance'):
         outbox.vault.erase_expired(now=expression.expires_at + timedelta(seconds=1))
         assert not outbox.vault.explicit_erasure_recorded(compiled_id)
         assert OpportunityExpressionStore(journal, content_vault=outbox.vault).resolve_model_candidate(expression.event_id) is None
         assert store.for_delivery(**args)['text'] == text
         assert store.capture(**args).event.event_id == history.event.event_id
+        if mode == 'expiry-maintenance':
+            report = store.reconcile_erasure()
+            assert report == {'examined':1, 'erased':0, 'unresolved':0}
+            assert store.for_delivery(**args)['text'] == text
+            return
         journal.append(EventEnvelope(event_type='consolidation.consent_changed',
             source='hermes.command.memory', actor='user:test', subject='user:test',
             sensitivity=Sensitivity.PRIVATE, payload={'enabled':True}))
@@ -98,8 +107,28 @@ async def exercise(root, mode):
         result = await interpreter.run(subject='user:test', outcome_event_id=feedback.event.event_id,
             operation_id='after-executable-expiry', call=interpret)
         assert len(calls) == 1 and not result.safe_for_automatic_learning
-    elif mode == 'explicit-forget':
+    elif mode in ('explicit-forget','maintenance-forget','startup-forget','runtime-maintenance-forget'):
+        backup = outbox.vault.create_managed_backup('before-history-forgetting')
         outbox.vault.erase_item(compiled_id)
+        if mode == 'startup-forget':
+            report = KernelRecoverySupervisor(root).recover()
+            assert report.history_derivatives_erased == 1 and report.history_derivatives_unresolved == 0
+            again = KernelRecoverySupervisor(root).recover()
+            assert again.history_derivatives_erased == 0
+        elif mode == 'runtime-maintenance-forget':
+            report = resume_retention_maintenance(root)
+            assert report['history_derivatives_erased'] == 1 and report['history_derivatives_unresolved'] == 0
+        if mode == 'maintenance-forget':
+            original = outbox.vault._aesgcm
+            def forbidden(_key):
+                raise AssertionError('metadata maintenance decrypted content')
+            outbox.vault._aesgcm = forbidden
+            try:
+                assert store.reconcile_erasure() == {'examined':1, 'erased':1, 'unresolved':0}
+                assert store.reconcile_erasure() == {'examined':1, 'erased':0, 'unresolved':0}
+            finally:
+                outbox.vault._aesgcm = original
+            assert not backup.exists()
         try:
             store.resolve(history.event.event_id, subject='user:test')
         except DeliveredHistoryError:
@@ -123,6 +152,7 @@ async def exercise(root, mode):
     elif mode == 'context-forget':
         proposal = journal.read(event_type='memory.proposed')[0]
         context_vault.erase_item(proposal.event.payload['content']['content_id'])
+        assert store.reconcile_erasure() == {'examined':1, 'erased':1, 'unresolved':0}
         try:
             store.resolve(history.event.event_id, subject='user:test')
         except DeliveredHistoryError:
@@ -137,10 +167,22 @@ async def exercise(root, mode):
             pass
         else:
             raise AssertionError('expired history reconstructed')
+    elif mode == 'forged-maintenance':
+        survivor = outbox.vault.put_json({'value':'foreign-owned survivor'}, subject='user:foreign',
+            purpose='message.delivered-history', sensitivity=Sensitivity.PRIVATE)
+        forged = _thaw_json(history.event.payload)
+        forged['content'] = survivor.to_event_payload()
+        journal.append(EventEnvelope(event_id=history.event.event_id + ':forged',
+            event_type='message.delivery_history', source='alive.delivered-history',
+            actor='system:alive-history', subject='user:test', sensitivity=Sensitivity.PRIVATE,
+            causation_id=history.event.causation_id, expires_at=history.event.expires_at, payload=forged))
+        assert store.reconcile_erasure() == {'examined':2, 'erased':0, 'unresolved':1}
+        assert outbox.vault.resolve_json(survivor.content_id, expected_subject='user:foreign')['value'] == 'foreign-owned survivor'
     assert not journal.read(event_type='preference.observed')
 
 async def main(root):
-    for mode in ('unchanged','expiry','explicit-forget','revoke','inbound-only','archive-expiry','context-forget'):
+    for mode in ('unchanged','expiry','explicit-forget','revoke','inbound-only','archive-expiry','context-forget',
+                 'maintenance-forget','expiry-maintenance','startup-forget','runtime-maintenance-forget','forged-maintenance'):
         await exercise(root / mode, mode)
 
 if __name__ == '__main__':

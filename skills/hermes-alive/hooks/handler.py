@@ -204,13 +204,18 @@ def _recover_kernel_state() -> None:
             if changed or result.erasures_resumed or result.expired_content_erased:
                 logger.info(
                     "Alive kernel recovery target=%s final=%s decisions=%s "
-                    "erasures=%s expired=%s",
+                    "erasures=%s expired=%s history_erased=%s history_unresolved=%s",
                     result.target_sequence,
                     result.final_sequence,
                     changed,
                     result.erasures_resumed,
                     result.expired_content_erased,
+                    result.history_derivatives_erased,
+                    result.history_derivatives_unresolved,
                 )
+                if result.history_derivatives_unresolved:
+                    logger.error('Alive history erasure dependencies require operator attention: %s',
+                                 result.history_derivatives_unresolved)
     except Exception:
         # Recovery is side-effect free outside Alive-owned local state and may
         # not make the legacy watcher unavailable. The error remains visible.

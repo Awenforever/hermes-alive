@@ -6,6 +6,13 @@ Last reviewed: 2026-10-14
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0100 adds metadata-only history erasure to existing local retention maintenance
+and startup recovery, not just later reads. Signed ownership/storage checks guard
+deletion, and unresolved dependencies remain visible. Tests cover absent readers,
+separate context storage, backups and repeated startup. Periodic/privacy-command
+integration, transitive copies, external storage and race/large-history behavior
+still need qualification; startup alone is not universal timely forgetting.
+
 ADR-0099 connects exact, canonically delivery-linked history under prior outbound
 consent to feedback snapshots after executable expiry. Independent history cannot
 grant resend or learning permission. Fixed action/context vault dependencies cover

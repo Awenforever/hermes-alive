@@ -325,7 +325,12 @@ def resume_retention_maintenance(shared_dir: str | Path) -> dict[str, int]:
     # converge on startup: content is erased and logical memories are retracted.
     _memory.project_new()
     expired = projection.content_vault.erase_expired(now=datetime.now(timezone.utc))
+    from .delivered_history import DeliveredHistoryStore
+    history = DeliveredHistoryStore(projection.journal, content_vault=projection.content_vault,
+        context_vault=_memory.content_vault).reconcile_erasure()
     return {
         "erasures_resumed": resumed,
         "expired_erased": expired.newly_erased,
+        "history_derivatives_erased": history['erased'],
+        "history_derivatives_unresolved": history['unresolved'],
     }

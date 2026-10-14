@@ -220,3 +220,49 @@ class DeliveredHistoryStore:
         if self.journal.get(event_id) is None:
             return None
         return self.resolve(event_id, subject=subject, clearance=clearance)
+
+    def reconcile_erasure(self, *, subject=None):
+        """Operator-owned metadata sweep; never decrypt or recreate old content.
+
+        Walk all relevant history, not a latest-N window. Verify ownership and
+        canonical signed history before allowing a dependency to erase its copy.
+        Broken locators/integrity remain visible, never guessed or ignored.
+        """
+        report = {'examined':0, 'erased':0, 'unresolved':0}
+        for record in self.journal.iter_reverse(event_types=('message.delivery_history',), subject=subject):
+            report['examined'] += 1
+            try:
+                if record.event.source != 'alive.delivered-history' or record.event.actor != 'system:alive-history':
+                    raise DeliveredHistoryError('history producer unavailable')
+                payload = _thaw_json(record.event.payload)
+                signature = payload.pop('integrity_authenticator', None)
+                if not self.protector.verify_json(self.NAMESPACE, payload, signature):
+                    raise DeliveredHistoryError('history integrity unavailable')
+                outcome = self.journal.get(payload['delivery_outcome_event_id'])
+                attempt = self.journal.get('action.attempt:' + payload['attempt_id'])
+                receipt = self.journal.get(payload['delivery_event_id'])
+                if (attempt is None or receipt is None or outcome is None
+                        or attempt.event.subject != record.event.subject
+                        or receipt.event.subject != record.event.subject
+                        or record.event.causation_id != outcome.event.event_id
+                        or self._event_id(attempt, receipt) != record.event.event_id
+                        or payload['execution_authority_granted'] is not False
+                        or payload['learning_authority_granted'] is not False):
+                    raise DeliveredHistoryError('history scope unavailable')
+                ref = ContentReference.from_event_payload(payload['content'])
+                with closing(self.vault._connect()) as connection:
+                    row = connection.execute('SELECT * FROM content_items WHERE content_id=?', (ref.content_id,)).fetchone()
+                if row is None:
+                    # Erasure resumption/backup completion is handled by the
+                    # vault maintenance, not by reconstructing a missing copy.
+                    continue
+                if (row['subject'] != record.event.subject or row['purpose'] != 'message.delivered-history'
+                        or self.vault._reference(row) != ref
+                        or ref.sensitivity != record.event.sensitivity
+                        or ref.retention_until != record.event.expires_at):
+                    raise DeliveredHistoryError('history storage scope unavailable')
+                if self._check_dependencies(payload['dependencies'], record.event.subject):
+                    report['erased'] += self.vault.erase_item(ref.content_id).newly_erased
+            except Exception:
+                report['unresolved'] += 1
+        return report

@@ -30,14 +30,14 @@ def response(value):
         message=SimpleNamespace(content=json.dumps(value)))])
 
 
-async def scenario(root, mode, custom_context=False, *, transport_route=None, return_ready=False):
-    journal = ExperienceJournal(root / 'journal.sqlite3')
+async def scenario(root, mode, custom_context=False, *, transport_route=None, return_ready=False, runtime_layout=False):
+    journal = ExperienceJournal(root / ('experience.sqlite3' if runtime_layout else 'journal.sqlite3'))
     owner = 'user:test'
     reader = DiscoveryOpportunityIngestor(journal)
     source = reader.ingest(DiscoveryCandidate(source='synthetic-public-fixture', title='Repair recording',
         summary='Free repair recording. Notice unverified.', url='https://example.invalid/repair',
         observed_at=datetime.now(timezone.utc)), subject=owner)
-    context_vault = ContentVault(root / 'separate-profile-vault') if custom_context else None
+    context_vault = reader.vault if runtime_layout else ContentVault(root / 'separate-profile-vault') if custom_context else None
     memory = MemoryProjection(journal, content_vault=context_vault)
     inbound = EventEnvelope(event_type='conversation.inbound', source='synthetic', actor=owner,
         subject=owner, payload={'synthetic': True})

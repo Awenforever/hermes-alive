@@ -16,6 +16,7 @@ from .consolidation import ConsolidationPolicyProjection
 from .content_vault import ContentVault
 from .deliberation_store import DeliberationProjection
 from .dispatch_outbox import DispatchOutbox
+from .delivered_history import DeliveredHistoryStore
 from .event_store import ExperienceJournal
 from .exploration_store import ExplorationProjection
 from .memory import MemoryProjection
@@ -49,6 +50,8 @@ class KernelRecoveryReport:
     dispatch_outcomes_reconciled: int
     started_at: datetime
     completed_at: datetime
+    history_derivatives_erased: int = 0
+    history_derivatives_unresolved: int = 0
 
 
 class KernelRecoveryError(RuntimeError):
@@ -164,6 +167,7 @@ class KernelRecoverySupervisor:
             evidence_after = outbox.evidence_checkpoint()
             dispatches = outbox.reconcile(now=started, recovering=True)
             dispatch_outcomes = outbox.reconcile_outcomes()
+            history = DeliveredHistoryStore(journal, content_vault=vault, context_vault=vault).reconcile_erasure()
             completed = datetime.now(timezone.utc)
             return KernelRecoveryReport(
                 target_sequence=target,
@@ -178,6 +182,8 @@ class KernelRecoverySupervisor:
                 dispatch_outcomes_reconciled=dispatch_outcomes,
                 started_at=started,
                 completed_at=completed,
+                history_derivatives_erased=history['erased'],
+                history_derivatives_unresolved=history['unresolved'],
             )
 
 
