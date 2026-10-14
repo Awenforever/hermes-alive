@@ -6,6 +6,14 @@ Last reviewed: 2026-10-14
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0108 replaces the synthetic pre-pinned routing shortcut with actual receiver
+ownership, route matching, served-profile checks and home resolution. Actual
+scoped auth uses the transport's grant, not the runtime destination's allowlist;
+an unserved route rejects without fallback. The first harness auth failure exposed
+missing gateway multiplex-mode bootstrap and is preserved. Receiver/source data
+remain synthetic, full session/transport/lifecycle proof is outstanding, and the
+real Alive observer still does not consume experimental quote metadata.
+
 ADR-0107 finds actual profile-manager separation breaks the instance-local
 handoff. A task-private, runtime-home-bound research handoff restores scoped SDK
 delivery without a global identity pool or core patch. Actual loop timers and
