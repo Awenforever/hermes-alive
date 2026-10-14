@@ -2,7 +2,7 @@
 cf444ad0788f9ab925b944e4668d974fb8dc36161d3bdc8d9963b6a5021dd53f  ./README.md
 15aa69e768b45e17d71ff22155150fac4d0925ba172748432c5c8c307985e1bb  ./README_CN.md
 a3ab6cbfada2ab9a7e9e0693d376d354563e3e50f4b368f6c45e3cfa7773ba35  ./SKILL.md
-f43e6ee84079989154749cd9e6d965bf6b6887a60743bb2cf1e9e17f39a54485  ./docs/ALIVE_KERNEL_PLAN.md
+f20f03584b1b55e379db04e79a0f07c0ac0d1695826b6c4eb0d3c02064c14d93  ./docs/ALIVE_KERNEL_PLAN.md
 97ab9e52cbfbc23d98822e39ecd598be1bb7ccd78395cf59aca7929a3ed98d5d  ./docs/ARCHITECTURE.md
 60a2ffe527b49c1598e8275b205985b63653270b499cdb29a2f7ab672e88fc0e  ./docs/DATA_AND_PRIVACY.md
 858c8d0089d0e8be7fbf40fe70fe162918edc43c1aa264f50fe6f07e0ce7ab1f  ./docs/DEVELOPMENT_MEMORANDUM.md
@@ -132,6 +132,7 @@ acf107b9fee2bddbbf471ca3eeb27f1db418b807fedac005077d61191f95fa6a  ./docs/adr/011
 ba1b3eebebd7eb24c14641743a8b5ce9653e9e02a068d436138de1c4d513d781  ./docs/adr/0115-explicit-natural-expression-delegation.md
 6676ff1b066931cb6a1c0db1acf1845aa705cc6dac7e18a1912da5a91e1643a1  ./docs/adr/0116-composed-runtime-to-hermes-command.md
 7c32f7b5990d3da169e5790915cafd0b2b2f41ca95e0be26d79478c769023635  ./docs/adr/0117-reported-message-identities-not-delivery.md
+a24efa8862ee273d7b6ea6ea56aaa3b30d38e8711677d37d174438a3793eafc3  ./docs/adr/0118-stock-weixin-receipt-ambiguity.md
 4d6108e5f522390a4f9008265a2681771192c500c4c34a02179e24a238b55332  ./docs/evidence/deepseek-seed-20261012.json
 40941e141314d626c51ad4d22ccc19c76dcf4b770a85daa0881d135089fb75ea  ./docs/evidence/qwen-route-20261012.json
 460cffae94c5494e13515ab9c2dc42331e9fd14260bf4182086d5f3bd9e19114  ./hooks/HOOK.yaml
@@ -371,6 +372,7 @@ b9938f00c5a88a63bdd0e8c5e9b577c7897a444fe2bea29b09ad3abd9ec11e6f  ./tests/run_ho
 b1db2fd958bb066b7671720584661c1062b191a3eda35c13dc3b7e7120ba145e  ./tests/run_host_transport_command_probe.py
 f5b14530cf447597b855b63ca70d1e90491ded69c78d313005b7966ba81061e1  ./tests/run_host_transport_registry_probe.py
 783ac2a9d433950791633eaf830165d7caf01a6335e448c56ffa615fe627f68c  ./tests/run_host_transport_source_contract.py
+bd0b327903db3d1d4b2d53364346d04d01c4474436f4f36b4e9eb02412863c1d  ./tests/run_host_weixin_send_receipt_probe.py
 7d41cb9f1fb2a5b28ee28eee309e4f0c69f00fa3eccb2944321d056fae0b4aea  ./tests/run_isolated_enforcement.py
 78da2f442f4217e4808e4d4d95a01b7e29fd3cd1d83e5ad393c29ddcc8c3696a  ./tests/run_joint_shadow_replay.py
 67cc8bb65bf88310148a9887bc3f41f049e211da6e4e220a7a592b14ec5d805c  ./tests/run_legacy_dream_retirement.py

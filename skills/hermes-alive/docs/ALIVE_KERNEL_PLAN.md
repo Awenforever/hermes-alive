@@ -33,6 +33,14 @@ core/queue edits or production changes follow from this permission.
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0118 runs the actual stock Weixin constructor/send loop with only chunk IO
+replaced. Seven successful chunk acknowledgements yield only the last client ID;
+zero-effect failure and failure after a prior effect expose the same error fields;
+cancellation can follow an accepted chunk. Never infer no effect/safe retry from
+failure or promote final IDs into full delivery/quote proof. Next qualify an owned
+send-boundary observer without touching FIFO/token/retry ownership. The probe
+auto-removes its test container and reuses the retained snapshot after cleanup.
+
 ADR-0117 measures the actual generic chunk helper returning only the last message
 ID. CLI observations now retain only scoped anonymous report references, explicitly
 not complete bubble inventory, delivery proof or canonical quote targets. Windows
