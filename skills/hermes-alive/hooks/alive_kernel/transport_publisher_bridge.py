@@ -48,20 +48,23 @@ class TransportPublisherBridge:
     def __init__(self, outbox):
         self.outbox, self.journal, self.protector = outbox, outbox.journal, outbox.protector
 
-    def _append(self, *, event_id, kind, cause, subject, sensitivity, payload, now):
+    def _append(self, *, event_id, kind, cause, subject, sensitivity, payload, now, precondition=None):
         payload = dict(payload)
         payload['integrity_authenticator'] = self.protector.authenticate_json(kind + '.v1', payload)
-        existing = self.journal.get(event_id)
-        if existing is not None:
-            if (existing.event.event_type != kind or existing.event.source != 'alive.transport.publisher'
-                    or existing.event.actor != 'system:alive-transport' or existing.event.subject != subject
-                    or existing.event.sensitivity != sensitivity or existing.event.causation_id != cause
-                    or _thaw_json(existing.event.payload) != payload):
-                raise EventConflictError('transport occurrence differs from canonical evidence')
-            return existing
-        return self.journal.append(EventEnvelope(event_id=event_id, event_type=kind,
-            source='alive.transport.publisher', actor='system:alive-transport', subject=subject,
-            sensitivity=sensitivity, causation_id=cause, occurred_at=now, observed_at=now, payload=payload))
+        def factory(connection):
+            row = connection.execute('SELECT sequence,canonical_json,integrity_hash FROM experience_events WHERE event_id=?',(event_id,)).fetchone()
+            if row is not None:
+                existing = self.journal._record(row)
+                if (existing.event.event_type != kind or existing.event.source != 'alive.transport.publisher'
+                        or existing.event.actor != 'system:alive-transport' or existing.event.subject != subject
+                        or existing.event.sensitivity != sensitivity or existing.event.causation_id != cause
+                        or _thaw_json(existing.event.payload) != payload):
+                    raise EventConflictError('transport occurrence differs from canonical evidence')
+                return existing.event
+            return EventEnvelope(event_id=event_id,event_type=kind,
+                source='alive.transport.publisher',actor='system:alive-transport',subject=subject,
+                sensitivity=sensitivity,causation_id=cause,occurred_at=now,observed_at=now,payload=payload)
+        return self.journal.append(factory,precondition=precondition)
 
     def bind(self, execution, publisher, *, now=None):
         """Bind an already-started/live launch; never grant another send."""
@@ -69,8 +72,12 @@ class TransportPublisherBridge:
         self.outbox.validate_execution_for_launch(execution, now=current)
         lease = self.outbox._channel_observation_owner(execution, current)
         publisher.validate(execution.route)
+        epoch = publisher.adapter._hermes_transport_receipts_v1.publisher_epoch
+        if not _digest(epoch):
+            raise DispatchOutboxError('qualified publisher ledger epoch required')
         payload = {'dispatch_id':lease.dispatch_id, 'attempt_id':lease.attempt_id,
             'start_event_id':execution.start_event_id, 'publisher_source_digest':publisher.source_digest,
+            'publisher_epoch':epoch,
             'subject':lease.subject, 'sensitivity':lease.sensitivity.value,
             'account_reference':self.protector.authenticate_json('transport.publisher.account.v1', str(publisher.adapter._account_id)),
             'route_reference':self.protector.authenticate_json('transport.publisher.route.v1', execution.route),
@@ -80,13 +87,7 @@ class TransportPublisherBridge:
             kind='transport.publisher.bound', cause=execution.start_event_id, subject=lease.subject,
             sensitivity=lease.sensitivity, payload=payload, now=current)
 
-    def ingest(self, binding_event_id, *, publisher, route, after_sequence=0, limit=128, now=None):
-        """Read bounded reports under a historical binding, including late ACKs.
-
-        Does not require a still-live send lease and never updates dispatch state.
-        Never interpret an empty page as absence of effects or completed delivery.
-        """
-        current = self.outbox._utc(now)
+    def _qualified_binding(self, binding_event_id, publisher, route, current):
         record = self.journal.get(binding_event_id)
         if record is None:
             raise DispatchOutboxError('canonical publisher binding required')
@@ -105,11 +106,27 @@ class TransportPublisherBridge:
                 or current < event.observed_at):
             raise DispatchOutboxError('publisher binding provenance or scope mismatch')
         store = publisher.validate(route)
+        if not _digest(payload.get('publisher_epoch')) or payload['publisher_epoch'] != store.publisher_epoch:
+            raise DispatchOutboxError('publisher ledger epoch changed; explicit reconciliation required')
+        return record, payload, store
+
+    def ingest(self, binding_event_id, *, publisher, route, after_sequence=0, limit=128, now=None):
+        """Read bounded reports under a historical binding, including late ACKs.
+
+        Does not require a still-live send lease and never updates dispatch state.
+        Never interpret an empty page as absence of effects or completed delivery.
+        """
+        current = self.outbox._utc(now)
+        record, payload, store = self._qualified_binding(binding_event_id,publisher,route,current)
+        event = record.event
         if type(after_sequence) is not int or after_sequence < 0 or type(limit) is not int or not 1 <= limit <= 1024:
             raise DispatchOutboxError('bounded receipt page required')
         page = store.read_receipts(str(publisher.adapter._account_id), route['chat_id'],
             payload['transport_binding'], after_sequence=after_sequence, limit=limit)
         if (page.get('version') != 1 or type(page.get('available')) is not bool
+                or page.get('publisher_epoch') != payload['publisher_epoch']
+                or type(page.get('high_water_sequence')) is not int
+                or page['high_water_sequence'] < after_sequence
                 or any(page.get(key) is not False for key in ('complete_inventory_proven',
                     'external_delivery_proven','canonical_quote_mapping_proven'))
                 or not isinstance(page.get('records'), list) or len(page['records']) > limit):
@@ -118,6 +135,7 @@ class TransportPublisherBridge:
         for row in page['records']:
             if (set(row) != {'seq','occurrence_id','client_reference','phase','observed_at'}
                     or type(row['seq']) is not int or row['seq'] <= previous
+                    or row['seq'] > page['high_water_sequence']
                     or not _digest(row['occurrence_id']) or not _digest(row['client_reference'])
                     or row['phase'] not in ('queued','acknowledged')
                     or type(row['observed_at']) not in (int,float) or not math.isfinite(row['observed_at'])
@@ -130,6 +148,7 @@ class TransportPublisherBridge:
         results = []
         for row in checked:
             observation = {'binding_event_id':binding_event_id,
+                'publisher_epoch':payload['publisher_epoch'],
                 'dispatch_id':payload['dispatch_id'], 'attempt_id':payload['attempt_id'],
                 'start_event_id':payload['start_event_id'], 'publisher_source_digest':publisher.source_digest,
                 'publisher_sequence':row['seq'], 'publisher_occurrence':row['occurrence_id'],

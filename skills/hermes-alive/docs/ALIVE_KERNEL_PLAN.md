@@ -33,6 +33,27 @@ core/queue edits or production changes follow from this permission.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+ADR-0127 qualifies four composed failure cases in Windows/fake and Linux/actual
+SDK synthetic IO: original error, caller cancellation after queue acceptance,
+publication-table failure after IO and user pause immediately before launch.
+Original error/result/cancellation survive, consumed starts do not resend and
+pause blocks invocation. Caller cancellation does NOT withdraw host FIFO entries.
+Next add authorized host-owned outstanding-submission cancellation/reconciliation
+for genuine user pause/revocation, without Alive editing FIFO or promising recall
+of in-flight/acknowledged messages. Keep consumer/writer/finality/feedback and full
+longitudinal, portable and production scope; no activation follows from these tests.
+
+ADR-0126 adds bounded durable consumer checkpoints after authenticated observation
+ingestion, atomic unchanged-head checking and writer-lock replay. Windows and
+Linux actual-SDK synthetic IO verify interruption/reopen, late ACK, unhealthy
+cursor freeze, concurrent-reader conflict/recovery and checkpoint tamper refusal,
+without sends or outcomes. Enhance development commit `95138df` exposes ledger
+epoch/snapshot high-water to refuse reconstruction/observable rollback. This is
+not full restore detection or a background subscriber; qualify lifetime, adverse
+send paths and performance, then autonomous scheduling/finality/feedback and
+longitudinal usefulness. Reader/state migration and production acceptance remain
+open; no production change or enhance release follows from these tests.
+
 ADR-0125 binds the qualified enhance publisher to a canonical Alive attempt/start
 and composes prepared execution with once-only queued submission and local report
 ingestion. Windows/fake and Linux/actual-SDK synthetic IO prove replay/scope,
