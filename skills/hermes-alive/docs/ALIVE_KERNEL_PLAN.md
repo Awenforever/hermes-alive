@@ -33,6 +33,14 @@ core/queue edits or production changes follow from this permission.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+ADR-0122 connects prepared planning/expression/authorization to an explicitly
+qualified stock-adapter call with closed trace publication in finally. Success,
+error/cancel and publication failure pass Windows/fake IO and Linux/actual SDK
+synthetic IO; no publication failure resends or replaces an original result.
+The adapter owns FIFO/tokens/retries, and no canonical delivery is inferred.
+Shared-worker ownership, writer shutdown/performance and production activation
+remain unqualified; continue them and canonical history/feedback before acceptance.
+
 ADR-0121 persists closed local chunk traces on an existing authenticated attempt/
 start, with owner/route/nonce binding, anonymous counts/references, interruption/
 scope flags and exact replay. Windows and isolated Linux publication/CLI regression
