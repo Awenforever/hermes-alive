@@ -33,6 +33,14 @@ core/queue edits or production changes follow from this permission.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+ADR-0133 adds bounded authenticated/erasable prior wording to opportunity
+interpretation and binds its snapshot across await/recovery. Windows and isolated
+Linux synthetic tests verify context inclusion, recovery and privacy boundaries;
+existing Windows expression regression passes. Generated wording is explicitly
+not delivery, preference or authority. Real-model novelty/usefulness is unproven;
+next compare unchanged/new/corrected evidence across fresh operations, then
+trustworthy pending/delivery/feedback context and unresolved-intent controls.
+
 ADR-0132 carries canonical actual renderer origin through the publisher seam,
 checking owner/selection/exact body after fresh launch validation. Immediate and
 deferred host-defined chunks retain that model despite conflicting foreground

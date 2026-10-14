@@ -302,6 +302,7 @@ class ExperienceJournal:
         subject: str | None = None,
         batch_size: int = 500,
         max_records: int | None = None,
+        before_sequence: int | None = None,
     ) -> Iterator[JournalRecord]:
         """Read newest records first through a bounded, filtered cursor."""
 
@@ -315,7 +316,9 @@ class ExperienceJournal:
         normalized_subject = str(subject).strip() if subject is not None else None
         if subject is not None and not normalized_subject:
             raise ValueError("subject must not be empty")
-        before: int | None = None
+        if before_sequence is not None and (type(before_sequence) is not int or before_sequence < 1):
+            raise ValueError("before_sequence must be a positive integer")
+        before: int | None = before_sequence
         yielded = 0
         while max_records is None or yielded < max_records:
             clauses: list[str] = []
