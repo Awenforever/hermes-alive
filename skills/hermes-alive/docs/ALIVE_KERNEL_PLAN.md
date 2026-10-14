@@ -33,6 +33,16 @@ core/queue edits or production changes follow from this permission.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+ADR-0130 composes reconciliation/current user policy with planning/expression,
+authorization and once-only publisher submission in a host-invoked cycle. New exact
+owner/attempt lease selection avoids taking unrelated eligible work; old cadence
+regression passes. Windows and Linux actual-SDK synthetic IO prove fresh-operation
+composition, reopen/no extra provider spend or send, shadow/no attempt, silence and
+pause/withdrawal. Synthetic positive reviews are NOT real-model semantic or utility
+qualification. Next lifecycle/cadence/operation ownership and fresh real-model
+multi-cycle scenarios, then attributed feedback/longitudinal and portable production
+gates; current publisher remains Weixin-specific and production is unchanged.
+
 ADR-0129 composes bounded owner binding discovery, trusted publisher resolution,
 current-policy revalidation, host withdrawal and durable observation consumption
 in one explicit host tick. Windows and Linux actual-SDK synthetic IO prove bad-row

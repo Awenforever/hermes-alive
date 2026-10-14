@@ -1045,7 +1045,12 @@ class DispatchOutbox:
         worker_id: str,
         now: datetime | None = None,
         lease_ttl: timedelta = timedelta(seconds=10),
+        subject: str | None = None,
+        attempt_id: str | None = None,
     ) -> DispatchLease | None:
+        for label,value in (('subject',subject),('attempt',attempt_id)):
+            if value is not None and (not isinstance(value,str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}',value)):
+                raise DispatchOutboxError('invalid scoped acquisition ' + label)
         current = self._utc(now)
         # A start event is the source of truth during the crash gap before the
         # operational row can be updated. Absorb it before considering reclaim.
@@ -1098,12 +1103,14 @@ class DispatchOutbox:
                     """
                     SELECT * FROM dispatch_outbox_v3
                     WHERE execute_by>?
+                      AND (? IS NULL OR subject=?)
+                      AND (? IS NULL OR attempt_id=?)
                       AND ((state='pending' AND available_at<=?)
                            OR (state='leased' AND lease_until<=?))
                     ORDER BY available_at, created_at, dispatch_id
                     LIMIT 1
                     """,
-                    (current.isoformat(), current.isoformat(), current.isoformat()),
+                    (current.isoformat(),subject,subject,attempt_id,attempt_id,current.isoformat(),current.isoformat()),
                 ).fetchone()
                 if row is None:
                     connection.execute("COMMIT")
