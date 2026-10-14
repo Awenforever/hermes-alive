@@ -6,6 +6,14 @@ Last reviewed: 2026-10-14
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0097 finds that delayed feedback depends on an approximately one-hour
+executable copy, while expired vault plaintext was still readable before erasure
+maintenance. The read boundary now denies before decryption, without extending
+retention. Next separate short-lived permission from consented exact delivered
+history and feedback/learning authority; do not call a CLI report delivery or
+archive outbound data under inbound-only consent. Authenticated expiry metadata,
+host-clock behavior and physical/derived-copy forgetting still need qualification.
+
 ADR-0096 tracks the enlarged execution regression's genuine concurrency failure.
 Two separately read discovery checkpoints can mistake another worker's completed
 prefix for lost evidence. Controlled thread scheduling reproduces it before the

@@ -18,6 +18,7 @@ sys.path.insert(0, str(ROOT / "hooks"))
 
 from alive_kernel.content_vault import (  # noqa: E402
     ContentErasedError,
+    ContentExpiredError,
     ContentVault,
 )
 from alive_kernel.events import Sensitivity  # noqa: E402
@@ -148,6 +149,17 @@ def main() -> None:
             purpose="memory.episode",
             retention_until=datetime.now(timezone.utc) - timedelta(seconds=1),
         )
+        original_decryptor = resumed._aesgcm
+        def forbidden_decryptor(_key):
+            raise AssertionError('expired content reached decryption')
+        resumed._aesgcm = forbidden_decryptor
+        try:
+            resumed.resolve_json(expired.content_id)
+            raise AssertionError('expired plaintext was readable before maintenance')
+        except ContentExpiredError:
+            pass
+        finally:
+            resumed._aesgcm = original_decryptor
         expiry_result = resumed.erase_expired()
         require(expiry_result.newly_erased == 1, "retention erasure failed")
         try:

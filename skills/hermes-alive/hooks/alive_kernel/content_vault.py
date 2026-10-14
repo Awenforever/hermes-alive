@@ -56,6 +56,10 @@ class ContentErasedError(ContentUnavailableError):
     """The reference was deliberately erased and must not be reconstructed."""
 
 
+class ContentExpiredError(ContentUnavailableError):
+    """The retention window closed; physical maintenance may still be pending."""
+
+
 class ContentIntegrityError(ContentVaultError):
     """Authenticated decryption or digest verification failed."""
 
@@ -517,6 +521,17 @@ class ContentVault:
             ):
                 self._audit(connection, content_id, "resolve", "metadata_mismatch")
                 raise ContentIntegrityError("content reference metadata mismatch")
+            if row['retention_until'] is not None:
+                try:
+                    expiry = _utc(datetime.fromisoformat(row['retention_until']), 'retention_until')
+                except (TypeError, ValueError):
+                    self._audit(connection, content_id, 'resolve', 'invalid_retention')
+                    raise ContentIntegrityError('content retention metadata is invalid') from None
+                if expiry <= datetime.now(timezone.utc):
+                    # Deny before decrypting. A delayed sweeper or restored backup
+                    # must not silently extend the authorized disclosure window.
+                    self._audit(connection, content_id, 'resolve', 'expired')
+                    raise ContentExpiredError('content_unavailable_expired')
             aad = _metadata_aad(
                 content_id=str(row["content_id"]),
                 subject=str(row["subject"]),

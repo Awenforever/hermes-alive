@@ -140,6 +140,7 @@ from .semantic_review import (
 )
 from .content_vault import (
     ContentErasedError,
+    ContentExpiredError,
     ContentIntegrityError,
     ContentReference,
     ContentUnavailableError,
@@ -356,6 +357,7 @@ __all__ = [
     "CognitionCycleError",
     "CognitionCycleResult",
     "ContentErasedError",
+    "ContentExpiredError",
     "ContentIntegrityError",
     "ContentReference",
     "ContentStatus",

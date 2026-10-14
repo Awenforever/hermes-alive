@@ -194,7 +194,9 @@ def main() -> int:
             valid_until=datetime.now(timezone.utc) - timedelta(hours=1),
         )
         memory.apply(memory.append_proposal(old, actor="user:test"))
-        assert get_memory(memory, old.proposal_id) is not None
+        expired_record = get_memory(memory, old.proposal_id)
+        assert expired_record is not None
+        assert expired_record.content_status is ContentStatus.EXPIRED and expired_record.value is None
         assert memory.retrieve(
             subject="user:test",
             predicate="context.temporary",

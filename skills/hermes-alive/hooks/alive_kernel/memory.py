@@ -16,6 +16,7 @@ from uuid import uuid4
 
 from .content_vault import (
     ContentErasedError,
+    ContentExpiredError,
     ContentIntegrityError,
     ContentReference,
     ContentUnavailableError,
@@ -82,6 +83,7 @@ class MemoryReview(StrEnum):
 
 class ContentStatus(StrEnum):
     AVAILABLE = "available"
+    EXPIRED = "expired"
     ERASED = "erased"
     MISSING = "missing"
     INTEGRITY_ERROR = "integrity_error"
@@ -852,7 +854,9 @@ class MemoryProjection:
                         raise ContentIntegrityError("memory content digest mismatch")
                     if proposal.kind is MemoryKind.COMMITMENT:
                         _validate_commitment(resolved_value)
-                except ContentErasedError:
+                except (ContentErasedError, ContentExpiredError):
+                    # Preserve structural history without retrieving expired or
+                    # erased plaintext, including during projection replay.
                     pass
                 except ContentUnavailableError:
                     decision = self._decide(
@@ -1361,6 +1365,9 @@ class MemoryProjection:
         except ContentErasedError:
             value = None
             content_status = ContentStatus.ERASED
+        except ContentExpiredError:
+            value = None
+            content_status = ContentStatus.EXPIRED
         except ContentUnavailableError:
             value = None
             content_status = ContentStatus.MISSING
