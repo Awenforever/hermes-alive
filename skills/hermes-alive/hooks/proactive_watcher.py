@@ -218,11 +218,17 @@ class ProactivePlatformWatcher:
             self._retention_maintenance_task = task
         try:
             report = await asyncio.shield(task)
-            self._retention_maintenance_ok = not bool(report.get('history_derivatives_unresolved', 0))
-            if report != self._retention_maintenance_report or any(report.values()):
+            self._retention_maintenance_ok = not bool(report.get('history_derivatives_unresolved', 0)
+                or report.get('maintenance_busy', 0))
+            if report.get('maintenance_busy', 0):
+                # Retry observation, not the running worker, promptly after lock
+                # release rather than treating a busy report as completed upkeep.
+                self._retention_maintenance_at = None
+            changed_content = any(value for key, value in report.items() if key != 'maintenance_busy')
+            if report != self._retention_maintenance_report or changed_content:
                 self._log('retention_maintenance', **report)
             self._retention_maintenance_report = dict(report)
-            if not self._retention_maintenance_ok:
+            if report.get('history_derivatives_unresolved', 0):
                 logger.error('Alive proactive work paused: unresolved history erasure dependencies')
         except asyncio.CancelledError:
             raise

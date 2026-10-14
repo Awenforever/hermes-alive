@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 import tempfile
 import threading
+import subprocess
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
@@ -116,6 +117,52 @@ async def exercise(root):
     else:
         raise AssertionError('periodic watcher did not physically erase expired fixture')
     assert not vault.explicit_erasure_recorded(expired.content_id)
+    # Two watcher objects must coordinate through the actual recovery lock,
+    # not through a Python task field that is lost during watcher replacement.
+    started.clear(); released.clear(); finished.clear(); count[0] = 0
+    with patch.object(module, 'BASE', real), patch.object(retention,
+            '_resume_retention_maintenance_locked', blocked):
+        old = Disabled({}, None)
+        old_wait = asyncio.create_task(old._maintain_retention())
+        assert await asyncio.to_thread(started.wait, 5)
+        owned = old._retention_maintenance_task
+        owned.cancel()
+        try: await old_wait
+        except asyncio.CancelledError: pass
+        new = NoAdapter({}, None)
+        reached.clear()
+        assert not await new.tick()
+        assert reached == [] and count[0] == 1
+        assert new._retention_maintenance_report == {'maintenance_busy':1}
+        released.set()
+        assert await asyncio.to_thread(finished.wait, 5)
+        # Real lock acquisition is authoritative; a busy observation can persist
+        # briefly after the test worker's own completion marker is written.
+        for _ in range(20):
+            if await new._maintain_retention(): break
+            await asyncio.sleep(.01)
+        else: raise AssertionError('replacement watcher did not recover after lock release')
+        assert count[0] == 2
+    # Presence of a lock file alone is never proof of a running owner.
+    assert (real / 'kernel/recovery.lock').is_file()
+    assert retention.resume_retention_maintenance(real).get('maintenance_busy', 0) == 0
+    # A separate process holds the same OS lock. Its live handle and handshake,
+    # not a PID/lock file alone, establish the precondition for busy rejection.
+    child_code = ("import sys; from pathlib import Path; sys.path.insert(0, sys.argv[1]); "
+        "from safe_io import file_lock\nwith file_lock(Path(sys.argv[2])):\n"
+        " print('LOCK_HELD', flush=True)\n sys.stdin.readline()\n")
+    child = subprocess.Popen([str(Path(sys.executable).absolute()), '-B', '-c', child_code,
+        str(HOOKS), str(real / 'kernel/recovery.lock')], stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+    try:
+        ready = await asyncio.wait_for(asyncio.to_thread(child.stdout.readline), timeout=5)
+        assert ready.strip() == 'LOCK_HELD' and child.poll() is None
+        assert retention.resume_retention_maintenance(real) == {'maintenance_busy':1}
+    finally:
+        child.communicate('\n', timeout=5)
+    assert child.returncode == 0
+    assert retention.resume_retention_maintenance(real).get('maintenance_busy', 0) == 0
 
 if __name__ == '__main__':
     with tempfile.TemporaryDirectory(prefix='alive-watcher-maintenance-') as directory:

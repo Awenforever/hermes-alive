@@ -6,6 +6,13 @@ Last reviewed: 2026-10-14
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0102 extends cleanup ownership across watcher replacement and startup recovery
+using their real shared OS lock. Busy is not completed maintenance or permission
+to send; lock-file presence and cancellation are not live/terminal evidence.
+Two-instance and separate-process tests cover controlled handoff. Actual installed
+gateway reload/kill/reboot, external locks/storage and full portability remain
+unqualified. No production restart/service/config change or real model call.
+
 ADR-0101 connects privacy maintenance to the running watcher before send gates
 and during interval waits, independently of proactive pause/cadence. Owned task
 shielding prevents cancellation-driven duplicate workers; unknown completion or
