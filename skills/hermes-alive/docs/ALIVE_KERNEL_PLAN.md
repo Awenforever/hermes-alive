@@ -33,6 +33,14 @@ core/queue edits or production changes follow from this permission.
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0119 adds a research-only owned chunk observer: identical delegation, no
+FIFO/token/retry ownership, own-task/route capture, anonymous bounded references,
+fail-open metadata and ownership-safe restoration. Windows contracts and actual
+Linux stock send loop with synthetic IO pass, retaining seven normal returns or
+one before partial failure/cancellation. No canonical delivery/history or live
+queue qualification follows. Next qualify shared/queued ownership and durable
+attempt-bound receipt publication, then feedback. Tests leave no containers.
+
 ADR-0118 runs the actual stock Weixin constructor/send loop with only chunk IO
 replaced. Seven successful chunk acknowledgements yield only the last client ID;
 zero-effect failure and failure after a prior effect expose the same error fields;
