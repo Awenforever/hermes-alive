@@ -31,7 +31,15 @@ Alive work, but its independent final acceptance/release cleanup is deferred unt
 Alive is complete. Record evidence and scope such fixes separately; no speculative
 core/queue edits or production changes follow from this permission.
 
-### Current finding: learned advice must retain its semantic evidence
+### Current integration milestone: delivery evidence and attributed feedback
+
+ADR-0121 persists closed local chunk traces on an existing authenticated attempt/
+start, with owner/route/nonce binding, anonymous counts/references, interruption/
+scope flags and exact replay. Windows and isolated Linux publication/CLI regression
+tests pass. These local traces cannot become canonical delivery results, complete
+inventory or preference evidence. Next wire a qualified producer lifecycle and
+queued ownership, then canonical delivered history and attributed feedback;
+retain scheduling/onboarding/model/longitudinal/portable production requirements.
 
 ADR-0120 reproduces/fixes late observer publication after unload during suspended
 IO and makes repeated close safe. Post-await active checks, explicit pending-close

@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 from pathlib import Path
 import secrets
+import re
 import sqlite3
 
 from .action_contract import ActionContractError, parse_action_contract
@@ -1447,19 +1448,8 @@ class DispatchOutbox:
                     "dispatch.launch.route.v1", self.host.resolve_route(binding))):
             raise DispatchOutboxError("launch content or route differs from authorization")
 
-    def record_cli_observation(
-        self, execution: DispatchExecution, *, stdout: str,
-        exit_code: int | None, now: datetime | None = None,
-    ) -> JournalRecord:
-        """Record a process report for an authenticated start, never acknowledge it.
-
-        This is local provenance of an observation, not a host delivery receipt.
-        Incomplete/error/skip reports cannot close the lease or train outcomes.
-        """
-        from .transport_receipts import classify_cli_report, reported_message_reference
-
-        report = classify_cli_report(stdout, exit_code)
-        current = self._utc(now)
+    def _channel_observation_owner(self, execution, current):
+        """Shared ownership gate for reports; never infer external effects."""
         lease = execution.lease
         if lease.capability != "hermes.channel.send":
             raise DispatchOutboxError("CLI send report requires a channel-send attempt")
@@ -1482,6 +1472,75 @@ class DispatchOutbox:
                     sensitivity=lease.sensitivity, generation=lease.generation)
                 or current < start.event.observed_at):
             raise DispatchOutboxError("CLI observation does not own an authenticated start")
+        return lease
+
+    def record_chunk_observation(self, execution, observer, *, now=None):
+        """Persist a closed local trace, NOT a delivery result or permission.
+
+        No body, raw IDs or token; incomplete coverage never becomes success.
+        Caller is the trusted host observer, not a model/remote JSON producer.
+        """
+        from .chunk_observation import OwnedChunkObserver
+        current = self._utc(now)
+        lease = self._channel_observation_owner(execution, current)
+        if (not isinstance(observer, OwnedChunkObserver) or not observer._entered
+                or not observer._closed or observer.active
+                or observer.attempt_binding != ('action.attempt:' + lease.attempt_id, execution.start_event_id)
+                or observer.subject != lease.subject
+                or observer.route != dict(execution.route)):
+            raise DispatchOutboxError('chunk observation is not closed or belongs to another owner/route')
+        rows = observer.observations
+        if (len(rows) > observer.limit or any(type(x.ordinal) is not int or x.ordinal != i
+                or not isinstance(x.scoped_client_reference, str)
+                or not re.fullmatch(r'[0-9a-f]{64}', x.scoped_client_reference)
+                for i, x in enumerate(rows, 1))
+                or any(type(x) is not int or x < 0 for x in (observer.failures, observer.cancellations))):
+            raise DispatchOutboxError('invalid bounded chunk observations')
+        flags = {name: getattr(observer, name) for name in ('closed_with_pending_calls',
+            'observation_failed', 'capacity_exceeded', 'unscoped_same_chat_calls', 'restoration_conflicted')}
+        if any(type(x) is not bool for x in flags.values()):
+            raise DispatchOutboxError('invalid chunk coverage flags')
+        payload = {'dispatch_id': lease.dispatch_id, 'attempt_id': lease.attempt_id,
+            'start_event_id': execution.start_event_id, 'lease_generation': lease.generation,
+            'scope': 'owned_task_text_chunk_normal_returns',
+            'references': [x.scoped_client_reference for x in rows],
+            'normal_return_count': len(rows), 'exception_count': observer.failures,
+            'cancellation_count': observer.cancellations, **flags,
+            'coverage_uncertain': any(flags.values()) or observer.failures > 0 or observer.cancellations > 0,
+            'trace_state': ('interrupted' if observer.closed_with_pending_calls or observer.cancellations
+                else 'scope_uncertain' if any(flags.values()) or observer.failures else 'closed'),
+            'complete_inventory_proven': False, 'external_delivery_proven': False,
+            'canonical_quote_target_proven': False, 'delivery_authority_granted': False}
+        payload['integrity_authenticator'] = self.protector.authenticate_json('transport.chunk.observation.v1', payload)
+        event_id = execution.start_event_id + ':chunk-observation'
+        existing = self.journal.get(event_id)
+        if existing is not None:
+            if (_thaw_json(existing.event.payload) != payload
+                    or existing.event.event_type != 'transport.chunk.observed'
+                    or existing.event.source != 'alive.dispatch.chunk.observation'
+                    or existing.event.actor != 'system:alive-dispatch'
+                    or existing.event.subject != lease.subject or existing.event.sensitivity != lease.sensitivity
+                    or existing.event.causation_id != execution.start_event_id):
+                raise EventConflictError('chunk observation already has different evidence')
+            return existing
+        return self.journal.append(EventEnvelope(event_id=event_id, event_type='transport.chunk.observed',
+            source='alive.dispatch.chunk.observation', actor='system:alive-dispatch',
+            subject=lease.subject, sensitivity=lease.sensitivity,
+            causation_id=execution.start_event_id, observed_at=current, occurred_at=current, payload=payload))
+
+    def record_cli_observation(
+        self, execution: DispatchExecution, *, stdout: str,
+        exit_code: int | None, now: datetime | None = None,
+    ) -> JournalRecord:
+        """Record a process report for an authenticated start, never acknowledge it.
+
+        This is local provenance of an observation, not a host delivery receipt.
+        Incomplete/error/skip reports cannot close the lease or train outcomes.
+        """
+        from .transport_receipts import classify_cli_report, reported_message_reference
+        report = classify_cli_report(stdout, exit_code)
+        current = self._utc(now)
+        lease = self._channel_observation_owner(execution, current)
         payload = {**report.to_document(), "dispatch_id": lease.dispatch_id,
                    "attempt_id": lease.attempt_id, "start_event_id": execution.start_event_id,
                    "lease_generation": lease.generation,

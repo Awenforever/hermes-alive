@@ -16,7 +16,8 @@ class ChunkReturnObservation:
 
 
 class OwnedChunkObserver:
-    def __init__(self, adapter, *, protector, subject, route, qualified=False, limit=128):
+    def __init__(self, adapter, *, protector, subject, route, qualified=False, limit=128,
+                 attempt_event_id=None, start_event_id=None):
         if qualified is not True or type(limit) is not int or not 1 <= limit <= 1024:
             raise ValueError('explicit operator qualification and bounded capacity required')
         if not isinstance(subject, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}', subject):
@@ -28,6 +29,12 @@ class OwnedChunkObserver:
             raise ValueError('exact operator route required')
         self.adapter, self.protector, self.subject = adapter, protector, subject
         self.route, self.limit = dict(route), limit
+        if ((attempt_event_id is None) != (start_event_id is None)
+                or (attempt_event_id is not None and any(not isinstance(value, str)
+                    or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:@/-]{0,254}', value)
+                    for value in (attempt_event_id, start_event_id)))):
+            raise ValueError('exact attempt/start observation binding required')
+        self._attempt_binding = (attempt_event_id, start_event_id)
         self._observations = []
         self.failures = self.cancellations = 0
         self.observation_failed = self.capacity_exceeded = False
@@ -40,6 +47,10 @@ class OwnedChunkObserver:
     @property
     def observations(self):
         return tuple(self._observations)
+
+    @property
+    def attempt_binding(self):
+        return self._attempt_binding
 
     async def __aenter__(self):
         if self._closed or self._entered or getattr(self.adapter, '_alive_owned_chunk_observer', None) is not None:
@@ -84,7 +95,8 @@ class OwnedChunkObserver:
                         self.capacity_exceeded = True
                     else:
                         reference = self.protector.authenticate_json('alive.chunk-return.v1',
-                            {'subject': self.subject, 'route': self.route, 'client_id': identifier})
+                            {'subject': self.subject, 'route': self.route, 'client_id': identifier,
+                             'attempt_binding': list(self.attempt_binding)})
                         if not isinstance(reference, str) or not re.fullmatch(r'[0-9a-f]{64}', reference):
                             raise ValueError('invalid protected chunk reference')
                         self._observations.append(ChunkReturnObservation(len(self.observations) + 1, reference))
