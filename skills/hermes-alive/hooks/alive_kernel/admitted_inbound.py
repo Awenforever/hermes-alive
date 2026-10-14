@@ -95,6 +95,7 @@ def record_admitted_inbound(shared_dir, values):
         "content_may_be_truncated":False, "raw_content_stored":False,
         "erasable_content_stored":False, "content_retention_status":"not_authorized",
         "quoted_target_available":False, "feedback_attribution":"unavailable",
+        "principal_kind":"not_exposed_by_host",
         "learning_authority_granted":False, "execution_authority_granted":False,
         "role":"native_input_observation_not_agent_turn"}
     sensitivity = Sensitivity.PRIVATE

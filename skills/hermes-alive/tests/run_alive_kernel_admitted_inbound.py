@@ -54,6 +54,7 @@ def run():
         first = record_admitted_inbound(shared, value())
         assert first.event.payload["erasable_content_stored"] is False
         assert first.event.payload["quoted_target_available"] is False
+        assert first.event.payload["principal_kind"] == "not_exposed_by_host"
         assert first.event.event_type == "conversation.admitted"
         journal, protector, vault, policy = runtime(shared)
         subject = protector.pseudonym("user", "synthetic-user")

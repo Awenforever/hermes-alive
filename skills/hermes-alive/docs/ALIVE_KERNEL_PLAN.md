@@ -6,6 +6,14 @@ Last reviewed: 2026-10-14
 
 ### Current finding: learned advice must retain its semantic evidence
 
+ADR-0105 exercises actual Hermes authorization/pairing admission before native
+capture: default deny, approval, revoke and rejected routes are verified with
+synthetic local state. It also demonstrates that authorized bots can reach the
+observer while the SDK drops is_bot. Native principal kind stays explicitly
+unknown, not human feedback. Next qualify a bounded metadata handoff or explicit
+verified target-selection interface; slash hooks do not share native message
+identity. Full gateway/session/profile/real-transport proof remains outstanding.
+
 ADR-0104 adds opt-in native full-input observation with canonical retention
 consent, encrypted erasable text, stable replay and writer-time revocation checks.
 Actual SDK discovery exposes/fixes an embedded-import defect hidden by local
