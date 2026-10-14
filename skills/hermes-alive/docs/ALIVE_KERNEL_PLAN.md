@@ -33,6 +33,16 @@ core/queue edits or production changes follow from this permission.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+ADR-0129 composes bounded owner binding discovery, trusted publisher resolution,
+current-policy revalidation, host withdrawal and durable observation consumption
+in one explicit host tick. Windows and Linux actual-SDK synthetic IO prove bad-row
+isolation, owner filtering, scan/reopen/wrap, timeout and pause during async
+resolution without another send or outcome. Returned keyed stage diagnostics
+retain no private errors. It is not a production timer or a full global-pause
+transaction; qualify lifecycle/cadence/cursor ownership, shutdown, retirement and
+writer/performance, then join useful autonomous planning/expression/feedback and
+real-model longitudinal utility. Portable production gates remain unchanged.
+
 ADR-0128 connects explicit canonical owner pause to an enhance-owned withdrawal
 interface (development `6b9b41f`). Windows and Linux actual-SDK synthetic IO prove
 scoped pending removal, unrelated FIFO preservation, persistent deny/new-submit
