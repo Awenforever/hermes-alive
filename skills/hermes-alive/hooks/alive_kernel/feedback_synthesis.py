@@ -234,9 +234,11 @@ class FeedbackSynthesizer:
             raise FeedbackSynthesisError("feedback operation already attempted")
         base = dict(source="alive.feedback-synthesis", actor="system:alive-feedback-interpreter",
                     subject=subject, sensitivity=Sensitivity(clearance))
-        self.journal.append(EventEnvelope(event_id=prefix + ":started", event_type="feedback.synthesis_started",
+        started = self.journal.append(EventEnvelope(event_id=prefix + ":started", event_type="feedback.synthesis_started",
             causation_id=outcome_event_id, payload={"snapshot_digest": digest, "prompt_digest": prompt_digest,
                                                   "automatic_learning_authority": False}, **base))
+        if not started.created:
+            raise FeedbackSynthesisError('feedback operation already attempted')
         try:
             route = {}
             response = await asyncio.wait_for(call(model=model, messages=[

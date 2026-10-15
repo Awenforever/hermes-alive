@@ -11,6 +11,7 @@ from .send_preparation_runtime import SendPreparationRuntime
 from .transport_reconciliation_runtime import TransportReconciliationRuntime
 from .reconsideration import ReconsiderationStore
 from .content_vault import ContentVaultError
+from .feedback_assimilation import FeedbackAssimilationRuntime
 
 
 @dataclass(frozen=True,slots=True)
@@ -30,12 +31,17 @@ class AutonomousCycleRuntime:
         self.outbox = DispatchOutbox(journal,content_vault=self.preparation.vault,context_vault=context_vault)
         self.reconciliation = TransportReconciliationRuntime(self.outbox)
         self.reconsideration = ReconsiderationStore(self.preparation, self.outbox.protector)
+        self.feedback = FeedbackAssimilationRuntime(journal,content_vault=self.preparation.vault,context_vault=context_vault)
 
     async def cycle(self,*,subject,operation_id,expression_parameters,resolve_binding,
             execute=False,authorization_parameters=None,send_parameters=None,worker_id=None,
             reconciliation_cursor=0,binding_limit=16,receipt_limit=128,
-            reconsider_after_seconds=None,cognition_configuration_id=None):
-        if (type(execute) is not bool or not isinstance(expression_parameters,dict)
+            reconsider_after_seconds=None,cognition_configuration_id=None,
+            interpret_feedback=False,feedback_model=None):
+        if (type(execute) is not bool or type(interpret_feedback) is not bool
+                or (feedback_model is not None and (not interpret_feedback or not isinstance(feedback_model,str)
+                    or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}',feedback_model)))
+                or not isinstance(expression_parameters,dict)
                 or not isinstance(operation_id,str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}',operation_id)
                 or any(key in expression_parameters for key in ('subject','operation_id','policy_context'))):
             raise ValueError('host cycle must own identity and current policy')
@@ -49,6 +55,9 @@ class AutonomousCycleRuntime:
             return AutonomousCycleResult('paused',reconciliation)
         if reconciliation['failed_bindings']:
             return AutonomousCycleResult('reconciliation_attention',reconciliation)
+        if interpret_feedback:
+            await self.feedback.tick(subject=subject,call=expression_parameters.get('call'),model=feedback_model,
+                clearance=expression_parameters.get('sensitivity','private'))
         parameters = {**expression_parameters,'subject':subject,'operation_id':operation_id,
                       'policy_context':policy.context}
         capture = None

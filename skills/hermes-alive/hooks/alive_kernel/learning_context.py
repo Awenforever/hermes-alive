@@ -29,11 +29,13 @@ class LearnedCognitionEvidence:
 
 
 class CognitionLearningReader:
-    def __init__(self, journal, *, content_vault=None):
+    def __init__(self, journal, *, content_vault=None, hypothesis_vault=None, context_vault=None):
         self.journal = journal
         self.outcomes = OutcomeProjection(journal, content_vault=content_vault)
         self.reflections = ReflectionProjection(journal, content_vault=content_vault)
         self.learning = PreferenceLearningProjection(journal, content_vault=content_vault)
+        from .feedback_assimilation import FeedbackAssimilationRuntime
+        self.hypotheses = FeedbackAssimilationRuntime(journal,content_vault=hypothesis_vault,context_vault=context_vault)
 
     def read(self, *, subject, clearance):
         target = self.journal.last_sequence()
@@ -57,4 +59,13 @@ class CognitionLearningReader:
             values.append(value)
             if len(values) == 8:
                 break
-        return tuple(values)
+        hypotheses = self.hypotheses.read(subject=subject,clearance=clearance)
+        if not hypotheses:
+            return tuple(values)
+        combined = list(hypotheses)
+        size = sum(len(json.dumps(v.to_prompt(),ensure_ascii=False)) for v in combined)
+        for value in values:
+            length = len(json.dumps(value.to_prompt(),ensure_ascii=False))
+            if len(combined)<8 and size+length<=8000:
+                combined.append(value); size += length
+        return tuple(combined)

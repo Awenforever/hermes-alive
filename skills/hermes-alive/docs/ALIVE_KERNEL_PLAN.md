@@ -2,7 +2,7 @@
 
 Status: active
 
-Last reviewed: 2026-10-15
+Last reviewed: 2026-10-16
 
 ### Delivery milestones and ownership (user clarification, 2026-10-14)
 
@@ -33,6 +33,19 @@ Qoder independently owns its repair work. Shared interface changes require
 explicit coordination. No speculative core/queue or production edits follow.
 
 ### Current integration milestone: delivery evidence and attributed feedback
+
+2026-10-16 — ADR-0146 integrates once-per-outcome feedback interpretation with
+the opt-in host cycle and retractable advisory context. Current consent/source/
+clearance and raw paired feedback remain authoritative; no typed profile, weights
+or action permission are written. An atomic start-race bug is fixed. Windows/
+offline Linux mixed feedback, restart/no-spend, withdrawal/erasure, failure and
+scope fixtures plus adjacent regressions pass. Four actual calls show uncertain
+courtesy and separated mixed feedback reaching next cognition; no ablation or
+longitudinal utility proof, and some scope/relevance judgments remain tentative.
+Totals 177 logical / 190 HTTP starts, zero actual sends. No production deployment.
+Continue sustained commitments/agenda and genuinely qualified reflection/learning,
+installed host/feedback ingress, full privacy/migration/rollback and production
+acceptance; do not equate this advisory layer with completed learning.
 
 2026-10-15 — ADR-0145 connects source-linked model reconsideration hints to the
 bounded wait ledger and original agenda IDs. Timing anchors to original prompt
