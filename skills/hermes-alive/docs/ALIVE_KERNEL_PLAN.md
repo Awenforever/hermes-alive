@@ -33,6 +33,14 @@ core/queue edits or production changes follow from this permission.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+ADR-0135 integrates opt-in grounded candidate review and one evidence-bound repair
+into planning and through the existing expression path. Windows/Linux synthetic
+tests prove partial-failure isolation, retained good choices, repair/reopen and
+honest correlated-vs-independent review. It is not installed/activated and models
+remain host-configured. Next real full-chain critique/repair and final-wording
+grounding (including single-family semantics), then longitudinal utility and the
+remaining pending/delivery/feedback/memory/agenda/portable production gates.
+
 ADR-0134 real history ablation shows useful unchanged/new/correction distinction
 but repeated unsupported prior-communication/user-history claims. Prompt-only
 clarification does not qualify them. Source-support review now sees typed prior

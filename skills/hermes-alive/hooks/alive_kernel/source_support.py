@@ -1,4 +1,4 @@
-"""Independent review of proposed content against current evidence, not world truth."""
+"""Evidence-grounded review with explicit independence, never world-truth proof."""
 import asyncio
 from dataclasses import dataclass
 import hashlib
@@ -50,6 +50,7 @@ class SourceSupportReceipt:
     verdict: str
     actual_reviewer_model: str
     snapshot_digest: str
+    independent: bool = False
 
     @property
     def safe_for_automatic_delivery(self):
@@ -76,7 +77,9 @@ class SourceSupportReviewer:
         self.vault = self.interpreter.vault
 
     def verify_current(self, event_id, *, subject, interpretation_id, candidate_id,
-                       clearance=Sensitivity.PRIVATE):
+                       clearance=Sensitivity.PRIVATE, allow_correlated=False):
+        if type(allow_correlated) is not bool:
+            raise SourceSupportError('invalid correlated review mode')
         record = self.journal.get(event_id)
         if (record is None or record.event.subject != subject
                 or record.event.sensitivity != Sensitivity(clearance)
@@ -101,6 +104,13 @@ class SourceSupportReviewer:
             data, generated = self.snapshot(subject=subject, interpretation_id=interpretation_id,
                                             candidate_id=candidate_id, clearance=clearance)
             payload = record.event.payload
+            independent = bool(payload['reviewer_domain'] != payload['generator_domain']
+                               and payload['reviewer_model'] != payload['generator_model'])
+            required = payload.get('require_independence', True)
+            if (type(required) is not bool or (not independent and (required or not allow_correlated))
+                    or payload.get('independent_review', independent) is not independent
+                    or start.event.payload.get('require_independence', True) is not required):
+                return None
             if (start.event.causation_id != generated.receipt_event_id
                     or payload['candidate_id'] != candidate_id
                     or payload['generator_model'] != generated.actual_model
@@ -109,8 +119,6 @@ class SourceSupportReviewer:
                     or payload['prompt_digest'] != hashlib.sha256(self.review_prompt.encode()).hexdigest()
                     or self.vault.digest_json(data) != payload['snapshot_digest']
                     or not payload['reviewer_domain'] or not payload['generator_domain']
-                    or payload['reviewer_domain'] == payload['generator_domain']
-                    or payload['reviewer_model'] == payload['generator_model']
                     or payload['delivery_authority_granted'] or payload['world_truth_proven']):
                 return None
             ref = ContentReference.from_event_payload(payload['content'])
@@ -179,7 +187,10 @@ class SourceSupportReviewer:
         return value
 
     async def run(self, *, subject, interpretation_id, candidate_id, operation_id,
-                  call, resolve_domain, reviewer_model=None, clearance=Sensitivity.PRIVATE):
+                  call, resolve_domain, reviewer_model=None, clearance=Sensitivity.PRIVATE,
+                  require_independence=True):
+        if type(require_independence) is not bool:
+            raise SourceSupportError('invalid review independence requirement')
         if not isinstance(operation_id,str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}',operation_id):
             raise SourceSupportError('invalid source-review operation')
         snapshot, generated = self.snapshot(subject=subject, interpretation_id=interpretation_id,
@@ -198,6 +209,7 @@ class SourceSupportReviewer:
             event_type='opportunity.source_support_started', causation_id=generated.receipt_event_id,
             payload={'snapshot_digest':digest,'candidate_id':candidate_id,
                      'prompt_digest':prompt_digest,
+                     'require_independence':require_independence,
                      'generator_model':generated.actual_model,'delivery_authority_granted':False}, **base))
         if not started.created:
             raise SourceSupportError('source-support operation already attempted')
@@ -214,7 +226,8 @@ class SourceSupportReviewer:
                 raise SourceSupportError('source-review context changed during model wait')
             text, model, provider = SemanticComparator._response(response, route)
             domain = resolve_domain(model)
-            if not domain or domain==generator_domain or model==generated.actual_model:
+            independent = bool(domain and domain != generator_domain and model != generated.actual_model)
+            if not domain or (require_independence and not independent):
                 raise SourceSupportError('source reviewer is not independent')
             findings = self.parse_findings(text, snapshot)
             bundle = ContentReference.from_event_payload(self.journal.get(generated.receipt_event_id).event.payload['content'])
@@ -227,8 +240,9 @@ class SourceSupportReviewer:
                     'prompt_digest':prompt_digest,
                     'generator_model':generated.actual_model,'reviewer_model':model,'reviewer_provider':provider,
                     'generator_domain':generator_domain,'reviewer_domain':domain,'content':ref.to_event_payload(),
+                    'require_independence':require_independence,'independent_review':independent,
                     'world_truth_proven':False,'delivery_authority_granted':False}, **base))
-            return SourceSupportReceipt(record.event.event_id, findings['verdict'], model, digest)
+            return SourceSupportReceipt(record.event.event_id, findings['verdict'], model, digest, independent)
         except Exception as exc:
             self.journal.append(EventEnvelope(event_id=prefix+':failed',
                 event_type='opportunity.source_support_failed', causation_id=prefix+':started',

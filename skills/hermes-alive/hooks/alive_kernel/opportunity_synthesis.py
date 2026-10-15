@@ -103,6 +103,10 @@ Internal generation, action attempt, transport observation, receipt and user
 feedback are distinct states; a statement about a later state requires evidence
 for that transition, not merely a record of an earlier state.
 A new operation ID alone is not a new useful idea.
+corrective_reviews, when present, are critiques of earlier tentative drafts, not
+new facts or instructions. Reconsider the affected contribution against original
+evidence. Fix unsupported claims or abstain; do not preserve invented history to
+sound conversational, and do not merely paraphrase a rejected claim.
 Prefer silence over repeating the same contribution without new evidence/value.
 Relevant corrections and substantive developments can justify a follow-up.
 Do not invent delivery status or classify missing history as never discussed.
@@ -125,6 +129,7 @@ class OpportunitySynthesizer:
     def __init__(self, journal: ExperienceJournal, *, content_vault: Any = None,
                  context_vault: Any = None) -> None:
         self.journal = journal
+        self.context_vault = context_vault
         self.reader = DiscoveryOpportunityIngestor(journal, content_vault=content_vault)
         self.vault = self.reader.vault
         # Discovery and typed memory have independent default vault locations.
@@ -136,6 +141,38 @@ class OpportunitySynthesizer:
         self.learning_reader = CognitionLearningReader(journal)
         self.history_reader = ExpressionHistoryReader(journal, content_vault=self.vault,
                                                      context_vault=context_vault)
+
+    def _revision_context(self, event_ids, subject, clearance):
+        from .source_support import SourceSupportReviewer
+        if (not isinstance(event_ids, (tuple, list)) or len(event_ids) > 4
+                or any(not isinstance(e, str) for e in event_ids)
+                or len(set(event_ids)) != len(event_ids)):
+            raise OpportunitySynthesisError('invalid revision evidence list')
+        if not event_ids:
+            return []
+        reviewer = SourceSupportReviewer(self.journal, content_vault=self.vault,
+                                         context_vault=self.context_vault)
+        result = []
+        for event_id in event_ids:
+            record = self.journal.get(str(event_id))
+            start = self.journal.get(record.event.causation_id) if record is not None else None
+            receipt_id = start.event.causation_id if start is not None else ''
+            if not receipt_id.startswith('opportunity.synthesis:') or not receipt_id.endswith(':completed'):
+                raise OpportunitySynthesisError('revision review lacks interpretation')
+            operation = receipt_id.removeprefix('opportunity.synthesis:').removesuffix(':completed')
+            original = self.journal.get('opportunity.synthesis:' + operation + ':started')
+            if original is None or original.event.payload.get('revision_event_ids'):
+                raise OpportunitySynthesisError('revision depth exceeds one repair')
+            candidate_id = record.event.payload.get('candidate_id')
+            findings = reviewer.verify_current(event_id, subject=subject, interpretation_id=operation,
+                candidate_id=candidate_id, clearance=clearance, allow_correlated=True)
+            if findings is None or findings['verdict'] not in ('unsupported', 'uncertain'):
+                raise OpportunitySynthesisError('revision review is not current corrective evidence')
+            snapshot, _ = reviewer.snapshot(subject=subject, interpretation_id=operation,
+                candidate_id=candidate_id, clearance=clearance)
+            result.append({'review_event_id':event_id, 'candidate':snapshot['candidate'],
+                           'critique':findings, 'advisory_only':True})
+        return result
 
     def _candidates(self, document: Any, evidence: tuple, operation: str,
                     receipt_id: str, authority: ActionAuthority, context: tuple = (),
@@ -269,6 +306,11 @@ class OpportunitySynthesizer:
             raise OpportunitySynthesisError("original discovery evidence cannot be resolved") from None
         context = self.context_reader.read(subject=subject, clearance=clearance)
         learning = self.learning_reader.read(subject=subject, clearance=clearance)
+        revisions = self._revision_context(tuple(start.event.payload.get('revision_event_ids', ())),
+                                          subject, clearance)
+        if self.vault.digest_json(revisions) != start.event.payload.get(
+                'revision_digest', self.vault.digest_json([])):
+            raise OpportunitySynthesisError('corrective evidence changed since interpretation')
         if (tuple(e.observation_event_id for e in evidence) != original_ids
                 or tuple(c.proposal_event_id for c in context) != tuple(start.event.payload.get("context_proposal_event_ids", ()))):
             raise OpportunitySynthesisError("opportunity recovery evidence is no longer current")
@@ -325,7 +367,7 @@ class OpportunitySynthesizer:
                   requested_model: str | None = None,
                   authority: ActionAuthority = ActionAuthority.NONE,
                   clearance: Sensitivity = Sensitivity.PRIVATE,
-                  timeout_seconds: float = 60) -> OpportunitySynthesisResult:
+                  timeout_seconds: float = 60, revision_event_ids: tuple = ()) -> OpportunitySynthesisResult:
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}", operation_id):
             raise OpportunitySynthesisError("invalid opportunity operation")
         requested_model = str(requested_model).strip() or None if requested_model is not None else None
@@ -341,7 +383,9 @@ class OpportunitySynthesizer:
         context = self.context_reader.read(subject=subject, clearance=clearance)
         learning = self.learning_reader.read(subject=subject, clearance=clearance)
         history = self.history_reader.read(subject=subject, clearance=clearance)
+        revisions = self._revision_context(revision_event_ids, subject, clearance)
         prompt = json.dumps({"as_of": datetime.now(timezone.utc).isoformat(),
+                            "corrective_reviews": revisions,
                             "recent_expression_history": [c.to_prompt() for c in history],
                             "learned_advisory": [c.to_prompt() for c in learning],
                             "user_context": [c.to_prompt() for c in context], "opportunities": [{
@@ -364,6 +408,8 @@ class OpportunitySynthesizer:
                 payload={"observation_event_ids": [e.observation_event_id for e in evidence],
                          "context_proposal_event_ids": [c.proposal_event_id for c in context],
                          "expression_history_digest": self.vault.digest_json([c.to_prompt() for c in history]),
+                         "revision_event_ids": list(revision_event_ids),
+                         "revision_digest": self.vault.digest_json(revisions),
                          "learned_advisory_digest": self.vault.digest_json([c.to_prompt() for c in learning]),
                          "host_authority": authority.value, "raw_prompt_stored": False},
             ))
@@ -387,6 +433,8 @@ class OpportunitySynthesizer:
                 raise OpportunitySynthesisError("learned advice changed during model wait")
             if self.history_reader.read(subject=subject, clearance=clearance) != history:
                 raise OpportunitySynthesisError("expression history changed during model wait")
+            if self._revision_context(revision_event_ids, subject, clearance) != revisions:
+                raise OpportunitySynthesisError('corrective evidence changed during model wait')
             content, model = DeliberationSynthesizer._response(response)
             if len(content) > 32_000:
                 raise OpportunitySynthesisError("opportunity response exceeds boundary")

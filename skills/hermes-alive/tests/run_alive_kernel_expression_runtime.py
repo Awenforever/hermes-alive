@@ -16,7 +16,8 @@ from alive_kernel.semantic_review import SemanticReviewError
 
 
 async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.USER_DELEGATED,
-                   source_summary='Public workshop, details unverified.', draft_text=None):
+                   source_summary='Public workshop, details unverified.', draft_text=None,
+                   grounding=False):
     journal = ExperienceJournal(root / 'experience.sqlite3')
     reader = DiscoveryOpportunityIngestor(journal)
     source = reader.ingest(DiscoveryCandidate(source='synthetic public fixture', title='Repair workshop',
@@ -35,6 +36,10 @@ async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.
                     'dimensions': {name: {'value': .1 if name in ('risk', 'urgency', 'interruption_cost')
                     else .8, 'reason': 'synthetic judgment'} for name in
                     ('user_value', 'urgency', 'novelty', 'confidence', 'risk', 'interruption_cost')}}]
+        elif task == 'alive_source_support':
+            kw['route_info']['provider'] = 'synthetic-provider'
+            value = {'verdict':'supported', 'unsupported_claims':[], 'uncertainties':[],
+                     'reason':'Synthetic positive fixture, not semantic qualification.'}
         elif task == 'alive_deliberation':
             candidates = json.loads(kw['messages'][1]['content'].split('\n', 1)[1])
             value = {'candidate_id': next(x['candidate_id'] for x in candidates
@@ -61,7 +66,7 @@ async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.
     def domain(provider, model):
         return 'synthetic-render-family' if model.endswith('/renderer') else 'synthetic-review-family'
     params = dict(operation_id='one', subject='user:test', policy_context=PolicyContext(can_interrupt=True),
-        call=call, authority=authority, resolve_domain=domain, language='en')
+        call=call, authority=authority, resolve_domain=domain, language='en', grounding=grounding)
     class InterruptedCommitRuntime(ExpressionRuntime):
         def _bound_record(self, event_id, kind, *args):
             if kind == 'expression.runtime_completed':
@@ -94,7 +99,7 @@ async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.
         runtime = ExpressionRuntime(ExperienceJournal(journal.path))
     result = await runtime.run(**params)
     assert not result.delivery_authorized
-    assert len(calls) == (1 if mode == 'silence' else 4)
+    assert len(calls) == (1 if mode == 'silence' else 4 + int(grounding))
     assert (result.text is None) == (mode == 'silence')
     before = journal.last_sequence()
     async def forbidden(**_):
@@ -127,4 +132,5 @@ if __name__ == '__main__':
     with tempfile.TemporaryDirectory(prefix='alive-expression-runtime-') as folder:
         for mode in ('share', 'silence', 'cancel', 'commit-crash'):
             asyncio.run(scenario(Path(folder) / mode, mode))
+        asyncio.run(scenario(Path(folder) / 'grounded-share', 'share', grounding=True))
     print('HERMES_ALIVE_KERNEL_EXPRESSION_RUNTIME_OK')
