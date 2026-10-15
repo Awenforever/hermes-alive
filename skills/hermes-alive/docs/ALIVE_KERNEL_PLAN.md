@@ -34,6 +34,17 @@ explicit coordination. No speculative core/queue or production edits follow.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-15 — ADR-0143 tests source scope before patching runtime. Four varied
+synthetic source contexts and direct/subtle contrasts make 15 actual logical /
+15 observed HTTP starts: preserved attribution and study limits, three material
+omissions rejected, ordinary concise positive accepted. Conditional access
+generation abstained; usefulness not established. These same-family diagnostics
+do not erase ADR-0142's failed fixture qualification or qualify the complete loop.
+No new runtime restriction/disclaimer/filter added. Totals 167 logical / 180 HTTP
+starts, zero sends; model jobs terminal, credentials removed, production unchanged.
+Next prioritize durable, bounded reconsideration and event-sensitive cost control
+alongside continued full-chain qualification, not endless per-fixture gates.
+
 2026-10-15 — ADR-0142 adds one explicitly bounded malformed-review recovery in
 planning. Original invalid output is encrypted, not normalized into approval;
 reopen validates recovery lineage and never repeats a spent operation. Valid
