@@ -101,7 +101,12 @@ async def test(root, mode):
                 else: raise AssertionError('repair of a repaired expression was allowed')
     count = len(calls)
     assert count == (1 if mode == 'confirmed' else 2 if mode in ('cancel','erase') else 4)
-    async def forbidden(**_): raise AssertionError('recovery repeated a provider call')
+    forbidden_calls = []
+    async def forbidden(**kwargs):
+        # prepare() deliberately contains repair failures. A raised assertion
+        # alone can therefore be swallowed and cannot prove zero provider spend.
+        forbidden_calls.append(kwargs['task'])
+        raise AssertionError('recovery repeated a provider call')
     try:
         reopened = await SendPreparationRuntime(ExperienceJournal(journal.path)).prepare(**{**args, 'call':forbidden})
     except ValueError:
@@ -111,6 +116,7 @@ async def test(root, mode):
             assert reopened.attempt_event_id is None and reopened.repair_disposition == 'unavailable'
         else: assert reopened == prepared
     assert len(calls) == count
+    assert not forbidden_calls, forbidden_calls
     if mode == 'supported':
         reviewer = ExpressionSourceSupportReviewer(journal, content_vault=runtime.vault)
         _owner, origin, clearance = runtime._expression_origin(original)
@@ -124,6 +130,7 @@ async def test(root, mode):
         except ValueError: pass
         else: raise AssertionError('another critique opened a sibling repair generation')
         assert len(calls) == count + 1
+        assert not forbidden_calls, forbidden_calls
         try:
             reviewer.correction_context(prepared.final_review_event_id, subject='user:test',
                 selection_event_id=original.planning.selection_event_id)

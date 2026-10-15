@@ -33,6 +33,14 @@ core/queue edits or production changes follow from this permission.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-15 recovery audit: all five latest Windows final-wording repair modes
+now pass, including correction-ancestry validation. Recovery and alternate-critique
+tests independently count forbidden provider invocations: raising an assertion
+inside the callback was insufficient evidence because bounded repair deliberately
+contains provider exceptions. The counter remains zero in all modes. This closes
+a test-observation blind spot, not a new runtime defect or real-model semantic
+qualification. No model calls, sends, deployment or production changes followed.
+
 ADR-0137 remains in semantic/utility qualification: one source-guided final-wording correction slot per
 selected intent, followed by fresh fidelity/source review; no automatic rewriting
 of exact confirmed text, no sibling generations and no recursive repair. The

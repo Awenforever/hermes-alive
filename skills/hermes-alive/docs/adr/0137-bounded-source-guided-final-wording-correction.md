@@ -71,3 +71,14 @@ utility and abstention controls. Preserve the full long-term objective: pending
 intent controls, attributable delivery/feedback, layered/external memory, sustained
 agenda and reflection/learning, forgetting/privacy, authenticated host lifecycle,
 portable installs/upgrades, migration/rollback and genuine production acceptance.
+
+### 2026-10-15 — Latest Windows matrix and observable no-respend assertion
+
+All five latest Windows modes now pass. The forbidden provider callback records
+each invocation independently of raising an assertion, and the test requires an
+empty record after reopen and sibling-repair refusal. This matters because the
+bounded repair path intentionally catches provider exceptions; an assertion
+alone could be caught and mistaken for proof that the callback was not called.
+No runtime defect was reproduced, and no real-model, fresh-install or delivery
+qualification is inferred. Real-model totals remain 119 logical / 132 observed
+HTTP starts; no actual sends or production changes.
