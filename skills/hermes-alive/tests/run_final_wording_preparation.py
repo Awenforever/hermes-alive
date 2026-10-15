@@ -35,6 +35,8 @@ async def test(root, mode):
         expires_at=datetime.now(timezone.utc) + timedelta(hours=1), operation_id='grant', allow_natural_expression=True)
     calls = []
     async def final_call(**kwargs):
+        if mode == 'unsupported' and kwargs['task'] == 'alive_semantic_render':
+            raise RuntimeError('synthetic repair provider unavailable')
         assert kwargs['task'] == 'alive_source_support'
         snapshot = json.loads(kwargs['messages'][1]['content'])
         assert snapshot['expression_binding']['stage'] == 'final_expression'
@@ -57,7 +59,8 @@ async def test(root, mode):
         assert prepared.final_review_event_id and len(calls) == 1
         if mode == 'unsupported':
             assert prepared.authorization is None and prepared.attempt_event_id is None
-            assert prepared.quality_disposition == 'final_unsupported'
+            assert prepared.quality_disposition == 'final_repair_unavailable'
+            assert prepared.repair_disposition == 'unavailable'
         else:
             assert prepared.authorization.authorized and prepared.quality_disposition == 'supported'
     count = len(calls)

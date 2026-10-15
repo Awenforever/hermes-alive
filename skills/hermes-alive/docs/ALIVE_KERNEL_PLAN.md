@@ -33,6 +33,19 @@ core/queue edits or production changes follow from this permission.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+ADR-0137 remains in semantic/utility qualification: one source-guided final-wording correction slot per
+selected intent, followed by fresh fidelity/source review; no automatic rewriting
+of exact confirmed text, no sibling generations and no recursive repair. The
+latest extension also binds correction ancestry into final support and core
+dispatch revalidation. Latest Linux checks pass all five repair and four final
+preparation modes. Latest Windows successful repair includes sibling and late
+ancestry-erasure refusal; the existing preparation regression passes. Earlier
+Windows full repair modes passed before the ancestry extension, not a full latest
+Windows matrix or genuine semantic/utility proof.
+No new real model call or production deployment. Continue useful longitudinal
+behavior and the full pending/delivery/feedback/memory/agenda/portable objective;
+do not count this bounded mechanism as ten clean production cycles.
+
 ADR-0136 adds exact-final-wording source review in grounded mode and carries its
 requirement in authenticated authorization through core outbox execution checks.
 It distinguishes correlated review from independent corroboration; a rejected,

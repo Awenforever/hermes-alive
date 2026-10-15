@@ -54,7 +54,7 @@ class ExpressionRuntime:
         return existing
 
     async def run(self, *, resolve_domain, renderer_model=None, reviewer_model=None,
-                  language=None, **planning_parameters):
+                  language=None, correction_review_event_id=None, **planning_parameters):
         # Reject malformed host options before planning can spend on a provider.
         for model in (renderer_model, reviewer_model):
             if model is not None and (not isinstance(model, str) or not re.fullmatch(
@@ -65,6 +65,9 @@ class ExpressionRuntime:
             raise ExpressionRuntimeError('invalid expression language')
         if not callable(resolve_domain):
             raise ExpressionRuntimeError('missing host independence resolver')
+        if correction_review_event_id is not None and (not isinstance(correction_review_event_id, str)
+                or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:@/-]{0,254}', correction_review_event_id)):
+            raise ExpressionRuntimeError('invalid correction review identity')
         planned = await self.planning.run(**planning_parameters)
         if planned.action_kind == 'silence':
             return ExpressionRuntimeResult(planned)
@@ -84,6 +87,34 @@ class ExpressionRuntime:
             'style_digest': self.store.content_vault.digest_json(style), 'delivery_authorized': False}
         if planning_parameters.get('grounding', False):
             binding['require_independence'] = independent
+        correction = None
+        if correction_review_event_id is not None:
+            if not planning_parameters.get('grounding', False):
+                raise ExpressionRuntimeError('final correction requires grounded planning')
+            correction = self.comparator._correction(correction_review_event_id, subject,
+                                                     planned.selection_event_id)
+            original_start = self.journal.get(start_id)
+            original_done = self.journal.get(done_id)
+            if (original_start is None or original_done is None
+                    or original_done.event.payload.get('expression_event_id') != correction['previous_expression_event_id']):
+                raise ExpressionRuntimeError('correction requires a completed original expression')
+            self._bound_record(start_id, 'expression.runtime_started', subject,
+                meaning.event.sensitivity, planned.selection_event_id, binding)
+            self._bound_record(done_id, 'expression.runtime_completed', subject,
+                meaning.event.sensitivity, start_id,
+                {'expression_event_id':correction['previous_expression_event_id'],
+                 'review_event_id':'message.semantic_review:comparison:' + operation,
+                 'delivery_authorized':False})
+            # One correction slot per selected intent, not one per critique ID.
+            # Another negative receipt cannot open sibling repair generations.
+            digest = self.store.content_vault.digest_json({'selection':planned.selection_event_id,
+                'phase':'final-wording-repair-v1'})[:40]
+            operation = 'runtime-expression-repair:' + digest
+            start_id = 'expression.runtime:' + digest + ':started'
+            done_id = 'expression.runtime:' + digest + ':completed'
+            binding = {**binding, 'correction_review_event_id':correction_review_event_id,
+                'correction_digest':self.store.content_vault.digest_json(correction),
+                'previous_expression_event_id':correction['previous_expression_event_id']}
         self._bound_record(start_id, 'expression.runtime_started', subject,
             meaning.event.sensitivity, planned.selection_event_id, binding)
         completed = self.journal.get(done_id)
@@ -109,13 +140,17 @@ class ExpressionRuntime:
                     meaning_event_id=meaning.event.event_id, subject=subject,
                     call=planning_parameters['call'], resolve_domain=resolve_domain,
                     renderer_model=renderer_model, reviewer_model=reviewer_model,
-                    language=language, operation_id=operation, require_independence=independent)
+                    language=language, operation_id=operation, require_independence=independent,
+                    correction_review_event_id=correction_review_event_id)
                 candidate_id, review_id = comparison.candidate.event_id, comparison.review.event_id
             completed = self._bound_record(done_id, 'expression.runtime_completed', subject,
                 meaning.event.sensitivity, start_id,
                 {'expression_event_id': candidate_id,
                  'review_event_id': review_id, 'delivery_authorized': False})
         # Current intent/evidence and current style remain authoritative on recovery.
+        if correction is not None and self.comparator._correction(correction_review_event_id,
+                subject, planned.selection_event_id) != correction:
+            raise ExpressionRuntimeError('retained correction evidence changed')
         candidate = self.store.resolve_model_candidate(str(completed.event.payload.get('expression_event_id', '')))
         review_record = self.journal.get(str(completed.event.payload.get('review_event_id', '')))
         review = self.store.verify_review(review_record, allow_correlated=not independent) if review_record is not None else None

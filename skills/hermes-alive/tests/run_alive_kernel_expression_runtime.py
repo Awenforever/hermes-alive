@@ -17,7 +17,7 @@ from alive_kernel.semantic_review import SemanticReviewError
 
 async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.USER_DELEGATED,
                    source_summary='Public workshop, details unverified.', draft_text=None,
-                   grounding=False, single_family=False):
+                   grounding=False, single_family=False, render_prefix=''):
     journal = ExperienceJournal(root / 'experience.sqlite3')
     reader = DiscoveryOpportunityIngestor(journal)
     source = reader.ingest(DiscoveryCandidate(source='synthetic public fixture', title='Repair workshop',
@@ -48,7 +48,7 @@ async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.
             if mode == 'cancel':
                 raise asyncio.CancelledError()
             data = json.loads(kw['messages'][1]['content'])
-            value = '\n'.join(atom['text'] for atom in data['meaning']['atoms'])
+            value = render_prefix + '\n'.join(atom['text'] for atom in data['meaning']['atoms'])
             kw['route_info']['provider'] = 'synthetic-render-provider'
             return SimpleNamespace(model='synthetic/renderer', choices=[SimpleNamespace(
                 message=SimpleNamespace(content=value))])

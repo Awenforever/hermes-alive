@@ -16,6 +16,8 @@ class SendPreparationResult:
     sent: bool = False
     final_review_event_id: str | None = None
     quality_disposition: str = 'not_reviewed'
+    initial_final_review_event_id: str | None = None
+    repair_disposition: str | None = None
 
 
 class SendPreparationRuntime:
@@ -96,14 +98,40 @@ manufactures them from model output or reviews, nor falls back to another body.
             return SendPreparationResult(expressed)
         subject = expression_parameters['subject']
         final_event, quality = None, 'not_reviewed'
+        initial_final, repair = None, None
         if expression_parameters.get('grounding', False):
             if expressed.review_disposition == 'rejected':
                 return SendPreparationResult(expressed, final_review_event_id=expressed.review_event_id,
                                               quality_disposition='final_semantic_rejected')
             final_event, quality = await self._review_final(expressed, expression_parameters)
             if quality != 'supported':
-                return SendPreparationResult(expressed, final_review_event_id=final_event,
-                                              quality_disposition='final_' + quality)
+                initial_final = final_event
+                if confirmation_event_id is not None:
+                    # Exact confirmed wording is immutable. A fresh confirmation
+                    # workflow, not this automatic repair, must own any rewrite.
+                    return SendPreparationResult(expressed, final_review_event_id=final_event,
+                        quality_disposition='final_' + quality, initial_final_review_event_id=initial_final,
+                        repair_disposition='requires_new_confirmation')
+                try:
+                    corrected = await self.expression.run(**{**expression_parameters,
+                        'correction_review_event_id':initial_final})
+                    if corrected.review_disposition == 'rejected':
+                        return SendPreparationResult(corrected,
+                            final_review_event_id=corrected.review_event_id,
+                            quality_disposition='final_semantic_rejected',
+                            initial_final_review_event_id=initial_final, repair_disposition='completed')
+                    final_event, quality = await self._review_final(corrected, expression_parameters)
+                    expressed, repair = corrected, 'completed'
+                except Exception:
+                    # An unresolved or failed repair is explicit attention, not
+                    # successful silence or permission to reuse rejected wording.
+                    return SendPreparationResult(expressed, final_review_event_id=initial_final,
+                        quality_disposition='final_repair_unavailable',
+                        initial_final_review_event_id=initial_final, repair_disposition='unavailable')
+                if quality != 'supported':
+                    return SendPreparationResult(expressed, final_review_event_id=final_event,
+                        quality_disposition='final_' + quality,
+                        initial_final_review_event_id=initial_final, repair_disposition=repair)
         witness = None
         if final_event is not None:
             _subject, origin, _clearance = self._expression_origin(expressed)
@@ -116,7 +144,8 @@ manufactures them from model output or reviews, nor falls back to another body.
             final_wording_witness=witness)
         if not decision.authorized:
             return SendPreparationResult(expressed, decision, final_review_event_id=final_event,
-                                          quality_disposition=quality)
+                quality_disposition=quality, initial_final_review_event_id=initial_final,
+                repair_disposition=repair)
         identity = 'runtime-attempt:' + self.vault.digest_json({
             'selection': expressed.planning.selection_event_id,
             'expression': expressed.expression_event_id, 'subject': subject})[:40]
@@ -129,7 +158,8 @@ manufactures them from model output or reviews, nor falls back to another body.
         if projected.outcome != 'recorded':
             raise ValueError('authorized runtime attempt was not admitted')
         return SendPreparationResult(expressed, decision, attempt.event.event_id,
-            final_review_event_id=final_event, quality_disposition=quality)
+            final_review_event_id=final_event, quality_disposition=quality,
+            initial_final_review_event_id=initial_final, repair_disposition=repair)
 
     def _validate_prepared_lease(self, prepared, lease):
         from .dispatch_outbox import DispatchOutboxError
