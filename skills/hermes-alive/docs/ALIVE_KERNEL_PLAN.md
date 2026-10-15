@@ -34,6 +34,18 @@ explicit coordination. No speculative core/queue or production edits follow.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-15 — ADR-0142 adds one explicitly bounded malformed-review recovery in
+planning. Original invalid output is encrypted, not normalized into approval;
+reopen validates recovery lineage and never repeats a spent operation. Valid
+unsupported/uncertain reviews and provider/independence failures do not loop.
+Ten synthetic modes and Linux adjacent regressions pass. A fresh seven-call real
+chain demonstrates bounded recovery, synthetic intent preparation and no-spend
+reopen; it again loses source qualifications while same-family review approves.
+Do not count that as clean semantics. Totals 152 logical / 165 observed HTTP starts,
+zero actual sends; credentials absent and production start unchanged. Continue
+qualification-preserving cognition, temporal deferral and genuine feedback
+learning within the unchanged full host/privacy/lifecycle/production scope.
+
 2026-10-15 — ADR-0141 real preparation is mixed, not qualified: a meeting-pause
 proposal required critique/regeneration; courtesy did not become preference; an
 explicit correction changed selection, but the first positive path hit a private

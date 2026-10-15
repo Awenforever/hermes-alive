@@ -62,7 +62,8 @@ watcher and not a complete production loop. It creates no channel queues.
                     await reviewer.run(subject=subject, interpretation_id=interpretation_id,
                         candidate_id=candidate_id, operation_id=key, call=call,
                         reviewer_model=reviewer_model, clearance=sensitivity,
-                        resolve_domain=resolve_domain, require_independence=require_independence)
+                        resolve_domain=resolve_domain, require_independence=require_independence,
+                        protocol_recovery=True)
                 except Exception:
                     # Isolate one provider/proposal failure, never retry it implicitly.
                     pass
