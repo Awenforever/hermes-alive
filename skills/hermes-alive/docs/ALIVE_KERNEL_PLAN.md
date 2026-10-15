@@ -34,6 +34,20 @@ explicit coordination. No speculative core/queue or production edits follow.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-15 — ADR-0141 real preparation is mixed, not qualified: a meeting-pause
+proposal required critique/regeneration; courtesy did not become preference; an
+explicit correction changed selection, but the first positive path hit a private
+fixture route-vault mismatch. A corrected-route rerun then stopped on a contradictory
+model review, not successful silence. Different-family review returned 403; no
+independent semantic result. Cumulative actual totals 145 logical / 158 observed
+HTTP starts, zero actual sends. Credentials absent and model jobs terminal.
+Send preparation now checks owner/host route contract before inference, retaining
+all post-model authorization/launch checks. Windows and isolated Linux fixture
+passes; Linux adjacent context/preparation/repair matrix passes. No production,
+Core, model or Qoder-owned Enhance changes. Next bounded review-protocol recovery,
+positive full-chain qualification and meaningful temporal deferral/feedback/learning,
+with the unchanged full production objective. Do not count these as clean cycles.
+
 2026-10-15 — ADR-0140 connects literal delivery-linked feedback to the next
 interpretation and source review, with source times on explicit memory rather
 than forcing an unqualified paraphrase into permanent preference. Candidate

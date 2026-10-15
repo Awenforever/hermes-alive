@@ -75,6 +75,7 @@ run_and_require run_alive_kernel_action_authorization.py '^HERMES_ALIVE_KERNEL_A
 run_and_require run_action_history.py '^HERMES_ALIVE_ACTION_HISTORY_OK$'
 run_and_require run_action_history_live_probe.py '^HERMES_ALIVE_ACTION_HISTORY_LIVE_PROBE_OK$'
 run_and_require run_feedback_context.py '^HERMES_ALIVE_FEEDBACK_CONTEXT_OK$'
+run_and_require run_send_preflight.py '^HERMES_ALIVE_SEND_PREFLIGHT_OK$'
 run_and_require run_expression_history.py '^HERMES_ALIVE_EXPRESSION_HISTORY_OK$'
 run_and_require run_final_wording_preparation.py '^HERMES_ALIVE_FINAL_WORDING_PREPARATION_OK$'
 run_and_require run_final_wording_repair.py '^HERMES_ALIVE_FINAL_WORDING_REPAIR_OK$'

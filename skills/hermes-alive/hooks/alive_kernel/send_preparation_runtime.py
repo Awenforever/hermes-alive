@@ -93,6 +93,20 @@ manufactures them from model output or reviews, nor falls back to another body.
             if not isinstance(value, str) or not re.fullmatch(
                     rf'[A-Za-z0-9][A-Za-z0-9._:@/-]{{0,{maximum}}}', value):
                 raise ValueError('invalid host ' + name)
+        # A configured route is a structural prerequisite, not evidence that
+        # the platform currently has a reply window or that anything was sent.
+        # Check owner metadata before resolving its private locator. Never spend
+        # on planning an executable send when its host contract cannot be read.
+        subject = expression_parameters['subject']
+        binding = self.authorizer.host.get_binding(route_binding_id)
+        if binding is None or binding.subject != subject:
+            raise ValueError('host route unavailable before planning')
+        _binding, route_reasons = self.authorizer.host.execution_binding(
+            route_binding_id, subject=subject, capability='hermes.channel.send')
+        if _binding is None or route_reasons:
+            raise ValueError('host route unavailable before planning')
+        # Final authorization still revalidates this route after all model work;
+        # this check does not mint a lease, consent, delegation or send permit.
         expressed = await self.expression.run(**expression_parameters)
         if expressed.planning.action_kind == 'silence':
             return SendPreparationResult(expressed)
