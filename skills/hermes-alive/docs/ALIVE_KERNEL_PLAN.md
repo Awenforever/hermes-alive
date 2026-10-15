@@ -33,6 +33,29 @@ core/queue edits or production changes follow from this permission.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+ADR-0136 adds exact-final-wording source review in grounded mode and carries its
+requirement in authenticated authorization through core outbox execution checks.
+It distinguishes correlated review from independent corroboration; a rejected,
+uncertain or unresolved review does not become permission or successful silence.
+The previous actual full-chain probe used nine calls: one supported development
+share and one correction silence, no repair, zero sends. Its semantic quality
+remains explicitly unqualified. Cumulative real counts: 119 logical / 132 observed
+async HTTP starts. The temporary credential export was removed after verifying
+the model job terminal; no new real model call or production change this turn.
+Next qualify bounded final-wording recovery and fresh longitudinal usefulness,
+then pending/delivery/feedback/memory/agenda/portable production gates. Do not
+mistake a durable quality constraint for independent truth or user benefit.
+
+Qualification evidence: authorization, preparation, semantic review/store and
+autonomous cycle regressions pass on Windows. The final-wording fixture covers
+supported, unsupported, interrupted/reopened and valid local-launch paths, plus
+witness substitution/removal and direct-outbox denial after erasure. Isolated
+Linux passes that fixture with network disabled and a read-only retained-module
+overlay; this is not fresh-install evidence. The first Linux invocation omitted
+the temporary profile path; the next exposed a stale exception-class alias in
+the overlay loader. Both harness faults were corrected, not counted as passes
+or hidden as runtime successes. Test containers are auto-removed; no real send.
+
 ADR-0135 integrates opt-in grounded candidate review and one evidence-bound repair
 into planning and through the existing expression path. Windows/Linux synthetic
 tests prove partial-failure isolation, retained good choices, repair/reopen and

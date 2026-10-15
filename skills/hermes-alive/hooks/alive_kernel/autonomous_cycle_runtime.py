@@ -55,6 +55,8 @@ class AutonomousCycleRuntime:
         prepared = await self.preparation.prepare(**parameters,**authorization_parameters)
         if prepared.expression.planning.action_kind=='silence':
             return AutonomousCycleResult('silence',reconciliation,prepared=prepared)
+        if prepared.quality_disposition.startswith('final_'):
+            return AutonomousCycleResult('content_review_attention',reconciliation,prepared=prepared)
         if prepared.authorization is None or not prepared.authorization.authorized:
             return AutonomousCycleResult('not_authorized',reconciliation,prepared=prepared)
         lease = self.outbox.acquire(worker_id=worker_id,subject=subject,

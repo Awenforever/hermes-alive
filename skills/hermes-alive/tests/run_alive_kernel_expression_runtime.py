@@ -17,7 +17,7 @@ from alive_kernel.semantic_review import SemanticReviewError
 
 async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.USER_DELEGATED,
                    source_summary='Public workshop, details unverified.', draft_text=None,
-                   grounding=False):
+                   grounding=False, single_family=False):
     journal = ExperienceJournal(root / 'experience.sqlite3')
     reader = DiscoveryOpportunityIngestor(journal)
     source = reader.ingest(DiscoveryCandidate(source='synthetic public fixture', title='Repair workshop',
@@ -57,13 +57,14 @@ async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.
             value = {'atom_reviews': [{'atom_id': atom['atom_id'], 'preserved': True, 'risks': []}
                 for atom in data['meaning']['atoms']], 'added_claims_detected': False,
                 'speech_act_preserved': True, 'protected_literals_preserved': True}
-            model = 'synthetic/reviewer'
+            model = 'synthetic/renderer' if single_family else 'synthetic/reviewer'
             kw['route_info']['provider'] = 'synthetic-review-provider'
         else:
             raise AssertionError(task)
         return SimpleNamespace(model=model, choices=[SimpleNamespace(
             message=SimpleNamespace(content=json.dumps(value)))])
     def domain(provider, model):
+        if single_family: return 'synthetic-shared-family'
         return 'synthetic-render-family' if model.endswith('/renderer') else 'synthetic-review-family'
     params = dict(operation_id='one', subject='user:test', policy_context=PolicyContext(can_interrupt=True),
         call=call, authority=authority, resolve_domain=domain, language='en', grounding=grounding)
@@ -99,6 +100,11 @@ async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.
         runtime = ExpressionRuntime(ExperienceJournal(journal.path))
     result = await runtime.run(**params)
     assert not result.delivery_authorized
+    if single_family:
+        assert result.review_disposition == 'correlated_review'
+        record = journal.get(result.review_event_id)
+        assert not record.event.payload['independent_review']
+        assert runtime.store.verify_review(record) is None
     assert len(calls) == (1 if mode == 'silence' else 4 + int(grounding))
     assert (result.text is None) == (mode == 'silence')
     before = journal.last_sequence()
@@ -133,4 +139,5 @@ if __name__ == '__main__':
         for mode in ('share', 'silence', 'cancel', 'commit-crash'):
             asyncio.run(scenario(Path(folder) / mode, mode))
         asyncio.run(scenario(Path(folder) / 'grounded-share', 'share', grounding=True))
+        asyncio.run(scenario(Path(folder) / 'single-family', 'share', grounding=True, single_family=True))
     print('HERMES_ALIVE_KERNEL_EXPRESSION_RUNTIME_OK')

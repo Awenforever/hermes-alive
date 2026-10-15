@@ -150,6 +150,7 @@ class SendTimeAuthorizer:
         permit_ttl_seconds: float,
         expression_event_id: str | None,
         delegation_event_id: str | None,
+        final_wording_witness: dict | None,
     ) -> ActionAuthorizationDecision | None:
         record = self.journal.get(f"action.authorization:{operation}")
         if record is None:
@@ -171,6 +172,7 @@ class SendTimeAuthorizer:
             or payload.get("confirmation_event_id") != confirmation_event_id
             or payload.get("expression_event_id") != expression_event_id
             or payload.get("delegation_event_id") != delegation_event_id
+            or payload.get("final_wording_witness") != final_wording_witness
             or payload.get("route_binding_id") != route_binding_id
             or payload.get("permit_ttl_seconds") != permit_ttl_seconds
             or payload.get("action_contract_version") != 1
@@ -189,6 +191,17 @@ class SendTimeAuthorizer:
         authorized = payload.get("outcome") == "authorized"
         parsed_until = datetime.fromisoformat(str(valid_until)) if valid_until else None
         reasons = tuple(str(value) for value in payload.get("reasons", ()))
+        if authorized and final_wording_witness is not None:
+            try:
+                from .expression_support import ExpressionSourceSupportReviewer
+                ExpressionSourceSupportReviewer(self.journal,
+                    content_vault=self.deliberation.content_vault,
+                    context_vault=self.context_vault).require_current_witness(final_wording_witness,
+                        subject=subject, expression_event_id=expression_event_id,
+                        selection_event_id=selection_event_id)
+            except ValueError:
+                authorized = False
+                reasons = (*reasons, "final_wording_not_current")
         if authorized and (parsed_until is None or parsed_until <= now):
             authorized = False
             reasons = (*reasons, "permit_expired")
@@ -259,6 +272,7 @@ class SendTimeAuthorizer:
         operation_id: str | None = None,
         confirmation_event_id: str | None = None,
         expression_event_id: str | None = None,
+        final_wording_witness: dict | None = None,
         delegation_event_id: str | None = None,
         route_binding_id: str | None = None,
         now: datetime | None = None,
@@ -337,6 +351,7 @@ class SendTimeAuthorizer:
             permit_ttl_seconds=permit_ttl_seconds,
             expression_event_id=expression_event_id,
             delegation_event_id=delegation_event_id,
+            final_wording_witness=final_wording_witness,
         )
         if existing is not None:
             return existing
@@ -548,6 +563,16 @@ class SendTimeAuthorizer:
             else:
                 reasons.append("action_authority_invalid")
 
+        if final_wording_witness is not None:
+            from .expression_support import ExpressionSourceSupportReviewer
+            try:
+                ExpressionSourceSupportReviewer(self.journal,
+                    content_vault=self.deliberation.content_vault,
+                    context_vault=self.context_vault).require_current_witness(final_wording_witness,
+                        subject=owner, expression_event_id=expression_event_id,
+                        selection_event_id=selection_event_id)
+            except ValueError:
+                reasons.append("final_wording_not_current")
         reasons = list(dict.fromkeys(reasons))
         authorized = not reasons
         valid_until = current + permit_ttl if authorized else None
@@ -579,6 +604,8 @@ class SendTimeAuthorizer:
             "valid_until": valid_until.isoformat() if valid_until else None,
             "executes_action": False,
         }
+        if final_wording_witness is not None:
+            payload["final_wording_witness"] = final_wording_witness
         payload["integrity_authenticator"] = self.receipt_protector.authenticate_json(
             "action.authorization.v1", payload
         )

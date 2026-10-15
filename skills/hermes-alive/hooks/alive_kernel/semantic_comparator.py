@@ -143,7 +143,10 @@ class SemanticComparator:
         renderer_model: str | None = None, reviewer_model: str | None = None,
         operation_id: str | None = None, timeout_seconds: float = 60,
         language: str | None = None, presentation_scope: str = "proactive_social",
+        require_independence: bool = True,
     ) -> SemanticComparison:
+        if type(require_independence) is not bool:
+            raise SemanticReviewError('invalid independence mode')
         operation = str(operation_id or uuid4())
         if not _ID.fullmatch(operation):
             raise SemanticReviewError("invalid comparison operation ID")
@@ -237,6 +240,7 @@ class SemanticComparator:
             receipt = self.store.record_review(
                 candidate_event_id=candidate.event_id, review=review,
                 actor="system:alive-shadow-reviewer",
+                require_independence=require_independence,
             )
             self._receipt(operation, "completed", subject, selection_event_id,
                           source.event.sensitivity,

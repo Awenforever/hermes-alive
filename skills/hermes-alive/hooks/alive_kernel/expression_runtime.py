@@ -76,10 +76,14 @@ class ExpressionRuntime:
         start_id = 'expression.runtime:' + digest + ':started'
         done_id = 'expression.runtime:' + digest + ':completed'
         style = self.comparator._style(subject, 'proactive_social')
+        independent = (planning_parameters.get('require_independent_grounding', False)
+                       if planning_parameters.get('grounding', False) else True)
         binding = {'selection_event_id': planned.selection_event_id,
             'meaning_event_id': meaning.event.event_id,
             'renderer_model': renderer_model, 'reviewer_model': reviewer_model, 'language': language,
             'style_digest': self.store.content_vault.digest_json(style), 'delivery_authorized': False}
+        if planning_parameters.get('grounding', False):
+            binding['require_independence'] = independent
         self._bound_record(start_id, 'expression.runtime_started', subject,
             meaning.event.sensitivity, planned.selection_event_id, binding)
         completed = self.journal.get(done_id)
@@ -88,7 +92,7 @@ class ExpressionRuntime:
                 native_done = self.journal.get('semantic.comparison:' + operation + ':completed')
                 native_failed = self.journal.get('semantic.comparison:' + operation + ':failed')
                 review_record = self.journal.get('message.semantic_review:comparison:' + operation)
-                recovered_review = self.store.verify_review(review_record) if review_record is not None else None
+                recovered_review = self.store.verify_review(review_record, allow_correlated=not independent) if review_record is not None else None
                 if (native_done is None or native_failed is not None or recovered_review is None
                         or native_done.event.event_type != 'semantic.comparison_stage'
                         or native_done.event.source != 'alive.semantic-comparator'
@@ -105,7 +109,7 @@ class ExpressionRuntime:
                     meaning_event_id=meaning.event.event_id, subject=subject,
                     call=planning_parameters['call'], resolve_domain=resolve_domain,
                     renderer_model=renderer_model, reviewer_model=reviewer_model,
-                    language=language, operation_id=operation)
+                    language=language, operation_id=operation, require_independence=independent)
                 candidate_id, review_id = comparison.candidate.event_id, comparison.review.event_id
             completed = self._bound_record(done_id, 'expression.runtime_completed', subject,
                 meaning.event.sensitivity, start_id,
@@ -114,7 +118,7 @@ class ExpressionRuntime:
         # Current intent/evidence and current style remain authoritative on recovery.
         candidate = self.store.resolve_model_candidate(str(completed.event.payload.get('expression_event_id', '')))
         review_record = self.journal.get(str(completed.event.payload.get('review_event_id', '')))
-        review = self.store.verify_review(review_record) if review_record is not None else None
+        review = self.store.verify_review(review_record, allow_correlated=not independent) if review_record is not None else None
         if (candidate is None or review is None or candidate.selection_event_id != planned.selection_event_id
                 or candidate.meaning_event_id != meaning.event.event_id
                 or candidate.renderer_execution_id != 'execution:' + operation + ':render'

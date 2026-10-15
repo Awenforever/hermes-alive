@@ -26,6 +26,30 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
         self.expressions = OpportunityExpressionStore(journal,
             content_vault=self.vault, context_vault=context_vault)
 
+    def require_current_witness(self, witness, *, subject, expression_event_id,
+                                selection_event_id):
+        """Revalidate a permit-bound quality requirement, never mint authority."""
+        if (not isinstance(witness, dict) or set(witness) != {
+                'review_event_id', 'interpretation_id', 'require_independence'}
+                or type(witness['require_independence']) is not bool
+                or any(not isinstance(witness[key], str) or not witness[key]
+                       for key in ('review_event_id', 'interpretation_id'))):
+            raise SourceSupportError('invalid final-wording witness')
+        if not isinstance(expression_event_id, str) or not expression_event_id:
+            raise SourceSupportError('final-wording witness needs an expression')
+        expression = self.expressions.resolve_model_candidate(expression_event_id)
+        header = self.journal.get(expression_event_id)
+        if (expression is None or header is None or header.event.subject != subject
+                or expression.selection_event_id != selection_event_id):
+            raise SourceSupportError('final-wording witness expression mismatch')
+        findings = self.verify_current(witness['review_event_id'], subject=subject,
+            interpretation_id=witness['interpretation_id'], candidate_id=expression_event_id,
+            allow_correlated=not witness['require_independence'], clearance=header.event.sensitivity)
+        record = self.journal.get(witness['review_event_id'])
+        if (findings is None or findings['verdict'] != 'supported' or record is None
+                or record.event.payload.get('require_independence') != witness['require_independence']):
+            raise SourceSupportError('final wording is no longer supported')
+
     def snapshot(self, *, subject, interpretation_id, candidate_id,
                  clearance=Sensitivity.PRIVATE):
         # Scope before resolving encrypted content. Resolution then verifies the

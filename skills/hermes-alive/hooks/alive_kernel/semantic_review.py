@@ -60,6 +60,7 @@ class ReviewerKind(StrEnum):
 
 class ReviewDisposition(StrEnum):
     SHADOW_ELIGIBLE = "shadow_eligible"
+    CORRELATED = "correlated_review"
     REJECTED = "rejected"
     INVALID = "invalid"
 
@@ -193,6 +194,10 @@ def assess_independent_review(
     review: IndependentSemanticReview,
 ) -> ReviewAssessment:
     """Validate binding, completeness and independence before reading verdicts."""
+    return _assess_review(document, candidate_text, review, require_independence=True)
+
+
+def _assess_review(document, candidate_text, review, *, require_independence):
 
     reasons: list[str] = []
     expected_meaning_event_id = f"message.meaning:{document.message_id}"
@@ -204,7 +209,7 @@ def assess_independent_review(
     reviewed_ids = tuple(item.atom_id for item in review.atom_reviews)
     if len(reviewed_ids) != len(expected_ids) or set(reviewed_ids) != set(expected_ids):
         reasons.append("atom_review_set_incomplete")
-    if not review.structurally_independent:
+    if require_independence and not review.structurally_independent:
         reasons.append("reviewer_not_independent")
     if reasons:
         return ReviewAssessment(ReviewDisposition.INVALID, (), tuple(reasons))
@@ -245,9 +250,10 @@ def assess_independent_review(
             tuple(dict.fromkeys(reasons or ("semantic_risk_detected",))),
         )
     return ReviewAssessment(
-        ReviewDisposition.SHADOW_ELIGIBLE,
+        ReviewDisposition.SHADOW_ELIGIBLE if review.structurally_independent else ReviewDisposition.CORRELATED,
         (),
-        ("complete_independent_review_found_no_semantic_change",),
+        (("complete_independent_review_found_no_semantic_change" if review.structurally_independent
+          else "correlated_review_is_not_independent_evidence"),),
     )
 
 
@@ -661,7 +667,10 @@ class SemanticReviewStore:
         review: IndependentSemanticReview,
         actor: str,
         observed_at: datetime | None = None,
+        require_independence: bool = True,
     ) -> StoredReviewReceipt:
+        if type(require_independence) is not bool:
+            raise SemanticReviewError('invalid independence mode')
         current = self._utc(
             observed_at or datetime.now(timezone.utc), "observed_at"
         )
@@ -683,10 +692,12 @@ class SemanticReviewStore:
         ):
             raise SemanticReviewError("review does not bind the stored renderer evidence")
         document = self.meanings.resolve(candidate.meaning_event_id)
-        assessment = assess_independent_review(document, candidate.text, review)
+        assessment = _assess_review(document, candidate.text, review, require_independence=require_independence)
         if assessment.disposition is ReviewDisposition.INVALID:
             raise SemanticReviewError("invalid independent review cannot be recorded")
         payload: dict[str, Any] = {
+            "require_independence": require_independence,
+            "independent_review": review.structurally_independent,
             "review_id": review.review_id,
             "candidate_event_id": candidate_event_id,
             "meaning_event_id": candidate.meaning_event_id,
@@ -736,14 +747,16 @@ class SemanticReviewStore:
             payload=payload,
         )
         record = self._append_idempotent(event)
-        verified = self.verify_review(record, as_of=current)
+        verified = self.verify_review(record, as_of=current, allow_correlated=not require_independence)
         if verified is None:
             raise SemanticReviewError("stored semantic review failed verification")
         return verified
 
     def verify_review(
-        self, record: JournalRecord, *, as_of: datetime | None = None
+        self, record: JournalRecord, *, as_of: datetime | None = None, allow_correlated: bool = False
     ) -> StoredReviewReceipt | None:
+        if type(allow_correlated) is not bool:
+            raise SemanticReviewError('invalid correlated review mode')
         event = record.event
         payload = event.payload
         try:
@@ -803,7 +816,12 @@ class SemanticReviewStore:
                 ],
             )
             document = self.meanings.resolve(candidate.meaning_event_id)
-            assessment = assess_independent_review(document, candidate.text, review)
+            required = payload.get('require_independence', True)
+            if (type(required) is not bool
+                    or payload.get('independent_review', review.structurally_independent) is not review.structurally_independent
+                    or (not review.structurally_independent and (required or not allow_correlated))):
+                return None
+            assessment = _assess_review(document, candidate.text, review, require_independence=required)
             return (
                 StoredReviewReceipt(
                     event.event_id,

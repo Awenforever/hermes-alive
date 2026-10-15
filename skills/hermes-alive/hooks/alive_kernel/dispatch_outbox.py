@@ -100,6 +100,13 @@ class DispatchOutbox:
                     owner=str(authorization.event.subject),
                     sensitivity=authorization.event.sensitivity)
             expression_id = authorization.event.payload.get("expression_event_id")
+            witness = authorization.event.payload.get("final_wording_witness")
+            if witness is not None:
+                from .expression_support import ExpressionSourceSupportReviewer
+                ExpressionSourceSupportReviewer(self.journal, content_vault=self.vault,
+                    context_vault=self.context_vault).require_current_witness(_thaw_json(witness),
+                        subject=str(authorization.event.subject), expression_event_id=expression_id,
+                        selection_event_id=str(authorization.event.payload["selection_event_id"]))
             if expression_id:
                 from .opportunity_expression import OpportunityExpressionStore
                 expressed, _expiry = OpportunityExpressionStore(self.journal,

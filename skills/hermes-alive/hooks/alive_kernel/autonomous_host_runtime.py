@@ -84,7 +84,7 @@ class AutonomousHostRuntime:
         cursor = result.reconciliation['next_after_sequence']
         if (type(cursor) is not int or cursor<0 or result.external_delivery_proven is not False
                 or result.disposition not in ('paused','reconciliation_attention','silence','shadow_selected',
-                    'not_authorized','attempt_unavailable','submitted')):
+                    'not_authorized','attempt_unavailable','submitted','content_review_attention')):
             raise ValueError('cycle completion exceeds qualified contract')
         payload = {'subject':self.subject,'lane':self.lane,'operation_id':cycle.operation_id,'disposition':result.disposition,
             'next_reconciliation_cursor':cursor,'external_delivery_proven':False,'authority_granted':False}

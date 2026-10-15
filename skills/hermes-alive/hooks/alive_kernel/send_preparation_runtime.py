@@ -14,6 +14,8 @@ class SendPreparationResult:
     attempt_event_id: str | None = None
     # Preparing an attempt never claims an external delivery.
     sent: bool = False
+    final_review_event_id: str | None = None
+    quality_disposition: str = 'not_reviewed'
 
 
 class SendPreparationRuntime:
@@ -33,6 +35,48 @@ manufactures them from model output or reviews, nor falls back to another body.
                                             context_vault=context_vault)
         self.outcomes = OutcomeProjection(journal, content_vault=self.vault)
 
+    def _expression_origin(self, expressed):
+        candidate = self.expression.store.resolve_model_candidate(expressed.expression_event_id)
+        if candidate is None:
+            raise ValueError('final expression provenance is unavailable')
+        subject = self.journal.get(candidate.event_id).event.subject
+        for receipt in (expressed.planning.interpretation_event_id,
+                        expressed.planning.repair_interpretation_event_id):
+            if receipt is None:
+                continue
+            operation = receipt.removeprefix('opportunity.synthesis:').removesuffix(':completed')
+            generated = self.expression.planning.synth.load_completed(subject=subject, operation_id=operation)
+            if any(c.action.candidate_id == candidate.candidate_id for c in generated.candidates):
+                return subject, operation, self.journal.get(candidate.event_id).event.sensitivity
+        raise ValueError('final expression does not belong to its planning evidence')
+
+    async def _review_final(self, expressed, parameters):
+        from .expression_support import ExpressionSourceSupportReviewer
+        subject, origin, clearance = self._expression_origin(expressed)
+        reviewer = ExpressionSourceSupportReviewer(self.journal, content_vault=self.vault,
+                                                   context_vault=self.context_vault)
+        required = parameters.get('require_independent_grounding', False)
+        resolver = parameters.get('resolve_grounding_domain') or (lambda model:'unqualified-family')
+        operation = 'final-ground:' + self.vault.digest_json({'expression':expressed.expression_event_id,
+            'required':required, 'model':parameters.get('grounding_model') or parameters.get('requested_model')})[:40]
+        prefix = 'opportunity.source-support:' + operation
+        if self.journal.get(prefix + ':started') is None:
+            await reviewer.run(subject=subject, interpretation_id=origin,
+                candidate_id=expressed.expression_event_id, operation_id=operation,
+                call=parameters['call'], resolve_domain=resolver,
+                reviewer_model=parameters.get('grounding_model') or parameters.get('requested_model'),
+                require_independence=required, clearance=clearance)
+        event_id = prefix + ':completed'
+        findings = reviewer.verify_current(event_id, subject=subject, interpretation_id=origin,
+            candidate_id=expressed.expression_event_id, allow_correlated=not required, clearance=clearance)
+        if findings is None:
+            raise ValueError('final review unresolved or stale; no implicit provider retry')
+        payload = self.journal.get(event_id).event.payload
+        if (resolver(payload['generator_model']) != payload['generator_domain']
+                or resolver(payload['reviewer_model']) != payload['reviewer_domain']):
+            raise ValueError('final review model scope changed')
+        return event_id, findings['verdict']
+
     async def prepare(self, *, authorization_operation_id, route_binding_id,
                       confirmation_event_id=None, delegation_event_id=None,
                       **expression_parameters):
@@ -51,12 +95,28 @@ manufactures them from model output or reviews, nor falls back to another body.
         if expressed.planning.action_kind == 'silence':
             return SendPreparationResult(expressed)
         subject = expression_parameters['subject']
+        final_event, quality = None, 'not_reviewed'
+        if expression_parameters.get('grounding', False):
+            if expressed.review_disposition == 'rejected':
+                return SendPreparationResult(expressed, final_review_event_id=expressed.review_event_id,
+                                              quality_disposition='final_semantic_rejected')
+            final_event, quality = await self._review_final(expressed, expression_parameters)
+            if quality != 'supported':
+                return SendPreparationResult(expressed, final_review_event_id=final_event,
+                                              quality_disposition='final_' + quality)
+        witness = None
+        if final_event is not None:
+            _subject, origin, _clearance = self._expression_origin(expressed)
+            witness = {'review_event_id':final_event, 'interpretation_id':origin,
+                       'require_independence':expression_parameters.get('require_independent_grounding', False)}
         decision = self.authorizer.evaluate(selection_event_id=expressed.planning.selection_event_id,
             subject=subject, capability='hermes.channel.send', operation_id=authorization_operation_id,
             route_binding_id=route_binding_id, confirmation_event_id=confirmation_event_id,
-            delegation_event_id=delegation_event_id, expression_event_id=expressed.expression_event_id)
+            delegation_event_id=delegation_event_id, expression_event_id=expressed.expression_event_id,
+            final_wording_witness=witness)
         if not decision.authorized:
-            return SendPreparationResult(expressed, decision)
+            return SendPreparationResult(expressed, decision, final_review_event_id=final_event,
+                                          quality_disposition=quality)
         identity = 'runtime-attempt:' + self.vault.digest_json({
             'selection': expressed.planning.selection_event_id,
             'expression': expressed.expression_event_id, 'subject': subject})[:40]
@@ -68,10 +128,23 @@ manufactures them from model output or reviews, nor falls back to another body.
         projected = self.outcomes.apply(attempt)
         if projected.outcome != 'recorded':
             raise ValueError('authorized runtime attempt was not admitted')
-        return SendPreparationResult(expressed, decision, attempt.event.event_id)
+        return SendPreparationResult(expressed, decision, attempt.event.event_id,
+            final_review_event_id=final_event, quality_disposition=quality)
 
     def _validate_prepared_lease(self, prepared, lease):
         from .dispatch_outbox import DispatchOutboxError
+        if prepared.expression.planning.grounding_reviews:
+            from .expression_support import ExpressionSourceSupportReviewer
+            subject, origin, clearance = self._expression_origin(prepared.expression)
+            record = self.journal.get(prepared.final_review_event_id) if prepared.final_review_event_id else None
+            findings = ExpressionSourceSupportReviewer(self.journal, content_vault=self.vault,
+                context_vault=self.context_vault).verify_current(prepared.final_review_event_id,
+                    subject=subject, interpretation_id=origin,
+                    candidate_id=prepared.expression.expression_event_id, allow_correlated=True,
+                    clearance=clearance) if record else None
+            if (prepared.quality_disposition != 'supported' or findings is None
+                    or findings['verdict'] != 'supported'):
+                raise DispatchOutboxError('prepared action lacks current final-wording support')
         attempt = self.journal.get(prepared.attempt_event_id) if prepared.attempt_event_id else None
         if (prepared.authorization is None or not prepared.authorization.authorized
                 or attempt is None
