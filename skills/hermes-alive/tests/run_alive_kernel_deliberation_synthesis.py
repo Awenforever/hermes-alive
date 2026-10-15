@@ -191,6 +191,9 @@ async def exercise(path: Path) -> None:
     assert len(calls) == 2
     assert all(call["task"] == "alive_deliberation" for call in calls)
     assert all(call["model"] == "provider/requested-primary" for call in calls)
+    clock = journal.get('deliberation.synthesis:selector-operation:started').event.payload['selection_as_of']
+    assert f'Host selection_as_of={clock};' in calls[0]['messages'][1]['content'].split('\n',1)[0]
+    assert calls[0]['messages'][1]['content'] == calls[1]['messages'][1]['content']
     prompt = json.loads(calls[0]["messages"][1]["content"].split("\n", 1)[1])
     prompt_ids = {item["candidate_id"] for item in prompt}
     assert prompt_ids == {safe.candidate_id, cycle.gate.silence_id}

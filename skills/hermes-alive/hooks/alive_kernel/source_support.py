@@ -42,6 +42,13 @@ for detail never justifies invention. Communication may be queued: generation ti
 does not establish delivery time. An unanchored relative countdown or moving date
 cannot be assumed still correct when delivered; prefer explicit dated references.
 Operational scope limits constrain behavior, not a requirement to recite guardrails.
+When candidate.communication_plan is present, review its recipient-facing contents
+and behavior_constraints as tentative model interpretations, not extra evidence.
+Check the goal and speech act against the actual source/user purpose. Essential
+caveats and time relationships must not disappear into behavior_constraints or
+be omitted from the plan. Distinguish agent operational prohibitions from factual
+negations, eligibility and uncertainty the recipient needs to understand. Reject
+a plan that hides material meaning even if its illustrative draft is accurate.
 Reviewing supplied evidence cannot establish
 real-world truth or authorize delivery. Return only this JSON object:
 {"verdict":"supported|unsupported|uncertain","unsupported_claims":[],
@@ -212,6 +219,12 @@ class SourceSupportReviewer:
             'recent_feedback_context':[f.to_prompt() for f in feedback],
             'candidate':{'id':candidate_id, 'kind':candidate.action.action_kind.value,
                 'text':_thaw_json(candidate.content)['operation']['text']}}
+        proposal = self.interpreter.retained_proposal(receipt_event_id=result.receipt_event_id,
+            candidate_id=candidate_id, subject=subject, clearance=clearance)
+        if 'communication_plan' in proposal:
+            data['candidate']['communication_plan'] = proposal['communication_plan']
+            data['interpretation_as_of'] = start.event.payload.get('interpretation_as_of')
+            data['time_anchor_is_not_delivery_time'] = True
         if len(json.dumps(data, ensure_ascii=False)) > 40000:
             raise SourceSupportError('source review exceeds prompt boundary')
         return data, result

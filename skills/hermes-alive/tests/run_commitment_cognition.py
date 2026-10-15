@@ -19,6 +19,10 @@ from alive_kernel.action_delegation import ActionDelegationStore
 from alive_kernel_testkit import install_terminal_route, authenticated_dispatch_receipt
 from alive_kernel.outcomes import OutcomeKind
 from alive_kernel.delivered_history import DeliveredHistoryStore, DeliveredHistoryError
+from alive_kernel.communication_plan import validate_communication_plan
+from alive_kernel.semantic_rendering import SemanticAtomKind
+from alive_kernel.source_support import SourceSupportReviewer
+from alive_kernel.communication_purpose import CommunicationPurposeReviewer
 
 
 def reply(value,model='synthetic/drafter'):
@@ -50,7 +54,7 @@ def transition(journal,agenda,proposal,state):
     assert agenda.apply(changed).outcome=='transitioned'
 
 
-async def test(root):
+async def test(root, *, recipient_meaning=False, purpose_repair=False):
     journal=ExperienceJournal(root/'main'/'kernel.sqlite3')
     synth=OpportunitySynthesizer(journal)
     forbidden_calls=[]
@@ -76,23 +80,45 @@ async def test(root):
     evidence=synth.reader.active_evidence(subject='user:test',clearance=Sensitivity.PRIVATE)
     assert len(evidence)==1 and evidence[0].content['origin_kind']=='commitment' and evidence[0].content['url']==''
     calls=[]
+    purpose_attempts=[]
     async def model(**kwargs):
         task=kwargs['task']; calls.append(task)
         if task=='alive_opportunity_candidates':
             item=json.loads(kwargs['messages'][1]['content'])['opportunities'][0]
+            generation = json.loads(kwargs['messages'][1]['content'])
+            if purpose_repair and generation['corrective_reviews']:
+                assert generation['corrective_reviews'][0]['critique']['reason']=='synthetic-purpose-mismatch'
             assert item['origin_kind']=='commitment' and item['url']==''
             assert json.loads(item['summary_excerpt'])['commitment']['constraint']=='只提醒，不代为提交'
-            return reply(dict(candidates=[dict(agenda_item_id=item['agenda_item_id'],kind='share',
+            proposed = dict(agenda_item_id=item['agenda_item_id'],kind='share',
                 text='提醒你核对实验记录；我不会代为提交，也没有将事项标为完成。',topic='explicit commitment',
                 dimensions={name:dict(value=.1 if name in ('risk','interruption_cost') else .8,reason='synthetic')
-                    for name in ('user_value','urgency','novelty','confidence','risk','interruption_cost')})]))
+                    for name in ('user_value','urgency','novelty','confidence','risk','interruption_cost')})
+            if recipient_meaning:
+                due = json.loads(item['summary_excerpt'])['due_at']
+                proposed['communication_plan'] = dict(version=1,
+                    recipient_goal='帮助用户记得核对实验记录，不宣称代为处理',speech_act='remind',
+                    contents=[dict(kind='request',text='请核对实验记录。',protected_literals=[]),
+                        dict(kind='deadline',text='截止：'+due,protected_literals=[due])],
+                    behavior_constraints=['只提醒，不代为提交','不能声称已替用户检查完成'])
+            return reply(dict(candidates=[proposed]))
         if task=='alive_source_support':
             kwargs['route_info']['provider']='synthetic-review-provider'
             data=json.loads(kwargs['messages'][1]['content'])
             assert data['evidence'][0]['provenance_metadata']['origin_kind']=='commitment'
+            if recipient_meaning:
+                assert data['candidate']['communication_plan']['speech_act']=='remind'
+                assert datetime.fromisoformat(data['interpretation_as_of']).utcoffset() is not None
+                assert data['time_anchor_is_not_delivery_time'] is True
+            if data.get('assessment_kind')=='recipient-purpose-v1':
+                purpose_attempts.append(data)
+                if purpose_repair and len(purpose_attempts)==1:
+                    return reply(dict(verdict='unsupported',unsupported_claims=['synthetic purpose mismatch'],
+                        uncertainties=[],reason='synthetic-purpose-mismatch'),'synthetic/reviewer')
             return reply(dict(verdict='supported',unsupported_claims=[],uncertainties=[],reason='synthetic review'),
                          'synthetic/reviewer')
         if task=='alive_deliberation':
+            assert 'Host selection_as_of=' in kwargs['messages'][1]['content'].split('\n',1)[0]
             options=json.loads(kwargs['messages'][1]['content'].split('\n',1)[1])
             chosen=next(o['candidate_id'] for o in options if o['candidate_id'].startswith('opportunity-candidate:'))
             return reply(dict(candidate_id=chosen,rationale='synthetic'))
@@ -100,6 +126,11 @@ async def test(root):
             kwargs['route_info']['provider']='synthetic-render-provider'
             data=json.loads(kwargs['messages'][1]['content'])
             assert all(a['kind']!='link' for a in data['meaning']['atoms'])
+            if recipient_meaning:
+                assert data['meaning']['speech_act']=='remind'
+                assert all(a['kind']!='proposed_content' for a in data['meaning']['atoms'])
+                assert '我不会代为提交' not in json.dumps(data['meaning'],ensure_ascii=False)
+                assert data['expression_context']['behavior_constraints']==['只提醒，不代为提交','不能声称已替用户检查完成']
             return reply('\n'.join(a['text'] for a in data['meaning']['atoms']),'synthetic/renderer')
         if task=='alive_semantic_review':
             kwargs['route_info']['provider']='synthetic-review-provider'
@@ -108,10 +139,33 @@ async def test(root):
                 added_claims_detected=False,speech_act_preserved=True,protected_literals_preserved=True),'synthetic/reviewer')
         raise AssertionError(task)
     expression=dict(call=model,resolve_domain=lambda provider,model:model,resolve_grounding_domain=lambda model:model,
-        grounding=True,authority=ActionAuthority.USER_DELEGATED,language='zh')
+        grounding=True,authority=ActionAuthority.USER_DELEGATED,language='zh',recipient_meaning=recipient_meaning)
     selected=await runtime.cycle(subject='user:test',operation_id='reminder',expression_parameters=expression,
         resolve_binding=lambda record:None)
     assert selected.disposition=='shadow_selected' and 'http' not in selected.expression.text
+    if recipient_meaning:
+        assert selected.expression.text.startswith('请核对实验记录。')
+        assert '我不会代为提交' not in selected.expression.text
+        meaning = runtime.preparation.expression.store.meanings.resolve(
+            journal.get(selected.expression.expression_event_id).event.payload['meaning_event_id'])
+        assert any(a.kind is SemanticAtomKind.DEADLINE for a in meaning.atoms)
+        purpose_event=next(event for _,verdict,event in selected.expression.planning.grounding_reviews
+            if 'planning-purpose:' in event and verdict=='supported')
+        start=journal.get(journal.get(purpose_event).event.causation_id)
+        origin=start.event.causation_id.removeprefix('opportunity.synthesis:').removesuffix(':completed')
+        review_args=dict(subject='user:test',interpretation_id=origin,
+            candidate_id=journal.get(purpose_event).event.payload['candidate_id'],
+            clearance=Sensitivity.PRIVATE,allow_correlated=True)
+        assert CommunicationPurposeReviewer(journal).verify_current(purpose_event,**review_args)
+        assert SourceSupportReviewer(journal).verify_current(purpose_event,**review_args) is None
+        assert len(purpose_attempts)==(2 if purpose_repair else 1)
+        # Same retained intent cannot silently change its original binding mode.
+        try:
+            await runtime.preparation.expression.run(subject='user:test',operation_id='reminder',
+                policy_context=policies.current('user:test').context,
+                **{**expression,'recipient_meaning':False,'call':forbidden})
+        except ValueError: pass
+        else: raise AssertionError('recipient meaning downgraded on recovery')
     route=install_terminal_route(journal,subject='user:test',content_vault=runtime.preparation.vault)
     grant=ActionDelegationStore(journal).grant(subject='user:test',actor='user:test',policy_event_id=policies.current('user:test').event_id,
         route_binding_id=route,action_kinds=('share',),maximum_sensitivity=Sensitivity.PRIVATE,
@@ -177,6 +231,7 @@ async def test(root):
         assert not foreign_synth.reader.active_evidence(subject='user:test',clearance=Sensitivity.PRIVATE)
 
 
-with tempfile.TemporaryDirectory(prefix='alive-commitment-cognition-') as folder:
-    asyncio.run(test(Path(folder)))
+for use_plan, repair_purpose in ((False,False),(True,False),(True,True)):
+    with tempfile.TemporaryDirectory(prefix='alive-commitment-cognition-') as folder:
+        asyncio.run(test(Path(folder),recipient_meaning=use_plan,purpose_repair=repair_purpose))
 print('HERMES_ALIVE_COMMITMENT_COGNITION_OK')

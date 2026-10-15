@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 from .action_contract import parse_action_contract
 from .content_vault import ContentReference
+from .communication_plan import validate_communication_plan, plan_atoms, expression_context
 from .deliberation import ActionKind, SideEffect
 from .deliberation_synthesis import DeliberationSynthesizer
 from .events import _thaw_json
@@ -85,16 +86,33 @@ class OpportunityExpressionStore(SemanticReviewStore):
             raise SemanticReviewError('original opportunity evidence is unavailable') from None
         if expiry is None or expiry <= datetime.now(timezone.utc):
             raise SemanticReviewError('original opportunity draft expired')
-        atom = SemanticAtom('proposed-message', SemanticAtomKind.PROPOSED_CONTENT,
-                            text, evidence, literals)
-        atoms = (atom,)
-        if original_url and original_url not in text:
+        plan = original.get('communication_plan')
+        if plan is not None:
+            validate_communication_plan(plan, action_kind=candidate.action_kind.value)
+            atoms = plan_atoms(plan, evidence=evidence)
+        else:
+            # Retained legacy proposals keep the exact old draft binding. Never
+            # retroactively reinterpret a confirmed or historic draft as a plan.
+            atoms = (SemanticAtom('proposed-message', SemanticAtomKind.PROPOSED_CONTENT,
+                                 text, evidence, literals),)
+        if original_url and not any(original_url in a.protected_literals for a in atoms):
             # Immutable selected wording remains the first atom. Provenance is
             # supplied by the host from canonical evidence, never guessed by the
             # renderer or conditional on the drafting model remembering a link.
             atoms += (SemanticAtom('source-link', SemanticAtomKind.LINK,
                                    original_url, evidence, (original_url,)),)
-        return source, stored, atoms, expiry
+        return source, stored, atoms, expiry, plan
+
+    def expression_context_for_selection(self, selection_event_id, subject):
+        *_, plan = self._selected_draft(selection_event_id, subject)
+        return expression_context(plan) if plan is not None else None
+
+    @staticmethod
+    def _speech(stored, plan):
+        if plan is not None:
+            return MessageSpeechAct(plan['speech_act'])
+        return (MessageSpeechAct.SHARE if stored.selection.candidate.action_kind is ActionKind.SHARE
+                else MessageSpeechAct.ASK)
 
     def _message_id(self, selection_event_id):
         return 'selected-opportunity:' + self.content_vault.digest_json(
@@ -123,7 +141,7 @@ class OpportunityExpressionStore(SemanticReviewStore):
             capability='hermes.channel.send'), candidate.expires_at
 
     def define_for_selection(self, *, selection_event_id, subject):
-        source, stored, atoms, expiry = self._selected_draft(selection_event_id, subject)
+        source, stored, atoms, expiry, plan = self._selected_draft(selection_event_id, subject)
         message_id = self._message_id(selection_event_id)
         event_id = 'message.meaning:' + message_id
         existing = self.journal.get(event_id)
@@ -132,8 +150,7 @@ class OpportunityExpressionStore(SemanticReviewStore):
                 meaning_event_id=event_id, subject=subject, observed_at=datetime.now(timezone.utc))
             return existing
         now = datetime.now(timezone.utc)
-        speech = (MessageSpeechAct.SHARE if stored.selection.candidate.action_kind is ActionKind.SHARE
-                  else MessageSpeechAct.ASK)
+        speech = self._speech(stored, plan)
         document = MeaningDocument(message_id, subject, speech, atoms, now,
             min(expiry, now + timedelta(hours=1)), source.event.sensitivity)
         record = self.meanings.define(document, actor='system:alive-opportunity-expression', observed_at=now)
@@ -142,7 +159,7 @@ class OpportunityExpressionStore(SemanticReviewStore):
         return record
 
     def _selection_context(self, *, selection_event_id, meaning_event_id, subject, observed_at):
-        source, stored, atoms, expiry = self._selected_draft(selection_event_id, subject)
+        source, stored, atoms, expiry, plan = self._selected_draft(selection_event_id, subject)
         message_id = self._message_id(selection_event_id)
         record = self.journal.get(meaning_event_id)
         # Scope checked before decrypting retained meaning.
@@ -156,8 +173,7 @@ class OpportunityExpressionStore(SemanticReviewStore):
             document = self.meanings.resolve(meaning_event_id)
         except SemanticRenderingError:
             raise SemanticReviewError('bound opportunity meaning is unavailable') from None
-        speech = (MessageSpeechAct.SHARE if stored.selection.candidate.action_kind is ActionKind.SHARE
-                  else MessageSpeechAct.ASK)
+        speech = self._speech(stored, plan)
         if (document.message_id != message_id or document.subject != subject
                 or document.speech_act is not speech or document.atoms != atoms
                 or document.expires_at > expiry

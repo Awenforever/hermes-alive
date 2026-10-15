@@ -43,7 +43,7 @@ async def run(output, *, model_call=None):
             raise
         finally: save()
     async def call(**kwargs):
-        if report['logical_calls']>=8: raise RuntimeError('commitment logical-call bound exhausted')
+        if report['logical_calls']>=12: raise RuntimeError('commitment logical-call bound exhausted')
         report['logical_calls']+=1
         item=dict(task=kwargs.get('task'),messages=kwargs['messages'])
         report['model_calls'].append(item); save()
@@ -67,7 +67,8 @@ async def run(output, *, model_call=None):
             enabled=True,context=PolicyContext(can_interrupt=True),operation_id='synthetic-enable'))
         runtime=AutonomousCycleRuntime(journal)
         expression=dict(call=call,resolve_domain=lambda provider,model:family(model),
-            resolve_grounding_domain=family,grounding=True,language='zh',authority=ActionAuthority.USER_DELEGATED)
+            resolve_grounding_domain=family,grounding=True,language='zh',
+            authority=ActionAuthority.USER_DELEGATED,recipient_meaning=True)
         async def stage(name):
             item=dict(name=name,calls_before=report['logical_calls'])
             report['stages'].append(item); save()
@@ -77,6 +78,14 @@ async def run(output, *, model_call=None):
                     cognition_configuration_id='synthetic-commitment-config')
                 item.update(disposition=result.disposition,
                     text=result.expression.text if result.expression is not None else None)
+                if result.expression is not None:
+                    planning = result.expression.planning
+                    item['interpretation_event_id'] = planning.interpretation_event_id
+                    item['grounding_reviews'] = list(planning.grounding_reviews)
+                    receipt = journal.get(planning.interpretation_event_id)
+                    if receipt is not None:
+                        item['candidate_count'] = receipt.event.payload.get('candidate_count')
+                        item['rejected_count'] = receipt.event.payload.get('rejected_count')
             except Exception as error: item['error_class']=type(error).__name__
             item['calls_after']=report['logical_calls']; save()
         await stage('empty-before-commitment')

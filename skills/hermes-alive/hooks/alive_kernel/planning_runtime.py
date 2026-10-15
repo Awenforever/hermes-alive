@@ -46,14 +46,17 @@ watcher and not a complete production loop. It creates no channel queues.
             content_vault=self.synth.vault, context_vault=context_vault)
 
     async def _ground_candidates(self, generated, *, subject, interpretation_id,
-            call, reviewer_model, sensitivity, resolve_domain, require_independence):
+            call, reviewer_model, sensitivity, resolve_domain, require_independence,
+            purpose=False):
         from .source_support import SourceSupportReviewer
-        reviewer = SourceSupportReviewer(self.journal, content_vault=self.synth.vault,
+        from .communication_purpose import CommunicationPurposeReviewer
+        reviewer_class = CommunicationPurposeReviewer if purpose else SourceSupportReviewer
+        reviewer = reviewer_class(self.journal, content_vault=self.synth.vault,
                                          context_vault=self.context_vault)
         eligible, reviews, failures = [], [], 0
         for candidate in generated.candidates:
             candidate_id = candidate.action.candidate_id
-            key = 'planning-ground:' + self.synth.vault.digest_json({
+            key = ('planning-purpose:' if purpose else 'planning-ground:') + self.synth.vault.digest_json({
                 'interpretation':interpretation_id, 'candidate':candidate_id})[:40]
             prefix = 'opportunity.source-support:' + key
             event_id = prefix + ':completed'
@@ -92,7 +95,9 @@ watcher and not a complete production loop. It creates no channel queues.
                   call, requested_model=None, authority=ActionAuthority.NONE,
                   sensitivity=Sensitivity.PRIVATE, grounding=False,
                   grounding_model=None, resolve_grounding_domain=None,
-                  require_independent_grounding=False):
+                  require_independent_grounding=False, recipient_meaning=False):
+        if type(recipient_meaning) is not bool:
+            raise PlanningRuntimeError('invalid recipient meaning mode')
         if type(grounding) is not bool or type(require_independent_grounding) is not bool:
             raise PlanningRuntimeError('invalid grounding mode')
         if grounding_model is not None and (not isinstance(grounding_model, str) or not re.fullmatch(
@@ -126,6 +131,8 @@ watcher and not a complete production loop. It creates no channel queues.
         if grounding:
             binding['grounding'] = {'model':grounding_model,
                 'require_independence':require_independent_grounding, 'method':'source-support-v1'}
+        if recipient_meaning:
+            binding['recipient_meaning'] = 'recipient-meaning-v1'
         digest = self.synth.vault.digest_json({'operation': operation_id, 'subject': subject})[:40]
         start_id = 'planning.runtime:' + digest + ':started'
         prior = self.journal.get(start_id)
@@ -153,8 +160,11 @@ watcher and not a complete production loop. It creates no channel queues.
                 authority=authority, clearance=sensitivity)
         else:
             generated = await self.synth.run(subject=subject, operation_id=interpret_id,
-                call=call, requested_model=requested_model, authority=authority, clearance=sensitivity)
+                call=call, requested_model=requested_model, authority=authority, clearance=sensitivity,
+                recipient_meaning=recipient_meaning)
         candidates, reviews, repair, repair_disposition = generated.candidates, (), None, None
+        if recipient_meaning and generated.rejected_count and not candidates:
+            raise PlanningRuntimeError('recipient meaning unavailable; malformed proposals are not qualified silence')
         repair_id = 'runtime-repair:' + digest
         if grounding:
             review_parameters = dict(subject=subject, call=call,
@@ -163,6 +173,13 @@ watcher and not a complete production loop. It creates no channel queues.
                 require_independence=require_independent_grounding)
             candidates, reviews, failures = await self._ground_candidates(generated,
                 interpretation_id=interpret_id, **review_parameters)
+            if recipient_meaning and candidates:
+                from dataclasses import replace
+                candidates, purpose_reviews, purpose_failures = await self._ground_candidates(
+                    replace(generated,candidates=candidates), interpretation_id=interpret_id,
+                    purpose=True, **review_parameters)
+                reviews += purpose_reviews
+                failures += purpose_failures
             rejected = tuple(event for _, verdict, event in reviews if verdict in ('unsupported', 'uncertain'))
             if rejected:
                 targets = {c.action.agenda_item_id for c in generated.candidates if any(
@@ -175,13 +192,22 @@ watcher and not a complete production loop. It creates no channel queues.
                     else:
                         repair = await self.synth.run(subject=subject, operation_id=repair_id,
                             call=call, requested_model=requested_model, authority=authority,
-                            clearance=sensitivity, revision_event_ids=rejected)
+                            clearance=sensitivity, revision_event_ids=rejected,
+                            recipient_meaning=recipient_meaning)
                     # A repair can address rejected intents, not expand the host's work scope.
                     from dataclasses import replace
+                    if recipient_meaning and repair.rejected_count and not repair.candidates:
+                        raise PlanningRuntimeError('corrected recipient meaning is malformed')
                     repaired = replace(repair, candidates=tuple(c for c in repair.candidates
                         if c.action.agenda_item_id in targets))
                     replacements, repair_reviews, repair_failures = await self._ground_candidates(
                         repaired, interpretation_id=repair_id, **review_parameters)
+                    if recipient_meaning and replacements:
+                        replacements, purpose_reviews, purpose_failures = await self._ground_candidates(
+                            replace(repaired,candidates=replacements), interpretation_id=repair_id,
+                            purpose=True, **review_parameters)
+                        repair_reviews += purpose_reviews
+                        repair_failures += purpose_failures
                     candidates += replacements
                     reviews += repair_reviews
                     failures += repair_failures
@@ -215,8 +241,7 @@ watcher and not a complete production loop. It creates no channel queues.
             authority=authority, clearance=sensitivity)
         if grounding:
             from .source_support import SourceSupportReviewer
-            verifier = SourceSupportReviewer(self.journal, content_vault=self.synth.vault,
-                                             context_vault=self.context_vault)
+            from .communication_purpose import reviewer_for_start
             if repair is not None:
                 self.synth.load_completed(subject=subject, operation_id=repair_id,
                     authority=authority, clearance=sensitivity)
@@ -225,6 +250,8 @@ watcher and not a complete production loop. It creates no channel queues.
                     continue
                 record = self.journal.get(event_id)
                 start = self.journal.get(record.event.causation_id)
+                verifier = reviewer_for_start(start)(self.journal, content_vault=self.synth.vault,
+                                                     context_vault=self.context_vault)
                 origin = start.event.causation_id.removeprefix('opportunity.synthesis:').removesuffix(':completed')
                 current = verifier.verify_current(event_id, subject=subject,
                     interpretation_id=origin, candidate_id=cid, clearance=sensitivity,

@@ -34,6 +34,10 @@ personal experiences, feelings or user preferences. Humor must not change the
 meaning or trivialize a warning. Language, when supplied, is a host-selected
 language code; otherwise preserve the meaning's language. Avoid mechanical
 atom labels, boilerplate or explanatory preambles.
+When expression_context is supplied, recipient_goal explains the communicative
+purpose; behavior_constraints constrain agent behavior but are not additional
+recipient-facing claims to recite. Preserve all meaning atoms, including material
+caveats and negations. The context is tentative interpretation, never permission.
 If correction context is supplied, revise the previous expression to remove
 unsupported additions while preserving the original meaning and protected links.
 Use canonical grounding context to avoid invented conversational history. Review
@@ -188,8 +192,13 @@ class SemanticComparator:
                       source.event.sensitivity, status="started")
         baseline = deterministic_text(document)
         meaning = serialize_meaning(document)
+        context_reader = getattr(self.store, 'expression_context_for_selection', None)
+        expression_context = (context_reader(selection_event_id, subject)
+                              if context_reader is not None else None)
         prompt = json.dumps({"meaning": meaning, "presentation": style,
-                             "language": language, **({'correction':correction} if correction else {})},
+                             "language": language,
+                             **({'expression_context':expression_context} if expression_context else {}),
+                             **({'correction':correction} if correction else {})},
                             ensure_ascii=False, separators=(",", ":"))
         if len(prompt) > (80_000 if correction else 40_000):
             self._receipt(operation, "failed", subject, selection_event_id,

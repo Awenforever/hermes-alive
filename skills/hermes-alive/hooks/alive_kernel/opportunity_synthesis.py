@@ -19,6 +19,7 @@ from .deliberation import (
 )
 from .deliberation_synthesis import DeliberationSynthesizer, ModelCaller
 from .cognition_opportunities import CognitionOpportunityReader
+from .communication_plan import validate_communication_plan
 from .event_store import EventConflictError, ExperienceJournal
 from .model_json import parse_model_json
 from .events import EventEnvelope, Sensitivity, _thaw_json
@@ -169,6 +170,31 @@ Return only JSON: {"abstentions":[{"agenda_item_id":"supplied ID","reason":"why 
 "interruption_cost":{"value":0.0,"reason":"brief"},"risk":{"value":0.0,"reason":"brief"}}}]}
 """
 
+_PLAN_GUIDANCE = """Separate intended meaning from illustrative draft wording.
+Every new communication candidate needs communication_plan version 1: recipient_goal
+(1-512 chars), speech_act (ask for kind=ask; share/inform/remind/warn for kind=share),
+1-6 whole recipient-facing contents and 0-6 behavior_constraints (each <=300 chars).
+Keep the whole plan within 4000 JSON characters. Contents are what the recipient
+needs to know, not an outline of how the system works. Behavioral constraints
+describe limits on action; do not turn them into promises or automatically include
+them in the message. Material caveats, uncertainty, eligibility, source attribution
+and limits that affect the person's understanding must remain recipient contents,
+not be hidden as internal constraints. A negation about the world is different
+from a prohibition on the agent. Neither the goal nor constraints create authority.
+Use precise semantic kinds, not proposed_content. Deadline/amount/link/contact/
+uncertainty/negation need a nonempty protected_literals list copied exactly from
+their text; literals are strings, not invented source evidence. Preserve time
+relationships: before a future deadline does not mean it is already due. Avoid
+delivery-relative wording when timing can change in transit. Draft is illustrative;
+the versioned recipient-facing contents, not incidental draft prose, bind later
+natural expression. You may abstain if no useful faithful plan exists.
+Add exactly this communication_plan object alongside each candidate's existing
+fields: {"version":1,"recipient_goal":"purpose","speech_act":"share|inform|remind|warn|ask",
+"contents":[{"kind":"fact|request|question|deadline|amount|link|contact|caveat|uncertainty|negation|source_attribution",
+"text":"essential meaning","protected_literals":[]}],"behavior_constraints":[]}.
+protected_literals may be omitted for kinds that do not require literal protection.
+"""
+
 _COMMITMENT_GUIDANCE = """For commitment-based communication, serve the person's
 actual purpose with a natural reminder or useful question, not a recitation of
 internal safety constraints. Scope limits constrain your actions; do not routinely
@@ -207,19 +233,19 @@ class OpportunitySynthesizer:
                                                     context_vault=context_vault)
 
     def _revision_context(self, event_ids, subject, clearance):
-        from .source_support import SourceSupportReviewer
+        from .communication_purpose import reviewer_for_start
         if (not isinstance(event_ids, (tuple, list)) or len(event_ids) > 4
                 or any(not isinstance(e, str) for e in event_ids)
                 or len(set(event_ids)) != len(event_ids)):
             raise OpportunitySynthesisError('invalid revision evidence list')
         if not event_ids:
             return []
-        reviewer = SourceSupportReviewer(self.journal, content_vault=self.vault,
-                                         context_vault=self.context_vault)
         result = []
         for event_id in event_ids:
             record = self.journal.get(str(event_id))
             start = self.journal.get(record.event.causation_id) if record is not None else None
+            reviewer = reviewer_for_start(start)(self.journal,content_vault=self.vault,
+                                                  context_vault=self.context_vault)
             receipt_id = start.event.causation_id if start is not None else ''
             if not receipt_id.startswith('opportunity.synthesis:') or not receipt_id.endswith(':completed'):
                 raise OpportunitySynthesisError('revision review lacks interpretation')
@@ -243,10 +269,32 @@ class OpportunitySynthesizer:
         return self.vault.digest_json([dict(event=e.observation_event_id,content=_thaw_json(e.content),
             expires_at=e.expires_at.isoformat()) for e in values])
 
+    def retained_proposal(self, *, receipt_event_id, candidate_id, subject, clearance):
+        """Resolve a proposal only after the caller revalidates its interpretation."""
+        receipt = self.journal.get(receipt_event_id)
+        if (receipt is None or receipt.event.subject != subject
+                or receipt.event.sensitivity is not Sensitivity(clearance)
+                or receipt.event.event_type != 'opportunity.synthesis_completed'):
+            raise OpportunitySynthesisError('proposal scope unavailable')
+        ref = ContentReference.from_event_payload(receipt.event.payload['content'])
+        bundle = self.vault.resolve_json(ref.content_id, expected_subject=subject,
+            expected_purpose='opportunity.candidates', expected_sensitivity=Sensitivity(clearance))
+        if self.vault.digest_json(bundle) != ref.digest:
+            raise OpportunitySynthesisError('proposal bundle changed')
+        operation = receipt_event_id.removeprefix('opportunity.synthesis:').removesuffix(':completed')
+        indices = bundle.get('proposal_indices', range(len(bundle['proposals'])))
+        for index, proposal in zip(indices, bundle['proposals']):
+            expected = 'opportunity-candidate:' + self.vault.digest_json(
+                {'operation':operation, 'index':index})[:40]
+            if expected == candidate_id:
+                return proposal
+        raise OpportunitySynthesisError('proposal identity unavailable')
+
     def _candidates(self, document: Any, evidence: tuple, operation: str,
                     receipt_id: str, authority: ActionAuthority, context: tuple = (),
                     indices: tuple[int, ...] | None = None, learning: tuple = (),
-                    source_presentation: str = "model_text_v1", feedback: tuple = ()) -> tuple[tuple, tuple, int, tuple]:
+                    source_presentation: str = "model_text_v1", feedback: tuple = (),
+                    recipient_meaning: bool = False) -> tuple[tuple, tuple, int, tuple]:
         if source_presentation not in _SOURCE_PRESENTATIONS:
             raise OpportunitySynthesisError("unknown source presentation policy")
         if (not isinstance(document, dict) or 'candidates' not in document
@@ -263,8 +311,9 @@ class OpportunitySynthesizer:
         accepted, drafts, accepted_indices = [], [], []
         for index, raw in zip(indices, document["candidates"]):
             try:
-                if (not isinstance(raw, dict) or set(raw) != {
-                        "agenda_item_id", "kind", "text", "topic", "dimensions"}
+                required = {"agenda_item_id", "kind", "text", "topic", "dimensions"}
+                if (not isinstance(raw, dict) or not required <= set(raw)
+                        or set(raw) - required - {'communication_plan'}
                         or raw["agenda_item_id"] not in sources
                         or raw["kind"] not in {"share", "ask"}
                         or not isinstance(raw["text"], str) or not 1 <= len(raw["text"]) <= 1600
@@ -272,6 +321,12 @@ class OpportunitySynthesizer:
                         or not isinstance(raw["dimensions"], dict)
                         or set(raw["dimensions"]) != set(_DIMENSIONS)):
                     raise ValueError("invalid candidate")
+                if 'communication_plan' in raw:
+                    if not recipient_meaning:
+                        raise ValueError('communication plan requires its explicit binding mode')
+                    validate_communication_plan(raw['communication_plan'], action_kind=raw['kind'])
+                elif recipient_meaning:
+                    raise ValueError('recipient meaning is required, no legacy draft fallback')
                 source = sources[raw["agenda_item_id"]]
                 scores = []
                 for name in _DIMENSIONS:
@@ -452,7 +507,8 @@ class OpportunitySynthesizer:
                 indices = tuple(range(count))
             candidates, _, invalid, _ = self._candidates({"candidates": bundle["proposals"]},
                 evidence, operation_id, receipt.event.event_id, authority, context, tuple(indices), learning,
-                source_presentation=bundle.get("source_presentation", "model_text_v1"),feedback=feedback)
+                source_presentation=bundle.get("source_presentation", "model_text_v1"),feedback=feedback,
+                recipient_meaning=start.event.payload.get('recipient_meaning',False))
             if invalid or len(candidates) != count:
                 raise OpportunitySynthesisError("completed proposals no longer valid")
             abstentions, invalid_abstentions = self._abstentions(
@@ -492,7 +548,10 @@ class OpportunitySynthesizer:
                   requested_model: str | None = None,
                   authority: ActionAuthority = ActionAuthority.NONE,
                   clearance: Sensitivity = Sensitivity.PRIVATE,
-                  timeout_seconds: float = 60, revision_event_ids: tuple = ()) -> OpportunitySynthesisResult:
+                  timeout_seconds: float = 60, revision_event_ids: tuple = (),
+                  recipient_meaning: bool = False) -> OpportunitySynthesisResult:
+        if type(recipient_meaning) is not bool:
+            raise OpportunitySynthesisError('invalid recipient meaning mode')
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}", operation_id):
             raise OpportunitySynthesisError("invalid opportunity operation")
         requested_model = str(requested_model).strip() or None if requested_model is not None else None
@@ -538,6 +597,7 @@ class OpportunitySynthesizer:
                 payload={"observation_event_ids": [e.observation_event_id for e in evidence],
                          "interpretation_as_of":as_of.isoformat(),
                          "commitment_digest":commitment_digest,
+                         "recipient_meaning":recipient_meaning,
                          "context_proposal_event_ids": [c.proposal_event_id for c in context],
                          "explicit_context_digest": self.vault.digest_json([c.to_prompt() for c in context]),
                          "feedback_context_digest": self.vault.digest_json([f.to_prompt() for f in feedback]),
@@ -558,7 +618,7 @@ class OpportunitySynthesizer:
             if evidence:
                 response = await asyncio.wait_for(call(
                     task="alive_opportunity_candidates", model=requested_model,
-                    messages=[{"role": "system", "content": _PROMPT+('\n'+_COMMITMENT_GUIDANCE
+                    messages=[{"role": "system", "content": _PROMPT+('\n'+_PLAN_GUIDANCE if recipient_meaning else '')+('\n'+_COMMITMENT_GUIDANCE
                         if any(e.content.get('origin_kind')=='commitment' for e in evidence) else '')},
                               {"role": "user", "content": prompt}],
                     temperature=.2, max_tokens=4000,
@@ -592,6 +652,7 @@ class OpportunitySynthesizer:
                 document, evidence, operation_id, receipt_id, authority, context, learning=learning,
                 source_presentation=self._SOURCE_PRESENTATION,
                 feedback=feedback,
+                recipient_meaning=recipient_meaning,
             )
             abstentions, rejected_abstentions = self._abstentions(
                 document.get("abstentions", []), evidence, document["candidates"])

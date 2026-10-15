@@ -34,6 +34,24 @@ explicit coordination. No speculative core/queue or production edits follow.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-16 — ADR-0148 adds explicit recipient-meaning plans and a separate model
+purpose assessment: immutable old contracts remain old; strict new mode separates
+recipient content from proposed operating constraints and supports actual remind
+speech acts. Grounded planning reviews facts and purpose separately, with at most
+the existing one correction generation. A purpose receipt cannot substitute for
+factual support or sending authority. All-malformed plans become unresolved, not
+qualified silence or another implicit provider spend. Actual trials still expose
+bad content classification, literal-contract failures and correlated reviewer
+misses. A four-case fixed-proposal purpose diagnostic meets three expectations,
+not a complete semantic claim; the fourth's necessity/context must be examined.
+Fresh composed selection exposed missing current time, now explicitly anchored
+and persisted with a retry-stable decision timestamp. No subsequent live success
+is claimed for that context fix. Totals204 logical/217 HTTP starts, zero sends.
+Continue robust plan production, recipient purpose/final wording and temporal
+usefulness, then the unchanged full host/memory/learning/privacy/migration/
+portable lifecycle/production objective. No production deployment or ten-clean
+semantic-cycle acceptance; new mode is isolated and opt-in.
+
 2026-10-16 — ADR-0147 connects admitted current commitments, without discovery,
 to the composed cognition/selection/expression/preparation pipeline. No current
 representable material now idles with auditable zero-provider work. Current task
