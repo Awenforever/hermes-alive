@@ -34,6 +34,18 @@ explicit coordination. No speculative core/queue or production edits follow.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-15 — ADR-0144 integrates opt-in bounded, change-sensitive reconsideration
+with the existing autonomous cycle/host. Only verified silence can wait; each
+later wait revalidates original planning with inference forbidden. New owner
+input/effective context/erasure/policy/configuration or time boundary invalidates
+it; reuse/restart does not extend the window. Transport reconciliation and pause
+still precede waiting, with no competing FIFO. Windows and offline Linux composed
+fixtures pass; this is not installed lifecycle or real-model temporal judgment.
+Next connect model-reasoned deferral and persistent commitments/agenda to this
+host boundary, then qualify meaningful autonomous feedback/reflection and the
+full migration/privacy/channel/production loop. No production deployment, model
+calls or actual sends in this work; totals remain 167 logical / 180 HTTP starts.
+
 2026-10-15 — ADR-0143 tests source scope before patching runtime. Four varied
 synthetic source contexts and direct/subtle contrasts make 15 actual logical /
 15 observed HTTP starts: preserved attribution and study limits, three material

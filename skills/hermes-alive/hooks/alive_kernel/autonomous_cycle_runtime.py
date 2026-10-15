@@ -9,6 +9,8 @@ import re
 from .dispatch_outbox import DispatchOutbox
 from .send_preparation_runtime import SendPreparationRuntime
 from .transport_reconciliation_runtime import TransportReconciliationRuntime
+from .reconsideration import ReconsiderationStore
+from .content_vault import ContentVaultError
 
 
 @dataclass(frozen=True,slots=True)
@@ -19,6 +21,7 @@ class AutonomousCycleResult:
     prepared: object = field(default=None,repr=False)
     submission: object = field(default=None,repr=False)
     external_delivery_proven: bool = False
+    reconsideration_event_id: str | None = None
 
 
 class AutonomousCycleRuntime:
@@ -26,10 +29,12 @@ class AutonomousCycleRuntime:
         self.preparation = SendPreparationRuntime(journal,content_vault=content_vault,context_vault=context_vault)
         self.outbox = DispatchOutbox(journal,content_vault=self.preparation.vault,context_vault=context_vault)
         self.reconciliation = TransportReconciliationRuntime(self.outbox)
+        self.reconsideration = ReconsiderationStore(self.preparation, self.outbox.protector)
 
     async def cycle(self,*,subject,operation_id,expression_parameters,resolve_binding,
             execute=False,authorization_parameters=None,send_parameters=None,worker_id=None,
-            reconciliation_cursor=0,binding_limit=16,receipt_limit=128):
+            reconciliation_cursor=0,binding_limit=16,receipt_limit=128,
+            reconsider_after_seconds=None,cognition_configuration_id=None):
         if (type(execute) is not bool or not isinstance(expression_parameters,dict)
                 or not isinstance(operation_id,str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}',operation_id)
                 or any(key in expression_parameters for key in ('subject','operation_id','policy_context'))):
@@ -46,14 +51,50 @@ class AutonomousCycleRuntime:
             return AutonomousCycleResult('reconciliation_attention',reconciliation)
         parameters = {**expression_parameters,'subject':subject,'operation_id':operation_id,
                       'policy_context':policy.context}
+        capture = None
+        if reconsider_after_seconds is not None:
+            def capture():
+                current_policy = self.reconciliation._owner_policy(subject)
+                if current_policy.event_id!=policy.event_id:
+                    raise ValueError('owner policy changed during reconsideration')
+                return self.reconsideration.capture(subject=subject,
+                    configuration_id=cognition_configuration_id, execute=execute, policy=current_policy,
+                    parameters=expression_parameters, window_seconds=reconsider_after_seconds)
+            before = capture()
+            waiting = self.reconsideration.current(subject=subject,
+                configuration_id=cognition_configuration_id, context=before)
+            if waiting is not None and waiting.event.payload['operation_id']!=operation_id:
+                async def forbidden(**_):
+                    raise ValueError('reconsideration cannot repeat spent inference')
+                try:
+                    retained = await self.preparation.expression.run(**{**parameters,
+                        'operation_id':waiting.event.payload['operation_id'], 'call':forbidden})
+                except (ValueError, ContentVaultError):
+                    # Lost/stale retained proof cannot justify waiting. The host's
+                    # new operation may think afresh; never resume the old spend.
+                    retained = None
+                after = capture()
+                if (retained is not None and retained.planning.action_kind=='silence'
+                        and before.semantic_digest==after.semantic_digest
+                        and before.owner_frontier==after.owner_frontier
+                        and self.reconsideration.current(subject=subject,
+                            configuration_id=cognition_configuration_id,context=after) is not None):
+                    return AutonomousCycleResult('waiting_for_change',reconciliation,
+                        reconsideration_event_id=waiting.event.event_id)
         if not execute:
             expression = await self.preparation.expression.run(**parameters)
+            if capture is not None and expression.planning.action_kind=='silence':
+                self.reconsideration.remember(subject=subject,configuration_id=cognition_configuration_id,
+                    before=before,after=capture(),planning=expression.planning)
             return AutonomousCycleResult('silence' if expression.planning.action_kind=='silence'
                 else 'shadow_selected',reconciliation,expression=expression)
         if any(key in authorization_parameters for key in parameters):
             raise ValueError('authorization cannot override cycle planning')
         prepared = await self.preparation.prepare(**parameters,**authorization_parameters)
         if prepared.expression.planning.action_kind=='silence':
+            if capture is not None:
+                self.reconsideration.remember(subject=subject,configuration_id=cognition_configuration_id,
+                    before=before,after=capture(),planning=prepared.expression.planning)
             return AutonomousCycleResult('silence',reconciliation,prepared=prepared)
         if prepared.quality_disposition.startswith('final_'):
             return AutonomousCycleResult('content_review_attention',reconciliation,prepared=prepared)

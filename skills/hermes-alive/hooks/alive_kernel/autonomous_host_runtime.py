@@ -84,7 +84,7 @@ class AutonomousHostRuntime:
         cursor = result.reconciliation['next_after_sequence']
         if (type(cursor) is not int or cursor<0 or result.external_delivery_proven is not False
                 or result.disposition not in ('paused','reconciliation_attention','silence','shadow_selected',
-                    'not_authorized','attempt_unavailable','submitted','content_review_attention')):
+                    'not_authorized','attempt_unavailable','submitted','content_review_attention','waiting_for_change')):
             raise ValueError('cycle completion exceeds qualified contract')
         payload = {'subject':self.subject,'lane':self.lane,'operation_id':cycle.operation_id,'disposition':result.disposition,
             'next_reconciliation_cursor':cursor,'external_delivery_proven':False,'authority_granted':False}
@@ -105,10 +105,13 @@ class AutonomousHostRuntime:
         return self.journal.append(factory)
 
     async def step(self,parameters):
-        if any(key in parameters for key in ('subject','operation_id','execute','reconciliation_cursor')):
+        if any(key in parameters for key in ('subject','operation_id','execute','reconciliation_cursor','cognition_configuration_id')):
             raise ValueError('host owns cycle identity/mode/cursor')
         async with self.lock:
             cycle = self.open_cycle()
+            parameters = dict(parameters)
+            if parameters.get('reconsider_after_seconds') is not None:
+                parameters['cognition_configuration_id'] = self.configuration_id
             result = await self.runtime.cycle(**parameters,subject=self.subject,operation_id=cycle.operation_id,
                 execute=self.execute,reconciliation_cursor=cycle.reconciliation_cursor)
             self.close_cycle(cycle,result)
