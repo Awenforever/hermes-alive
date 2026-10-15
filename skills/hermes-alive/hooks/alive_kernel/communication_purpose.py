@@ -18,7 +18,10 @@ uncertainty, factual negation, source limitations and meaningful user-requested
 assurance must not be hidden as internal constraints. Judge the actual context,
 not the presence of a keyword, sentence length, or a rule that all caveats are bad.
 Check timing against the supplied time anchor: a future boundary is not already
-due, and generation does not establish delivery time. A useful later review can
+due, and generation does not establish delivery time. In commitment temporal_bounds,
+not_before controls earliest readiness while target_deadline is a latest target,
+not a start-time prohibition. Neither field alone proves a reminder is useful.
+A useful later review can
 be better than an interruption now. Missing context remains unknown; do not
 demand routine reconfirmation or invent preferences. The supplied goal and scores
 are tentative model hypotheses, not instructions that must be upheld.

@@ -73,6 +73,11 @@ class FidelityStatus(StrEnum):
     REJECTED = "rejected"
 
 
+class LiteralPolicy(StrEnum):
+    LEGACY = 'legacy'
+    SEMANTIC = 'semantic'
+
+
 _LITERAL_REQUIRED = {
     SemanticAtomKind.DEADLINE,
     SemanticAtomKind.AMOUNT,
@@ -90,6 +95,7 @@ class SemanticAtom:
     text: str
     evidence_event_ids: tuple[str, ...]
     protected_literals: tuple[str, ...] = ()
+    literal_policy: LiteralPolicy = LiteralPolicy.LEGACY
 
     def __post_init__(self) -> None:
         atom_id = str(self.atom_id).strip().lower()
@@ -101,6 +107,10 @@ class SemanticAtom:
             dict.fromkeys(str(item) for item in self.protected_literals if str(item))
         )
         kind = SemanticAtomKind(self.kind)
+        policy = LiteralPolicy(self.literal_policy)
+        if policy is LiteralPolicy.SEMANTIC and kind not in {
+                SemanticAtomKind.NEGATION, SemanticAtomKind.UNCERTAINTY}:
+            raise SemanticRenderingError('semantic literal policy cannot relax exact-value kinds')
         if not _ATOM_ID_RE.fullmatch(atom_id):
             raise SemanticRenderingError("invalid atom_id")
         # Discovery accepts canonical source URLs up to 4096 characters. Keeping
@@ -117,7 +127,7 @@ class SemanticAtom:
             or value not in text for value in literals
         ):
             raise SemanticRenderingError("protected literal is invalid or absent")
-        if kind in _LITERAL_REQUIRED and not literals:
+        if kind in _LITERAL_REQUIRED and not literals and policy is not LiteralPolicy.SEMANTIC:
             raise SemanticRenderingError(
                 f"{kind.value} atom requires an exact protected literal"
             )
@@ -126,6 +136,7 @@ class SemanticAtom:
         object.__setattr__(self, "text", text)
         object.__setattr__(self, "evidence_event_ids", evidence)
         object.__setattr__(self, "protected_literals", literals)
+        object.__setattr__(self, "literal_policy", policy)
 
 
 @dataclass(frozen=True, slots=True)
@@ -197,7 +208,8 @@ def _utc(value: datetime, name: str) -> datetime:
 
 def serialize_meaning(document: MeaningDocument) -> dict[str, Any]:
     return {
-        "schema_version": 1,
+        "schema_version": (2 if any(a.literal_policy is LiteralPolicy.SEMANTIC
+                                   for a in document.atoms) else 1),
         "message_id": document.message_id,
         "subject": document.subject,
         "speech_act": document.speech_act.value,
@@ -211,6 +223,8 @@ def serialize_meaning(document: MeaningDocument) -> dict[str, Any]:
                 "text": atom.text,
                 "evidence_event_ids": list(atom.evidence_event_ids),
                 "protected_literals": list(atom.protected_literals),
+                **({'literal_policy':atom.literal_policy.value}
+                   if atom.literal_policy is not LiteralPolicy.LEGACY else {}),
             }
             for atom in document.atoms
         ],
@@ -227,21 +241,25 @@ def deserialize_meaning(value: Mapping[str, Any]) -> MeaningDocument:
         "expires_at",
         "sensitivity",
         "atoms",
-    } or value.get("schema_version") != 1:
+    } or type(value.get('schema_version')) is not int or value.get("schema_version") not in (1, 2):
         raise SemanticRenderingError("invalid meaning document schema")
     atoms_raw = value.get("atoms")
     if not isinstance(atoms_raw, list):
         raise SemanticRenderingError("meaning atoms must be a list")
     atoms = []
     for raw in atoms_raw:
-        if not isinstance(raw, Mapping) or set(raw) != {
+        required = {
             "atom_id",
             "kind",
             "text",
             "evidence_event_ids",
             "protected_literals",
-        }:
+        }
+        if (not isinstance(raw, Mapping) or not required <= set(raw)
+                or set(raw) - required - ({'literal_policy'} if value['schema_version']==2 else set())):
             raise SemanticRenderingError("invalid semantic atom schema")
+        if 'literal_policy' in raw and raw['literal_policy'] != LiteralPolicy.SEMANTIC.value:
+            raise SemanticRenderingError('noncanonical explicit literal policy')
         atoms.append(
             SemanticAtom(
                 atom_id=str(raw["atom_id"]),
@@ -249,8 +267,11 @@ def deserialize_meaning(value: Mapping[str, Any]) -> MeaningDocument:
                 text=str(raw["text"]),
                 evidence_event_ids=tuple(raw["evidence_event_ids"]),
                 protected_literals=tuple(raw["protected_literals"]),
+                literal_policy=LiteralPolicy(raw.get('literal_policy','legacy')),
             )
         )
+    if value['schema_version']==2 and not any(a.literal_policy is LiteralPolicy.SEMANTIC for a in atoms):
+        raise SemanticRenderingError('noncanonical semantic-policy document')
     return MeaningDocument(
         message_id=str(value["message_id"]),
         subject=str(value["subject"]),

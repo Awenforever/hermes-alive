@@ -2,6 +2,7 @@
 """Recipient meaning boundaries; structural tests are not semantic quality proof."""
 from copy import deepcopy
 import asyncio
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sys
@@ -9,6 +10,7 @@ import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'hooks'))
 from alive_kernel.communication_plan import validate_communication_plan, plan_atoms, expression_context
+from alive_kernel.cognition_opportunities import CognitionOpportunityReader
 from alive_kernel.event_store import ExperienceJournal
 from alive_kernel.events import Sensitivity, _freeze_json
 from alive_kernel.discovery_opportunities import OpportunityEvidence
@@ -47,6 +49,23 @@ async def rejected_plan(root):
             assert 'malformed proposals' in str(error)
         else: raise AssertionError('malformed plan became qualified silence')
     assert calls==['alive_opportunity_candidates']
+
+
+def temporal_boundaries(root):
+    journal=ExperienceJournal(root/'timing.sqlite3'); owner='user:timing'
+    event=journal.append(EventEnvelope(event_type='conversation.inbound',source='synthetic-fixture',
+        actor=owner,subject=owner,payload={'synthetic':True}))
+    agenda=AgendaProjection(journal); now=datetime.now(timezone.utc)
+    for item_id,available in (('within-window',None),('not-yet-ready',now+timedelta(hours=1))):
+        proposal=agenda.append_proposal(AgendaProposal(item_id=item_id,kind=AgendaItemKind.COMMITMENT,
+            subject=owner,details={'request':'synthetic timing'},source_event_ids=(event.event.event_id,),
+            confidence=1,authority=AgendaAuthority.USER_EXPLICIT,available_at=available,
+            due_at=now+timedelta(hours=2)),actor=owner)
+        agenda.apply(proposal)
+    values=CognitionOpportunityReader(journal).active_evidence(subject=owner,clearance=Sensitivity.PRIVATE)
+    assert len(values)==1 and values[0].agenda_item_id=='within-window'
+    bounds=json.loads(values[0].content['summary'])['temporal_bounds']
+    assert bounds['not_before'] is None and datetime.fromisoformat(bounds['target_deadline'])>now
 
 
 def main():
@@ -88,6 +107,7 @@ def main():
         assert len(mixed[0]) == 1 and mixed[2:] == (1,(1,))
         assert mixed[1][0]['communication_plan']['contents'][1]['kind'] == 'negation'
         asyncio.run(rejected_plan(Path(folder)))
+        temporal_boundaries(Path(folder))
     print('HERMES_ALIVE_COMMUNICATION_PLAN_OK')
     return 0
 

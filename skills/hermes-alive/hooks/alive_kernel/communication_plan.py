@@ -5,13 +5,18 @@ Plans belong to their immutable opportunity proposal, not to a mutable style cac
 """
 import json
 
-from .semantic_rendering import MessageSpeechAct, SemanticAtom, SemanticAtomKind
+from .semantic_rendering import MessageSpeechAct, SemanticAtom, SemanticAtomKind, LiteralPolicy
+
+
+def _policy(plan, item):
+    return (LiteralPolicy.SEMANTIC if plan['version']==2 and item['kind'] in (
+            SemanticAtomKind.NEGATION.value, SemanticAtomKind.UNCERTAINTY.value) else LiteralPolicy.LEGACY)
 
 
 def validate_communication_plan(raw, *, action_kind):
     if (not isinstance(raw, dict) or set(raw) != {
             'version', 'recipient_goal', 'speech_act', 'contents', 'behavior_constraints'}
-            or type(raw['version']) is not int or raw['version'] != 1
+            or type(raw['version']) is not int or raw['version'] not in (1,2)
             or not isinstance(raw['recipient_goal'], str)
             or not 1 <= len(raw['recipient_goal']) <= 512
             or not isinstance(raw['contents'], list) or not 1 <= len(raw['contents']) <= 6
@@ -39,7 +44,7 @@ def validate_communication_plan(raw, *, action_kind):
         # Reuse the actual literal/kind limits; the synthetic evidence ID is only
         # for structural validation, never persisted as a real source witness.
         SemanticAtom(f'content-{index}', kind, item['text'], ('plan:structure-only',),
-                     tuple(item.get('protected_literals', ())))
+                     tuple(item.get('protected_literals', ())), _policy(raw,item))
     if len(json.dumps(raw, ensure_ascii=False)) > 4000:
         raise ValueError('communication plan exceeds context budget')
     return raw
@@ -47,11 +52,11 @@ def validate_communication_plan(raw, *, action_kind):
 
 def plan_atoms(plan, *, evidence):
     return tuple(SemanticAtom(f'content-{index}', SemanticAtomKind(item['kind']),
-        item['text'], evidence, tuple(item.get('protected_literals', ())))
+        item['text'], evidence, tuple(item.get('protected_literals', ())), _policy(plan,item))
         for index, item in enumerate(plan['contents']))
 
 
 def expression_context(plan):
-    return dict(method='recipient-meaning-v1', recipient_goal=plan['recipient_goal'],
+    return dict(method='recipient-meaning-v'+str(plan['version']), recipient_goal=plan['recipient_goal'],
         behavior_constraints=plan['behavior_constraints'],
         constraints_are_not_recipient_content=True, authority_granted=False)

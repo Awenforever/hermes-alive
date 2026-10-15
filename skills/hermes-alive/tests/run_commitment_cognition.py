@@ -54,7 +54,7 @@ def transition(journal,agenda,proposal,state):
     assert agenda.apply(changed).outcome=='transitioned'
 
 
-async def test(root, *, recipient_meaning=False, purpose_repair=False):
+async def test(root, *, recipient_meaning=False, purpose_repair=False, plan_version=1):
     journal=ExperienceJournal(root/'main'/'kernel.sqlite3')
     synth=OpportunitySynthesizer(journal)
     forbidden_calls=[]
@@ -73,7 +73,8 @@ async def test(root, *, recipient_meaning=False, purpose_repair=False):
     assert (await runtime.cycle(operation_id='empty-cycle',**params)).disposition=='silence'
     assert (await runtime.cycle(operation_id='empty-wait',**params)).disposition=='waiting_for_change'
     assert not forbidden_calls
-    agenda,proposal=commitment(journal)
+    agenda,proposal=commitment(journal,details={'task':'核对实验记录','constraint':'只提醒，不代为提交',
+                                              'status':'尚未核对'})
     try: synth.load_completed(subject='user:test',operation_id='empty')
     except OpportunitySynthesisError: pass
     else: raise AssertionError('new commitment did not invalidate empty material')
@@ -90,17 +91,22 @@ async def test(root, *, recipient_meaning=False, purpose_repair=False):
                 assert generation['corrective_reviews'][0]['critique']['reason']=='synthetic-purpose-mismatch'
             assert item['origin_kind']=='commitment' and item['url']==''
             assert json.loads(item['summary_excerpt'])['commitment']['constraint']=='只提醒，不代为提交'
+            bounds=json.loads(item['summary_excerpt'])['temporal_bounds']
+            assert bounds['not_before'] is None
+            assert bounds['target_deadline']==json.loads(item['summary_excerpt'])['due_at']
             proposed = dict(agenda_item_id=item['agenda_item_id'],kind='share',
                 text='提醒你核对实验记录；我不会代为提交，也没有将事项标为完成。',topic='explicit commitment',
                 dimensions={name:dict(value=.1 if name in ('risk','interruption_cost') else .8,reason='synthetic')
                     for name in ('user_value','urgency','novelty','confidence','risk','interruption_cost')})
             if recipient_meaning:
                 due = json.loads(item['summary_excerpt'])['due_at']
-                proposed['communication_plan'] = dict(version=1,
+                proposed['communication_plan'] = dict(version=plan_version,
                     recipient_goal='帮助用户记得核对实验记录，不宣称代为处理',speech_act='remind',
                     contents=[dict(kind='request',text='请核对实验记录。',protected_literals=[]),
                         dict(kind='deadline',text='截止：'+due,protected_literals=[due])],
                     behavior_constraints=['只提醒，不代为提交','不能声称已替用户检查完成'])
+                if plan_version==2:
+                    proposed['communication_plan']['contents'].append(dict(kind='negation',text='记录尚未核对。'))
             return reply(dict(candidates=[proposed]))
         if task=='alive_source_support':
             kwargs['route_info']['provider']='synthetic-review-provider'
@@ -149,6 +155,8 @@ async def test(root, *, recipient_meaning=False, purpose_repair=False):
         meaning = runtime.preparation.expression.store.meanings.resolve(
             journal.get(selected.expression.expression_event_id).event.payload['meaning_event_id'])
         assert any(a.kind is SemanticAtomKind.DEADLINE for a in meaning.atoms)
+        if plan_version==2:
+            assert any(a.kind is SemanticAtomKind.NEGATION and not a.protected_literals for a in meaning.atoms)
         purpose_event=next(event for _,verdict,event in selected.expression.planning.grounding_reviews
             if 'planning-purpose:' in event and verdict=='supported')
         start=journal.get(journal.get(purpose_event).event.causation_id)
@@ -231,7 +239,7 @@ async def test(root, *, recipient_meaning=False, purpose_repair=False):
         assert not foreign_synth.reader.active_evidence(subject='user:test',clearance=Sensitivity.PRIVATE)
 
 
-for use_plan, repair_purpose in ((False,False),(True,False),(True,True)):
+for use_plan, repair_purpose, version in ((False,False,1),(True,False,1),(True,True,1),(True,False,2)):
     with tempfile.TemporaryDirectory(prefix='alive-commitment-cognition-') as folder:
-        asyncio.run(test(Path(folder),recipient_meaning=use_plan,purpose_repair=repair_purpose))
+        asyncio.run(test(Path(folder),recipient_meaning=use_plan,purpose_repair=repair_purpose,plan_version=version))
 print('HERMES_ALIVE_COMMITMENT_COGNITION_OK')

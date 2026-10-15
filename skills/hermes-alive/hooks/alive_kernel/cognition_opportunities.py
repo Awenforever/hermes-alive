@@ -84,7 +84,9 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
         if self.commitment_vault.digest_json(details)!=ref.digest:
             return None
         summary = json.dumps(dict(commitment=details,state=state.value,available_at=available,
-            due_at=payload.get('due_at'),expires_at=payload.get('expires_at')),ensure_ascii=False)
+            due_at=payload.get('due_at'),expires_at=payload.get('expires_at'),
+            temporal_bounds=dict(not_before=available,target_deadline=payload.get('due_at'),
+                                 active_until=payload.get('expires_at'))),ensure_ascii=False)
         if len(summary)>1800:
             return None  # Never silently cut a commitment's condition or negation.
         expiry = datetime.max.replace(tzinfo=timezone.utc)

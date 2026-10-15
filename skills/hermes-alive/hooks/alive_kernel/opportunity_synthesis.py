@@ -171,7 +171,7 @@ Return only JSON: {"abstentions":[{"agenda_item_id":"supplied ID","reason":"why 
 """
 
 _PLAN_GUIDANCE = """Separate intended meaning from illustrative draft wording.
-Every new communication candidate needs communication_plan version 1: recipient_goal
+Every new communication candidate needs communication_plan version 2: recipient_goal
 (1-512 chars), speech_act (ask for kind=ask; share/inform/remind/warn for kind=share),
 1-6 whole recipient-facing contents and 0-6 behavior_constraints (each <=300 chars).
 Keep the whole plan within 4000 JSON characters. Contents are what the recipient
@@ -181,15 +181,17 @@ them in the message. Material caveats, uncertainty, eligibility, source attribut
 and limits that affect the person's understanding must remain recipient contents,
 not be hidden as internal constraints. A negation about the world is different
 from a prohibition on the agent. Neither the goal nor constraints create authority.
-Use precise semantic kinds, not proposed_content. Deadline/amount/link/contact/
-uncertainty/negation need a nonempty protected_literals list copied exactly from
-their text; literals are strings, not invented source evidence. Preserve time
+Use precise semantic kinds, not proposed_content. Deadline/amount/link/contact
+need a nonempty protected_literals list copied exactly from their text. Negation
+and uncertainty preserve meaning, not a particular phrase; their literal lists
+may be empty. Any supplied literal must be copied exactly. Literals are strings,
+not invented source evidence. Preserve time
 relationships: before a future deadline does not mean it is already due. Avoid
 delivery-relative wording when timing can change in transit. Draft is illustrative;
 the versioned recipient-facing contents, not incidental draft prose, bind later
 natural expression. You may abstain if no useful faithful plan exists.
 Add exactly this communication_plan object alongside each candidate's existing
-fields: {"version":1,"recipient_goal":"purpose","speech_act":"share|inform|remind|warn|ask",
+fields: {"version":2,"recipient_goal":"purpose","speech_act":"share|inform|remind|warn|ask",
 "contents":[{"kind":"fact|request|question|deadline|amount|link|contact|caveat|uncertainty|negation|source_attribution",
 "text":"essential meaning","protected_literals":[]}],"behavior_constraints":[]}.
 protected_literals may be omitted for kinds that do not require literal protection.
@@ -203,6 +205,9 @@ Transport may deliver later than generation. Express a relevant due time with it
 absolute date and explicit source offset/timezone, not an unanchored countdown,
 'today' or 'tomorrow' whose meaning can change while queued. Do not guess the user's
 display timezone. A due time is not proof of completion or permission to act.
+Commitment temporal_bounds distinguishes not_before (earliest readiness) from
+target_deadline (target latest time); a future target is not itself a ban on an
+earlier useful reminder. Respect the original request and actual readiness.
 """
 
 

@@ -41,10 +41,10 @@ async def run(output, *, model_call=None):
                 ['不代填记录、不发邮件'],'unsupported'),
             ('useful-reminder','请提醒我核对实验记录，只提醒，不代填、不发邮件。',
                 [('request','请核对实验记录。')],['不代填记录、不发邮件'],'supported'),
-            ('material-eligibility','请提醒我查看活动通知：活动仅限受邀人员，不对公众开放。不要替我报名。',
-                [('request','请查看活动通知。'),('caveat','活动仅限受邀人员，不对公众开放。')],
+            ('material-eligibility','请告诉我活动的参加资格：活动仅限受邀人员，不对公众开放。不要替我报名。',
+                [('caveat','活动仅限受邀人员，不对公众开放。')],
                 ['不替用户报名'],'supported'),
-            ('hidden-eligibility','请提醒我查看活动通知：活动仅限受邀人员，不对公众开放。不要替我报名。',
+            ('hidden-eligibility','请告诉我活动的参加资格：活动仅限受邀人员，不对公众开放。不要替我报名。',
                 [('request','请查看活动通知。')],['仅限受邀人员，不对公众开放','不替用户报名'],'unsupported')):
             stage=dict(name=name,expected=expected,fixture_generation_calls=0)
             report['stages'].append(stage); save()
@@ -56,7 +56,9 @@ async def run(output, *, model_call=None):
                 details={'request':request},source_event_ids=(inbound.event.event_id,),confidence=1,
                 authority=AgendaAuthority.USER_EXPLICIT,due_at=datetime.now(timezone.utc)+timedelta(hours=1)),actor=subject)
             agenda.apply(proposed)
-            plan=dict(version=1,recipient_goal='提醒用户处理其明确要求的事项',speech_act='remind',
+            eligibility=name in ('material-eligibility','hidden-eligibility')
+            plan=dict(version=2,recipient_goal='告知用户通知中的参加资格' if eligibility else '提醒用户处理其明确要求的事项',
+                speech_act='inform' if eligibility else 'remind',
                 contents=[dict(kind=k,text=t) for k,t in contents],behavior_constraints=constraints)
             async def fixture(**kwargs):
                 stage['fixture_generation_calls']+=1

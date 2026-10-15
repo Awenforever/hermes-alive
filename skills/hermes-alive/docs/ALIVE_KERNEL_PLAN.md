@@ -34,6 +34,23 @@ explicit coordination. No speculative core/queue or production edits follow.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-16 — ADR-0149 separates exact-value protection from semantic polarity in
+new v2 plans/meaning while preserving v1 byte shape and locks. Negation/uncertainty
+may be paraphrased, never dropped; free generation still requires semantic review,
+and exact dates/amounts/links/contacts cannot relax their policy. Explicit agenda
+temporal_bounds distinguish not-before from target deadline without rescheduling
+tasks or forcing a decision. Actual v2 generation avoids the prior literal failure;
+full-context selection reaches expression with a fixed deadline, but redundant
+operational recital still survives purpose review. Four fixed-proposal purpose
+contrasts meet expectations after making eligibility necessity explicit; that is
+not full-chain success or a retrospective pass for the old ambiguous fixture.
+Current whole-package offline regression replaces module overlays for this phase;
+fresh installation/lifecycle remains unproved. Totals218 logical/231 HTTP starts,
+zero actual sends. Next test compact purpose-first versus draft-first interpretation
+on fresh blinded scenarios, rather than patching phrases or trusting self-approval.
+The complete sustained agenda, memory/adaptation, authenticated host/feedback,
+privacy/migration/rollback, portability and production objective remains active.
+
 2026-10-16 — ADR-0148 adds explicit recipient-meaning plans and a separate model
 purpose assessment: immutable old contracts remain old; strict new mode separates
 recipient content from proposed operating constraints and supports actual remind
