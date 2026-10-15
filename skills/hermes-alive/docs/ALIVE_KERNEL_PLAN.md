@@ -26,12 +26,27 @@ outbox tracks intent/evidence/recovery; it is not permission to reorder or resen
 the platform FIFO. Host ingress probes establish observation fidelity only.
 Failure with a replaced high-level worker does not prove a queue defect.
 
-The user permits repairing confirmed wechat-enhance defects discovered during
-Alive work, but its independent final acceptance/release cleanup is deferred until
-Alive is complete. Record evidence and scope such fixes separately; no speculative
-core/queue edits or production changes follow from this permission.
+The earlier permission to repair confirmed wechat-enhance defects during Alive
+work is superseded by the 2026-10-15 Qoder handoff for concurrent ownership.
+Codex now records and coordinates such findings rather than editing Enhance;
+Qoder independently owns its repair work. Shared interface changes require
+explicit coordination. No speculative core/queue or production edits follow.
 
 ### Current integration milestone: delivery evidence and attributed feedback
+
+2026-10-15 — ADR-0139 actual interpretation uses registered intent/outcome context
+in four new synthetic histories: three unchanged contributions are not proposed
+again, while a distinct new method remains eligible. No invented delivery/user
+feedback in engineering inspection; no ablation, independent semantic review,
+or longitudinal utility proof. Four real calls/four HTTP starts: cumulative
+132 logical / 145 observed HTTP starts, zero real sends. Job terminal, model
+export absent and production unchanged. The versioned opt-in diagnostic retains
+failure/raw-output evidence and explicitly checks no new attempts/dispatch; it
+does not automatically run or activate learning. Next useful unresolved-intent
+settlement and grounded feedback/tentative learning, not more blanket gates.
+The diagnostic fault-observability fixture passes on Windows and isolated
+resource-limited/offline Linux, and is registered in portable CI. The full CI
+pipeline and fresh-install lifecycle have not been rerun for this diagnostic.
 
 2026-10-15 — ADR-0138 connects registered communication attempts and separately
 validated canonical outcome facts to the next interpretation and source review.
