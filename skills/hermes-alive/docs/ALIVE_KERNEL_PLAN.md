@@ -33,6 +33,33 @@ core/queue edits or production changes follow from this permission.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-15 — ADR-0138 connects registered communication attempts and separately
+validated canonical outcome facts to the next interpretation and source review.
+It is not a queue/pending-state detector or another FIFO. Current context changes
+invalidate retained decisions; erased content cannot remain usable. The first
+composed fixture exposed an incorrect default outcome-vault connection, fixed
+to match the explicitly selected send-runtime vault. Latest Windows passes the
+fixture, including reopen and in-flight erasure. Resource-limited, network-disabled
+Linux passes it plus expression-history, all four final-preparation and all five
+final-repair modes. These use retained-module overlays, not a fresh installation.
+The four regression entrypoints are now included in portable CI; the entire CI
+pipeline has not been rerun this turn. Outcome recording time/order are explicit.
+Next real longitudinal usefulness and unresolved-intent admission/delivery/feedback.
+
+Actual bounded final-wording recovery now has limited model evidence: nine logical
+calls/nine HTTP starts, all on the configured model, one unchanged positive control
+and two seeded false claims corrected and re-reviewed; zero repeat calls on reopen.
+No send. Initial planning/render/review were synthetic, not full semantic or utility
+qualification. Cumulative counts: 128 logical / 141 observed HTTP starts. The first
+launch failed before inference because of its isolated profile setup; credential
+exports were removed after terminal state. Production was unchanged.
+
+Enhance ownership has been handed to Qoder through the user-managed handoff.
+Codex will not concurrently edit its repository/experimental branch/production
+Hook, manage its queue or restart production. Alive continues in isolation;
+shared interface changes need explicit coordination. The public Enhance baseline
+and unpublished transport experiment remain separate, not an implicit dependency.
+
 2026-10-15 recovery audit: all five latest Windows final-wording repair modes
 now pass, including correction-ancestry validation. Recovery and alternate-critique
 tests independently count forbidden provider invocations: raising an assertion

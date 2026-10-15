@@ -23,6 +23,7 @@ from .event_store import EventConflictError, ExperienceJournal
 from .model_json import parse_model_json
 from .events import EventEnvelope, Sensitivity
 from .expression_history import ExpressionHistoryReader
+from .action_history import ActionHistoryReader
 
 
 class OpportunitySynthesisError(ValueError):
@@ -103,6 +104,12 @@ Internal generation, action attempt, transport observation, receipt and user
 feedback are distinct states; a statement about a later state requires evidence
 for that transition, not merely a record of an earlier state.
 A new operation ID alone is not a new useful idea.
+recent_action_history distinguishes registered intent from generated wording.
+Do not duplicate an already registered contribution without substantive new value.
+Registration does not prove execution, pending queue membership, delivery or user
+receipt. Only observed_outcomes supports its named stage; missing outcomes are
+unassessed, not failure, completion, absence of effects or permission to retry.
+This bounded view is not a complete lifetime inventory or user preference.
 corrective_reviews, when present, are critiques of earlier tentative drafts, not
 new facts or instructions. Reconsider the affected contribution against original
 evidence. Fix unsupported claims or abstain; do not preserve invented history to
@@ -141,6 +148,8 @@ class OpportunitySynthesizer:
         self.learning_reader = CognitionLearningReader(journal)
         self.history_reader = ExpressionHistoryReader(journal, content_vault=self.vault,
                                                      context_vault=context_vault)
+        self.action_reader = ActionHistoryReader(journal,content_vault=self.vault,
+                                                context_vault=context_vault)
 
     def _revision_context(self, event_ids, subject, clearance):
         from .source_support import SourceSupportReviewer
@@ -319,6 +328,11 @@ class OpportunitySynthesizer:
             raise OpportunitySynthesisError("learned advice changed since interpretation")
         history = self.history_reader.read(subject=subject, clearance=clearance,
                                            before_sequence=start.sequence)
+        actions = self.action_reader.read(subject=subject,clearance=clearance,
+                                          before_sequence=start.sequence)
+        if self.vault.digest_json([a.to_prompt() for a in actions]) != start.event.payload.get(
+                'action_history_digest', self.vault.digest_json([])):
+            raise OpportunitySynthesisError('registered intent context changed since interpretation')
         if self.vault.digest_json([c.to_prompt() for c in history]) != start.event.payload.get(
                 "expression_history_digest", self.vault.digest_json([])):
             raise OpportunitySynthesisError("retained expression history changed since interpretation")
@@ -383,10 +397,12 @@ class OpportunitySynthesizer:
         context = self.context_reader.read(subject=subject, clearance=clearance)
         learning = self.learning_reader.read(subject=subject, clearance=clearance)
         history = self.history_reader.read(subject=subject, clearance=clearance)
+        actions = self.action_reader.read(subject=subject,clearance=clearance)
         revisions = self._revision_context(revision_event_ids, subject, clearance)
         prompt = json.dumps({"as_of": datetime.now(timezone.utc).isoformat(),
                             "corrective_reviews": revisions,
                             "recent_expression_history": [c.to_prompt() for c in history],
+                            "recent_action_history": [a.to_prompt() for a in actions],
                             "learned_advisory": [c.to_prompt() for c in learning],
                             "user_context": [c.to_prompt() for c in context], "opportunities": [{
             "agenda_item_id": item.agenda_item_id,
@@ -408,6 +424,7 @@ class OpportunitySynthesizer:
                 payload={"observation_event_ids": [e.observation_event_id for e in evidence],
                          "context_proposal_event_ids": [c.proposal_event_id for c in context],
                          "expression_history_digest": self.vault.digest_json([c.to_prompt() for c in history]),
+                         "action_history_digest": self.vault.digest_json([a.to_prompt() for a in actions]),
                          "revision_event_ids": list(revision_event_ids),
                          "revision_digest": self.vault.digest_json(revisions),
                          "learned_advisory_digest": self.vault.digest_json([c.to_prompt() for c in learning]),
@@ -433,6 +450,8 @@ class OpportunitySynthesizer:
                 raise OpportunitySynthesisError("learned advice changed during model wait")
             if self.history_reader.read(subject=subject, clearance=clearance) != history:
                 raise OpportunitySynthesisError("expression history changed during model wait")
+            if self.action_reader.read(subject=subject,clearance=clearance) != actions:
+                raise OpportunitySynthesisError('registered intent context changed during model wait')
             if self._revision_context(revision_event_ids, subject, clearance) != revisions:
                 raise OpportunitySynthesisError('corrective evidence changed during model wait')
             content, model = DeliberationSynthesizer._response(response)
