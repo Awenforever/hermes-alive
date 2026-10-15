@@ -10,6 +10,7 @@ from .event_store import EventConflictError
 from .events import EventEnvelope, Sensitivity, _thaw_json
 from .outcomes import OutcomeProjection, OutcomeKind
 from .memory import MemoryProjection
+from .agenda import AgendaProjection
 
 
 class DeliveredHistoryError(ValueError):
@@ -26,12 +27,15 @@ class DeliveredHistoryStore:
         self.outcomes = OutcomeProjection(journal, content_vault=self.vault)
         self.protector = self.outcomes.receipt_protector
         self.context_vault = MemoryProjection(journal, content_vault=context_vault).content_vault
+        self.agenda_vault = AgendaProjection(journal).content_vault
 
     def _dependency_vault(self, alias):
         if alias == 'action':
             return self.vault
         if alias == 'context':
             return self.context_vault
+        if alias == 'agenda':
+            return self.agenda_vault
         raise DeliveredHistoryError('unknown dependency vault')
 
     def _check_dependencies(self, dependencies, subject):
@@ -131,7 +135,8 @@ class DeliveredHistoryStore:
         for evidence_id in evidence_ids:
             record = self.journal.get(evidence_id) if evidence_id else None
             if record is not None and record.event.subject == subject and record.event.payload.get('content'):
-                alias = 'context' if record.event.event_type == 'memory.proposed' else 'action'
+                alias = ('context' if record.event.event_type=='memory.proposed' else
+                         'agenda' if record.event.event_type=='agenda.proposed' else 'action')
                 dependency_ids.add((alias, ContentReference.from_event_payload(record.event.payload['content']).content_id))
         dependencies = [{'vault':alias, 'content_id':value} for alias, value in sorted(dependency_ids)]
         if self._check_dependencies(dependencies, subject):

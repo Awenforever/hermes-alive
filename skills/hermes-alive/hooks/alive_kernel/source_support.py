@@ -38,7 +38,11 @@ mixed meaning and time; do not promote politeness into enthusiasm or stale profi
 memory into authority over a newer explicit correction.
 Do not mistake collector codes for external authority;
 do not hide that a fixture is synthetic or that evidence is unverified. A request
-for detail never justifies invention. Reviewing supplied evidence cannot establish
+for detail never justifies invention. Communication may be queued: generation time
+does not establish delivery time. An unanchored relative countdown or moving date
+cannot be assumed still correct when delivered; prefer explicit dated references.
+Operational scope limits constrain behavior, not a requirement to recite guardrails.
+Reviewing supplied evidence cannot establish
 real-world truth or authorize delivery. Return only this JSON object:
 {"verdict":"supported|unsupported|uncertain","unsupported_claims":[],
 "uncertainties":[],"reason":"brief explanation"}.
@@ -199,7 +203,8 @@ class SourceSupportReviewer:
             'url':s.content['url'], 'excerpt':s.content['summary'][:1800],
             'published_at':s.content.get('published_at'),
             'excerpt_may_be_truncated':len(s.content['summary'])>1800,
-            'provenance_metadata':{'collector':s.content['source']}} for s in sources],
+            'provenance_metadata':{'collector':s.content['source'],**(
+                {'origin_kind':s.content['origin_kind']} if 'origin_kind' in s.content else {})}} for s in sources],
             'explicit_context':[c.to_prompt() for c in context],
             'learned_advisory':[c.to_prompt() for c in advice],
             'recent_expression_history':[c.to_prompt() for c in history],

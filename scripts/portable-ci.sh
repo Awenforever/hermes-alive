@@ -81,6 +81,7 @@ run_and_require run_source_scope_live_probe.py '^HERMES_ALIVE_SOURCE_SCOPE_LIVE_
 run_and_require run_reconsideration.py '^HERMES_ALIVE_RECONSIDERATION_OK$'
 run_and_require run_semantic_reconsideration.py '^HERMES_ALIVE_SEMANTIC_RECONSIDERATION_OK$'
 run_and_require run_feedback_assimilation.py '^HERMES_ALIVE_FEEDBACK_ASSIMILATION_OK$'
+run_and_require run_commitment_cognition.py '^HERMES_ALIVE_COMMITMENT_COGNITION_OK$'
 run_and_require run_expression_history.py '^HERMES_ALIVE_EXPRESSION_HISTORY_OK$'
 run_and_require run_final_wording_preparation.py '^HERMES_ALIVE_FINAL_WORDING_PREPARATION_OK$'
 run_and_require run_final_wording_repair.py '^HERMES_ALIVE_FINAL_WORDING_REPAIR_OK$'

@@ -34,6 +34,23 @@ explicit coordination. No speculative core/queue or production edits follow.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-16 — ADR-0147 connects admitted current commitments, without discovery,
+to the composed cognition/selection/expression/preparation pipeline. No current
+representable material now idles with auditable zero-provider work. Current task
+changes invalidate interpretation; typed agenda vault binding and delivered-history
+dependencies fix a real preparation/erasure integration gap. Two actual five-call
+trials reach shadow selection but still fail naturalness/timing quality despite
+support/fidelity approval. Totals 187 logical / 200 HTTP starts, zero actual sends.
+Next address purpose-aware intent/meaning/expression rather than phrase patches;
+also qualify handed-off intent invalidation with Qoder, bounded-view coverage,
+custom vault binding and authenticated host ingress. No deployment or acceptance.
+The private Linux regression runner's early successful SystemExit stopped the
+suite after two tests; the corrected terminal run proves all eight completions:
+commitment cognition, action authorization, delivered history, opportunity
+synthesis, feedback assimilation, semantic reconsideration, final preparation
+and repair. Fresh Windows commitment cognition and authorization also pass.
+No claim of full CI, fresh install or ten clean semantic cycles follows.
+
 2026-10-16 — ADR-0146 integrates once-per-outcome feedback interpretation with
 the opt-in host cycle and retractable advisory context. Current consent/source/
 clearance and raw paired feedback remain authoritative; no typed profile, weights

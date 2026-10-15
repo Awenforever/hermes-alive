@@ -87,6 +87,7 @@ class SendTimeAuthorizer:
         self.agenda = AgendaProjection(
             journal, content_vault=self.deliberation.content_vault
         )
+        self.commitments = AgendaProjection(journal)
         self.receipt_protector = LocalIdentityProtector(
             journal.path.parent / "identity.key"
         )
@@ -496,13 +497,20 @@ class SendTimeAuthorizer:
                 if candidate.authority is not ActionAuthority.SYSTEM_CRITICAL:
                     reasons.append("active_agenda_required")
             else:
+                origin = self.journal.get('agenda.proposal:'+candidate.agenda_item_id)
+                commitment = (candidate.candidate_id.startswith('opportunity-candidate:')
+                              and origin is not None and origin.event.subject==owner
+                              and origin.event.payload.get('kind')=='commitment')
+                agenda_projection = self.commitments if commitment else self.agenda
                 active = {
                     item.item_id: item
-                    for item in self.agenda.list_items(
+                    for item in agenda_projection.list_items(
                         clearance=sensitivity,
-                        states=(AgendaState.ACTIVE,),
+                        states=(AgendaState.ACTIVE,AgendaState.SNOOZED) if commitment else (AgendaState.ACTIVE,),
                         as_of=current,
                         limit=1000,
+                        subject=owner,
+                        item_ids=(candidate.agenda_item_id,),
                     )
                     if item.subject == owner
                 }
