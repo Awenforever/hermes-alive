@@ -77,6 +77,8 @@ class AutonomousCycleRuntime:
                 if (retained is not None and retained.planning.action_kind=='silence'
                         and before.semantic_digest==after.semantic_digest
                         and before.owner_frontier==after.owner_frontier
+                        and self.reconsideration.timing(retained.planning,subject=subject)==
+                            list(waiting.event.payload.get('timing',()))
                         and self.reconsideration.current(subject=subject,
                             configuration_id=cognition_configuration_id,context=after) is not None):
                     return AutonomousCycleResult('waiting_for_change',reconciliation,

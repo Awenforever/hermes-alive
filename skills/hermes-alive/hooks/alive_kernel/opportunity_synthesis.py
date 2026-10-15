@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 import re
 from typing import Any
@@ -40,6 +40,17 @@ class OpportunityAbstention:
 
 
 @dataclass(frozen=True, slots=True)
+class OpportunityReconsideration:
+    """Model advisory for re-evaluation, never a user deadline or send permission."""
+
+    agenda_item_id: str
+    observation_event_id: str
+    after_seconds: int
+    reconsider_at: datetime
+    reason: str = field(repr=False)
+
+
+@dataclass(frozen=True, slots=True)
 class OpportunitySynthesisResult:
     actual_model: str
     candidates: tuple[CycleCandidate, ...] = field(repr=False)
@@ -48,6 +59,8 @@ class OpportunitySynthesisResult:
     abstentions: tuple[OpportunityAbstention, ...] = field(default=(), repr=False)
     rejected_abstention_count: int = 0
     unassessed_agenda_item_ids: tuple[str, ...] = ()
+    reconsiderations: tuple[OpportunityReconsideration, ...] = field(default=(), repr=False)
+    rejected_reconsideration_count: int = 0
 
 
 _DIMENSIONS = ("user_value", "urgency", "novelty", "confidence", "interruption_cost", "risk")
@@ -127,7 +140,17 @@ Relevant corrections and substantive developments can justify a follow-up.
 Do not invent delivery status or classify missing history as never discussed.
 Do not turn tolerated content into a demand for more, or temporary circumstances
 into lasting preferences. If meaning remains ambiguous, preserve that uncertainty.
+For a source you explicitly abstain from, you may propose an internal
+reconsideration: agenda_item_id, after_seconds (integer 1-86400), reason (1-512
+characters). Choose timing from the actual situation; do not invent a user's
+deadline or pretend to know when they become available. A future review is not
+a scheduled send, an obligation, permission or a lasting preference. New relevant
+information may trigger earlier review. Do not request routine reconfirmation.
+Use an empty reconsiderations list when there is no useful timing rationale;
+missing information alone does not require another timer. Never supply a review
+hint for an unassessed source or one with a communication candidate.
 Return only JSON: {"abstentions":[{"agenda_item_id":"supplied ID","reason":"why no communication"}],
+"reconsiderations":[{"agenda_item_id":"abstained supplied ID","after_seconds":1800,"reason":"why revisit then"}],
 "candidates":[{"agenda_item_id":"supplied ID","kind":"share|ask",
 "text":"draft <=1600 chars","topic":"brief topic","dimensions":{
 "user_value":{"value":0.0,"reason":"brief"},"urgency":{"value":0.0,"reason":"brief"},
@@ -200,8 +223,8 @@ class OpportunitySynthesizer:
                     source_presentation: str = "model_text_v1", feedback: tuple = ()) -> tuple[tuple, tuple, int, tuple]:
         if source_presentation not in _SOURCE_PRESENTATIONS:
             raise OpportunitySynthesisError("unknown source presentation policy")
-        if (not isinstance(document, dict) or set(document) not in (
-                {"candidates"}, {"candidates", "abstentions"})
+        if (not isinstance(document, dict) or 'candidates' not in document
+                or set(document)-{'candidates','abstentions','reconsiderations'}
                 or not isinstance(document["candidates"], list)
                 or len(document["candidates"]) > 4):
             raise OpportunitySynthesisError("invalid opportunity candidate envelope")
@@ -292,6 +315,29 @@ class OpportunitySynthesizer:
     def _unassessed(evidence: tuple, candidates: tuple, abstentions: tuple) -> tuple[str, ...]:
         assessed = {c.action.agenda_item_id for c in candidates} | {a.agenda_item_id for a in abstentions}
         return tuple(e.agenda_item_id for e in evidence if e.agenda_item_id not in assessed)
+
+    @staticmethod
+    def _reconsiderations(raw, abstentions, as_of):
+        if not isinstance(raw, list) or len(raw)>8:
+            # An optional bad advisory envelope cannot invalidate separate drafts.
+            return (), 1
+        allowed = {a.agenda_item_id:a for a in abstentions}
+        ids = [r.get('agenda_item_id') for r in raw if isinstance(r, dict)]
+        accepted = []
+        for item in raw:
+            if (not isinstance(item, dict) or set(item)!={'agenda_item_id','after_seconds','reason'}
+                    or not isinstance(item['agenda_item_id'],str)
+                    or item['agenda_item_id'] not in allowed
+                    or ids.count(item['agenda_item_id'])!=1
+                    or type(item['after_seconds']) is not int or not 1<=item['after_seconds']<=86400
+                    or not isinstance(item['reason'],str) or not item['reason'].strip()
+                    or len(item['reason'])>512 or not isinstance(as_of,datetime)
+                    or as_of.tzinfo is None or as_of.utcoffset() is None):
+                continue
+            source = allowed[item['agenda_item_id']]
+            accepted.append(OpportunityReconsideration(source.agenda_item_id,source.observation_event_id,
+                item['after_seconds'],as_of+timedelta(seconds=item['after_seconds']),item['reason']))
+        return tuple(accepted), len(raw)-len(accepted)
 
     def load_completed(self, *, subject: str, operation_id: str,
                        authority: ActionAuthority = ActionAuthority.NONE,
@@ -388,11 +434,20 @@ class OpportunitySynthesizer:
                     or type(rejected_abstentions) is not int
                     or not 0 <= rejected_abstentions <= 8 - abstention_count):
                 raise OpportunitySynthesisError("completed abstentions no longer valid")
+            anchor = start.event.payload.get('interpretation_as_of')
+            reconsiderations, invalid_hints = self._reconsiderations(bundle.get('reconsiderations',[]),
+                abstentions, datetime.fromisoformat(anchor) if anchor is not None else None)
+            hint_count = receipt.event.payload.get('reconsideration_count',0)
+            rejected_hints = receipt.event.payload.get('rejected_reconsideration_count',0)
+            if (invalid_hints or type(hint_count) is not int or hint_count!=len(reconsiderations)
+                    or type(rejected_hints) is not int or not 0<=rejected_hints<=8-len(reconsiderations)):
+                raise OpportunitySynthesisError('completed reconsiderations no longer valid')
             model = receipt.event.payload["actual_model"]
             if not isinstance(model, str) or not model:
                 raise OpportunitySynthesisError("completed model attribution unavailable")
             return OpportunitySynthesisResult(model, candidates, receipt.event.event_id, rejected,
-                abstentions, rejected_abstentions, self._unassessed(evidence, candidates, abstentions))
+                abstentions, rejected_abstentions, self._unassessed(evidence, candidates, abstentions),
+                reconsiderations, rejected_hints)
         except Exception:
             raise OpportunitySynthesisError("retained opportunity completion is not recoverable") from None
 
@@ -419,7 +474,8 @@ class OpportunitySynthesizer:
         actions = self.action_reader.read(subject=subject,clearance=clearance)
         feedback = self.feedback_reader.read(subject=subject,clearance=clearance)
         revisions = self._revision_context(revision_event_ids, subject, clearance)
-        prompt = json.dumps({"as_of": datetime.now(timezone.utc).isoformat(),
+        as_of = datetime.now(timezone.utc)
+        prompt = json.dumps({"as_of": as_of.isoformat(),
                             "corrective_reviews": revisions,
                             "recent_expression_history": [c.to_prompt() for c in history],
                             "recent_action_history": [a.to_prompt() for a in actions],
@@ -443,6 +499,7 @@ class OpportunitySynthesizer:
                 event_id=f"opportunity.synthesis:{operation_id}:started",
                 event_type="opportunity.synthesis_started", **base,
                 payload={"observation_event_ids": [e.observation_event_id for e in evidence],
+                         "interpretation_as_of":as_of.isoformat(),
                          "context_proposal_event_ids": [c.proposal_event_id for c in context],
                          "explicit_context_digest": self.vault.digest_json([c.to_prompt() for c in context]),
                          "feedback_context_digest": self.vault.digest_json([f.to_prompt() for f in feedback]),
@@ -492,9 +549,13 @@ class OpportunitySynthesizer:
             )
             abstentions, rejected_abstentions = self._abstentions(
                 document.get("abstentions", []), evidence, document["candidates"])
+            reconsiderations, rejected_hints = self._reconsiderations(document.get('reconsiderations',[]),
+                abstentions, as_of)
             bundle = self.vault.put_json(
                 {"proposals": list(drafts), "proposal_indices": list(indices),
                  "source_presentation": self._SOURCE_PRESENTATION,
+                 "reconsiderations":[{'agenda_item_id':r.agenda_item_id,'after_seconds':r.after_seconds,
+                                      'reason':r.reason} for r in reconsiderations],
                  "abstentions": [{"agenda_item_id": a.agenda_item_id, "reason": a.reason}
                                  for a in abstentions]}, subject=subject,
                 purpose="opportunity.candidates", sensitivity=Sensitivity(clearance),
@@ -508,11 +569,14 @@ class OpportunitySynthesizer:
                 payload={"actual_model": model, "candidate_count": len(candidates),
                          "abstention_count": len(abstentions),
                          "rejected_abstention_count": rejected_abstentions,
+                         "reconsideration_count":len(reconsiderations),
+                         "rejected_reconsideration_count":rejected_hints,
                          "rejected_count": rejected, "content": bundle.to_event_payload(),
                          "raw_prompt_stored": False, "raw_response_stored": False},
             ))
             return OpportunitySynthesisResult(model, candidates, receipt_id, rejected, abstentions,
-                rejected_abstentions, self._unassessed(evidence, candidates, abstentions))
+                rejected_abstentions, self._unassessed(evidence, candidates, abstentions),
+                reconsiderations, rejected_hints)
         except BaseException as exc:
             # Cancellation also leaves a structural terminal fact, never a retry.
             self.journal.append(EventEnvelope(

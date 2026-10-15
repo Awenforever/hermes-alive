@@ -15,7 +15,7 @@ class ReconsiderationContext:
 
 
 class ReconsiderationStore:
-    METHOD = 'alive-reconsideration-v1'
+    METHOD = 'alive-reconsideration-v2'
     EVENT = 'cognition.wait_recorded'
 
     def __init__(self, preparation, protector, *, clock=None):
@@ -90,7 +90,10 @@ class ReconsiderationStore:
         event = record.event
         payload = _thaw_json(event.payload)
         signature = payload.pop('integrity_authenticator', None)
-        identity = self.protector.authenticate_json(self.METHOD+'.identity',
+        method = payload.get('method')
+        if method not in ('alive-reconsideration-v1',self.METHOD):
+            raise ValueError('unknown reconsideration history method')
+        identity = self.protector.authenticate_json(method+'.identity',
             dict(subject=subject,configuration_id=payload.get('configuration_id'),
                  operation_id=payload.get('operation_id')))
         if (event.source!='alive.reconsideration' or event.actor!='system:alive-runtime'
@@ -110,13 +113,36 @@ class ReconsiderationStore:
             return None
         return record
 
+    def timing(self, planning, *, subject):
+        """Bind internal revisit suggestions to retained source-linked decisions."""
+        values = []
+        for receipt_id in (planning.interpretation_event_id,planning.repair_interpretation_event_id):
+            if receipt_id is None:
+                continue
+            record = self.journal.get(receipt_id)
+            if record is None or record.event.subject!=subject:
+                raise ValueError('reconsideration interpretation unavailable or foreign')
+            operation = receipt_id.removeprefix('opportunity.synthesis:').removesuffix(':completed')
+            result = self.synth.load_completed(subject=subject,operation_id=operation,
+                                              clearance=record.event.sensitivity)
+            for hint in result.reconsiderations:
+                values.append(dict(interpretation_event_id=receipt_id,agenda_item_id=hint.agenda_item_id,
+                    observation_event_id=hint.observation_event_id,reconsider_at=hint.reconsider_at.isoformat()))
+        return values
+
     def remember(self, *, subject, configuration_id, before, after, planning):
         if (planning.action_kind!='silence' or before.semantic_digest!=after.semantic_digest
                 or min(before.valid_until,after.valid_until) <= self.now()):
             return None
+        timing = self.timing(planning,subject=subject)
+        deadline = min([before.valid_until,after.valid_until]+
+                       [datetime.fromisoformat(h['reconsider_at']) for h in timing])
+        if deadline<=self.now():
+            # An already-due suggestion cannot restart its relative countdown.
+            return None
         payload = dict(method=self.METHOD, subject=subject, configuration_id=configuration_id,
             semantic_digest=after.semantic_digest, owner_frontier=after.owner_frontier,
-            valid_until=min(before.valid_until, after.valid_until).isoformat(),
+            valid_until=deadline.isoformat(),timing=timing,
             operation_id=planning.operation_id, selection_event_id=planning.selection_event_id,
             authority_granted=False)
         identity = self.protector.authenticate_json(self.METHOD+'.identity',

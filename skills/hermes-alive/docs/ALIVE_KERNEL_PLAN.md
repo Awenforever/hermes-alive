@@ -34,6 +34,17 @@ explicit coordination. No speculative core/queue or production edits follow.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-15 — ADR-0145 connects source-linked model reconsideration hints to the
+bounded wait ledger and original agenda IDs. Timing anchors to original prompt
+time, never extends on reopen, cannot exceed host/source limits or authorize a
+send; new information still wakes early. Windows/Linux fixtures and adjacent
+regressions pass. One actual six-call story defers for an explicit 45-minute
+meeting, waits across restart with no inference, then responds to early availability
+with qualified wording. No permanent preference, action attempt or actual send.
+Totals 173 logical / 186 HTTP starts; credentials absent, job terminal and production
+start unchanged during it. This is not general commitments, reflection/learning,
+longitudinal usefulness or production acceptance; those full-scope milestones remain.
+
 2026-10-15 — ADR-0144 integrates opt-in bounded, change-sensitive reconsideration
 with the existing autonomous cycle/host. Only verified silence can wait; each
 later wait revalidates original planning with inference forbidden. New owner

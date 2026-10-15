@@ -183,7 +183,7 @@ from .cognition_cycle import (
     CycleCandidate,
 )
 from .opportunity_synthesis import (
-    OpportunitySynthesizer, OpportunitySynthesisError, OpportunitySynthesisResult, OpportunityAbstention,
+    OpportunitySynthesizer, OpportunitySynthesisError, OpportunitySynthesisResult, OpportunityAbstention, OpportunityReconsideration,
 )
 from .deliberation import (
     ActionAuthority,
@@ -354,6 +354,7 @@ __all__ = [
     "OpportunitySynthesisError",
     "OpportunitySynthesisResult",
     "OpportunityAbstention",
+    "OpportunityReconsideration",
     "CognitionCycleError",
     "CognitionCycleResult",
     "ContentErasedError",
