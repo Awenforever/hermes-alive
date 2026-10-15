@@ -18,11 +18,14 @@ class CognitionContextEvidence:
     predicate: str
     kind: str
     value: Any = field(repr=False)
+    source_observations: tuple = ()
 
     def to_prompt(self) -> dict[str, Any]:
         return {"memory_id": self.memory_id, "proposal_event_id": self.proposal_event_id,
                 "source_event_ids": list(self.source_event_ids), "predicate": self.predicate,
-                "kind": self.kind, "value": _thaw_json(self.value)}
+                "kind": self.kind, "value": _thaw_json(self.value),
+                "source_observations":[{"event_id":e,"observed_at":at}
+                                       for e,at in self.source_observations]}
 
 
 class CognitionContextReader:
@@ -69,6 +72,7 @@ class CognitionContextReader:
             accepted.append(CognitionContextEvidence(
                 item.memory_id, item.created_from_event_id, proposal.source_event_ids,
                 item.predicate, item.kind.value, _freeze_json(item.value),
+                tuple((s.event.event_id,s.event.observed_at.isoformat()) for s in sources),
             ))
             if len(accepted) == limit:
                 break

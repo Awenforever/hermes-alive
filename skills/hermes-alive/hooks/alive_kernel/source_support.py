@@ -32,6 +32,10 @@ must remain uncertainty, not a completed action or presumed shared context.
 recent_action_history describes registered intent and only its separately validated
 named outcomes. Registration alone proves neither execution nor queue membership;
 missing outcomes are unassessed, not failure, no effects or permission to retry.
+recent_feedback_context contains literal attributed replies to exact delivered
+wording, not model-certified preferences or permission. Preserve situational scope,
+mixed meaning and time; do not promote politeness into enthusiasm or stale profile
+memory into authority over a newer explicit correction.
 Do not mistake collector codes for external authority;
 do not hide that a fixture is synthetic or that evidence is unverified. A request
 for detail never justifies invention. Reviewing supplied evidence cannot establish
@@ -151,6 +155,7 @@ class SourceSupportReviewer:
                                                      before_sequence=start.sequence)
         actions = self.interpreter.action_reader.read(subject=subject,clearance=clearance,
                                                       before_sequence=start.sequence)
+        feedback = self.interpreter.feedback_reader.read(subject=subject,clearance=clearance)
         # The recorded start is a historical anchor, not the exact model prompt clock.
         # Never substitute today's clock into a retained review snapshot.
         data = {'interpretation_started_at': start.event.occurred_at.isoformat(),
@@ -163,6 +168,7 @@ class SourceSupportReviewer:
             'learned_advisory':[c.to_prompt() for c in advice],
             'recent_expression_history':[c.to_prompt() for c in history],
             'recent_action_history':[a.to_prompt() for a in actions],
+            'recent_feedback_context':[f.to_prompt() for f in feedback],
             'candidate':{'id':candidate_id, 'kind':candidate.action.action_kind.value,
                 'text':_thaw_json(candidate.content)['operation']['text']}}
         if len(json.dumps(data, ensure_ascii=False)) > 40000:

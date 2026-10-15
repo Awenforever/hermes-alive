@@ -34,6 +34,24 @@ explicit coordination. No speculative core/queue or production edits follow.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-15 — ADR-0140 connects literal delivery-linked feedback to the next
+interpretation and source review, with source times on explicit memory rather
+than forcing an unqualified paraphrase into permanent preference. Candidate
+evidence retains feedback lineage; new opportunity content cannot outlive its
+included feedback. Reopen/model-await checks reject withdrawal/erasure changes.
+No preference/memory update or new model-feedback interpretation is performed.
+This is feedback context, not completed reflection/learning. General physical
+cascade forgetting, gateway-owner qualification and production migration remain
+open. No new real model calls (132 logical / 145 observed HTTP starts total).
+Latest Windows and isolated resource-limited/offline Linux pass the composed
+fixture including oversized-input preservation. Linux also passes explicit-context,
+registered-intent, expression-history and all final preparation/repair modes.
+The first overlay regression used a stale facade exception alias; fixing that
+private test wrapper restored its expected rejection handling, not a runtime fix.
+The new fixture is registered in portable CI; full CI/fresh install is not proven.
+Next actual-model feedback meaning and useful retractable learning/full-loop
+qualification, without a competing FIFO or Qoder-owned Enhance changes.
+
 2026-10-15 — ADR-0139 actual interpretation uses registered intent/outcome context
 in four new synthetic histories: three unchanged contributions are not proposed
 again, while a distinct new method remains eligible. No invented delivery/user
