@@ -110,6 +110,31 @@ no changes to production model settings occurred during these experiments.
 
 ## Still required
 
+### Parent bridge progress, 2026-10-16
+
+`native_host_caller.py` adds an explicit host-owned acquisition interface. Each
+capability names subject, profile, operation and revision, supplies a detached
+model-only configuration and an explicit credential-name manifest, and exposes
+bound secret reads plus a current-lifecycle predicate. It checks the predicate
+before/after each credential read and again through the native caller. A bounded
+per-operation budget includes failed acquisitions. A busy guard and retained
+uncertain native worker prevent overlapping/retried child execution.
+
+The child environment is an explicit OS/network/TLS transport allowlist rather
+than a copy of the parent environment. Native worker bootstrap also binds Windows
+USERPROFILE to its private home and removes HOMEDRIVE/HOMEPATH in that child only.
+No live process or production environment is rewritten.
+
+`run_native_host_caller.py` passes with a replaced worker on Windows: valid
+snapshot, ambient key/profile/code exclusion, detached config, foreign profile,
+revocation before and during reads, malformed/unhashable/duplicate credential
+manifests, invalid projections/grants before reads, bounded calls, overlapping
+acquisition and pending-child retry blocking. Adjacent host-snapshot and worker
+protocol tests also pass. This is deliberately **not** actual Core factory,
+credential refresh, subprocess lifecycle or semantic behavior evidence. The
+bridge still requires a trusted real-host acquisition implementation; an invented
+revision string or a predicate that always returns true is not qualification.
+
 Build the host-owned capture/factory that selects necessary capabilities from
 the actual current owner without copying an entire .env/private profile. Its
 environment must be deliberately minimal, not an ambient credential dump. Bind

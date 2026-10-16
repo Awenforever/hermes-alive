@@ -60,4 +60,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_rich_content_model_attributio
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_runtime_disable_contract.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_matrix.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_stress.py"
+PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_native_host_snapshot.py"
+PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_native_client_policy.py"
+PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_native_host_caller.py"
 echo HERMES_ALIVE_PHASE_H_ALL_RESULT=PASS

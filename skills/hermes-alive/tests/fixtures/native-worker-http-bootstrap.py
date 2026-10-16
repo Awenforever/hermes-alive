@@ -2,6 +2,8 @@
 import json
 import os
 import runpy
+import sys
+import time
 from pathlib import Path
 import httpx
 
@@ -50,6 +52,13 @@ def controlled(client,request,*args,**kwargs):
             assert request.headers.get('X-Owner-Policy')=='synthetic-common'
         if body['model'] in ('fail-primary','policy-fail-primary'):
             return httpx.Response(403,request=request,json=dict(error=dict(message='synthetic denied',type='permission_error')))
+        if body['model']=='hold-primary':
+            workspace=Path(sys.argv[sys.argv.index('--workspace')+1])
+            (workspace/'scope-test-ready').touch()
+            deadline=time.monotonic()+20
+            while not (workspace/'scope-test-release').exists():
+                if time.monotonic()>deadline: raise RuntimeError('synthetic host change test timed out')
+                time.sleep(.05)
         return httpx.Response(200,request=request,json=dict(id='synthetic-156',object='chat.completion',created=0,
             model='served-label/'+body['model'],choices=[dict(index=0,finish_reason='stop',message=dict(
             role='assistant',content=content))],usage=dict(prompt_tokens=100,completion_tokens=10,total_tokens=110)))

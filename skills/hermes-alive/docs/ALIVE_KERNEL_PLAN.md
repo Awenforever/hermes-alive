@@ -42,6 +42,38 @@ authorize an Alive/Core/email deployment or a second restart after rollback.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-16 — ADR-0160 now connects actual current Core home/secret scopes to
+the owner-bound caller and native child, without ambient secret discovery.
+Default/alias/primary403->backup pass on actual retained Core in a network-none,
+read-only owned container. A real controlled in-flight child completion is
+rejected after host lifecycle revocation; terminal workspace closes. The canonical
+Alive shadow cycle uses the same acquired caller and replay does not call again.
+Parent environment remains unchanged. This is controlled synthetic evidence,
+not real model/semantic quality, ten clean rounds or production acceptance.
+The host lifecycle/config/grant readers remain explicit synthetic inputs in the
+probe; automatic production-host factory and auth/transport coverage are still
+open. Next connect the authorized factory and advance sustained useful native
+behavior, memory/agenda/outcome/reflection integration. No production restart or
+change was performed; no model-call count increment.
+
+2026-10-16 — Resumed Alive after the separately authorized Enhance3.4.2 urgent
+release/deployment window closed. The preceding turn was concrete progress for
+that inserted task, not completion of the Alive objective. Alive remains isolated
+and undeployed; neither that restart authority nor its CI qualifies this kernel.
+
+The owner-bound native caller now acquires a fresh model capability per request,
+checks subject/profile/operation and revision validity around scoped credential
+reads, detaches model-only data, and excludes ambient credentials/profile/code
+paths from the child environment. Unit tests cover revoked/mismatched bindings,
+malformed projections before secret reads, detached snapshots, budget exhaustion,
+concurrent acquisition rejection and retained uncertain-child retry blocking.
+These tests replace the worker; they prove the parent boundary only, not actual
+Core capture, process cancellation or intelligent autonomous usefulness.
+Adjacent snapshot/protocol suites pass on Windows. Actual host acquisition and
+native child integration remain next; then resume longitudinal decision, agenda,
+memory/outcome/learning qualification rather than expanding boundary probes
+indefinitely. No real model calls, channel sends or production changes this turn.
+
 2026-10-16 — ADR-0159 connects explicit model-only host snapshots through the
 owned native worker to actual Core default/alias/fallback/secret resolution and
 the canonical Alive shadow cycle. Conflicting ambient keys do not override the

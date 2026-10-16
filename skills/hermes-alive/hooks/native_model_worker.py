@@ -32,10 +32,14 @@ def main():
             profile=workspace/'profile'; profile.mkdir(mode=0o700)
             scratch=workspace/'temporary'; scratch.mkdir(mode=0o700)
             home=workspace/'home'; home.mkdir(mode=0o700)
-            os.environ.update(HERMES_HOME=str(profile),HOME=str(home),TMPDIR=str(scratch),TEMP=str(scratch),TMP=str(scratch),
+            os.environ.update(HERMES_HOME=str(profile),HOME=str(home),USERPROFILE=str(home),TMPDIR=str(scratch),TEMP=str(scratch),TMP=str(scratch),
                 XDG_CACHE_HOME=str(home/'cache'),XDG_CONFIG_HOME=str(home/'config'),
                 HERMES_ALIVE_SHARED_DIR=str(profile/'plugin-data'/'hermes-alive'/'runtime'),
                 HERMES_BUNDLED_PLUGINS=str(profile/'empty-bundled'),PYTHONDONTWRITEBYTECODE='1')
+            # Windows expanduser/SDKs may ignore HOME and prefer these aliases.
+            # Only this private process is changed, never the host Gateway.
+            os.environ.pop('HOMEDRIVE',None)
+            os.environ.pop('HOMEPATH',None)
             os.chdir(workspace)
             def no_descendants(event,values):
                 if event in ('subprocess.Popen','os.fork','os.forkpty','os.posix_spawn','os.exec'):
