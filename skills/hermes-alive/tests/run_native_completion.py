@@ -70,6 +70,47 @@ def exercise():
     hub.post(**values(normalized),response_model='normalized-label',finish_reason='stop',assistant_tool_call_count=0,
         assistant_message=SimpleNamespace(content='PRIVATE_CANDIDATE',tool_calls=None))
     assert hub.finish(normalized,result(normalized)).response_model=='normalized-label'
+    # Failure diagnostics disclose shape, never a partial answer or opaque
+    # finish-reason text. Identical terminal replay cannot grow memory forever.
+    diagnostic=hub.open(subject='user:one'); hub.pre(**values(diagnostic))
+    for _ in range(24): post(hub,diagnostic)
+    observed=hub._scopes[(diagnostic.session_id,diagnostic.task_id)]
+    assert len(observed.terminal_shapes)==16
+    assert observed.terminal_shapes[-1]==dict(finish_reason='stop',has_text=True,
+        content_chars=len('PRIVATE_CANDIDATE'),has_tool_calls=False,tool_count=0)
+    assert 'PRIVATE_CANDIDATE' not in repr(observed.terminal_shapes)
+    checks=hub.diagnostics(diagnostic,result(diagnostic))
+    assert checks['exact_text_match'] and all(checks['coordinate_matches'].values())
+    assert 'PRIVATE_CANDIDATE' not in repr(checks)
+    hub.finish(diagnostic,result(diagnostic))
+    assert hub.diagnostics(diagnostic,result(diagnostic)) is None
+    trimmed=hub.open(subject='user:one'); hub.pre(**values(trimmed))
+    post(hub,trimmed,text='  PRIVATE_CANDIDATE\n')
+    checks=hub.diagnostics(trimmed,result(trimmed))
+    assert not checks['exact_text_match'] and checks['stripped_text_match']
+    trimmed_evidence=hub.finish(trimmed,result(trimmed))
+    assert trimmed_evidence.source_content_chars==len('  PRIVATE_CANDIDATE\n')
+    assert trimmed_evidence.source_content_sha256==hashlib.sha256(b'  PRIVATE_CANDIDATE\n').hexdigest()
+    assert trimmed_evidence.content_sha256==hashlib.sha256(b'PRIVATE_CANDIDATE').hexdigest()
+    assert trimmed_evidence.text_projection=='outer-whitespace-v1'
+    for original,final in (('A\n\nB','A\nB'),(' A B ','AB'),(' A ',' A '),
+                           ('<think>secret</think>A','A'),(' \n\t ','x')):
+        scope=hub.open(subject='user:one'); hub.pre(**values(scope)); post(hub,scope,text=original)
+        denied(hub,scope,result(scope,text=final))
+    preserved=hub.open(subject='user:one'); hub.pre(**values(preserved))
+    post(hub,preserved,text=' \nA\n\nB\tC\n')
+    assert hub.finish(preserved,result(preserved,text='A\n\nB\tC')).content_chars==len('A\n\nB\tC')
+    for reason,count,expected_reason,expected_count in (
+            ('length',0,'length',0),('PRIVATE_REASON',True,'other',None),
+            (None,10001,None,None)):
+        scope=hub.open(subject='user:one'); hub.pre(**values(scope))
+        hub.post(**values(scope),response_model='actual-response-label',finish_reason=reason,
+            assistant_message=SimpleNamespace(content='PRIVATE_PARTIAL',tool_calls=None),
+            assistant_tool_call_count=count)
+        shape=hub._scopes[(scope.session_id,scope.task_id)].terminal_shapes[-1]
+        assert shape['finish_reason']==expected_reason and shape['tool_count']==expected_count
+        assert 'PRIVATE_' not in repr(shape)
+        denied(hub,scope,result(scope,text='PRIVATE_PARTIAL'))
     labelled=hub.open(subject='user:one')
     hub.pre(**values(labelled,model='模型 route A',provider='Custom Provider'))
     post(hub,labelled,model='模型 route A',provider='Custom Provider',response_model='厂商 / Model A')

@@ -106,9 +106,10 @@ def main():
                     raise ValueError('worker acquired unadmitted capability')
                 stage='conversation'
                 result=agent.run_conversation(request['messages'][1]['content'],conversation_history=[],task_id=scope.task_id)
-                diagnostics=dict(api_calls=result.get('api_calls'),observations=[dict(error=s.error,
-                    requests=len(s.requests),states=[a['state'] for r in s.requests.values()
-                        for a in r['attempts'].values()]) for s in hub._scopes.values()])
+                diagnostics=dict(api_calls=result.get('api_calls'),
+                    result_flags={k:result.get(k) if type(result.get(k)) is bool else None for k in (
+                        'completed','failed','partial','interrupted','response_transformed','response_reused')},
+                    **hub.diagnostics(scope,result))
                 stage='completion'
                 evidence=hub.finish(scope,result)
                 document=completion_document(request,evidence,result['final_response'])

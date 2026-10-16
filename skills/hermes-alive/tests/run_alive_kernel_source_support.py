@@ -7,6 +7,7 @@ from pathlib import Path
 import sys
 import tempfile
 from types import SimpleNamespace
+from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'hooks'))
 from alive_kernel import (ExperienceJournal,DiscoveryCandidate,DiscoveryOpportunityIngestor,
@@ -34,7 +35,10 @@ async def exercise(root,mode):
     async def review(**kw):
         calls.append(kw)
         data=json.loads(kw['messages'][1]['content'])
-        assert set(data)=={'interpretation_started_at','evidence','explicit_context','learned_advisory','recent_expression_history','candidate'}
+        assert set(data)=={'interpretation_started_at','evidence','explicit_context','learned_advisory',
+            'recent_expression_history','recent_action_history','recent_feedback_context','candidate'}
+        assert data['recent_action_history']==[] and data['recent_feedback_context']==[]
+        assert kw['timeout']==(90 if mode=='supported' else 40)
         assert data['interpretation_started_at']==journal.get('opportunity.synthesis:generate:started').event.occurred_at.isoformat()
         assert 'published_at' in data['evidence'][0]
         assert data['evidence'][0]['excerpt'].endswith('unverified.')
@@ -52,6 +56,13 @@ async def exercise(root,mode):
             choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps(findings)))])
     args=dict(subject='user:test',interpretation_id='generate',candidate_id=candidate_id,
         operation_id='review',call=review,resolve_domain=lambda model:model)
+    with patch.object(reviewer,'snapshot',side_effect=AssertionError('invalid budget read private evidence')):
+        for timeout in (True,0,-1,241,float('nan'),float('inf'),'40'):
+            try: await reviewer.run(**args,timeout_seconds=timeout)
+            except SourceSupportError: pass
+            else: raise AssertionError('invalid source review budget accepted')
+    assert not calls and not journal.read(event_type='opportunity.source_support_started')
+    if mode=='supported': args['timeout_seconds']=90
     if mode=='start-race':
         original_append=journal.append
         def competing_append(event):

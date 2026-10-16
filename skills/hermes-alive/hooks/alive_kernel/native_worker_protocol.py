@@ -112,7 +112,14 @@ def validate_completion(document,request):
     except (TypeError,KeyError): raise NativeWorkerError('worker completion evidence malformed') from None
     text=document['text']
     if (not isinstance(text,str) or not 0<len(text)<=32000 or evidence.subject!=request['subject']
-            or evidence.source_contract!='hermes.native.post_api_request.v2' or evidence.authority_granted is not False
+            or evidence.source_contract!='hermes.native.post_api_request.v3' or evidence.authority_granted is not False
+            or evidence.text_projection!='outer-whitespace-v1'
+            or type(evidence.source_content_chars) is not int
+            or not len(text)<=evidence.source_content_chars<=32000
+            or not isinstance(evidence.source_content_sha256,str)
+            or not re.fullmatch(r'[0-9a-f]{64}',evidence.source_content_sha256)
+            or (evidence.source_content_chars==len(text) and evidence.source_content_sha256!=evidence.content_sha256)
+            or text!=text.strip()
             or type(evidence.request_attempt) is not int or not 1<=evidence.request_attempt<=16
             or type(evidence.api_started_at) not in (int,float) or not math.isfinite(evidence.api_started_at)
             or type(evidence.content_chars) is not int or evidence.content_chars!=len(text)

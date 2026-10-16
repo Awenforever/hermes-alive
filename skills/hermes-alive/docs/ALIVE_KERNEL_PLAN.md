@@ -42,6 +42,22 @@ authorize an Alive/Core/email deployment or a second restart after rollback.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-17 — ADR0163 preserves the failed longitudinal candidate and reviews a
+private copy rather than rerunning or rewriting its history. Correlated review
+correctly rejects the lost source qualification; recipient-meaning revision
+chooses abstention. This is not independent or zero-error acceptance. Prioritize
+the user's qwen3.8-reasoner for different-family review. A180-second native
+attempt reaches a stop completion but fails final text/coordinate binding.
+Exact diagnostics establish Core's outer-whitespace stripping as the mismatch;
+v3 evidence now binds both raw and projected fingerprints, with no internal
+rewrite accepted. Prospective r10 completes with actual USTC qwen3.8-reasoner
+and independently rejects the lost fictional-source caveat. r9's fallback to
+DeepSeek remains disqualified for independence. All experiment credentials are
+removed after terminal state. Next consume the genuine retained independent
+receipt in model-driven correction, then exercise full decision/expression/
+feedback on fresh useful scenarios. Do not extend route probes into a substitute
+for the full autonomous kernel or count case r10 as ten clean semantic rounds.
+
 2026-10-16 — ADR-0162 exposes and fixes a genuine missed native-feedback interface
 defect: FeedbackSynthesizer's per-call timeout was not accepted by native callers.
 Bounded narrowing now reaches the real child/request budget; protocol/host tests

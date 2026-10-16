@@ -3,6 +3,7 @@ import asyncio
 from dataclasses import dataclass
 import hashlib
 import json
+import math
 import re
 
 from .content_vault import ContentReference
@@ -254,7 +255,10 @@ class SourceSupportReviewer:
 
     async def run(self, *, subject, interpretation_id, candidate_id, operation_id,
                   call, resolve_domain, reviewer_model=None, clearance=Sensitivity.PRIVATE,
-                  require_independence=True, protocol_recovery=False):
+                  require_independence=True, protocol_recovery=False, timeout_seconds=40):
+        if (type(timeout_seconds) not in (int,float) or not math.isfinite(timeout_seconds)
+                or not 1<=timeout_seconds<=240):
+            raise SourceSupportError('source review timeout outside host budget')
         if type(require_independence) is not bool or type(protocol_recovery) is not bool:
             raise SourceSupportError('invalid review independence requirement')
         if not isinstance(operation_id,str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}',operation_id):
@@ -276,6 +280,7 @@ class SourceSupportReviewer:
             payload={'snapshot_digest':digest,'candidate_id':candidate_id,
                      'prompt_digest':prompt_digest,
                      'require_independence':require_independence,
+                     'timeout_seconds':timeout_seconds,
                      'protocol_recovery_enabled':protocol_recovery,
                      'generator_model':generated.actual_model,'delivery_authority_granted':False}, **base))
         if not started.created:
@@ -300,7 +305,7 @@ class SourceSupportReviewer:
                 route = {}
                 response = await asyncio.wait_for(call(task='alive_source_support', model=reviewer_model,
                     messages=messages, temperature=0, max_tokens=self.max_tokens,
-                    timeout=40, route_info=route), timeout=50)
+                    timeout=timeout_seconds, route_info=route), timeout=timeout_seconds+10)
                 current, result = self.snapshot(subject=subject, interpretation_id=interpretation_id,
                                                  candidate_id=candidate_id, clearance=clearance)
                 if (self.vault.digest_json(current)!=digest or result!=generated

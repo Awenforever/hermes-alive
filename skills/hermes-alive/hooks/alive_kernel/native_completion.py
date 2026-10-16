@@ -43,9 +43,12 @@ class NativeCompletionEvidence:
     provider: str
     content_sha256: str
     content_chars: int
+    source_content_sha256: str
+    source_content_chars: int
+    text_projection: str = 'outer-whitespace-v1'
     request_attempt: int = 1
     api_started_at: float = 0.0
-    source_contract: str = 'hermes.native.post_api_request.v2'
+    source_contract: str = 'hermes.native.post_api_request.v3'
     authority_granted: bool = False
 
 
@@ -61,6 +64,7 @@ class _Observation:
     scope: NativeCompletionScope
     requests: dict = field(default_factory=dict,repr=False)
     error: str | None = None
+    terminal_shapes: list = field(default_factory=list,repr=False)
 
 
 class NativeCompletionHub:
@@ -162,6 +166,14 @@ class NativeCompletionHub:
                 if attempt is None: raise NativeCompletionError('completion has no request attempt')
                 message=values.get('assistant_message')
                 text=getattr(message,'content',None)
+                reason=values.get('finish_reason')
+                count=values.get('assistant_tool_call_count')
+                scope.terminal_shapes.append(dict(
+                    finish_reason=reason if reason in ('stop','length','tool_calls','content_filter',None) else 'other',
+                    has_text=isinstance(text,str) and bool(text),content_chars=len(text) if isinstance(text,str) else 0,
+                    has_tool_calls=bool(getattr(message,'tool_calls',None)),
+                    tool_count=count if type(count) is int and 0<=count<=10000 else None))
+                del scope.terminal_shapes[:-16]
                 # Core passes its NormalizedResponse, whose assistant role is
                 # implicit in post_api_request (it has no role attribute).
                 if (values.get('finish_reason')!='stop' or getattr(message,'role','assistant')!='assistant'
@@ -170,13 +182,19 @@ class NativeCompletionHub:
                         or values['assistant_tool_call_count']!=0
                         or not isinstance(text,str) or not text or len(text)>self.max_content_chars):
                     raise NativeCompletionError('completion is not bounded final text')
+                projected=text.strip()  # Core turn_final_response's outer whitespace step only.
+                if not projected:
+                    raise NativeCompletionError('completion has no visible final text')
                 evidence=NativeCompletionEvidence(scope.scope.subject,scope.scope.session_id,scope.scope.task_id,*key,
                     attempt['pre']['requested_model'],_label(values.get('response_model')),
                     _label(values.get('model')),_label(values.get('provider')),
-                    hashlib.sha256(text.encode('utf-8')).hexdigest(),len(text),attempt['ordinal'],self._attempt_start(values))
+                    hashlib.sha256(projected.encode('utf-8')).hexdigest(),len(projected),
+                    hashlib.sha256(text.encode('utf-8')).hexdigest(),len(text),
+                    request_attempt=attempt['ordinal'],api_started_at=self._attempt_start(values))
                 if attempt['state']=='completed' and attempt['completion']==evidence: return None
                 if attempt['state']!='started': raise NativeCompletionError('conflicting terminal completion')
-                attempt.update(state='completed',completion=evidence)
+                attempt.update(state='completed',completion=evidence,
+                    stripped_sha256=hashlib.sha256(text.strip().encode('utf-8')).hexdigest())
             except NativeCompletionError as error: scope.error='post:'+str(error)
             except (TypeError,AttributeError): scope.error='invalid_post_shape'
         return None
@@ -194,6 +212,27 @@ class NativeCompletionHub:
             except NativeCompletionError as error: scope.error='error:'+str(error)
             except (TypeError,AttributeError): scope.error='invalid_error_shape'
         return None
+
+    def diagnostics(self,scope,result):
+        """Bounded shape and equality checks; never return provider text/labels."""
+        with self._lock:
+            state=self._scopes.get((scope.session_id,scope.task_id))
+            if state is None or state.scope is not scope: return None
+            result=result if isinstance(result,dict) else {}
+            attempts=[a for r in state.requests.values() for a in r['attempts'].values()]
+            completed=[a for a in attempts if a['state']=='completed']
+            evidence=completed[0]['completion'] if len(completed)==1 else None
+            text=result.get('final_response')
+            digest=hashlib.sha256(text.encode('utf-8')).hexdigest() if isinstance(text,str) else None
+            return dict(
+                final_text_chars=len(text) if isinstance(text,str) else None,
+                exact_text_match=evidence is not None and digest==evidence.source_content_sha256,
+                stripped_text_match=evidence is not None and digest==completed[0].get('stripped_sha256'),
+                coordinate_matches={k:evidence is not None and result.get(k)==getattr(evidence,field)
+                    for k,field in (('session_id','session_id'),('turn_id','turn_id'),
+                                    ('model','route_model'),('provider','provider'))},
+                observations=[dict(error=state.error,terminal_shapes=list(state.terminal_shapes),
+                    requests=len(state.requests),states=[a['state'] for a in attempts])])
 
     def finish(self,scope,result):
         with self._lock:

@@ -56,7 +56,8 @@ async def exercise(root):
     with patch.object(ManagedModelProcess,'run',capture):
         await one(**params,timeout=40)
     assert observed==[(45,40)]
-    for mode in ('wrong_context','mixed_text','fail','wrong_request','authority','old_evidence','not_json'):
+    for mode in ('wrong_context','mixed_text','fail','wrong_request','authority','old_evidence','not_json',
+                 'bad_projection','bad_source_hash','bad_source_length','missing_source_hash'):
         attempts=one.calls
         try: await one(**{**params,'task':mode})
         except NativeWorkerError as error: assert 'PRIVATE_SYNTHETIC_KEY' not in str(error)
