@@ -1,0 +1,7 @@
+name: hermes-alive-native-worker
+version: 0.0.1
+description: Private one-operation native worker completion observer; never a gateway plugin.
+provides_hooks:
+  - pre_api_request
+  - post_api_request
+  - api_request_error

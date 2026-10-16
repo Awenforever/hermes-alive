@@ -34,6 +34,21 @@ explicit coordination. No speculative core/queue or production edits follow.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-16 — ADR-0156 connects an opt-in ModelCaller to a dedicated native worker:
+canonical parent/context/route/identity request binding, private minimal Profile,
+strict completed output and current-binding recheck, retained uncertain work with
+terminal-only cleanup. Host-supplied Hermes route callback owns model/alias/fallback;
+no invented default, profile copying or automatic gateway enablement. Actual Core
+controlled tests pass primary/alias and403->declared-backup with correct keys, then
+canonical Alive shadow/replay without another worker call. Real fallback exposed
+v1 logical-id/attempt conflation; v2 evidence uses explicit exact started_at markers
+(not time windows/order), preserving old contracts as old. Windows real protocol-
+child tests and pure event tests pass; not actual Windows Core, live provider health,
+model quality or installed profile auto-resolution. No new real calls/sends.
+Next qualify actual host-scoped capability/presentation projection, then real
+sustained native shadow intelligence. All memory/agenda/learning/Halo/forgetting/
+migration/portable lifecycle/production gates remain, not replaced by RPC tests.
+
 2026-10-16 — ADR-0155 adds a single-use managed model-process lease with bounded
 input/output, retained asynchronous startup, timeout/cancel stop, terminate/kill
 and actual child wait. Pending startup is uncertain, not terminal or permission

@@ -28,9 +28,9 @@ def exercise():
     from alive_kernel.native_completion import NativeCompletionHub,NativeCompletionError
     def configured(**kwargs):
         hub=NativeCompletionHub(**kwargs); context=Context(); hub.install(context); return hub,context
-    def values(scope,*,request='request:1',turn='turn:1',model='route-primary',provider='custom:synthetic'):
+    def values(scope,*,request='request:1',turn='turn:1',model='route-primary',provider='custom:synthetic',started=1.0):
         return dict(session_id=scope.session_id,task_id=scope.task_id,turn_id=turn,api_request_id=request,
-            model=model,provider=provider)
+            model=model,provider=provider,started_at=started)
     def post(hub,scope,*,text='PRIVATE_CANDIDATE',response_model='actual-response-label',**kwargs):
         event=dict(**values(scope,**kwargs),response_model=response_model,finish_reason='stop',
             assistant_tool_call_count=0,assistant_message=SimpleNamespace(role='assistant',content=text,tool_calls=None))
@@ -84,6 +84,14 @@ def exercise():
     post(hub,retry,request='request:2',model='route-backup',response_model='reported-backup')
     assert 'DO_NOT_RETAIN_SECRET' not in repr(hub._scopes)
     assert hub.finish(retry,result(retry,api_calls=2,model='route-backup')).response_model=='reported-backup'
+    shared=hub.open(subject='user:one')
+    hub.pre(**values(shared)); hub.error(**values(shared))
+    # Core fallback reuses one logical API id and can reset retry_count. Exact
+    # started_at is an attempt marker, not an age/order heuristic.
+    hub.pre(**values(shared,started=.5,model='route-backup'))
+    post(hub,shared,started=.5,model='route-backup',response_model='reported-backup')
+    evidence=hub.finish(shared,result(shared,model='route-backup'))
+    assert evidence.request_attempt==2 and evidence.api_started_at==.5
 
     for alteration in (
             {'final_response':'changed'}, {'model':'guessed-last-model'}, {'provider':'other'},

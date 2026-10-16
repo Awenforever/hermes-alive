@@ -6,6 +6,7 @@ not inspected or retained. No raw prompt, response text or credentials are store
 """
 from dataclasses import dataclass, field
 import hashlib
+import math
 import re
 import threading
 from uuid import uuid4
@@ -42,7 +43,9 @@ class NativeCompletionEvidence:
     provider: str
     content_sha256: str
     content_chars: int
-    source_contract: str = 'hermes.native.post_api_request.v1'
+    request_attempt: int = 1
+    api_started_at: float = 0.0
+    source_contract: str = 'hermes.native.post_api_request.v2'
     authority_granted: bool = False
 
 
@@ -115,20 +118,35 @@ class NativeCompletionHub:
     def _coordinates(values):
         return _token(values.get('turn_id')),_token(values.get('api_request_id'))
 
+    @staticmethod
+    def _attempt_start(values):
+        value=values.get('started_at')
+        if type(value) not in (int,float) or not math.isfinite(value):
+            raise NativeCompletionError('native attempt start marker unavailable')
+        # Exact Core event marker, not clock ordering, age, or a time window.
+        return value
+
     def pre(self,**values):
         with self._lock:
             scope=self._current(values)
             if scope is None or scope.error: return None
             try:
                 key=self._coordinates(values)
+                started=self._attempt_start(values)
                 expected=dict(requested_model=_label(values.get('model')),provider=_label(values.get('provider')))
-                if key in scope.requests:
-                    if scope.requests[key]['pre']!=expected or scope.requests[key]['state']!='started':
+                request=scope.requests.get(key)
+                if request is not None and started in request['attempts']:
+                    if request['attempts'][started]['pre']!=expected:
                         raise NativeCompletionError('conflicting request replay')
                 else:
-                    if len(scope.requests)>=self.max_requests:
-                        raise NativeCompletionError('native request bound exhausted')
-                    scope.requests[key]=dict(pre=expected,state='started',completion=None)
+                    if sum(len(r['attempts']) for r in scope.requests.values())>=self.max_requests:
+                        raise NativeCompletionError('native attempt bound exhausted')
+                    if request is None:
+                        request=dict(attempts={}); scope.requests[key]=request
+                    elif any(a['state']!='failed' for a in request['attempts'].values()):
+                        raise NativeCompletionError('new attempt overlaps a nonfailed request')
+                    request['attempts'][started]=dict(pre=expected,state='started',completion=None,
+                        ordinal=len(request['attempts'])+1)
             except NativeCompletionError as error: scope.error='pre:'+str(error)
             except (TypeError,AttributeError): scope.error='invalid_pre_shape'
         return None
@@ -140,7 +158,8 @@ class NativeCompletionHub:
             try:
                 key=self._coordinates(values)
                 request=scope.requests.get(key)
-                if request is None: raise NativeCompletionError('completion has no request')
+                attempt=request['attempts'].get(self._attempt_start(values)) if request else None
+                if attempt is None: raise NativeCompletionError('completion has no request attempt')
                 message=values.get('assistant_message')
                 text=getattr(message,'content',None)
                 # Core passes its NormalizedResponse, whose assistant role is
@@ -152,12 +171,12 @@ class NativeCompletionHub:
                         or not isinstance(text,str) or not text or len(text)>self.max_content_chars):
                     raise NativeCompletionError('completion is not bounded final text')
                 evidence=NativeCompletionEvidence(scope.scope.subject,scope.scope.session_id,scope.scope.task_id,*key,
-                    request['pre']['requested_model'],_label(values.get('response_model')),
+                    attempt['pre']['requested_model'],_label(values.get('response_model')),
                     _label(values.get('model')),_label(values.get('provider')),
-                    hashlib.sha256(text.encode('utf-8')).hexdigest(),len(text))
-                if request['state']=='completed' and request['completion']==evidence: return None
-                if request['state']!='started': raise NativeCompletionError('conflicting terminal completion')
-                request.update(state='completed',completion=evidence)
+                    hashlib.sha256(text.encode('utf-8')).hexdigest(),len(text),attempt['ordinal'],self._attempt_start(values))
+                if attempt['state']=='completed' and attempt['completion']==evidence: return None
+                if attempt['state']!='started': raise NativeCompletionError('conflicting terminal completion')
+                attempt.update(state='completed',completion=evidence)
             except NativeCompletionError as error: scope.error='post:'+str(error)
             except (TypeError,AttributeError): scope.error='invalid_post_shape'
         return None
@@ -168,9 +187,10 @@ class NativeCompletionHub:
             if scope is None or scope.error: return None
             try:
                 request=scope.requests.get(self._coordinates(values))
-                if request is None or request['state']=='completed':
+                attempt=request['attempts'].get(self._attempt_start(values)) if request else None
+                if attempt is None or attempt['state']=='completed':
                     raise NativeCompletionError('error lacks current request')
-                request['state']='failed'
+                attempt['state']='failed'
             except NativeCompletionError as error: scope.error='error:'+str(error)
             except (TypeError,AttributeError): scope.error='invalid_error_shape'
         return None
@@ -192,8 +212,9 @@ class NativeCompletionHub:
                     or result.get('session_id')!=scope.session_id
                     or type(result.get('api_calls')) is not int or result['api_calls']!=len(state.requests)):
                 raise NativeCompletionError('native turn is not an exact completed result')
-            completions=[r['completion'] for r in state.requests.values() if r['state']=='completed']
-            if len(completions)!=1 or any(r['state']=='started' for r in state.requests.values()):
+            attempts=[a for r in state.requests.values() for a in r['attempts'].values()]
+            completions=[a['completion'] for a in attempts if a['state']=='completed']
+            if len(completions)!=1 or any(a['state']=='started' for a in attempts):
                 raise NativeCompletionError('native final completion is missing or ambiguous')
             evidence=completions[0]
             text=result.get('final_response')
