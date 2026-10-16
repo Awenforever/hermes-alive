@@ -4,6 +4,7 @@ import asyncio
 from contextlib import closing
 from datetime import datetime, timedelta, timezone
 import json
+import hashlib
 from pathlib import Path
 import sys
 import tempfile
@@ -64,6 +65,8 @@ async def test(root, *, recipient_meaning=False, purpose_repair=False, plan_vers
     empty=await synth.run(subject='user:test',operation_id='empty',call=forbidden)
     assert not empty.candidates and empty.actual_model=='system/alive-no-current-material'
     assert synth.load_completed(subject='user:test',operation_id='empty')==empty
+    idle_method=journal.get('opportunity.synthesis:empty:started').event.payload['interpreter_method']
+    assert idle_method['kind']=='system_no_material' and idle_method['system_prompt_sha256'] is None
     policies=AutonomyPolicyProjection(journal)
     policies.apply(policies.append_update(subject='user:test',actor='user:test',expected_revision=0,
         enabled=True,context=PolicyContext(can_interrupt=True),operation_id='enable'))
@@ -85,6 +88,12 @@ async def test(root, *, recipient_meaning=False, purpose_repair=False, plan_vers
     async def model(**kwargs):
         task=kwargs['task']; calls.append(task)
         if task=='alive_opportunity_candidates':
+            current_start=journal.read(event_type='opportunity.synthesis_started')[-1]
+            method=current_start.event.payload['interpreter_method']
+            assert method['kind']=='model_prompt'
+            assert method['protocol']==('recipient-plan-v2' if recipient_meaning else 'legacy-draft-v1')
+            assert method['system_prompt_sha256']==hashlib.sha256(kwargs['messages'][0]['content'].encode()).hexdigest()
+            assert method['requested_model']==kwargs.get('model')
             item=json.loads(kwargs['messages'][1]['content'])['opportunities'][0]
             generation = json.loads(kwargs['messages'][1]['content'])
             if purpose_repair and generation['corrective_reviews']:

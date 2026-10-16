@@ -84,6 +84,7 @@ run_and_require run_feedback_assimilation.py '^HERMES_ALIVE_FEEDBACK_ASSIMILATIO
 run_and_require run_commitment_cognition.py '^HERMES_ALIVE_COMMITMENT_COGNITION_OK$'
 run_and_require run_communication_plan.py '^HERMES_ALIVE_COMMUNICATION_PLAN_OK$'
 run_and_require run_semantic_literal_policy.py '^HERMES_ALIVE_SEMANTIC_LITERAL_POLICY_OK$'
+run_and_require run_plan_order_probe.py '^HERMES_ALIVE_PLAN_ORDER_PROBE_OK$'
 run_and_require run_expression_history.py '^HERMES_ALIVE_EXPRESSION_HISTORY_OK$'
 run_and_require run_final_wording_preparation.py '^HERMES_ALIVE_FINAL_WORDING_PREPARATION_OK$'
 run_and_require run_final_wording_repair.py '^HERMES_ALIVE_FINAL_WORDING_REPAIR_OK$'

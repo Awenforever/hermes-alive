@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+import hashlib
 import json
 import re
 from typing import Any
@@ -592,6 +593,12 @@ class OpportunitySynthesizer:
         } for item in evidence]}, ensure_ascii=False, separators=(",", ":"))
         if len(prompt) > 32_000:
             raise OpportunitySynthesisError("opportunity prompt exceeds boundary")
+        system_prompt = _PROMPT+('\n'+_PLAN_GUIDANCE if recipient_meaning else '')+(
+            '\n'+_COMMITMENT_GUIDANCE if any(e.content.get('origin_kind')=='commitment' for e in evidence) else '')
+        method = dict(protocol='recipient-plan-v2' if recipient_meaning else 'legacy-draft-v1',
+            kind='model_prompt' if evidence else 'system_no_material',
+            system_prompt_sha256=hashlib.sha256(system_prompt.encode()).hexdigest() if evidence else None,
+            requested_model=requested_model if evidence else None)
         receipt_id = f"opportunity.synthesis:{operation_id}:completed"
         base = dict(source="alive.opportunity-synthesis", actor="system:alive-interpreter",
                     subject=subject, sensitivity=Sensitivity(clearance))
@@ -603,6 +610,7 @@ class OpportunitySynthesizer:
                          "interpretation_as_of":as_of.isoformat(),
                          "commitment_digest":commitment_digest,
                          "recipient_meaning":recipient_meaning,
+                         "interpreter_method":method,
                          "context_proposal_event_ids": [c.proposal_event_id for c in context],
                          "explicit_context_digest": self.vault.digest_json([c.to_prompt() for c in context]),
                          "feedback_context_digest": self.vault.digest_json([f.to_prompt() for f in feedback]),
@@ -623,8 +631,7 @@ class OpportunitySynthesizer:
             if evidence:
                 response = await asyncio.wait_for(call(
                     task="alive_opportunity_candidates", model=requested_model,
-                    messages=[{"role": "system", "content": _PROMPT+('\n'+_PLAN_GUIDANCE if recipient_meaning else '')+('\n'+_COMMITMENT_GUIDANCE
-                        if any(e.content.get('origin_kind')=='commitment' for e in evidence) else '')},
+                    messages=[{"role": "system", "content": system_prompt},
                               {"role": "user", "content": prompt}],
                     temperature=.2, max_tokens=4000,
                 ), timeout=timeout_seconds)

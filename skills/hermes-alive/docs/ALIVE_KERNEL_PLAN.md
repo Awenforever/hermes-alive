@@ -34,6 +34,21 @@ explicit coordination. No speculative core/queue or production edits follow.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-16 — ADR-0150 tests current/compact contracts crossed with requested output
+order on six new synthetic scenes (24 calls per protocol). First-run fixture and
+schema parity defects are preserved and corrected in a complete second run, not
+selective retries. Corrected cells:13 structural candidates/10 abstentions/1 invalid
+JSON; none of the four arms solves ordinary scope recital. Longer contracts also
+infer personal ineligibility without evidence and skip preliminary leads; compact
+ones can convey caveats but add source/control commentary. No winner, independent
+review or production acceptance claim. Field order is not hidden reasoning order.
+Add exact interpreter system-prompt method hash/requested-model audit metadata at
+the call boundary, with explicit no-material provenance; no runtime prompt/model
+switch. Totals266 logical/279 HTTP starts, zero actual sends. Next qualify a genuine
+source/context-only purpose stage before any draft/claimed candidate goal, including
+timing relation, unknown affiliation, assurance and meaningful silence. Keep the
+complete memory/agenda/learning/host/privacy/migration/portable/production goal.
+
 2026-10-16 — ADR-0149 separates exact-value protection from semantic polarity in
 new v2 plans/meaning while preserving v1 byte shape and locks. Negation/uncertainty
 may be paraphrased, never dropped; free generation still requires semantic review,

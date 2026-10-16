@@ -12,19 +12,19 @@ aca8d6a6cf0ed5e704affd9a8df37cc6fb9e185de2ff72ebb10abfb79710bdf5  ./__init__.py
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./ci/fakes/agent/__init__.py
 9ad885f59b90418d1d95092668742c0607ca1352274c3b1310eba9fc084f84a0  ./ci/fakes/agent/auxiliary_client.py
 0969da99a0bc2a1b71ed50584560f4588a37567ac63af3ddbaf3c4617ca5621a  ./ci/requirements.txt
-60f1bf63608beb35f2312dd8688b00e6ca93c0a45b87c396d6b7337078317108  ./metadata/hermes-alive-source.sha256
+e7ee54a374b7b144fbad7d5d8dd9c83dde4ab1300cd36a206786cfdebb7b9d08  ./metadata/hermes-alive-source.sha256
 5cba4486635fe54faef4cbb05cfb645c315d9ad4dd3316817f12bc81c44b220e  ./metadata/hermes-alive.json
 4fb37d59dd4a70056e4612fef2ac1c841323d5b6879da9d6eadcfd09edf61410  ./plugin.yaml
 f8f5599ae916b0775205a1dfbb1e57c0b6c72465948f276e4332f3a2aa87f4df  ./plugin_cli.py
 1abd5395e8cb5a88160ba7b6b97b5f41a2b9fcd13a8c5e6a18c8e7b5d5aba36b  ./scripts/bootstrap.sh
-33f3118075caae89487d5405c7b7e642859b98287699b59b8c7adec78a1acc76  ./scripts/portable-ci.sh
+47888645233d3a67ba72bb7e9182b2551ac0b51c27079b465182218cebbee45b  ./scripts/portable-ci.sh
 acc205902d64993d163b7a7e2a89a0eb97e7561a2ac4f515313de2190181ee0e  ./scripts/update-manifests.py
 17135db708feb017de309005fe95501a23b024c73f77e0566c4aad5f6d64ce6a  ./scripts/verify-repository.py
 57eb07543f9e2147613ab27e56d47f13e912e951d2c7fd4f27e731ee47c75b25  ./skills/hermes-alive/LICENSE
 cf444ad0788f9ab925b944e4668d974fb8dc36161d3bdc8d9963b6a5021dd53f  ./skills/hermes-alive/README.md
 15aa69e768b45e17d71ff22155150fac4d0925ba172748432c5c8c307985e1bb  ./skills/hermes-alive/README_CN.md
 a3ab6cbfada2ab9a7e9e0693d376d354563e3e50f4b368f6c45e3cfa7773ba35  ./skills/hermes-alive/SKILL.md
-40b4b4204f99be96c26f34d3d2a881c3d4aebcf4a7492a5035179cc7356e4f58  ./skills/hermes-alive/docs/ALIVE_KERNEL_PLAN.md
+a4813d6ff70c016ad45f24201cd7459fbe62984d352d7e32921adb846c18277e  ./skills/hermes-alive/docs/ALIVE_KERNEL_PLAN.md
 97ab9e52cbfbc23d98822e39ecd598be1bb7ccd78395cf59aca7929a3ed98d5d  ./skills/hermes-alive/docs/ARCHITECTURE.md
 60a2ffe527b49c1598e8275b205985b63653270b499cdb29a2f7ab672e88fc0e  ./skills/hermes-alive/docs/DATA_AND_PRIVACY.md
 858c8d0089d0e8be7fbf40fe70fe162918edc43c1aa264f50fe6f07e0ce7ab1f  ./skills/hermes-alive/docs/DEVELOPMENT_MEMORANDUM.md
@@ -186,6 +186,7 @@ fb3df81a83f2a4628a6fe2f57e1e6e5c32ffa022f08a8a45e9f3cd959b333cd4  ./skills/herme
 a81174257ed491d7bc05a3e3092d72fe4bbbaca8fdee0808561c4a9d90d45560  ./skills/hermes-alive/docs/adr/0147-user-admitted-commitments-in-current-cognition.md
 86d02bf51c3d37f37c2ff5e4df1f01520a92f8c0e92752a26ca002898745760a  ./skills/hermes-alive/docs/adr/0148-recipient-meaning-and-separate-purpose-assessment.md
 cf46c88afc280fa5e069c9f748ca5d6c5bc92403109912aa85177d473c49fb05  ./skills/hermes-alive/docs/adr/0149-semantic-polarity-and-explicit-temporal-bounds.md
+20622b25c80183fbfeecda0f40651289c2b0142aab09856e3c202f33eca4b1ac  ./skills/hermes-alive/docs/adr/0150-crossed-plan-order-diagnostic-and-method-provenance.md
 4d6108e5f522390a4f9008265a2681771192c500c4c34a02179e24a238b55332  ./skills/hermes-alive/docs/evidence/deepseek-seed-20261012.json
 40941e141314d626c51ad4d22ccc19c76dcf4b770a85daa0881d135089fb75ea  ./skills/hermes-alive/docs/evidence/qwen-route-20261012.json
 460cffae94c5494e13515ab9c2dc42331e9fd14260bf4182086d5f3bd9e19114  ./skills/hermes-alive/hooks/HOOK.yaml
@@ -243,7 +244,7 @@ a9908b84e2ac79d6d2b01a279fa7fbd209a804489e794dc9497d2dd8d117577a  ./skills/herme
 d6870789e6c6ff34c5c19f68ff57b5d6af6f17113273fe96b65e6112c21f9724  ./skills/hermes-alive/hooks/alive_kernel/model_json.py
 8431cd7a75570babe55ced1299042c19c53e943fb242465511b31f6da50e7365  ./skills/hermes-alive/hooks/alive_kernel/observed_channel_execution.py
 2d55f84eec610bf00a30611417dba4f976ecd8b20f96d9587acc02d06db146ec  ./skills/hermes-alive/hooks/alive_kernel/opportunity_expression.py
-ea9bd39ed41614fbae03d4ed6582f37307cf5c79a78557206d20d0b9a48326c0  ./skills/hermes-alive/hooks/alive_kernel/opportunity_synthesis.py
+41990f50f2577c81666f4c4b68f31324773098340b865de6740115802537a80a  ./skills/hermes-alive/hooks/alive_kernel/opportunity_synthesis.py
 cd00b9a2027d7e618db1a69c37295e5ba0120a2f39d7bd94d092d100a8da126e  ./skills/hermes-alive/hooks/alive_kernel/outcomes.py
 b8f985886db59b1bec033b20db474b2d465d97124c0d39735a534c2a3097b22f  ./skills/hermes-alive/hooks/alive_kernel/owner_review.py
 8898e13f82b990b0c2347623f5b06bbb65412e859c17abb129383385127b46f0  ./skills/hermes-alive/hooks/alive_kernel/planning_runtime.py
@@ -344,6 +345,7 @@ a4ac3956efe73764226f51cd1ac9eb4971bebd6a5cd8d585d5a680783f366a6b  ./skills/herme
 8f14c172ea77c8f2fe121c0ab95cca41c33248c09230688d9482a1ba91647159  ./skills/hermes-alive/tests/probe_alive_live_source_scope.py
 92ca6f774d1c05ff3ec56cab0e3e8d7b91d402a10454558e2f01eb0d76327ed7  ./skills/hermes-alive/tests/probe_alive_live_source_support.py
 f9c057d03c6af7a4573eee949b5575866557962794e3337413a5aa88a144743f  ./skills/hermes-alive/tests/probe_alive_live_temporal_reconsideration.py
+9e53918396161cd5e22a195ef90278d2a6935955d1de778b6f36603bb42f5e19  ./skills/hermes-alive/tests/probe_alive_plan_order.py
 ba8b37833adb097d1ec932e3b40f38b3a93cdd08819a72241d85850a61738924  ./skills/hermes-alive/tests/run_action_history.py
 73df823bc18ebf88d2afe24c610d8869117ca6159aea4aa280bf942f2efaf858  ./skills/hermes-alive/tests/run_action_history_live_probe.py
 f8ef3cc170877f6caf9b189653ce09771c7d9ca6dd86a585eae7bf6ea2990f28  ./skills/hermes-alive/tests/run_admission_metadata_cache.py
@@ -436,7 +438,7 @@ a54e63e19fa87a87f60c6f987da50fb45a23f73f81443036f93e25a7a0a06dc9  ./skills/herme
 6939f2a4b524b01e2cf1ca519787c2f6ee192fd4b502a4e8c702d1d4d5740d32  ./skills/hermes-alive/tests/run_cli_process.py
 f6d714dc612851ddba91bf3bb074ac22510b1b2fc18441c194c4b2c50e6c29e2  ./skills/hermes-alive/tests/run_cli_report_classification.py
 f382e4810ed19d97e935d2aa31026a092cde39bb00a442ef53fcbf8a51d6ae4e  ./skills/hermes-alive/tests/run_cli_send_contract.py
-fd34713940effb32698a83b5fe4b39ca9614ceadcf359ceced5b139ecf31aac9  ./skills/hermes-alive/tests/run_commitment_cognition.py
+bbaa55fb3a406b4a1392fd3641a3234ae6e0cee9f390294341d02d35e1c5f1ba  ./skills/hermes-alive/tests/run_commitment_cognition.py
 7f54a307c3a54dae0227851d455b7f4d9a6635817c16cd991939aa0d53c16d50  ./skills/hermes-alive/tests/run_communication_plan.py
 1319660b0d6b92c84b3edac112a2a3328b046d1a9df45f8fcc8ce1cc6be60982  ./skills/hermes-alive/tests/run_context_visibility_concurrency_replay.py
 b1855c8bdae0689f2713fdf8a60afc80623f322032206aa9c4e36ce5ec96ba06  ./skills/hermes-alive/tests/run_context_visibility_contracts.py
@@ -474,6 +476,7 @@ f3e4cc6dc1e14ece2702fe3de717c5aaba47c8764226fafb13665eca3840c854  ./skills/herme
 3c625019a3ceace2e34b011e9b772796b901debbdd13cf04cebb83b1a240984c  ./skills/hermes-alive/tests/run_owned_chunk_observation.py
 cf83d75d6ff3555905e4ca12acd9a9f0c1b46ff821dd36f98efe79fd2a5c6269  ./skills/hermes-alive/tests/run_personality_semantic_bubbles.py
 61bd1da1131fdc512b486a22ee9b23f163f4da333b415dc05646f16f3d3d5c79  ./skills/hermes-alive/tests/run_personality_semantic_stress_replay.py
+aac606f53fb268b70ebc503ef3f5805899dac8ca59cef2c5023e8982caa38d91  ./skills/hermes-alive/tests/run_plan_order_probe.py
 6edc12ad541e7f74b82f394d62b4fab8ab268004015040c476527f00ea202af8  ./skills/hermes-alive/tests/run_plugin_cli_portable.py
 881411a43b185e0f3e6966d40ac3c5cde148828be52ed758823eb0e78f48de08  ./skills/hermes-alive/tests/run_proactive_quality_governor.py
 515511ca2a2ef34d8b8b7fa16a76cbb9ad3b9193358948e7bb488858972ca086  ./skills/hermes-alive/tests/run_production_enforcement.py
