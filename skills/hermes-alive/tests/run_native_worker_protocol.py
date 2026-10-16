@@ -37,6 +37,25 @@ async def exercise(root):
     reply=await one(**{**params,'model':'Hermes-configured-alias'})
     assert json.loads(reply.choices[0].message.content)['model']=='configured-alias-target'
     assert resolutions[-1]['model']=='Hermes-configured-alias'
+    from alive_kernel.native_worker_protocol import invocation_limits
+    assert invocation_limits(None,90)==(90,85)
+    assert invocation_limits(40,90)==(45,40)
+    assert invocation_limits(120,60)==(60,55)
+    assert invocation_limits(1,90)==(10,1)
+    for invalid_timeout in (True,0,-1,241,float('nan'),float('inf'),'40'):
+        before=len(resolutions)
+        try: await one(**params,timeout=invalid_timeout)
+        except NativeWorkerError: pass
+        else: raise AssertionError('invalid per-call timeout admitted')
+        assert len(resolutions)==before
+    observed=[]
+    original_run=ManagedModelProcess.run
+    async def capture(lease,payload):
+        observed.append((lease.timeout_seconds,json.loads(payload)['budget_seconds']))
+        return await original_run(lease,payload)
+    with patch.object(ManagedModelProcess,'run',capture):
+        await one(**params,timeout=40)
+    assert observed==[(45,40)]
     for mode in ('wrong_context','mixed_text','fail','wrong_request','authority','old_evidence','not_json'):
         attempts=one.calls
         try: await one(**{**params,'task':mode})

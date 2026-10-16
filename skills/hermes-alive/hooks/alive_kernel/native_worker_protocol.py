@@ -24,6 +24,17 @@ def request_digest(document):
     return hashlib.sha256(canonical(document)).hexdigest()
 
 
+def invocation_limits(timeout,lifetime):
+    """Auxiliary callers may narrow, never widen, the owned worker budget."""
+    if type(lifetime) not in (int,float) or not math.isfinite(lifetime) or not 10<=lifetime<=300:
+        raise NativeWorkerError('invalid owned worker lifetime')
+    if timeout is None: return lifetime,min(240,lifetime-5)
+    if type(timeout) not in (int,float) or not math.isfinite(timeout) or not 1<=timeout<=240:
+        raise NativeWorkerError('invalid per-invocation model timeout')
+    owned=min(lifetime,max(10,timeout+5))
+    return owned,min(timeout,240,owned-5)
+
+
 def validate_request(document):
     expected={'version','operation_id','request_id','subject','task','context_digest','messages',
         'runtime','identity','temperature','max_tokens','budget_seconds'}

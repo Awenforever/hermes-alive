@@ -8,7 +8,7 @@ import json
 
 from .native_host_snapshot import validate_host_snapshot
 from .native_worker_caller import NativeWorkerCaller
-from .native_worker_protocol import NativeWorkerError, canonical, identifier
+from .native_worker_protocol import NativeWorkerError, canonical, identifier, invocation_limits
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,7 +81,8 @@ class HostNativeCaller:
         if self._active is None: return dict(closed=0,remaining=0)
         return await self._active.reap_pending(timeout_seconds=timeout_seconds)
 
-    async def __call__(self,*,task,model,messages,temperature,max_tokens,route_info=None):
+    async def __call__(self,*,task,model,messages,temperature,max_tokens,route_info=None,timeout=None):
+        invocation_limits(timeout,self.arguments['timeout_seconds'])
         if self._busy: raise NativeWorkerError('host model invocation is already active')
         self._busy=True
         try:
@@ -133,7 +134,7 @@ class HostNativeCaller:
                 identity=capability.identity,max_calls=1,**self.arguments)
             self._active=worker  # Retain its binding/workspace if cancellation leaves an uncertain lease.
             return await worker(task=task,model=model,messages=messages,temperature=temperature,
-                max_tokens=max_tokens,route_info=route_info)
+                max_tokens=max_tokens,route_info=route_info,timeout=timeout)
         finally:
             self._busy=False
             if self._active is not None and not self._active.pending: self._active=None

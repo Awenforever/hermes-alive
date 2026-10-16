@@ -13,7 +13,7 @@ from types import MappingProxyType, SimpleNamespace
 from uuid import uuid4
 
 from .model_process import ManagedModelProcess
-from .native_worker_protocol import (NativeWorkerError,canonical,identifier,request_digest,
+from .native_worker_protocol import (NativeWorkerError,canonical,identifier,request_digest,invocation_limits,
     validate_request,validate_completion)
 
 
@@ -58,7 +58,8 @@ class NativeWorkerCaller:
                 self._cleanup(key); closed+=1
         return dict(closed=closed,remaining=len(self._jobs))
 
-    async def __call__(self,*,task,model,messages,temperature,max_tokens,route_info=None):
+    async def __call__(self,*,task,model,messages,temperature,max_tokens,route_info=None,timeout=None):
+        lifetime,budget=invocation_limits(timeout,self.timeout)
         self._current()
         await self.reap_pending()
         if self._jobs or self.calls>=self.max_calls:
@@ -70,7 +71,7 @@ class NativeWorkerCaller:
         except Exception: raise NativeWorkerError('Hermes runtime resolution failed') from None
         request=dict(version=1,operation_id=self.operation_id,request_id=uuid4().hex,subject=self.subject,
             task=task,context_digest=request_digest(messages),messages=messages,runtime=runtime,
-            identity=self.identity,temperature=temperature,max_tokens=max_tokens,budget_seconds=min(240,self.timeout-5))
+            identity=self.identity,temperature=temperature,max_tokens=max_tokens,budget_seconds=budget)
         try: request=json.loads(canonical(validate_request(request)))
         except Exception: raise NativeWorkerError('Hermes runtime cannot cross the native worker boundary') from None
         self._current()
@@ -84,7 +85,7 @@ class NativeWorkerCaller:
         try:
             lease=ManagedModelProcess(command=(str(self.interpreter),'-B',str(self.entrypoint),
                 '--core',str(self.core),'--workspace',str(child_root)),cwd=root,environment=env,
-                private_tmp_dir=root,timeout_seconds=self.timeout)
+                private_tmp_dir=root,timeout_seconds=lifetime)
         except Exception:
             workspace.cleanup()
             raise

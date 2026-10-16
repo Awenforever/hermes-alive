@@ -42,6 +42,23 @@ authorize an Alive/Core/email deployment or a second restart after rollback.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-16 — ADR-0162 exposes and fixes a genuine missed native-feedback interface
+defect: FeedbackSynthesizer's per-call timeout was not accepted by native callers.
+Bounded narrowing now reaches the real child/request budget; protocol/host tests
+pass. A new prospective real-model series completes four native calls: feedback
+interpretation, concise suggestion, explicit topic-pause abstention, and return
+after explicit withdrawal of that pause memory. User/scenario are synthetic;
+no channel sends, production edits or private chat reads. Secret projection was
+removed after the terminal container and no pending children remain.
+This is NOT zero-error: the last candidate omits a material fictional-source
+qualification while its risk rationale incorrectly says it was preserved.
+Structural rejected_count0 is not fidelity. Next exercise versioned recipient
+meaning plus source/purpose review and correction through final wording, not a
+specific phrase patch or more route probes. Actual endpoint/physical HTTP total
+was not instrumented; four new logical calls all report deepseek-flash. Full
+host installation, longitudinal memory/agenda/outcomes/learning and production
+acceptance remain open. Preserve this failed semantic example as evidence.
+
 2026-10-16 — ADR-0161 composes the acquired native caller with the actual durable
 host lifetime and authenticated owner policy. A cycle-bound parameter factory
 gets the journal's exact operation ID after opening/recovering it; factory errors
