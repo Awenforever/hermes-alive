@@ -34,6 +34,21 @@ explicit coordination. No speculative core/queue or production edits follow.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-16 — ADR-0151 actually removes a prior draft/goal from purpose interpretation,
+then compares both paths with the same renderer/language on six new synthetic
+scenes. Seventeen configured-model calls yield more informational replies, but
+ordinary scope recital remains; assurance loses actor scope, and source summaries
+become stronger whole-source/verification claims. No extra purpose stage is adopted.
+One isolated user-named qwen3.8-reasoner attempt observes a timeout/retry and stops
+after one logical/two HTTP starts with no returned model; no403, quality or
+independent-family conclusion is inferred. Production configuration stays unchanged.
+Totals284 logical/298 observed HTTP starts, zero actual sends. Fake Windows/Linux
+tests qualify mechanics only; raw evidence is archived privately outside temporary
+storage. Next compare host-native/direct contribution composition and explicit
+actor/modality/time relations, not more disclaimer rules or unreviewed deliveries.
+Preserve the whole host/memory/agenda/adaptation/privacy/migration/portable and
+production objective; current production remains on the legacy runtime.
+
 2026-10-16 — ADR-0150 tests current/compact contracts crossed with requested output
 order on six new synthetic scenes (24 calls per protocol). First-run fixture and
 schema parity defects are preserved and corrected in a complete second run, not
