@@ -34,6 +34,20 @@ explicit coordination. No speculative core/queue or production edits follow.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-16 — ADR-0153 uses the actual retained Hermes AIAgent/prompt/SDK/turn facade
+with physical HTTP controlled, rather than a high-level fake worker. Native SOUL
+and ephemeral task reach the provider request, tools/external memory/project files
+are excluded. Canonical Alive typed memory/commitment/discovery/attributed feedback
+reach shadow planning; reopening spends no new call, withdrawal/forgetting exclude
+old context from the next fresh session. Three fake replies, zero actual model or
+channel calls, no network attempts in the final expanded run. Early incorrect
+cache/policy/helper assertions and native model-field assumptions are preserved.
+The host's served_model is not necessarily the completion-body model; do not ship
+a guessed attribution adapter. This is not native Windows/fresh install, independent
+semantic quality, long-term learning, external Halo or complete erasure proof.
+Next qualify a scoped/recoverable host-call and completion-evidence boundary, then
+real-model shadow behavior; preserve all original production/lifecycle requirements.
+
 2026-10-16 — ADR-0152 screens a single direct contribution on six fresh synthetic
 scenes, using original sources/context and a fixed owner-time anchor. Six real
 calls: four messages/two silences, all valid envelopes, but ordinary instruction

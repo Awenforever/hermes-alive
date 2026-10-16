@@ -2,7 +2,7 @@
 cf444ad0788f9ab925b944e4668d974fb8dc36161d3bdc8d9963b6a5021dd53f  ./README.md
 15aa69e768b45e17d71ff22155150fac4d0925ba172748432c5c8c307985e1bb  ./README_CN.md
 a3ab6cbfada2ab9a7e9e0693d376d354563e3e50f4b368f6c45e3cfa7773ba35  ./SKILL.md
-aa70baa82be9e07e711e63d330c455657ed0aed762d2608336cd4fb1833aa44f  ./docs/ALIVE_KERNEL_PLAN.md
+dd91e29a049ca9e377a1fcc347d8295731ecdb91fde26b32bc865c488ae9c8db  ./docs/ALIVE_KERNEL_PLAN.md
 97ab9e52cbfbc23d98822e39ecd598be1bb7ccd78395cf59aca7929a3ed98d5d  ./docs/ARCHITECTURE.md
 60a2ffe527b49c1598e8275b205985b63653270b499cdb29a2f7ab672e88fc0e  ./docs/DATA_AND_PRIVACY.md
 858c8d0089d0e8be7fbf40fe70fe162918edc43c1aa264f50fe6f07e0ce7ab1f  ./docs/DEVELOPMENT_MEMORANDUM.md
@@ -167,6 +167,7 @@ cf46c88afc280fa5e069c9f748ca5d6c5bc92403109912aa85177d473c49fb05  ./docs/adr/014
 20622b25c80183fbfeecda0f40651289c2b0142aab09856e3c202f33eca4b1ac  ./docs/adr/0150-crossed-plan-order-diagnostic-and-method-provenance.md
 6274da7c9814943523c2537918f81698b121235500405cebe139544a19c59dd2  ./docs/adr/0151-source-only-purpose-and-matched-expression-diagnostic.md
 3d7e0337a5f6f9cc9a74c27f9c140c6a9e447de9dd90684667b7c48ea914c4f4  ./docs/adr/0152-direct-contribution-feasibility-before-runtime-adoption.md
+a5fd2fa17dae1331ba619742ca27c41f6a45d1ad8ff394aa4b476c093412a119  ./docs/adr/0153-actual-native-host-shadow-and-context-boundaries.md
 4d6108e5f522390a4f9008265a2681771192c500c4c34a02179e24a238b55332  ./docs/evidence/deepseek-seed-20261012.json
 40941e141314d626c51ad4d22ccc19c76dcf4b770a85daa0881d135089fb75ea  ./docs/evidence/qwen-route-20261012.json
 460cffae94c5494e13515ab9c2dc42331e9fd14260bf4182086d5f3bd9e19114  ./hooks/HOOK.yaml
@@ -326,6 +327,7 @@ a4ac3956efe73764226f51cd1ac9eb4971bebd6a5cd8d585d5a680783f366a6b  ./tests/probe_
 8f14c172ea77c8f2fe121c0ab95cca41c33248c09230688d9482a1ba91647159  ./tests/probe_alive_live_source_scope.py
 92ca6f774d1c05ff3ec56cab0e3e8d7b91d402a10454558e2f01eb0d76327ed7  ./tests/probe_alive_live_source_support.py
 f9c057d03c6af7a4573eee949b5575866557962794e3337413a5aa88a144743f  ./tests/probe_alive_live_temporal_reconsideration.py
+675c547e9122bb238f038e89cb4f69ca4b08e8da938b3ec8afdbec1bda591dde  ./tests/probe_alive_native_host.py
 9e53918396161cd5e22a195ef90278d2a6935955d1de778b6f36603bb42f5e19  ./tests/probe_alive_plan_order.py
 21337ea7d02bb9d406dfa521a7ca989479221d82f04ab7b90bc6c06c9d99871d  ./tests/probe_alive_purpose_only.py
 ba8b37833adb097d1ec932e3b40f38b3a93cdd08819a72241d85850a61738924  ./tests/run_action_history.py
