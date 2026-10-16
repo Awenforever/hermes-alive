@@ -32,7 +32,25 @@ Codex now records and coordinates such findings rather than editing Enhance;
 Qoder independently owns its repair work. Shared interface changes require
 explicit coordination. No speculative core/queue or production edits follow.
 
+2026-10-16 ownership update: the user explicitly reassigned Enhance integration/
+distribution closure to Codex and Email Watchdog to Qoder. That supersedes the
+previous scheduling/ownership for this scoped handoff, not module boundaries.
+Enhance work stays in a separate repository; it still solely owns FIFO/token.
+Alive's experimental kernel is not deployed by that work. Shared production
+windows remain explicit and independent: an approved Enhance restart does not
+authorize an Alive/Core/email deployment or a second restart after rollback.
+
 ### Current integration milestone: delivery evidence and attributed feedback
+
+2026-10-16 — ADR-0157 qualifies actual Core home/secret/alias/fallback semantics
+with two synthetic owners (A→B→A), scoped key_env and ambient-key exclusion.
+Original config/env bytes and context restoration hold; Core's readonly loader
+still creates LKG backups and first-use scaffolding, so no filesystem-zero-write
+claim follows. Complete official Git548e66f source, retained dependencies,
+controlled metadata HTTP, denied DNS/connect/subprocess; no model calls/sends.
+Prefer host-owned bound snapshot plus private-process resolution; full routing/
+privacy/header/TLS/pool projection and automatic native caller remain to build.
+This is sequential evidence, not concurrency, fresh-install or quality proof.
 
 2026-10-16 — ADR-0156 connects an opt-in ModelCaller to a dedicated native worker:
 canonical parent/context/route/identity request binding, private minimal Profile,
