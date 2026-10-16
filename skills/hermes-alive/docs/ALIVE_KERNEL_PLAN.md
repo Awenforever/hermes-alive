@@ -34,6 +34,20 @@ explicit coordination. No speculative core/queue or production edits follow.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-16 — ADR-0154 implements bounded, explicitly registered NativeCompletionHub:
+random owner-bound session/task scopes, native pre/post/error correlation and exact
+final text/model evidence, not last-model guessing. Real PluginManager lifecycle
+dispatch supplies evidence in the actual native shadow chain; replay/withdrawal/
+forgetting still pass. Early SDK-role assumption failed against Core's normalized
+response and was corrected from the actual contract, not a Core patch. Pure-event
+Windows/Linux tests cover concurrency, denied finalizations, duplicate/late events,
+cancel/dispose and bounds. No raw prompt/body, new memory authority, sends or real
+model calls. Cancelling evidence is explicitly NOT stopping a worker/HTTP request.
+Next use a managed isolated process with bounded cancellation, authoritative wait,
+current model/profile inheritance and durable outer operation replay. A cancelled
+to_thread await is insufficient; do not activate the diagnostic synchronous caller.
+Keep the full host/learning/privacy/portable/migration/production objective active.
+
 2026-10-16 — ADR-0153 uses the actual retained Hermes AIAgent/prompt/SDK/turn facade
 with physical HTTP controlled, rather than a high-level fake worker. Native SOUL
 and ephemeral task reach the provider request, tools/external memory/project files

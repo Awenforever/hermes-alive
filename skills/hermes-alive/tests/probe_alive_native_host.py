@@ -8,6 +8,7 @@ import inspect
 import json
 import os
 from pathlib import Path
+import shutil
 import sys
 import tempfile
 import traceback
@@ -20,7 +21,9 @@ os.umask(0o077)
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--core',type=Path,required=True)
 parser.add_argument('--kernel-package',type=Path,default=Path(__file__).resolve().parents[1])
+parser.add_argument('--scoped-completion',action='store_true')
 args=parser.parse_args()
+args.core=args.core.resolve(strict=True); args.kernel_package=args.kernel_package.resolve(strict=True)
 sys.path[:0]=[str(args.core),str(args.kernel_package/'hooks'),str(args.kernel_package/'tests')]
 root=Path(tempfile.mkdtemp(prefix='alive-native-boundary-'))
 profile=root/'profile'; profile.mkdir(mode=0o700)
@@ -33,9 +36,19 @@ os.environ['XDG_CACHE_HOME']=str(home/'cache')
 os.environ['OPENAI_API_KEY']='synthetic-not-a-real-key'
 os.environ['HERMES_SKIP_UPDATE_CHECK']='1'
 os.chdir(project)
-(profile/'config.yaml').write_text(json.dumps(dict(model=dict(default='synthetic-model',streaming=False),
+configuration=dict(model=dict(default='synthetic-model',streaming=False),
     memory=dict(memory_enabled=False,user_profile_enabled=False),
-    compression=dict(enabled=False),agent=dict(max_iterations=1))),encoding='utf-8')
+    compression=dict(enabled=False),agent=dict(max_iterations=1))
+hub=None
+if args.scoped_completion:
+    from alive_kernel.native_completion import NativeCompletionHub
+    hub=NativeCompletionHub()
+    sys.modules['alive_native_completion_probe_bus']=SimpleNamespace(hub=hub)
+    fixture=args.kernel_package/'tests'/'fixtures'/'native-completion-observer'
+    shutil.copytree(fixture,profile/'plugins'/'alive-native-completion-fixture')
+    configuration['plugins']=dict(enabled=['alive-native-completion-fixture'])
+    os.environ['HERMES_BUNDLED_PLUGINS']=str(profile/'empty-bundled')
+(profile/'config.yaml').write_text(json.dumps(configuration),encoding='utf-8')
 (profile/'SOUL.md').write_text('SYNTHETIC_SOUL_BOUNDARY_153: Be a concise, candid assistant. Never pretend to be human.',encoding='utf-8')
 (profile/'memories').mkdir()
 (profile/'memories'/'MEMORY.md').write_text('FORBIDDEN_PRIVATE_MEMORY_153',encoding='utf-8')
@@ -81,13 +94,18 @@ async def fake_async_http(client,request,*args,**kwargs):
 httpx.AsyncClient.send=fake_async_http
 
 from run_agent import AIAgent
+boundary_scope=None
+if hub is not None:
+    from hermes_cli.plugins import discover_plugins
+    discover_plugins()
+    boundary_scope=hub.open(subject='user:native-boundary')
 agent=AIAgent(base_url='https://provider.invalid/v1',api_key='synthetic-not-a-real-key',
     provider='custom',model='synthetic-model',api_mode='chat_completions',
     enabled_toolsets=[],disabled_toolsets=[],max_iterations=1,run_budget_seconds=10,
     max_tokens=256,quiet_mode=True,save_trajectories=False,skip_context_files=True,
     load_soul_identity=True,skip_memory=True,skip_background_review=True,
     ephemeral_system_prompt='SYNTHETIC_ALIVE_TASK_153: Propose, never send.',
-    session_id='alive-native-boundary-153',cwd=str(project))
+    session_id=boundary_scope.session_id if boundary_scope else 'alive-native-boundary-153',cwd=str(project))
 print(json.dumps(dict(tools=len(agent.tools),valid_tools=sorted(agent.valid_tool_names),
     memory_store=agent._memory_store is not None,memory_manager=agent._memory_manager is not None,
     background_review_skipped=agent.skip_background_review,
@@ -104,7 +122,8 @@ checks=dict(soul='SYNTHETIC_SOUL_BOUNDARY_153' in prompt,task='SYNTHETIC_ALIVE_T
 print(json.dumps(dict(prompt_chars=len(prompt),prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
     checks=checks,network_attempts=attempts)),flush=True)
 assert checks['soul'] and not checks['task'] and not any(checks[k] for k in ('private_memory','private_user','project_instructions'))
-result=agent.run_conversation('SYNTHETIC_CURRENT_CONTEXT_153: Draft a proposal only, do not perform actions.')
+result=agent.run_conversation('SYNTHETIC_CURRENT_CONTEXT_153: Draft a proposal only, do not perform actions.',
+    task_id=boundary_scope.task_id if boundary_scope else None)
 print(json.dumps(dict(result_keys=sorted(result),provider_calls=len(provider_requests),
     network_attempts=len(attempts),request_routes=requests)),flush=True)
 assert len(provider_requests)==1
@@ -113,6 +132,12 @@ assert 'SYNTHETIC_SOUL_BOUNDARY_153' in wire and 'SYNTHETIC_ALIVE_TASK_153' in w
 assert 'SYNTHETIC_CURRENT_CONTEXT_153' in wire
 assert not any(s in wire for s in ('FORBIDDEN_PRIVATE_MEMORY_153','FORBIDDEN_PRIVATE_USER_153','FORBIDDEN_PROJECT_INSTRUCTIONS_153'))
 assert result.get('final_response')=='SYNTHETIC_PROPOSAL_153: no message was sent.'
+if hub is not None:
+    print(json.dumps(dict(scope_diagnostics=[dict(error=s.error,request_count=len(s.requests))
+        for s in hub._scopes.values()])),flush=True)
+    evidence=hub.finish(boundary_scope,result)
+    assert evidence.requested_model=='synthetic-model' and evidence.response_model=='synthetic-returned-model'
+    assert not evidence.authority_granted
 assert not attempts
 agent.close()
 print('HERMES_ALIVE_NATIVE_CONSTRUCTOR_PROMPT_BOUNDARY_OK',flush=True)
@@ -161,17 +186,19 @@ native_calls=[]
 async def native_call(**kwargs):
     assert kwargs['task']=='alive_opportunity_candidates'
     native_calls.append(kwargs['task'])
+    scope=hub.open(subject=owner) if hub is not None else None
     # Never share the foreground session, history, tools or memory manager.
     child=AIAgent(base_url='https://provider.invalid/v1',api_key='synthetic-not-a-real-key',
         provider='custom',model='synthetic-model',api_mode='chat_completions',
         enabled_toolsets=[],disabled_toolsets=[],max_iterations=1,run_budget_seconds=10,max_tokens=512,
         quiet_mode=True,save_trajectories=False,skip_context_files=True,load_soul_identity=True,
         skip_memory=True,skip_background_review=True,cwd=str(project),
-        session_id='alive-native-shadow-'+str(len(native_calls)),
+        session_id=scope.session_id if scope else 'alive-native-shadow-'+str(len(native_calls)),
         ephemeral_system_prompt=kwargs['messages'][0]['content'])
     try:
         assert not child.tools and child._memory_manager is None and child._memory_store is None
-        result=child.run_conversation(kwargs['messages'][1]['content'],conversation_history=[])
+        result=child.run_conversation(kwargs['messages'][1]['content'],conversation_history=[],
+            task_id=scope.task_id if scope else None)
         print(json.dumps(dict(native_result={key:result.get(key) for key in (
             'completed','failed','model','served_model','turn_exit_reason','final_response')})),flush=True)
         assert result['completed'] and not result['failed']
@@ -180,9 +207,12 @@ async def native_call(**kwargs):
         # This diagnostic knows the fake provider body at the HTTP boundary; a
         # production adapter must obtain scoped response evidence, never guess.
         assert result['served_model'] is None and result['model']=='synthetic-model'
-        return SimpleNamespace(model=provider_response_models[-1],choices=[SimpleNamespace(
+        actual=hub.finish(scope,result).response_model if hub is not None else provider_response_models[-1]
+        assert actual=='synthetic-returned-model'
+        return SimpleNamespace(model=actual,choices=[SimpleNamespace(
             message=SimpleNamespace(content=result['final_response']))])
     except Exception as error:
+        if hub is not None: hub.cancel(scope)
         print('NATIVE_CALLBACK_ERROR='+type(error).__name__+':'+str(error),flush=True)
         raise
     finally: child.close()
@@ -224,4 +254,7 @@ print(json.dumps(dict(native_shadow_calls=len(native_calls),fake_provider_calls=
     native_profile_retained_feedback_paths=native_copies,
     profile_scope='temporary synthetic; not a production forgetting guarantee')),flush=True)
 print('HERMES_ALIVE_NATIVE_SHADOW_SOURCE_BOUNDARY_OK',flush=True)
+if hub is not None:
+    hub.close()
+    print('HERMES_ALIVE_NATIVE_SCOPED_COMPLETION_OK',flush=True)
 faulthandler.cancel_dump_traceback_later()

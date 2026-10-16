@@ -21,8 +21,10 @@ from alive_kernel_testkit import authenticated_dispatch_receipt
 from run_alive_kernel_learning_context import seed
 
 
-def prepare_case(root, case):
+def prepare_case(root, case, *, feedback_retention_days=29):
     """Create only synthetic fixture grants/receipts; no transport invocation."""
+    if type(feedback_retention_days) is not int or not 1<=feedback_retention_days<=30:
+        raise ValueError('synthetic feedback retention outside fixture consent')
     journal = ExperienceJournal(root / "kernel.sqlite3")
     subject = "user:synthetic-" + case["id"]
     seed(journal, subject, PreferenceDirection.SUPPORT, message_text=case["sent"])
@@ -43,7 +45,7 @@ def prepare_case(root, case):
     assert outcomes.apply(delivered).outcome == "recorded"
     content = outcomes.content_vault.put_json({"text": case["reply"], "direction": "inbound", "may_be_truncated": False},
         subject=subject, purpose="conversation.inbound", sensitivity=Sensitivity.PRIVATE,
-        retention_until=datetime.now(timezone.utc) + timedelta(days=29), content_id="input:fixture")
+        retention_until=datetime.now(timezone.utc) + timedelta(days=feedback_retention_days), content_id="input:fixture")
     incoming = journal.append(EventEnvelope(event_id="input:fixture", event_type="conversation.inbound",
         source="synthetic-public-fixture", actor=subject, subject=subject, sensitivity=Sensitivity.PRIVATE,
         causation_id=attempt.event.event_id, payload={"erasable_content_stored": True, "content_may_be_truncated": False,

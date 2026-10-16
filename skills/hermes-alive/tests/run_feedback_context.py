@@ -18,9 +18,9 @@ from alive_kernel.opportunity_synthesis import OpportunitySynthesizer,Opportunit
 from probe_alive_live_feedback import prepare_case
 
 
-async def test(root):
+async def test(root,*,source_days=30,feedback_days=29):
     case={'id':'literal','sent':'合成分享：公开修补演示。','reply':'谢谢，但我现在在开会，稍后再说；不是不喜欢这个主题。'}
-    interpreter,subject,outcome_id=prepare_case(root/'main',case)
+    interpreter,subject,outcome_id=prepare_case(root/'main',case,feedback_retention_days=feedback_days)
     journal=interpreter.journal
     reader=FeedbackContextReader(journal,content_vault=interpreter.vault)
     def read(): return reader.read(subject=subject,clearance=Sensitivity.PRIVATE)
@@ -51,7 +51,7 @@ async def test(root):
     observed=datetime.now(timezone.utc)
     DiscoveryOpportunityIngestor(journal,content_vault=interpreter.vault).ingest(DiscoveryCandidate(
         source='synthetic',title='Another repair method',summary='Synthetic new repair technique; no urgency.',
-        url='https://example.invalid/new',observed_at=observed,expires_at=observed+timedelta(days=30)),subject=subject)
+        url='https://example.invalid/new',observed_at=observed,expires_at=observed+timedelta(days=source_days)),subject=subject)
     before=tuple(journal.read(event_type='preference.observed'))
     memories=tuple(journal.read(event_type='memory.proposed'))
     synth=OpportunitySynthesizer(journal,content_vault=interpreter.vault)
@@ -71,7 +71,10 @@ async def test(root):
     assert context[0].outcome_event_id in evidence and context[0].source_event_id in evidence
     assert generated.candidates[0].action.authority.value=='none'
     ref=ContentReference.from_event_payload(journal.get(generated.receipt_event_id).event.payload['content'])
-    assert ref.retention_until==datetime.fromisoformat(context[0].retention_until)
+    started=journal.get('opportunity.synthesis:literal-context:started').event
+    as_of=datetime.fromisoformat(started.payload['interpretation_as_of'])
+    assert ref.retention_until==min(as_of+timedelta(days=7),observed+timedelta(days=source_days),
+        datetime.fromisoformat(context[0].retention_until))
     assert synth.load_completed(subject=subject,operation_id='literal-context')
     snapshot,_=interpreter.snapshot(subject=subject,outcome_event_id=outcome_id)
     async def erase_during_wait(**kw):
@@ -112,6 +115,7 @@ async def test(root):
 
 
 if __name__=='__main__':
-    with tempfile.TemporaryDirectory(prefix='alive-feedback-context-') as directory:
-        asyncio.run(test(Path(directory)))
+    for source_days,feedback_days in ((30,29),(1,29),(30,1)):
+        with tempfile.TemporaryDirectory(prefix='alive-feedback-context-') as directory:
+            asyncio.run(test(Path(directory),source_days=source_days,feedback_days=feedback_days))
     print('HERMES_ALIVE_FEEDBACK_CONTEXT_OK')

@@ -1,0 +1,7 @@
+name: alive-native-completion-fixture
+version: 0.0.1
+description: Test-only scoped completion consumer; synthetic isolated host only.
+provides_hooks:
+  - pre_api_request
+  - post_api_request
+  - api_request_error
