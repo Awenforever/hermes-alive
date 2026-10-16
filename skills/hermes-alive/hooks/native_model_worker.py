@@ -51,9 +51,11 @@ def main():
             # The route is a trusted, already-resolved Hermes capability. No
             # provider/model/credential discovery is reimplemented by Alive.
             route=dict(request['runtime'])
-            config=dict(model=dict(default=route['model'],provider=route['provider'],streaming=False),
+            from alive_kernel.native_client_policy import private_client_config
+            config=dict(**private_client_config(route),
                 plugins=dict(enabled=['hermes-alive-native-worker']),compression=dict(enabled=False),
                 memory=dict(memory_enabled=False,user_profile_enabled=False))
+            route.pop('client_policy',None)
             (profile/'config.yaml').write_bytes(canonical(config))
             if request['identity']: (profile/'SOUL.md').write_text(request['identity'],encoding='utf-8')
             shutil.copytree(hooks/'native_worker_observer',profile/'plugins'/'hermes-alive-native-worker')

@@ -42,6 +42,16 @@ authorize an Alive/Core/email deployment or a second restart after rollback.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-16 — ADR-0158 adds an opt-in, model-only private client policy boundary.
+Actual Core primary403 -> named fallback preserves endpoint-specific/common
+headers and credentials; canonical shadow/replay still passes. The anonymous
+custom fallback lost its endpoint headers in r1/r2 and remains unqualified;
+preflight now refuses that policy combination rather than silently losing it.
+Provider routing/capability args are forwarded, not yet full on-wire privacy
+qualification. No production/model calls/sends. Complete host snapshot/resolver,
+per-model routing, other transports/TLS/credential lifecycles and sustained
+native intelligence remain open, not replaced by this intermediate boundary.
+
 2026-10-16 — ADR-0157 qualifies actual Core home/secret/alias/fallback semantics
 with two synthetic owners (A→B→A), scoped key_env and ambient-key exclusion.
 Original config/env bytes and context restoration hold; Core's readonly loader

@@ -41,6 +41,29 @@ async def exercise(root):
         assert not caller.pending and not list(work.iterdir())
         print('HERMES_ALIVE_NATIVE_WORKER_ROUTE_OK='+str(requested),flush=True)
     assert [v['model'] for v in selections]==[None,'existing-alias','fallback-check']
+    # The real Core client must apply common and endpoint-specific headers,
+    # including after an actual primary403 -> backup switch. No SDK constructor
+    # or Core fallback function is replaced by this qualification.
+    policy=dict(default_headers={'X-Owner-Policy':'synthetic-common'},routes=[
+        dict(base_url=route['base_url'],extra_headers={'X-Route-Policy':'synthetic-main'},ssl_verify=True),
+        dict(base_url='https://backup.invalid/v1',extra_headers={'X-Route-Policy':'synthetic-backup'},ssl_verify=True)])
+    policy_caller=NativeWorkerCaller(subject='user:synthetic',operation_id='actual-policy-worker',
+        interpreter=sys.executable,core=core,private_root=work,environment={**os.environ,
+            'ALIVE_TEST_HTTP_DIAGNOSTIC':str(root/'policy-http.jsonl')},
+        resolve_runtime=lambda **_kw:{**route,'model':'policy-fail-primary','client_policy':policy,
+            'fallback_model':[{**route['fallback_model'][0],'model':'policy-backup','provider':'custom:owner-backup'}],
+            'providers_allowed':['synthetic-approved'],'providers_ignored':['synthetic-denied'],
+            'provider_data_collection':'deny','provider_require_parameters':True,
+            'capabilities':{'vision':False}},assert_current=lambda:True,
+        identity='SYNTHETIC_PERSONA_156: concise.',entrypoint=Path(__file__).resolve().parent/
+        'fixtures'/'native-worker-http-bootstrap.py',timeout_seconds=60)
+    try: result=await policy_caller(**params)
+    finally:
+        if (root/'policy-http.jsonl').exists():
+            print('NATIVE_POLICY_WIRE_DIAGNOSTIC='+ (root/'policy-http.jsonl').read_text(),flush=True)
+    assert result.model=='served-label/policy-backup'
+    assert not policy_caller.pending and not list(work.iterdir())
+    print('HERMES_ALIVE_ACTUAL_NATIVE_CLIENT_POLICY_OK',flush=True)
     from probe_alive_live_feedback import prepare_case
     from alive_kernel import (AutonomyPolicyProjection,DiscoveryCandidate,DiscoveryOpportunityIngestor,PolicyContext)
     from alive_kernel.autonomous_cycle_runtime import AutonomousCycleRuntime

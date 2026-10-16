@@ -1,5 +1,6 @@
 """Test operator bootstrap: replace physical HTTP, execute the real worker script."""
 import json
+import os
 import runpy
 from pathlib import Path
 import httpx
@@ -22,8 +23,19 @@ def controlled(client,request,*args,**kwargs):
             assert 'SYNTHETIC_TASK_156' in text and 'SYNTHETIC_CONTEXT_156' in text
             content='native synthetic reply'
         key='PRIVATE_FALLBACK_KEY' if request.url.host=='backup.invalid' else 'PRIVATE_MAIN_KEY'
+        if os.environ.get('ALIVE_TEST_HTTP_DIAGNOSTIC'):
+            with open(os.environ['ALIVE_TEST_HTTP_DIAGNOSTIC'],'a',encoding='utf-8') as output:
+                output.write(json.dumps(dict(model=body['model'],
+                    common=request.headers.get('X-Owner-Policy')=='synthetic-common',
+                    route=request.headers.get('X-Route-Policy')==('synthetic-backup' if request.url.host=='backup.invalid' else 'synthetic-main'),
+                    key=request.headers.get('authorization')=='Bearer '+key))+'\n')
         assert request.headers['authorization']=='Bearer '+key
-        if body['model']=='fail-primary':
+        if request.headers.get('X-Owner-Policy'):
+            assert request.headers['X-Owner-Policy']=='synthetic-common'
+            assert request.headers['X-Route-Policy']==('synthetic-backup' if request.url.host=='backup.invalid' else 'synthetic-main')
+        if body['model'] in ('policy-fail-primary','policy-backup'):
+            assert request.headers.get('X-Owner-Policy')=='synthetic-common'
+        if body['model'] in ('fail-primary','policy-fail-primary'):
             return httpx.Response(403,request=request,json=dict(error=dict(message='synthetic denied',type='permission_error')))
         return httpx.Response(200,request=request,json=dict(id='synthetic-156',object='chat.completion',created=0,
             model='served-label/'+body['model'],choices=[dict(index=0,finish_reason='stop',message=dict(

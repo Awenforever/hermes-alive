@@ -45,6 +45,8 @@ def validate_request(document):
     runtime=document['runtime']
     allowed={'model','provider','base_url','api_key','api_mode','requested_provider','fallback_model',
         'request_overrides','reasoning_config','service_tier'}
+    from .native_client_policy import ROUTING_FIELDS, validate_client_policy
+    allowed |= ROUTING_FIELDS | {'client_policy'}
     if (not isinstance(runtime,dict) or set(runtime)-allowed
             or not all(isinstance(runtime.get(k),str) and runtime[k].strip() for k in ('model','provider','base_url','api_key','api_mode'))
             or runtime['api_mode'] not in ('chat_completions','anthropic_messages','codex_responses')):
@@ -62,6 +64,7 @@ def validate_request(document):
                 or not all(isinstance(entry.get(k),str) and entry[k].strip() for k in ('provider','model','api_key'))
                 for entry in entries)):
             raise NativeWorkerError('fallback API capabilities must already be resolved by Hermes')
+    validate_client_policy(runtime)
     # Whole finite JSON snapshot, not a live mutable config/client or callable key.
     if len(canonical(document))>131072: raise NativeWorkerError('native worker input exceeds bound')
     return document
