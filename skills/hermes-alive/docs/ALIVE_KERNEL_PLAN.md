@@ -34,6 +34,20 @@ explicit coordination. No speculative core/queue or production edits follow.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-16 — ADR-0155 adds a single-use managed model-process lease with bounded
+input/output, retained asynchronous startup, timeout/cancel stop, terminate/kill
+and actual child wait. Pending startup is uncertain, not terminal or permission
+to retry/clean; original capture handles remain until that same worker ends.
+Native Windows real-child tests pass. The actual Linux Core shadow runs inside
+this supervisor; a second Core process held in its first synthetic API request is
+cancelled and waited without accepting partial output. Python descendant denial
+blocks Core/SDK ancillary probes; test challenges the guard instead of pretending
+no attempts occurred. No arbitrary process-tree, parent-death or cross-restart
+worker adoption proof, encrypted temporary bytes, real model/cancel-provider or
+fresh-install qualification. Next build the admitted worker protocol with exact
+parent/context binding, current Hermes model/fallback and consented identity;
+then real sustained shadow behavior. The full original objective stays active.
+
 2026-10-16 — ADR-0154 implements bounded, explicitly registered NativeCompletionHub:
 random owner-bound session/task scopes, native pre/post/error correlation and exact
 final text/model evidence, not last-model guessing. Real PluginManager lifecycle

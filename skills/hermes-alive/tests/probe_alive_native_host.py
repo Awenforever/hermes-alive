@@ -9,8 +9,10 @@ import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 import tempfile
+import time
 import traceback
 import httpx
 from types import SimpleNamespace
@@ -22,7 +24,12 @@ parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--core',type=Path,required=True)
 parser.add_argument('--kernel-package',type=Path,default=Path(__file__).resolve().parents[1])
 parser.add_argument('--scoped-completion',action='store_true')
+parser.add_argument('--deny-child-processes',action='store_true')
+parser.add_argument('--hold-first-request',action='store_true')
+parser.add_argument('--request-ready-file',type=Path)
 args=parser.parse_args()
+if args.hold_first_request and args.request_ready_file is None:
+    parser.error('--hold-first-request requires an owned --request-ready-file')
 args.core=args.core.resolve(strict=True); args.kernel_package=args.kernel_package.resolve(strict=True)
 sys.path[:0]=[str(args.core),str(args.kernel_package/'hooks'),str(args.kernel_package/'tests')]
 root=Path(tempfile.mkdtemp(prefix='alive-native-boundary-'))
@@ -30,6 +37,7 @@ profile=root/'profile'; profile.mkdir(mode=0o700)
 home=root/'home'; home.mkdir(mode=0o700)
 project=root/'project'; project.mkdir(mode=0o700)
 os.environ['HERMES_HOME']=str(profile)
+os.environ['HERMES_ALIVE_SHARED_DIR']=str(profile/'plugin-data'/'hermes-alive'/'runtime')
 os.environ['HOME']=str(home)
 os.environ['XDG_CONFIG_HOME']=str(home/'config')
 os.environ['XDG_CACHE_HOME']=str(home/'cache')
@@ -56,11 +64,17 @@ if args.scoped_completion:
 (project/'AGENTS.md').write_text('FORBIDDEN_PROJECT_INSTRUCTIONS_153',encoding='utf-8')
 
 attempts=[]
+child_attempts=[]
 def audit(event,args):
+    if parser_options.deny_child_processes and event in ('subprocess.Popen','os.fork','os.forkpty','os.posix_spawn','os.exec'):
+        child_attempts.append(dict(event=event,stack=[dict(file=Path(f.filename).name,function=f.name,line=f.lineno)
+            for f in traceback.extract_stack(limit=12)[:-1]]))
+        raise RuntimeError('native worker probe forbids descendant processes')
     if event in ('socket.connect','socket.getaddrinfo'):
         attempts.append(dict(event=event,stack=[dict(file=Path(f.filename).name,function=f.name,line=f.lineno)
             for f in traceback.extract_stack(limit=10)[:-1]]))
         raise RuntimeError('native boundary probe forbids network')
+parser_options=args
 sys.addaudithook(audit)
 
 requests=[]; provider_requests=[]; provider_response_models=[]
@@ -73,6 +87,14 @@ def fake_http(client,request,*args,**kwargs):
         assert not body.get('stream') and not body.get('tools')
         provider_requests.append(body)
         provider_response_models.append('synthetic-returned-model')
+        if parser_options.hold_first_request and len(provider_requests)==1:
+            ready_path=parser_options.request_ready_file
+            staging=ready_path.with_name(ready_path.name+'.writing')
+            with staging.open('x',encoding='ascii') as ready:
+                ready.write(str(os.getpid()))
+                ready.flush(); os.fsync(ready.fileno())
+            os.replace(staging,ready_path)
+            time.sleep(30)  # Parent cancellation test: a pending synthetic request.
         content='SYNTHETIC_PROPOSAL_153: no message was sent.'
         for message in body['messages']:
             if message['role']=='user' and isinstance(message['content'],str):
@@ -245,15 +267,25 @@ async def shadow():
     assert before=={name:len(journal.read(event_type=name)) for name in before}
     assert not attempts and len(provider_requests)==3
 asyncio.run(shadow())
+descendant_guard_verified=False
+if args.deny_child_processes:
+    try: subprocess.run([sys.executable,'-c','raise SystemExit(99)'],check=False)
+    except RuntimeError as error:
+        assert str(error)=='native worker probe forbids descendant processes'
+        descendant_guard_verified=True
+    else: raise AssertionError('native descendant guard allowed a process')
 native_copies=[]
 for path in profile.rglob('*'):
     if path.is_file() and any(marker.encode() in path.read_bytes() for marker in (feedback_marker,own_memory_marker)):
         native_copies.append(str(path.relative_to(profile)))
 print(json.dumps(dict(native_shadow_calls=len(native_calls),fake_provider_calls=len(provider_requests),
     actual_model_calls=0,sends=0,network_attempts=len(attempts),
+    child_process_attempts=child_attempts,
+    descendant_guard_verified=descendant_guard_verified,
     native_profile_retained_feedback_paths=native_copies,
     profile_scope='temporary synthetic; not a production forgetting guarantee')),flush=True)
 print('HERMES_ALIVE_NATIVE_SHADOW_SOURCE_BOUNDARY_OK',flush=True)
+assert not args.deny_child_processes or descendant_guard_verified
 if hub is not None:
     hub.close()
     print('HERMES_ALIVE_NATIVE_SCOPED_COMPLETION_OK',flush=True)
