@@ -82,7 +82,10 @@ class CoreScopedModelAcquirer:
             def current(candidate):
                 try:
                     return (candidate==binding and self.read_binding()==binding
-                        and self._scope() is scope and fingerprint()==revision)
+                        and self._scope() is scope
+                        and self.read_credential_names(task=task,model=model,
+                            configuration=self._configuration())==names
+                        and fingerprint()==revision)
                 except Exception:
                     return False
             if not current(binding):

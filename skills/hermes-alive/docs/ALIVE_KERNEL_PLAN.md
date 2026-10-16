@@ -42,6 +42,27 @@ authorize an Alive/Core/email deployment or a second restart after rollback.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-16 — ADR-0161 composes the acquired native caller with the actual durable
+host lifetime and authenticated owner policy. A cycle-bound parameter factory
+gets the journal's exact operation ID after opening/recovering it; factory errors
+cannot replace that identity or fabricate completion. Native cycle authority
+closes on exit and uncertain children block new work until terminal cleanup.
+Actual Core r3 passes initial synthetic silence, unchanged-context reconsideration
+without inference, real owner pause during an in-flight child (failed receipt,
+no successful close), then paused recovery without a new model call. Windows
+host lifetime and caller tests pass. The r2 test incorrectly expected the raw
+worker error rather than synthesis's normalized failure; preserve that failed
+test and its corrected receipt-level evidence. No production changes or real
+model/channel calls. Explicit profile/config/grant/family inputs and automatic
+installation/scheduler wiring remain unfinished; move next toward qualified
+real-host grants and sustained native behavioral scenarios, not more interface
+checks in place of memory/agenda/outcome/learning usefulness.
+Final r4 also fixes a discovered grant-currentness gap: withdrawing the host's
+credential-name grant invalidates an existing capability before another secret
+read, even without a configuration edit or whole-Alive pause. All four actual
+Core integration markers pass. Revoke/regrant ABA still requires a host-owned
+monotonic authorization generation; do not claim polling detects unseen history.
+
 2026-10-16 — ADR-0160 now connects actual current Core home/secret scopes to
 the owner-bound caller and native child, without ambient secret discovery.
 Default/alias/primary403->backup pass on actual retained Core in a network-none,

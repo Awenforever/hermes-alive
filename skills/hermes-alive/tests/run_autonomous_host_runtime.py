@@ -45,6 +45,15 @@ async def test(root):
     assert restarted.operations==[operation]
     await recovered.step({})
     assert restarted.operations[-1]!=operation
+    bound_identity=[]
+    await recovered.step_bound(lambda cycle:bound_identity.append(cycle.operation_id) or {})
+    assert bound_identity==[restarted.operations[-1]]
+    try: await recovered.step_bound(lambda cycle:{'operation_id':'foreign-operation'})
+    except ValueError: pass
+    else: raise AssertionError('factory overrode durable operation identity')
+    waiting=recovered.open_cycle().operation_id
+    await recovered.step_bound(lambda cycle:{})
+    assert restarted.operations[-1]==waiting
     before = len(journal.read(event_type='autonomous.host.closed'))
     stop = asyncio.Event()
     result = await recovered.run(build_parameters=lambda:{},stop=stop,max_cycles=2,interval_seconds=0)

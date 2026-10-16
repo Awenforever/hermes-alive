@@ -107,8 +107,19 @@ class AutonomousHostRuntime:
     async def step(self,parameters):
         if any(key in parameters for key in ('subject','operation_id','execute','reconciliation_cursor','cognition_configuration_id')):
             raise ValueError('host owns cycle identity/mode/cursor')
+        return await self.step_bound(lambda _cycle:parameters)
+
+    async def step_bound(self,build_parameters):
+        """Build operation-bound capabilities only after durable identity exists."""
+        if not callable(build_parameters):
+            raise ValueError('cycle-bound parameter factory required')
         async with self.lock:
             cycle = self.open_cycle()
+            parameters=build_parameters(cycle)
+            if hasattr(parameters,'__await__'): parameters=await parameters
+            if (not isinstance(parameters,dict) or any(key in parameters for key in
+                    ('subject','operation_id','execute','reconciliation_cursor','cognition_configuration_id'))):
+                raise ValueError('host owns cycle identity/mode/cursor')
             parameters = dict(parameters)
             if parameters.get('reconsider_after_seconds') is not None:
                 parameters['cognition_configuration_id'] = self.configuration_id
