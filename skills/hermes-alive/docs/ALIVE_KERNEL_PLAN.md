@@ -34,6 +34,18 @@ explicit coordination. No speculative core/queue or production edits follow.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-16 — ADR-0152 screens a single direct contribution on six fresh synthetic
+scenes, using original sources/context and a fixed owner-time anchor. Six real
+calls: four messages/two silences, all valid envelopes, but ordinary instruction
+recital remains and one external observation loses its canonical link. Requested
+first-person assurance and source-strength boundaries improve in these individual
+samples; no comparative superiority, independent review or production quality
+claim follows. Direct auxiliary composition is not the host-native agent/persona.
+No runtime switch is adopted. Totals290 logical/304 observed HTTP starts, zero
+actual sends. Next inspect and compose the actual host/memory/agenda/outcome shadow
+loop, not another round of auxiliary prompt patches; all original privacy,
+forgetting, learning, migration/rollback, portability and production gates remain.
+
 2026-10-16 — ADR-0151 actually removes a prior draft/goal from purpose interpretation,
 then compares both paths with the same renderer/language on six new synthetic
 scenes. Seventeen configured-model calls yield more informational replies, but
