@@ -42,6 +42,20 @@ authorize an Alive/Core/email deployment or a second restart after rollback.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-16 — ADR-0159 connects explicit model-only host snapshots through the
+owned native worker to actual Core default/alias/fallback/secret resolution and
+the canonical Alive shadow cycle. Conflicting ambient keys do not override the
+owner; missing credentials do not become an implicit no-auth grant. Actual
+controlled OpenRouter wire preserves per-model pins and data-collection deny,
+without leaking unrelated custom endpoint headers. Core-created private pools
+stay in that process, not serialized. Replay makes no extra native call.
+Full r9 probe passes; failed r1/r3-r8 assumptions are documented, not counted as
+successful rounds. No real model/channel calls or production edits. Automatic
+owner-bound capture/minimal environment, other transport/TLS/auth lifecycles,
+sustained semantic usefulness, learning/Halo/portability and production remain
+open. Next build real host capture and proceed to longitudinal native behavior;
+do not let routing probes substitute for the original intelligent-kernel goal.
+
 2026-10-16 — ADR-0158 adds an opt-in, model-only private client policy boundary.
 Actual Core primary403 -> named fallback preserves endpoint-specific/common
 headers and credentials; canonical shadow/replay still passes. The anonymous

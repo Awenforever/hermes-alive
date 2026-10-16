@@ -43,6 +43,11 @@ def validate_request(document):
             or not math.isfinite(document['budget_seconds']) or not 1<=document['budget_seconds']<=240):
         raise NativeWorkerError('invalid native worker context or budget')
     runtime=document['runtime']
+    if isinstance(runtime,dict) and set(runtime)=={'host_snapshot'}:
+        from .native_host_snapshot import validate_host_snapshot
+        validate_host_snapshot(runtime['host_snapshot'])
+        if len(canonical(document))>131072: raise NativeWorkerError('native worker input exceeds bound')
+        return document
     allowed={'model','provider','base_url','api_key','api_mode','requested_provider','fallback_model',
         'request_overrides','reasoning_config','service_tier'}
     from .native_client_policy import ROUTING_FIELDS, validate_client_policy
@@ -51,12 +56,7 @@ def validate_request(document):
             or not all(isinstance(runtime.get(k),str) and runtime[k].strip() for k in ('model','provider','base_url','api_key','api_mode'))
             or runtime['api_mode'] not in ('chat_completions','anthropic_messages','codex_responses')):
         raise NativeWorkerError('native worker needs an admitted API route from Hermes')
-    overrides=runtime.get('request_overrides') or {}
-    reserved={'model','messages','input','instructions','tools','tool_choice','functions','function_call',
-        'stream','max_tokens','max_completion_tokens','max_output_tokens'}
-    extra=overrides.get('extra_body',{}) if isinstance(overrides,dict) else None
-    if not isinstance(overrides,dict) or reserved.intersection(overrides) or not isinstance(extra,dict) or reserved.intersection(extra):
-        raise NativeWorkerError('route overrides exceed worker text-only boundary')
+    validate_text_overrides(runtime.get('request_overrides'))
     fallback=runtime.get('fallback_model')
     if fallback is not None:
         entries=[fallback] if isinstance(fallback,dict) else fallback
@@ -64,10 +64,22 @@ def validate_request(document):
                 or not all(isinstance(entry.get(k),str) and entry[k].strip() for k in ('provider','model','api_key'))
                 for entry in entries)):
             raise NativeWorkerError('fallback API capabilities must already be resolved by Hermes')
+        for entry in entries:
+            validate_text_overrides(entry.get('request_overrides'))
+            if 'extra_body' in entry: validate_text_overrides({'extra_body':entry['extra_body']})
     validate_client_policy(runtime)
     # Whole finite JSON snapshot, not a live mutable config/client or callable key.
     if len(canonical(document))>131072: raise NativeWorkerError('native worker input exceeds bound')
     return document
+
+
+def validate_text_overrides(value):
+    overrides={} if value is None else value
+    reserved={'model','messages','input','instructions','tools','tool_choice','functions','function_call',
+        'stream','max_tokens','max_completion_tokens','max_output_tokens'}
+    extra=overrides.get('extra_body',{}) if isinstance(overrides,dict) else None
+    if not isinstance(overrides,dict) or reserved.intersection(overrides) or not isinstance(extra,dict) or reserved.intersection(extra):
+        raise NativeWorkerError('route overrides exceed worker text-only boundary')
 
 
 def completion_document(request,evidence,text):

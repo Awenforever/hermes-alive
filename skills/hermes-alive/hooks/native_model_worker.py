@@ -22,9 +22,10 @@ def main():
     output=sys.stdout
     request=None
     diagnostics=None
+    stage='bootstrap'
     sink=DiscardDiagnostics()
     os.umask(0o077)
-    with contextlib.redirect_stdout(sink),contextlib.redirect_stderr(sink):
+    with contextlib.redirect_stdout(sink),contextlib.redirect_stderr(sink),contextlib.ExitStack() as bindings:
         try:
             workspace=args.workspace.resolve(strict=True)
             if not workspace.is_dir() or any(workspace.iterdir()): raise ValueError('worker workspace must be empty')
@@ -48,17 +49,41 @@ def main():
             raw=sys.stdin.buffer.read(131073)
             if len(raw)>131072: raise ValueError('worker input exceeds bound')
             request=validate_request(json.loads(raw))
-            # The route is a trusted, already-resolved Hermes capability. No
-            # provider/model/credential discovery is reimplemented by Alive.
+            stage='private_config'
+            # Either a trusted resolved capability or a model-only host
+            # projection. Core resolves the latter inside this private process;
+            # never discover/copy a foreground profile or rewrite its environment.
             route=dict(request['runtime'])
-            from alive_kernel.native_client_policy import private_client_config
-            config=dict(**private_client_config(route),
+            snapshot=route.get('host_snapshot')
+            if snapshot is not None:
+                stage='owner_binding'
+                from alive_kernel.native_host_snapshot import private_snapshot_config
+                model_config=private_snapshot_config(snapshot)
+            else:
+                from alive_kernel.native_client_policy import private_client_config
+                model_config=private_client_config(route)
+            config=dict(**model_config,
                 plugins=dict(enabled=['hermes-alive-native-worker']),compression=dict(enabled=False),
                 memory=dict(memory_enabled=False,user_profile_enabled=False))
-            route.pop('client_policy',None)
             (profile/'config.yaml').write_bytes(canonical(config))
             if request['identity']: (profile/'SOUL.md').write_text(request['identity'],encoding='utf-8')
             shutil.copytree(hooks/'native_worker_observer',profile/'plugins'/'hermes-alive-native-worker')
+            if snapshot is not None:
+                from agent.secret_scope import (set_secret_scope,reset_secret_scope,
+                    set_multiplex_context,reset_multiplex_context)
+                bindings.callback(reset_multiplex_context,set_multiplex_context(True))
+                bindings.callback(reset_secret_scope,set_secret_scope(snapshot['secrets'],profile_home=str(profile)))
+                from hermes_cli.runtime_provider import frozen_runtime_config
+                bindings.enter_context(frozen_runtime_config(config))
+                from alive_kernel.native_host_snapshot import resolve_host_snapshot
+                stage='host_resolution'
+                route=resolve_host_snapshot(snapshot)
+                # Re-run the resolved-route boundary before constructing an agent.
+                private_pool=route.pop('credential_pool',None)
+                validate_request({**request,'runtime':route})
+                if private_pool is not None: route['credential_pool']=private_pool
+            route.pop('client_policy',None)  # Applied through private Core config, not an AIAgent kwarg.
+            stage='observer'
             hub=NativeCompletionHub()
             sys.modules['_alive_native_worker_bus']=SimpleNamespace(hub=hub)
             from hermes_cli.plugins import discover_plugins
@@ -66,6 +91,7 @@ def main():
             scope=hub.open(subject=request['subject'])
             from run_agent import AIAgent
             overrides={**(route.pop('request_overrides',None) or {}),'temperature':request['temperature']}
+            stage='agent'
             agent=AIAgent(**route,request_overrides=overrides,enabled_toolsets=[],disabled_toolsets=[],
                 max_iterations=1,run_budget_seconds=request['budget_seconds'],max_tokens=request['max_tokens'],
                 quiet_mode=True,save_trajectories=False,skip_context_files=True,load_soul_identity=True,
@@ -74,17 +100,19 @@ def main():
             try:
                 if agent.tools or agent._memory_store is not None or agent._memory_manager is not None:
                     raise ValueError('worker acquired unadmitted capability')
+                stage='conversation'
                 result=agent.run_conversation(request['messages'][1]['content'],conversation_history=[],task_id=scope.task_id)
                 diagnostics=dict(api_calls=result.get('api_calls'),observations=[dict(error=s.error,
                     requests=len(s.requests),states=[a['state'] for r in s.requests.values()
                         for a in r['attempts'].values()]) for s in hub._scopes.values()])
+                stage='completion'
                 evidence=hub.finish(scope,result)
                 document=completion_document(request,evidence,result['final_response'])
             finally:
                 agent.close(); hub.close()
             exitcode=0
         except BaseException as error:
-            document=dict(version=1,status='failed',error_class=type(error).__name__,authority_granted=False)
+            document=dict(version=1,status='failed',error_class=type(error).__name__,stage=stage,authority_granted=False)
             if type(error).__module__=='alive_kernel.native_completion': document['diagnostics']=diagnostics
             exitcode=2
     # Exactly one protocol document. Never print a traceback, provider exception,

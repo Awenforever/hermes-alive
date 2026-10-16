@@ -53,6 +53,8 @@ async def exercise(root):
     for invalid_route in (
             {**route,'api_key':lambda:'not JSON'},
             {**route,'request_overrides':{'extra_body':{'tools':[{'name':'unadmitted'}]}}},
+            {**route,'fallback_model':[{**route['fallback_model'][0],
+                'request_overrides':{'extra_body':{'tools':[{'name':'unadmitted'}]}}}]},
             {**route,'fallback_model':[{'provider':'custom','model':'unresolved-backup','key_env':'NOT_PROJECTED'}]}):
         invalid=caller(resolve_runtime=lambda **_kw:invalid_route)
         try: await invalid(**params)

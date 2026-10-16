@@ -64,6 +64,81 @@ async def exercise(root):
     assert result.model=='served-label/policy-backup'
     assert not policy_caller.pending and not list(work.iterdir())
     print('HERMES_ALIVE_ACTUAL_NATIVE_CLIENT_POLICY_OK',flush=True)
+    snapshot=dict(config=dict(model=dict(default='configured-primary',provider='custom:owner-main',
+        default_headers={'X-Owner-Policy':'synthetic-common','X-Host-Snapshot':'yes'}),
+        custom_providers=[dict(name='owner-main',model='configured-primary',base_url=route['base_url'],
+            api_mode='chat_completions',key_env='OWNER_MAIN_KEY',extra_headers={'X-Route-Policy':'synthetic-main'},
+            extra_body={'native_policy_probe':'synthetic-marker'}),
+            dict(name='owner-backup',base_url='https://backup.invalid/v1',api_mode='chat_completions',
+                key_env='OWNER_BACKUP_KEY',extra_headers={'X-Route-Policy':'synthetic-backup'})],
+        model_aliases=dict(chosen=dict(model='configured-other',provider='custom',base_url=route['base_url'],
+            key_env='OWNER_ALIAS_KEY'),failover=dict(model='fail-primary',provider='custom',
+                base_url=route['base_url'],key_env='OWNER_ALIAS_KEY')),
+        fallback_providers=[dict(provider='custom:owner-backup',model='configured-backup',key_env='OWNER_BACKUP_KEY')],
+        agent=dict(reasoning_effort=False),provider_routing=dict(data_collection='deny',
+            only=['synthetic-approved'],models={'configured-other':{'only':['synthetic-model-pin']}})),
+        secrets=dict(OWNER_MAIN_KEY='PRIVATE_MAIN_KEY',OWNER_ALIAS_KEY='PRIVATE_MAIN_KEY',OWNER_BACKUP_KEY='PRIVATE_FALLBACK_KEY'),
+        selected_model=None)
+    host_caller=NativeWorkerCaller(subject='user:synthetic',operation_id='actual-host-worker',
+        interpreter=sys.executable,core=core,private_root=work,
+        environment={**os.environ,'OWNER_MAIN_KEY':'FOREIGN_AMBIENT_KEY','OWNER_ALIAS_KEY':'FOREIGN_AMBIENT_KEY',
+            'OWNER_BACKUP_KEY':'FOREIGN_AMBIENT_KEY'},
+        resolve_runtime=lambda **kw:dict(host_snapshot={**snapshot,'selected_model':kw['model']}),
+        assert_current=lambda:True,identity='SYNTHETIC_PERSONA_156: concise.',
+        entrypoint=Path(__file__).resolve().parent/'fixtures'/'native-worker-http-bootstrap.py',timeout_seconds=60)
+    for selected,expected in ((None,'configured-primary'),('chosen','configured-other'),('failover','configured-backup')):
+        try: result=await host_caller(**{**params,'model':selected})
+        except NativeWorkerError as error:
+            print('HOST_SNAPSHOT_ERROR_CLASS='+getattr(error,'worker_error_class',type(error).__name__),flush=True)
+            raise
+        assert result.model=='served-label/'+expected
+        assert not host_caller.pending and not list(work.iterdir())
+        print('HERMES_ALIVE_ACTUAL_NATIVE_HOST_SNAPSHOT_OK='+str(selected),flush=True)
+    import copy
+    private_snapshot=copy.deepcopy(snapshot)
+    private_snapshot['config']['fallback_providers']=[]
+    private_snapshot['secrets']={}
+    missing=NativeWorkerCaller(subject='user:synthetic',operation_id='missing-owner-credential',
+        interpreter=sys.executable,core=core,private_root=work,
+        environment={**os.environ,'OWNER_MAIN_KEY':'FOREIGN_AMBIENT_KEY',
+            'ALIVE_TEST_HTTP_DIAGNOSTIC':str(root/'missing-http.jsonl')},
+        resolve_runtime=lambda **_kw:dict(host_snapshot=private_snapshot),assert_current=lambda:True,
+        identity='SYNTHETIC_PERSONA_156: concise.',entrypoint=Path(__file__).resolve().parent/
+            'fixtures'/'native-worker-http-bootstrap.py',timeout_seconds=60)
+    try: await missing(**params)
+    except NativeWorkerError as error:
+        assert getattr(error,'worker_error_class',None) in ('AuthError','NativeWorkerError')
+    else: raise AssertionError('undeclared ambient owner credential was accepted')
+    finally:
+        if (root/'missing-http.jsonl').exists():
+            print('MISSING_OWNER_WIRE_DIAGNOSTIC='+ (root/'missing-http.jsonl').read_text(),flush=True)
+    assert not (root/'missing-http.jsonl').exists(), 'missing credential reached model HTTP'
+    assert not missing.pending and not list(work.iterdir())
+    assert snapshot['selected_model'] is None and snapshot['secrets']['OWNER_MAIN_KEY']=='PRIVATE_MAIN_KEY'
+    print('HERMES_ALIVE_ACTUAL_NATIVE_HOST_SECRET_DENIED_OK',flush=True)
+    router_snapshot=copy.deepcopy(snapshot)
+    router_snapshot['config']['model'].update(default='policy-openrouter',provider='openrouter')
+    router_snapshot['config']['fallback_providers']=[]
+    router_snapshot['config']['provider_routing']['models']={'policy-openrouter':{'only':['synthetic-model-pin']}}
+    router_snapshot['secrets']={'OPENROUTER_API_KEY':'PRIVATE_MAIN_KEY'}
+    router=NativeWorkerCaller(subject='user:synthetic',operation_id='host-policy-on-wire',
+        interpreter=sys.executable,core=core,private_root=work,environment={**os.environ,
+            'ALIVE_TEST_HTTP_DIAGNOSTIC':str(root/'router-http.jsonl')},
+        resolve_runtime=lambda **_kw:dict(host_snapshot=router_snapshot),assert_current=lambda:True,
+        identity='SYNTHETIC_PERSONA_156: concise.',entrypoint=Path(__file__).resolve().parent/
+            'fixtures'/'native-worker-http-bootstrap.py',timeout_seconds=60)
+    try: result=await router(**params)
+    except NativeWorkerError as error:
+        print('HOST_ROUTER_ERROR_CLASS='+getattr(error,'worker_error_class',type(error).__name__),flush=True)
+        print('HOST_ROUTER_ERROR_STAGE='+getattr(error,'worker_error_stage','unavailable'),flush=True)
+        print(json.dumps(getattr(error,'worker_diagnostics',None)),flush=True)
+        raise
+    finally:
+        if (root/'router-http.jsonl').exists():
+            print('ROUTER_WIRE_DIAGNOSTIC='+ (root/'router-http.jsonl').read_text(),flush=True)
+    assert result.model=='served-label/policy-openrouter'
+    assert not router.pending and not list(work.iterdir())
+    print('HERMES_ALIVE_ACTUAL_NATIVE_HOST_ROUTING_WIRE_OK',flush=True)
     from probe_alive_live_feedback import prepare_case
     from alive_kernel import (AutonomyPolicyProjection,DiscoveryCandidate,DiscoveryOpportunityIngestor,PolicyContext)
     from alive_kernel.autonomous_cycle_runtime import AutonomousCycleRuntime
@@ -77,7 +152,8 @@ async def exercise(root):
         title='SYNTHETIC_CONTEXT_156 public observation',summary='An uncertain nonurgent reading lead.',
         url='https://example.invalid/native-worker',observed_at=datetime.now(timezone.utc)),subject=owner)
     canonical_caller=NativeWorkerCaller(subject=owner,operation_id='canonical-worker',interpreter=sys.executable,
-        core=core,private_root=work,environment=dict(os.environ),resolve_runtime=resolve,assert_current=lambda:True,
+        core=core,private_root=work,environment=dict(os.environ),
+        resolve_runtime=lambda **kw:dict(host_snapshot={**snapshot,'selected_model':kw['model']}),assert_current=lambda:True,
         identity='SYNTHETIC_PERSONA_156: a candid concise assistant.',entrypoint=Path(__file__).resolve().parent/
         'fixtures'/'native-worker-http-bootstrap.py',timeout_seconds=60)
     runtime=AutonomousCycleRuntime(journal,content_vault=interpreter.vault)

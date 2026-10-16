@@ -1,7 +1,8 @@
 """Opt-in ModelCaller using one private native worker per logical invocation.
 
-Hermes/host supply route resolution, consented identity and current-binding check.
-The caller does not discover models, read a foreground profile, or grant actions.
+Hermes/host supply a resolved capability or model-only snapshot, consented identity
+and current-binding check. Core resolves snapshots inside the owned child; this
+caller does not discover models, read a foreground profile, or grant actions.
 """
 import json
 import os
@@ -97,6 +98,9 @@ class NativeWorkerCaller:
                     label=failure.get('error_class')
                     if failure.get('status')=='failed' and isinstance(label,str) and re.fullmatch(r'[A-Za-z][A-Za-z0-9_]{0,63}',label):
                         error.worker_error_class=label
+                        if failure.get('stage') in {'bootstrap','private_config','owner_binding',
+                                'host_resolution','observer','agent','conversation','completion'}:
+                            error.worker_error_stage=failure['stage']
                         if label=='NativeCompletionError': error.worker_diagnostics=failure.get('diagnostics')
                 except (ValueError,AttributeError,UnicodeError): pass
                 raise error

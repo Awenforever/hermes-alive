@@ -7,8 +7,18 @@ import httpx
 
 
 def controlled(client,request,*args,**kwargs):
-    if request.url.path=='/v1/chat/completions':
+    if request.url.path.endswith('/chat/completions'):
         body=json.loads(request.content)
+        if body['model']=='policy-openrouter':
+            if os.environ.get('ALIVE_TEST_HTTP_DIAGNOSTIC'):
+                with open(os.environ['ALIVE_TEST_HTTP_DIAGNOSTIC'],'a',encoding='utf-8') as output:
+                    output.write(json.dumps(dict(model='policy-openrouter',
+                        only=body.get('provider',{}).get('only')==['synthetic-model-pin'],
+                        privacy=body.get('provider',{}).get('data_collection')=='deny'))+'\n')
+            assert body['provider']['only']==['synthetic-model-pin']
+            assert body['provider']['data_collection']=='deny'
+        if request.headers.get('X-Host-Snapshot')=='yes' and body['model']=='configured-primary':
+            assert body['native_policy_probe']=='synthetic-marker'
         assert not body.get('tools') and not body.get('stream')
         text=json.dumps(body['messages'],ensure_ascii=False)
         assert 'SYNTHETIC_PERSONA_156' in text
@@ -32,7 +42,10 @@ def controlled(client,request,*args,**kwargs):
         assert request.headers['authorization']=='Bearer '+key
         if request.headers.get('X-Owner-Policy'):
             assert request.headers['X-Owner-Policy']=='synthetic-common'
-            assert request.headers['X-Route-Policy']==('synthetic-backup' if request.url.host=='backup.invalid' else 'synthetic-main')
+            if request.url.host in ('provider.invalid','backup.invalid'):
+                assert request.headers['X-Route-Policy']==('synthetic-backup' if request.url.host=='backup.invalid' else 'synthetic-main')
+            elif body['model']=='policy-openrouter':
+                assert 'X-Route-Policy' not in request.headers  # Do not leak custom endpoint headers.
         if body['model'] in ('policy-fail-primary','policy-backup'):
             assert request.headers.get('X-Owner-Policy')=='synthetic-common'
         if body['model'] in ('fail-primary','policy-fail-primary'):
