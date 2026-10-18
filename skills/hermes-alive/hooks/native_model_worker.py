@@ -88,7 +88,7 @@ def main():
                 if private_pool is not None: route['credential_pool']=private_pool
             route.pop('client_policy',None)  # Applied through private Core config, not an AIAgent kwarg.
             stage='observer'
-            hub=NativeCompletionHub()
+            hub=NativeCompletionHub(observe_execution=True)
             sys.modules['_alive_native_worker_bus']=SimpleNamespace(hub=hub)
             from hermes_cli.plugins import discover_plugins
             discover_plugins()
@@ -97,7 +97,7 @@ def main():
             overrides={**(route.pop('request_overrides',None) or {}),'temperature':request['temperature']}
             stage='agent'
             agent=AIAgent(**route,request_overrides=overrides,enabled_toolsets=[],disabled_toolsets=[],
-                max_iterations=1,run_budget_seconds=request['budget_seconds'],max_tokens=request['max_tokens'],
+                max_iterations=2,run_budget_seconds=request['budget_seconds'],max_tokens=request['max_tokens'],
                 quiet_mode=True,save_trajectories=False,skip_context_files=True,load_soul_identity=True,
                 skip_memory=True,skip_background_review=True,session_id=scope.session_id,cwd=str(workspace),
                 ephemeral_system_prompt=request['messages'][0]['content'])
@@ -112,7 +112,8 @@ def main():
                         'completed','failed','partial','interrupted','response_transformed','response_reused')},
                     **hub.diagnostics(scope,result))
                 stage='completion'
-                evidence=hub.finish(scope,result)
+                evidence=hub.finish(scope,result,worker_turn_binding=(agent.session_id,
+                    getattr(agent,'_current_task_id',None),getattr(agent,'_current_turn_id',None)))
                 document=completion_document(request,evidence,result['final_response'])
             finally:
                 agent.close(); hub.close()

@@ -4,6 +4,15 @@ Status: active
 
 Last reviewed: 2026-10-18
 
+Current continuation correction: ADR0172 records actual Core reproduction of a
+one-iteration/length-continuation conflict. Corrected isolated runtime/tests
+e797f18 pass focused Core qualification: reasoning-only continuation can complete;
+partial-text stitching, unclosed attempts and auxiliary summaries remain rejected.
+Turn identity comes from the exact result or a narrowly qualified worker-owned
+continuation binding, never guessed metadata. Full canonical CI and private
+interest revalidation are still pending; no production deployment or usefulness
+acceptance is implied. Continue the bounded personalization milestone below.
+
 ### Product correction: recipient value before further framework expansion
 
 2026-10-18 — The owner reports that deployed Alive shares uninteresting material.

@@ -41,6 +41,23 @@ async def exercise(root):
         assert not caller.pending and not list(work.iterdir())
         print('HERMES_ALIVE_NATIVE_WORKER_ROUTE_OK='+str(requested),flush=True)
     assert [v['model'] for v in selections]==[None,'existing-alias','fallback-check']
+    # Actual Core continuation, not a synthetic post event. Only a reasoning-only
+    # exhausted request can precede one exact, untransformed final completion.
+    for recovery_model,accepted in (('length-reasoning',True),('length-content',False),('length-always',False)):
+        recovery=NativeWorkerCaller(subject='user:synthetic',operation_id='actual-length-worker',
+            interpreter=sys.executable,core=core,private_root=work,environment=dict(os.environ),
+            resolve_runtime=lambda m=recovery_model,**_:{**route,'model':m,'fallback_model':[]},
+            assert_current=lambda:True,identity='SYNTHETIC_PERSONA_156: concise.',
+            entrypoint=Path(__file__).resolve().parent/'fixtures'/'native-worker-http-bootstrap.py',timeout_seconds=60)
+        try: recovered=await recovery(**params)
+        except NativeWorkerError as error:
+            assert not accepted and getattr(error,'worker_error_class',None)=='NativeCompletionError'
+        else:
+            assert accepted and recovered.choices[0].message.content=='native synthetic reply'
+            assert recovered.native_completion.api_request_id.endswith(':api:2')
+            assert recovered.native_completion.turn_identity_origin=='isolated-worker-continuation-v1'
+        assert not recovery.pending and not list(work.iterdir())
+    print('HERMES_ALIVE_ACTUAL_NATIVE_REASONING_CONTINUATION_OK',flush=True)
     # The real Core client must apply common and endpoint-specific headers,
     # including after an actual primary403 -> backup switch. No SDK constructor
     # or Core fallback function is replaced by this qualification.

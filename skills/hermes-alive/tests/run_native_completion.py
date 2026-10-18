@@ -22,6 +22,8 @@ class Context:
     def register_hook(self,name,callback):
         self.callbacks[name]=callback
         handle=Handle(self,name); self.handles.append(handle); return handle
+    def register_middleware(self,name,callback):
+        return self.register_hook(name,callback)
 
 
 def exercise():
@@ -197,6 +199,73 @@ def exercise():
     except RuntimeError: pass
     else: raise AssertionError('partial registration became ready')
     assert not broken.callbacks
+
+    # A raw reasoning-only length response is non-output, never final evidence.
+    # Core may continue once; only the later exact post can qualify final text.
+    continued,continuation_context=configured(observe_execution=True)
+    assert 'llm_execution' in continuation_context.callbacks
+    def raw_response(content=None,reason='length',role='assistant',tools=None,function=None):
+        return SimpleNamespace(choices=[SimpleNamespace(finish_reason=reason,
+            message=SimpleNamespace(role=role,content=content,tool_calls=tools,function_call=function))])
+    scope=continued.open(subject='user:one'); continued.pre(**values(scope))
+    original=raw_response(); requests=[]; original_request={'model':'synthetic'}
+    def next_call(request):
+        requests.append(request); return original
+    assert continued.execution(request=original_request,next_call=next_call,**values(scope)) is original
+    assert requests==[original_request] and requests[0] is original_request
+    continued.pre(**values(scope,request='request:2')); post(continued,scope,request='request:2')
+    final=continued.finish(scope,result(scope,api_calls=2))
+    assert final.api_request_id=='request:2' and not final.authority_granted
+    assert final.turn_identity_origin=='result-envelope-v1'
+    for binding_kind in ('owned','absent','foreign-session','foreign-task','foreign-turn','wrong-result'):
+        scope=continued.open(subject='user:one'); continued.pre(**values(scope))
+        continued.execution(request={},next_call=lambda _:raw_response(),**values(scope))
+        continued.pre(**values(scope,request='request:2')); post(continued,scope,request='request:2')
+        document=result(scope,api_calls=2); document.pop('turn_id')
+        binding=(scope.session_id,scope.task_id,'turn:1')
+        if binding_kind=='absent': binding=None
+        if binding_kind=='foreign-session': binding=('foreign',scope.task_id,'turn:1')
+        if binding_kind=='foreign-task': binding=(scope.session_id,'foreign','turn:1')
+        if binding_kind=='foreign-turn': binding=(scope.session_id,scope.task_id,'foreign')
+        if binding_kind=='wrong-result': document['turn_id']='foreign'
+        try: bound=continued.finish(scope,document,worker_turn_binding=binding)
+        except NativeCompletionError:
+            assert binding_kind!='owned'
+        else:
+            assert binding_kind=='owned'
+            assert bound.turn_identity_origin=='isolated-worker-continuation-v1'
+    # A foreign scope is never inspected; downstream errors are not retried.
+    class RawBomb:
+        @property
+        def choices(self): raise AssertionError('foreign response inspected')
+    foreign=RawBomb()
+    assert continued.execution(request={},next_call=lambda _:foreign,
+        session_id='foreign',task_id='foreign') is foreign
+    def downstream_error(_): raise RuntimeError('synthetic downstream failure')
+    try: continued.execution(request={},next_call=downstream_error)
+    except RuntimeError: pass
+    else: raise AssertionError('execution failure swallowed')
+    # Partial text, tools/functions, role mismatch and unknown/missing response
+    # shapes cannot close a missing post. A complete second reply is insufficient.
+    for raw in (raw_response(content='partial'),raw_response(content=' '),
+                raw_response(tools=['unadmitted']),raw_response(function={'name':'x'}),
+                raw_response(role='user'),raw_response(reason='stop'),SimpleNamespace()):
+        scope=continued.open(subject='user:one'); continued.pre(**values(scope))
+        assert continued.execution(request={},next_call=lambda _,r=raw:r,**values(scope)) is raw
+        continued.pre(**values(scope,request='request:2')); post(continued,scope,request='request:2')
+        denied(continued,scope,result(scope,api_calls=2))
+    scope=continued.open(subject='user:one'); continued.pre(**values(scope))
+    continued.execution(request={},next_call=lambda _:raw_response(),**values(scope))
+    # An auxiliary summary/uncompleted turn cannot be promoted to a completion.
+    denied(continued,scope,{**result(scope),'completed':False,'turn_exit_reason':'max_iterations_reached(1/1)'})
+    scope=continued.open(subject='user:one'); continued.pre(**values(scope))
+    continued.execution(request={},next_call=lambda _:raw_response(),**values(scope,model='wrong-route'))
+    continued.pre(**values(scope,request='request:2')); post(continued,scope,request='request:2')
+    denied(continued,scope,result(scope,api_calls=2))
+    scope=continued.open(subject='user:one'); continued.pre(**values(scope)); post(continued,scope)
+    continuation_context.handles[-1].dispose()
+    denied(continued,scope,result(scope))
+    continued.close(); assert not continuation_context.callbacks
 
 
 with tempfile.TemporaryDirectory(prefix='alive-native-completion-') as folder:

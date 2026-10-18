@@ -4,7 +4,7 @@ The host owns plugin registration and isolated agent/process lifetime. This hub
 observes only explicitly opened random session/task pairs; foreground payloads are
 not inspected or retained. No raw prompt, response text or credentials are stored.
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import hashlib
 import math
 import re
@@ -50,6 +50,7 @@ class NativeCompletionEvidence:
     api_started_at: float = 0.0
     source_contract: str = 'hermes.native.post_api_request.v3'
     authority_granted: bool = False
+    turn_identity_origin: str = 'result-envelope-v1'
 
 
 @dataclass(frozen=True,slots=True,eq=False)
@@ -70,11 +71,14 @@ class _Observation:
 class NativeCompletionHub:
     """One explicitly registered host observer; no default process-global hub."""
 
-    def __init__(self,*,max_scopes=16,max_requests=4,max_content_chars=32000):
+    def __init__(self,*,max_scopes=16,max_requests=4,max_content_chars=32000,observe_execution=False):
         if (type(max_scopes) is not int or not 1<=max_scopes<=64
                 or type(max_requests) is not int or not 1<=max_requests<=16
                 or type(max_content_chars) is not int or not 1<=max_content_chars<=64000):
             raise NativeCompletionError('invalid native observer bounds')
+        if type(observe_execution) is not bool:
+            raise NativeCompletionError('invalid execution observation setting')
+        self.observe_execution=observe_execution
         self.max_scopes,self.max_requests,self.max_content_chars=max_scopes,max_requests,max_content_chars
         self._lock=threading.RLock()
         self._scopes={}
@@ -92,13 +96,60 @@ class NativeCompletionHub:
                     if not callable(getattr(handle,'dispose',None)) or getattr(handle,'active',None) is not True:
                         raise NativeCompletionError('native observer needs host-owned registration handles')
                     self._handles.append(handle)
+                if self.observe_execution:
+                    handle=context.register_middleware('llm_execution',self.execution)
+                    if not callable(getattr(handle,'dispose',None)) or getattr(handle,'active',None) is not True:
+                        raise NativeCompletionError('native execution observer needs owned registration')
+                    self._handles.append(handle)
             except Exception:
                 self.close()
                 raise
 
     def _ready(self):
-        if self._retired or len(self._handles)!=3 or not all(h.active for h in self._handles):
+        if self._retired or len(self._handles)!=(4 if self.observe_execution else 3) or not all(h.active for h in self._handles):
             raise NativeCompletionError('native observer registration unavailable')
+
+    def execution(self,*,request,next_call,**values):
+        """Observe pre-intake response shape, never alter a provider result/request.
+
+        Core handles reasoning-only length before its post hook. Closing that
+        non-output attempt does not create final evidence: finish still requires
+        one exact post_api_request completion and an untransformed Core result.
+        """
+        response=next_call(request)
+        with self._lock:
+            state=self._current(values)
+            if state is None or state.error: return response
+            try:
+                key=self._coordinates(values)
+                current=state.requests.get(key)
+                active=[a for a in current['attempts'].values() if a['state']=='started'] if current else []
+                if len(active)!=1:
+                    raise NativeCompletionError('execution lacks unique active request')
+                attempt=active[0]
+                if (values.get('model')!=attempt['pre']['requested_model']
+                        or values.get('provider')!=attempt['pre']['provider']):
+                    raise NativeCompletionError('execution route differs from active request')
+                # An unfamiliar transport shape remains unqualified, not guessed.
+                choices=getattr(response,'choices',None)
+                if not isinstance(choices,(list,tuple)) or len(choices)!=1: return response
+                choice=choices[0]; message=getattr(choice,'message',None)
+                reason=getattr(choice,'finish_reason',None)
+                content=getattr(message,'content',None)
+                tools=getattr(message,'tool_calls',None)
+                functions=getattr(message,'function_call',None)
+                state.terminal_shapes.append(dict(execution_finish_reason=reason if reason in (
+                    'stop','length','tool_calls','content_filter',None) else 'other',
+                    has_text=bool(content),has_tool_calls=bool(tools) or bool(functions)))
+                del state.terminal_shapes[:-16]
+                if (reason=='length' and getattr(message,'role',None)=='assistant'
+                        and (content is None or content=='') and not tools and not functions):
+                    attempt['state']='no_output_length'
+            except Exception:
+                # Observation is fail-closed for our proof, never a new provider
+                # retry or a change to Core's response/continuation behavior.
+                state.error='invalid_execution_observation'
+        return response
 
     def open(self,*,subject):
         subject=_token(subject)
@@ -251,7 +302,7 @@ class NativeCompletionHub:
                 observations=[dict(error=state.error,terminal_shapes=list(state.terminal_shapes),
                     requests=len(state.requests),states=[a['state'] for a in attempts])])
 
-    def finish(self,scope,result):
+    def finish(self,scope,result,*,worker_turn_binding=None):
         with self._lock:
             key=(scope.session_id,scope.task_id)
             state=self._scopes.get(key)
@@ -273,10 +324,24 @@ class NativeCompletionHub:
             if len(completions)!=1 or any(a['state']=='started' for a in attempts):
                 raise NativeCompletionError('native final completion is missing or ambiguous')
             evidence=completions[0]
+            turn_id=result.get('turn_id')
+            if 'turn_id' not in result and worker_turn_binding is not None:
+                # Core intentionally omits transcript-index coordinates when a
+                # continuation rewrites the original user row. Our isolated
+                # toolless worker may bind its directly owned live agent instead;
+                # never copy an ID from the post record into a missing result.
+                if (not isinstance(worker_turn_binding,tuple) or len(worker_turn_binding)!=3
+                        or worker_turn_binding[:2]!=(scope.session_id,scope.task_id)
+                        or worker_turn_binding[2]!=evidence.turn_id
+                        or len(attempts)!=2
+                        or sorted(a['state'] for a in attempts)!=['completed','no_output_length']):
+                    raise NativeCompletionError('missing result coordinate lacks owned continuation binding')
+                turn_id=worker_turn_binding[2]
+                evidence=replace(evidence,turn_identity_origin='isolated-worker-continuation-v1')
             text=result.get('final_response')
             if (not isinstance(text,str) or len(text)!=evidence.content_chars
                     or hashlib.sha256(text.encode('utf-8')).hexdigest()!=evidence.content_sha256
-                    or result.get('turn_id')!=evidence.turn_id or result.get('model')!=evidence.route_model
+                    or turn_id!=evidence.turn_id or result.get('model')!=evidence.route_model
                     or result.get('provider')!=evidence.provider):
                 raise NativeCompletionError('native final text or route differs from observed completion')
             return evidence

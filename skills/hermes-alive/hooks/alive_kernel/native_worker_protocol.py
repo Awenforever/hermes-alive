@@ -113,6 +113,7 @@ def validate_completion(document,request):
     text=document['text']
     if (not isinstance(text,str) or not 0<len(text)<=32000 or evidence.subject!=request['subject']
             or evidence.source_contract!='hermes.native.post_api_request.v3' or evidence.authority_granted is not False
+            or evidence.turn_identity_origin not in ('result-envelope-v1','isolated-worker-continuation-v1')
             or evidence.text_projection!='outer-whitespace-v1'
             or type(evidence.source_content_chars) is not int
             or not len(text)<=evidence.source_content_chars<=32000
