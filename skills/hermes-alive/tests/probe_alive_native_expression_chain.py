@@ -19,6 +19,8 @@ parser.add_argument('--allow-live-models',action='store_true',required=True)
 parser.add_argument('--core',type=Path,required=True)
 parser.add_argument('--model-projection',type=Path,required=True)
 parser.add_argument('--evidence',type=Path,required=True)
+parser.add_argument('--profile-choice',choices=('a','b'),default='a',
+    help='Synthetic profile for a collected multi-material interest fixture')
 parser.add_argument('--reviewer-model',required=True)
 parser.add_argument('--reviewer-model-projection',type=Path)
 parser.add_argument('--resume-expression',type=Path)
@@ -44,27 +46,51 @@ async def exercise():
     from alive_kernel.native_host_caller import HostModelBinding,HostNativeCaller
     from alive_kernel.native_core_acquisition import CoreScopedModelAcquirer
     spec=json.loads(args.evidence.read_text(encoding='utf-8'))
-    if (set(spec)!={'title','url','excerpt','collection_note','synthetic_user_context'}
-            or any(not isinstance(v,str) or not v.strip() or len(v)>1800 for v in spec.values())
-            or not spec['url'].startswith('https://')):
+    if set(spec)=={'title','url','excerpt','collection_note','synthetic_user_context'}:
+        if (any(not isinstance(v,str) or not v.strip() or len(v)>1800 for v in spec.values())
+                or not spec['url'].startswith('https://')):
+            raise ValueError('explicit bounded public evidence and synthetic context required')
+        materials=[dict(title=spec['title'],url=spec['url'],excerpt=spec['excerpt'],priority_hint=.5)]
+        collection_note=spec['collection_note']
+        user_context=spec['synthetic_user_context']
+    elif set(spec)=={'materials','preference_a','preference_b'}:
+        materials=spec['materials']
+        if (not isinstance(materials,list) or not 2<=len(materials)<=24
+                or any(not isinstance(spec[k],str) or not 1<=len(spec[k])<=1500
+                       for k in ('preference_a','preference_b'))):
+            raise ValueError('bounded material pool and synthetic preferences required')
+        for item in materials:
+            if (not isinstance(item,dict) or set(item)!={'title','url','excerpt','priority_hint'}
+                    or any(not isinstance(item[k],str) or not 1<=len(item[k])<=1500
+                           for k in ('title','url','excerpt')) or not item['url'].startswith('https://')
+                    or type(item['priority_hint']) not in (int,float) or not 0<=item['priority_hint']<=1):
+                raise ValueError('explicit bounded public material required')
+        if len({m['url'] for m in materials})!=len(materials):
+            raise ValueError('distinct material identities required')
+        collection_note='Public publisher/listing collection; not full article/video verification'
+        user_context=spec['preference_'+args.profile_choice]
+    else:
         raise ValueError('explicit bounded public evidence and synthetic context required')
     args.output.mkdir(mode=0o700,parents=True,exist_ok=False)
     if args.resume_expression:
         original=json.loads((args.resume_expression/'report.json').read_text(encoding='utf-8'))
         if (original.get('source')!=spec or original.get('synthetic_owner')!='user:synthetic-native-public-expression'
-                or original.get('error_class') is not None or 'result' not in original):
+                or original.get('error_class') is not None or 'result' not in original
+                or original.get('profile_choice','a')!=args.profile_choice):
             raise ValueError('resume requires the exact completed synthetic public expression context')
         shutil.copytree(args.resume_expression/'kernel',args.output/'kernel')
     journal=ExperienceJournal(args.output/'kernel'/'experience.sqlite3')
     owner='user:synthetic-native-public-expression'
     if not args.resume_expression:
-        DiscoveryOpportunityIngestor(journal).ingest(DiscoveryCandidate(
-            source=spec['collection_note'],title=spec['title'],url=spec['url'],summary=spec['excerpt'],
-            observed_at=datetime.now(timezone.utc)),subject=owner)
+        ingestor=DiscoveryOpportunityIngestor(journal)
+        for material in materials:
+            ingestor.ingest(DiscoveryCandidate(source=collection_note,title=material['title'],
+                url=material['url'],summary=material['excerpt'],priority_hint=material['priority_hint'],
+                observed_at=datetime.now(timezone.utc)),subject=owner)
         inbound=journal.append(EventEnvelope(event_type='conversation.inbound',source='synthetic-user',
             actor=owner,subject=owner,payload={'synthetic':True}))
         MemoryProjection(journal).append_proposal(MemoryProposal(kind=MemoryKind.PREFERENCE,
-            subject=owner,predicate='profile.interest',value=spec['synthetic_user_context'],
+            subject=owner,predicate='profile.interest',value=user_context,
             authority=MemoryAuthority.USER_EXPLICIT,source_event_ids=(inbound.event.event_id,),confidence=1),actor=owner)
     projection=json.loads(args.model_projection.read_text())
     review_projection=json.loads(args.reviewer_model_projection.read_text()) if args.reviewer_model_projection else projection
@@ -76,7 +102,8 @@ async def exercise():
     home=args.output/'host'; home.mkdir(mode=0o700)
     workers=args.output/'workers'; workers.mkdir(mode=0o700)
     binding=HostModelBinding(owner,'profile:synthetic','operation:public-expression','generation:1')
-    report=dict(logical_calls=0,calls=[],source=spec,synthetic_owner=owner,
+    report=dict(logical_calls=0,calls=[],source=spec,profile_choice=args.profile_choice,
+        admitted_materials=len(materials),synthetic_owner=owner,
         sends=0,automatic_delivery_authority=False,semantic_accuracy_proven=False,
         synthetic_policy_only=True,family_resolver_is_experiment_only=True,
         final_grounding=args.final_grounding,resumed_expression=str(args.resume_expression) if args.resume_expression else None)
@@ -116,6 +143,8 @@ async def exercise():
                 for key in ('worker_error_class','worker_error_stage'):
                     value=getattr(error,key,None)
                     if isinstance(value,str) and value.isidentifier(): item[key]=value
+                if getattr(error,'worker_error_class',None)=='NativeCompletionError':
+                    item['completion_diagnostics']=getattr(error,'worker_diagnostics',None)
                 raise
             finally: save()
         parameters=dict(operation_id='native-public-expression:one',subject=owner,call=call,

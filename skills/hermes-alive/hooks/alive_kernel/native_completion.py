@@ -224,7 +224,24 @@ class NativeCompletionHub:
             evidence=completed[0]['completion'] if len(completed)==1 else None
             text=result.get('final_response')
             digest=hashlib.sha256(text.encode('utf-8')).hexdigest() if isinstance(text,str) else None
+            # Core may deliberately return an incomplete explainer after an
+            # iteration/error exit. Disclose only its known exit class, never
+            # parenthesized exception details or an arbitrary new reason string.
+            reason=result.get('turn_exit_reason')
+            prefix=reason.partition('(')[0] if isinstance(reason,str) else None
+            known={'text_response','max_iterations_reached','budget_exhausted',
+                'empty_response_exhausted','all_retries_exhausted_no_response',
+                'local_processing_error','repeated_outer_errors','error_near_max_iterations',
+                'pending_tool_result','partial_stream_recovery','fallback_prior_turn_content',
+                'session_persistence_failed','interrupted_by_user','interpreter_shutdown',
+                'context_compression_timeout','redirect_restart_limit_exceeded',
+                'rebuilt_restart_limit_exceeded'}
             return dict(
+                turn_exit_class=prefix if prefix in known else 'other' if reason is not None else None,
+                result_error_present=result.get('error') is not None,
+                token_usage={key:result.get(key) if type(result.get(key)) is int
+                    and 0<=result[key]<=1_000_000_000 else None for key in (
+                        'input_tokens','output_tokens','reasoning_tokens','completion_tokens','total_tokens')},
                 final_text_chars=len(text) if isinstance(text,str) else None,
                 exact_text_match=evidence is not None and digest==evidence.source_content_sha256,
                 stripped_text_match=evidence is not None and digest==completed[0].get('stripped_sha256'),

@@ -82,6 +82,17 @@ def exercise():
     checks=hub.diagnostics(diagnostic,result(diagnostic))
     assert checks['exact_text_match'] and all(checks['coordinate_matches'].values())
     assert 'PRIVATE_CANDIDATE' not in repr(checks)
+    checks=hub.diagnostics(diagnostic,result(diagnostic,
+        turn_exit_reason='local_processing_error(PRIVATE_PROVIDER_ERROR_AND_KEY)',
+        error='PRIVATE_PROVIDER_ERROR_AND_KEY',reasoning_tokens=1234,
+        output_tokens=True,total_tokens=1_000_000_001))
+    assert checks['turn_exit_class']=='local_processing_error' and checks['result_error_present']
+    assert checks['token_usage']['reasoning_tokens']==1234
+    assert checks['token_usage']['output_tokens'] is None and checks['token_usage']['total_tokens'] is None
+    assert 'PRIVATE_PROVIDER_ERROR_AND_KEY' not in repr(checks)
+    assert hub.diagnostics(diagnostic,result(diagnostic,turn_exit_reason='PRIVATE_UNKNOWN_CODE'))['turn_exit_class']=='other'
+    assert 'PRIVATE_UNKNOWN_CODE' not in repr(hub.diagnostics(diagnostic,result(diagnostic,
+        turn_exit_reason='PRIVATE_UNKNOWN_CODE')))
     hub.finish(diagnostic,result(diagnostic))
     assert hub.diagnostics(diagnostic,result(diagnostic)) is None
     trimmed=hub.open(subject='user:one'); hub.pre(**values(trimmed))

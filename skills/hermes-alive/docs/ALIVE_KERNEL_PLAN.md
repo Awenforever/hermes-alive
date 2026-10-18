@@ -38,13 +38,26 @@ separate fresh bounded collector snapshot before legacy interest/threshold/share
 filters. Actual collection exposes 18 observations versus 12 legacy candidates.
 Shared request health distinguishes observed failures from unknown empty results;
 a follow-up actual run correctly records two unavailable sources while continuing
-domestic sources. Five focused suites pass; complete current-tree CI remains
-pending at this record. Native profile contrast is incomplete: a successful
+domestic sources. ADR0170 is committed as0e8c185; its complete isolated portable
+suite passes (64 retained logs), followed only by verified documentation changes.
+Native profile contrast is incomplete: a successful
 baseline is followed by a worker failure; one bounded diagnostic follow-up lacks
 native terminal completion evidence. Do not retry indefinitely or relax evidence.
 This is not personalized network search, full source
 coverage or a fix for ADR0169's semantic failure. Continue the bounded useful
 discovery/selection/feedback milestone, not another reviewer framework.
+
+2026-10-18 — ADR0171 exercises the complete existing quality path on all 18 live
+public observations rather than a preselected source. Nine actual native calls
+complete interpretation, independent source/purpose review, selection, expression,
+semantic and final review, then reopen without inference. Official DeepSeek
+generation and Qwen3.8 review identities are retained, not inferred from settings.
+Manual output is faithful but stiff and preview-level, so model support is not
+usefulness acceptance. Earlier partial profile contrast and one pooled generation
+failure stay failed; safe exit-class/token diagnostics do not weaken completion
+or prove their unknown causes. Improve selective source depth, natural expression
+and attributed feedback on fresh scenarios; do not keep resampling this pool or
+add infrastructure. No production deployment, real send or ten-round acceptance.
 
 ### Delivery milestones and ownership (user clarification, 2026-10-14)
 

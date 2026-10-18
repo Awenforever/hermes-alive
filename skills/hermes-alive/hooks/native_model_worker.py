@@ -107,6 +107,7 @@ def main():
                 stage='conversation'
                 result=agent.run_conversation(request['messages'][1]['content'],conversation_history=[],task_id=scope.task_id)
                 diagnostics=dict(api_calls=result.get('api_calls'),
+                    request_limits={'max_tokens':request['max_tokens'],'budget_seconds':request['budget_seconds']},
                     result_flags={k:result.get(k) if type(result.get(k)) is bool else None for k in (
                         'completed','failed','partial','interrupted','response_transformed','response_reused')},
                     **hub.diagnostics(scope,result))
