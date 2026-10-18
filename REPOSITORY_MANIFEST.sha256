@@ -13,7 +13,7 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./ci/fakes/age
 0969da99a0bc2a1b71ed50584560f4588a37567ac63af3ddbaf3c4617ca5621a  ./ci/requirements.txt
 fa12374c80223cbf00738847fb258fdb1abb6170540ec39fbdb1108ef18b9e28  ./metadata/hermes-alive-source.sha256
 5cba4486635fe54faef4cbb05cfb645c315d9ad4dd3316817f12bc81c44b220e  ./metadata/hermes-alive.json
-fcb27bf1a706b8e3596acb9317bcf9787a3929c3d29c1861cbfa3f0a6d609cca  ./plugin.yaml
+d954d78c7671aac782cd6afa2fa1e971ec4285aaeda65b983a9d3a4712f72944  ./plugin.yaml
 f8f5599ae916b0775205a1dfbb1e57c0b6c72465948f276e4332f3a2aa87f4df  ./plugin_cli.py
 1abd5395e8cb5a88160ba7b6b97b5f41a2b9fcd13a8c5e6a18c8e7b5d5aba36b  ./scripts/bootstrap.sh
 bbf5d1b13c996ba702cc396d07c806e1f2a3acde19a6d28652d5a334cb2fc3df  ./scripts/portable-ci.sh
