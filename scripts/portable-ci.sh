@@ -125,6 +125,7 @@ run_and_require run_production_enforcement.py '^HERMES_ALIVE_PRODUCTION_ENFORCEM
 run_and_require run_discovery_quality_pivot_v3.py '^HERMES_ALIVE_DISCOVERY_PIVOT_V3_RESULT=PASS$'
 run_and_require run_editorial_discovery_v4.py '^HERMES_ALIVE_EDITORIAL_DISCOVERY_V4_RESULT=PASS$'
 run_and_require run_bilibili_content_evidence.py '^HERMES_ALIVE_BILIBILI_CONTENT_EVIDENCE_OK$'
+run_and_require run_discovery_observation_boundary.py '^HERMES_ALIVE_DISCOVERY_OBSERVATION_BOUNDARY_OK$'
 run_and_require run_rich_content_model_attribution_v1.py '^HERMES_ALIVE_RICH_CONTENT_MODEL_ATTRIBUTION_RESULT=PASS([[:space:]]|$)'
 run_and_require run_runtime_disable_contract.py '^HERMES_ALIVE_RUNTIME_DISABLE_CONTRACT_RESULT=PASS$'
 run_and_require run_plugin_cli_portable.py '^HERMES_ALIVE_PLUGIN_CLI_PORTABLE_RESULT=PASS$'

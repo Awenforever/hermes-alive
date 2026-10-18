@@ -75,13 +75,22 @@ def test_lanes_are_interleaved_and_capped() -> None:
 def test_proxy_is_opt_in_and_applied() -> None:
     discovery = ExternalDiscovery({"network": {"proxy_url": "http://proxy.invalid:7890"}})
 
+    class Response:
+        status = 200
+        def __init__(self, url, kwargs): self.url, self.kwargs = url, kwargs
+        async def __aenter__(self): return self
+        async def __aexit__(self, *_): return False
     class Session:
         def get(self, url, **kwargs):
-            return url, kwargs
+            return Response(url, kwargs)
 
-    url, kwargs = discovery._request(Session(), "https://example.invalid")
-    check(url == "https://example.invalid", "request URL changed")
-    check(kwargs.get("proxy") == "http://proxy.invalid:7890", f"proxy missing: {kwargs}")
+    async def exercise():
+        async with discovery._request(Session(), "https://example.invalid") as response:
+            check(response.url == "https://example.invalid", "request URL changed")
+            check(response.kwargs.get("proxy") == "http://proxy.invalid:7890", f"proxy missing: {response.kwargs}")
+        async with discovery._request(Session(), "https://example.invalid", proxy="http://explicit.invalid") as response:
+            check(response.kwargs['proxy'] == 'http://explicit.invalid', 'explicit proxy overwritten')
+    asyncio.run(exercise())
 
 
 def test_news_aggregator_caps_real_publishers() -> None:

@@ -108,6 +108,10 @@ candidates, only share or ask, only for supplied agenda_item_id values.
 The supplied recall window is bounded, not a complete world/user inventory.
 Collector popularity is not recipient relevance. Use current interests and
 qualifications to choose among the supplied material before proposing anything.
+Interests are soft evidence of value, not an exhaustive admission boundary.
+Consider independently important developments and worthwhile unfamiliar material
+alongside familiar topics. Explicit exclusions remain binding; do not manufacture
+random filler or an exploration quota, or infer dislike from unfamiliarity.
 Do not exhaustively summarize the window: at most 8 explicit abstentions and 8
 reconsiderations; other material remains unassessed, never a negative preference.
 Empty

@@ -25,12 +25,26 @@ Current engineering status: the retained CLI-observation replay correction and
 ADR0168 fair recall are committed in 037c291; its canonical tree eba418e passed
 the complete isolated portable suite (63 logs). This is not fresh-dependency,
 production or usefulness acceptance. Earlier failures remain historical evidence.
-The current uncommitted review-scope experiments passed four adjacent suites,
-but the full native expression's manual inspection exposes unsupported first-person
+Review-scope work is committed in 3be9871; complete isolated CI passed before a
+documentation-only follow-up, whose final tree passed canonical verification.
+The full native expression's manual inspection exposes unsupported first-person
 verification attribution despite model approval. ADR0169 records that failure.
 Do not add more review layers to manufacture a green score. Prioritize the bounded
 personalization/discovery/feedback milestone in PERSONALIZATION_DELIVERY_PLAN.md.
 No production deployment, real message or restart is authorized by this plan.
+
+2026-10-18 — ADR0170 extends recall upstream: the discovery shadow now reads a
+separate fresh bounded collector snapshot before legacy interest/threshold/share
+filters. Actual collection exposes 18 observations versus 12 legacy candidates.
+Shared request health distinguishes observed failures from unknown empty results;
+a follow-up actual run correctly records two unavailable sources while continuing
+domestic sources. Five focused suites pass; complete current-tree CI remains
+pending at this record. Native profile contrast is incomplete: a successful
+baseline is followed by a worker failure; one bounded diagnostic follow-up lacks
+native terminal completion evidence. Do not retry indefinitely or relax evidence.
+This is not personalized network search, full source
+coverage or a fix for ADR0169's semantic failure. Continue the bounded useful
+discovery/selection/feedback milestone, not another reviewer framework.
 
 ### Delivery milestones and ownership (user clarification, 2026-10-14)
 

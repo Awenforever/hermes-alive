@@ -20,6 +20,10 @@ from __future__ import annotations
 # Marker: RICH_CONTENT_IMAGE_SOURCE_V1
 
 import asyncio
+from collections import deque
+from contextlib import asynccontextmanager
+from contextvars import ContextVar
+from copy import deepcopy
 import html
 import logging
 import os
@@ -96,6 +100,7 @@ SOURCES_CONFIG_PATH = os.getenv(
 )
 BUDGET_MAX_PER_RUN = int(os.getenv("HERMES_DISCOVERY_BUDGET_MAX_PER_RUN", "15"))
 BUDGET_MAX_PER_SOURCE = int(os.getenv("HERMES_DISCOVERY_BUDGET_MAX_PER_SOURCE", "5"))
+MAX_COGNITIVE_OBSERVATIONS = 128
 SHARE_THRESHOLD_MIN_SCORE = float(os.getenv("HERMES_DISCOVERY_SHARE_THRESHOLD_MIN_SCORE", "0.6"))
 
 # Default sources config (used if sources.yaml not found)
@@ -123,14 +128,27 @@ class ExternalDiscovery:
         self._session: aiohttp.ClientSession | None = None
         self.sources_config = sources_config or {}
         self.last_health: dict[str, dict[str, Any]] = {}
+        self._collector_context = ContextVar('alive_discovery_collector', default=None)
+        self._request_errors: dict[str, list[str]] = {}
 
-    def _request(self, session: aiohttp.ClientSession, url: str, **kwargs: Any) -> Any:
-        """Create a GET request with the optional user-configured network proxy."""
+    @asynccontextmanager
+    async def _request(self, session: aiohttp.ClientSession, url: str, **kwargs: Any) -> Any:
+        """Observe request failures even when a collector safely returns []."""
         network = self.sources_config.get("network", {})
         proxy = str(network.get("proxy_url") or os.getenv("HERMES_DISCOVERY_PROXY_URL", "")).strip()
         if proxy and "proxy" not in kwargs:
             kwargs["proxy"] = proxy
-        return session.get(url, **kwargs)
+        collector = self._collector_context.get()
+        try:
+            async with session.get(url, **kwargs) as response:
+                if collector is not None and response.status != 200:
+                    self._request_errors.setdefault(collector, []).append(f'HTTP{response.status}')
+                yield response
+        except Exception as error:
+            if collector is not None:
+                # Keep bounded error classes, never query URLs or credentials.
+                self._request_errors.setdefault(collector, []).append(type(error).__name__)
+            raise
 
     async def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
@@ -140,6 +158,8 @@ class ExternalDiscovery:
     async def collect(self) -> list[dict[str, Any]]:
         """Run all external collectors concurrently and return a merged list."""
         results: list[dict[str, Any]] = []
+        self.last_health = {}
+        self._request_errors = {}
         if aiohttp is None:
             logger.debug("aiohttp not available; skipping external discovery")
             return results
@@ -172,7 +192,13 @@ class ExternalDiscovery:
 
         # Run all collectors concurrently with asyncio.gather
         task_items = list(tasks.items())
-        coros = [task for _, task in task_items]
+        async def observed(name, task):
+            token = self._collector_context.set(name)
+            try:
+                return await task
+            finally:
+                self._collector_context.reset(token)
+        coros = [observed(name, task) for name, task in task_items]
         names = [name for name, _ in task_items]
         gathered = await asyncio.gather(*coros, return_exceptions=True)
         for source_name, result in zip(names, gathered):
@@ -182,11 +208,17 @@ class ExternalDiscovery:
                     source_name,
                     type(result).__name__,
                 )
-                self.last_health[source_name] = {"ok": False, "fetched": 0, "error": type(result).__name__}
+                self.last_health[source_name] = {"ok": False, "status": "failed", "fetched": 0, "error": type(result).__name__}
             else:
                 items = result or []
                 results.extend(items)
-                self.last_health[source_name] = {"ok": True, "fetched": len(items)}
+                errors = sorted(set(self._request_errors.get(source_name, ())))
+                if errors:
+                    self.last_health[source_name] = dict(ok=False, fetched=len(items),
+                        status='partial' if items else 'failed', error=errors[0], errors=errors)
+                else:
+                    self.last_health[source_name] = dict(ok=True if items else None,
+                        status='available' if items else 'empty_or_unverified', fetched=len(items))
                 logger.debug("ExternalDiscovery[%s]: %d items", source_name, len(items))
 
         if self._session and not self._session.closed:
@@ -1550,6 +1582,7 @@ class DiscoveryEngine:
         self._external = ExternalDiscovery(sources_config=self._sources_config)
         self._local = LocalDiscovery()
         self._cached: dict[str, Any] | None = None
+        self._observation_cache: dict[str, Any] | None = None
         self._last_fetch: float = 0.0
         self._in_progress: bool = False
         self._topic_dedup = TopicDedupStore()
@@ -1627,13 +1660,37 @@ class DiscoveryEngine:
                 logger.error("Local discovery failed: %s", local)
                 local = []
 
-            # Apply pipeline to external items
+            # Preserve collector evidence before legacy rank/threshold/delivery
+            # filtering mutates or discards it. This separate view is not passed
+            # to the legacy composer and never grants permission to share.
+            fetched_at = datetime.now(timezone.utc).isoformat()
+            queues: dict[tuple[str, str], deque] = {}
+            for item in external:
+                if not isinstance(item, dict):
+                    continue
+                key = (str(item.get('source') or 'unknown'),
+                       str(item.get('publisher') or item.get('feed_name') or ''))
+                queues.setdefault(key, deque()).append(item)
+            observed = []
+            count = sum(len(queue) for queue in queues.values())
+            while queues and len(observed) < MAX_COGNITIVE_OBSERVATIONS:
+                for key in tuple(queues):
+                    observed.append(deepcopy(queues[key].popleft()))
+                    if not queues[key]:
+                        del queues[key]
+                    if len(observed) == MAX_COGNITIVE_OBSERVATIONS:
+                        break
+            self._observation_cache = dict(external=observed, fetched_at=fetched_at,
+                source_health=deepcopy(self._external.last_health),
+                observation_scope='collector_only', omitted_observations=count-len(observed))
+
+            # Apply the unchanged legacy sharing pipeline to its own view.
             external = self._apply_pipeline(external)
 
             results: dict[str, Any] = {
                 "external": external,
                 "local": local,
-                "fetched_at": datetime.now(timezone.utc).isoformat(),
+                "fetched_at": fetched_at,
                 "source_health": dict(self._external.last_health),
                 "lane_counts": self._count_by(external, "lane"),
                 "source_counts": self._count_by(external, "source"),
@@ -1798,6 +1855,17 @@ class DiscoveryEngine:
         """Remove items below the share threshold score."""
         threshold = self._sources_config.get("share_threshold", {}).get("min_score", SHARE_THRESHOLD_MIN_SCORE)
         return [item for item in items if item.get("score", 0.0) >= threshold]
+
+    def get_observations(self) -> dict[str, Any] | None:
+        """Fresh bounded external collector view, not a delivery-eligible list.
+
+        Never include local discovery or run legacy interest/delivery filters.
+        Overflow remains unobserved by the kernel, not rejected or disliked.
+        This in-memory batch is not an exhaustive source history or send grant.
+        """
+        if not self.has_fresh() or self._observation_cache is None:
+            return None
+        return deepcopy(self._observation_cache)
 
     def get_recent(self) -> dict[str, Any] | None:
         """Return the fresh cache with delivery-ineligible topics removed.

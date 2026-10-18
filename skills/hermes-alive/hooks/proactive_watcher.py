@@ -2751,13 +2751,13 @@ class ProactivePlatformWatcher:
             return engine.get_recent()
         return None
 
-    @staticmethod
     def _mirror_discovery_kernel_shadow(
+        self,
         *,
         chat_id: str,
         discovery_context: dict[str, Any],
     ) -> None:
-        """Observe legacy discovery without changing any watcher decision."""
+        """Observe collector evidence without changing any legacy send decision."""
 
         try:
             from alive_kernel.discovery_opportunities import (
@@ -2767,10 +2767,17 @@ class ProactivePlatformWatcher:
 
             if not discovery_shadow_enabled():
                 return
+            engine = self._discovery_engine
+            observation_reader = getattr(engine, 'get_observations', None)
+            observations = observation_reader() if callable(observation_reader) else None
+            if observations is None:
+                # A gated legacy list is not an equivalent observation batch.
+                return
             report = mirror_legacy_discovery_batch(
                 _SHARED_DIR,
                 raw_subject=chat_id,
-                discovery_context=discovery_context,
+                discovery_context=observations,
+                max_candidates=128,
             )
             logger.info(
                 "Alive discovery kernel shadow observed=%d deduplicated=%d "

@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import re
 import sys
 from types import SimpleNamespace
 
@@ -147,8 +148,20 @@ async def exercise(args):
                             message=SimpleNamespace(content=prior_fault['raw_response']))])
                     report['logical_calls'] += 1
                     kwargs['timeout'] = 180
-                    response = await caller(**kwargs)
-                    invocation.update(actual_model=response.model,
+                    save()
+                    try:
+                        response = await caller(**kwargs)
+                    except Exception as error:
+                        invocation['error_class'] = type(error).__name__
+                        for key in ('worker_error_class', 'worker_error_stage'):
+                            value = getattr(error, key, None)
+                            if isinstance(value, str) and re.fullmatch(r'[A-Za-z][A-Za-z0-9_]{0,63}', value):
+                                invocation[key] = value
+                        if getattr(error, 'worker_error_class', None) == 'NativeCompletionError':
+                            invocation['completion_diagnostics'] = getattr(error, 'worker_diagnostics', None)
+                        save()
+                        raise
+                    invocation.update(actual_model=response.model, actual_provider=response.native_completion.provider,
                         completion_evidence=asdict(response.native_completion),
                         raw_response=response.choices[0].message.content)
                     save()

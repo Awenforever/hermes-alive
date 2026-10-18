@@ -11,6 +11,7 @@ from __future__ import annotations
 from contextlib import closing
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 import hmac
 import json
 import math
@@ -825,7 +826,12 @@ def candidate_from_legacy(item: Mapping[str, Any], *, observed_at: datetime | No
         try:
             published_at = datetime.fromisoformat(str(published).replace("Z", "+00:00"))
         except ValueError:
-            published_at = None
+            try:
+                published_at = parsedate_to_datetime(str(published))
+            except (TypeError, ValueError, OverflowError):
+                published_at = None
+    if published_at is not None and published_at.utcoffset() is None:
+        published_at = None  # Unknown timezone is not an observed publication instant.
     attributes = {
         key: value
         for key, value in item.items()
@@ -842,6 +848,8 @@ def candidate_from_legacy(item: Mapping[str, Any], *, observed_at: datetime | No
             "interest_score",
         }
     }
+    if published and published_at is None:
+        attributes['published_at_raw'] = str(published)
     return DiscoveryCandidate(
         source=item.get("source") or "legacy-unknown",
         title=item.get("title"),
