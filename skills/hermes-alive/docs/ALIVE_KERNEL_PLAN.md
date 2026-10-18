@@ -9,9 +9,13 @@ one-iteration/length-continuation conflict. Corrected isolated runtime/tests
 e797f18 pass focused Core qualification: reasoning-only continuation can complete;
 partial-text stitching, unclosed attempts and auxiliary summaries remain rejected.
 Turn identity comes from the exact result or a narrowly qualified worker-owned
-continuation binding, never guessed metadata. Full canonical CI and private
-interest revalidation are still pending; no production deployment or usefulness
-acceptance is implied. Continue the bounded personalization milestone below.
+continuation binding, never guessed metadata. Commit 37dfe06, canonical tree
+fb344ef, passes complete isolated portable CI (64 retained logs). Actual private
+interest revalidation now completes Qwen generation but rejects all proposed
+plans for absent protected literals; this is not a clean recommendation round.
+Next simplify the model/host meaning-and-source contract, preserving immutable
+source/literal safeguards. No production deployment or usefulness acceptance is
+implied. Continue the bounded personalization milestone below.
 
 ### Product correction: recipient value before further framework expansion
 

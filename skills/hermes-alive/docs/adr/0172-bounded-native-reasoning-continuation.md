@@ -1,6 +1,6 @@
 # ADR 0172: bounded native reasoning-only continuation
 
-Date: 2026-10-18. Status: implemented; isolated qualification in progress.
+Date: 2026-10-18. Status: implemented; isolated regression qualified, product acceptance open.
 
 ## Measured failure
 
@@ -63,8 +63,18 @@ existing result-envelope origin. No sending permission is created.
 - No paid model, private chat, route authorization, transport or production send
   is used by these controlled tests. This is not proof of recipient usefulness,
   fresh dependency installation, ten clean rounds or complete longitudinal memory.
-- Real profile revalidation and full canonical portable CI remain pending at
-  this writing. A content-length failure still needs an evidence-based output
+- Full canonical portable CI passes on commit 37dfe06/tree fb344ef, 64 retained
+  logs, exact Git modes, source548/repository571 entries. Installed cryptography
+  is 50.0.1; this is not a fresh-dependency installation qualification.
+- Actual private-interest revalidation completes Qwen generation with api:2 and
+  exact stop evidence from the owned continuation binding. All three proposed
+  plans are then rejected because their protected literals are absent from their
+  corresponding content text. The original boundary is crossed, but the composed
+  recommendation path still fails before source review/selection/expression.
+  Do not count it as a clean round or expose private profile/proposal details in
+  public fixtures. Next simplify the model/host semantic/source responsibilities
+  and qualify the existing bounded correction path rather than remove safeguards.
+- A content-length failure still needs an evidence-based output
   contract/budget correction; do not simply accept concatenated fragments or add
   indefinite retries/review layers.
 
