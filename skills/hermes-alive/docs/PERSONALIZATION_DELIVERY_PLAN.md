@@ -7,6 +7,14 @@ the integrated product outcome, not an assertion that all components are absent.
 
 ## Current truth and stop-expanding rule
 
+2026-10-18 editorial correction: source-grounded output still reads like an
+abstract. ADR0176 fixes selection seeing a different draft from the reviewed plan,
+and refines the existing purpose criterion rather than adding another evaluator.
+Do not force enthusiasm, a personal-relevance slogan or a question into every
+share. Requested reports and worthwhile outside-profile material must survive.
+Run finite contrasts and actual complete messages; reviewer approval is still
+not the acceptance oracle. No new framework or production deployment is justified.
+
 2026-10-18 continuation: a newly collected public batch, including deeper primary
 source reading and unrelated general discovery, still fails plan admission before
 review. ADR0175 reuses existing one-shot correction with original evidence and

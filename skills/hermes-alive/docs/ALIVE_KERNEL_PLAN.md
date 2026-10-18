@@ -4,6 +4,16 @@ Status: active
 
 Last reviewed: 2026-10-18
 
+ADR0176 fixes a measured selection/meaning mismatch: selection now sees the
+authenticated recipient plan used by purpose review and expression, not its
+illustrative draft. Frame/action/history remain unchanged. Existing generation,
+purpose and selection prompts evaluate the contribution beyond topic-match and
+self-assigned scores, without a new judge/framework or anti-summary blanket rule.
+Five adjacent focused suites pass. Fixed synthetic contrasts and newly collected
+public-source full-chain validation are in progress, not qualified acceptance.
+ADR0175 full canonical regression passed at 3a5e7d1/tree14e2a1c, 65 retained logs;
+the actual unsent r10 remains a manual usefulness failure despite model approval.
+
 ADR0175 extends existing single-shot model recovery to inadmissible recipient
 plans, rather than adding literal-specific prompt patches or weakening checks.
 Focused tests include withdrawal/cancellation/timeout, false recovery evidence,

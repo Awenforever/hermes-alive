@@ -234,6 +234,13 @@ and promotional claims are not automatically essential meaning. Requested detail
 reports and material qualifications are different: do not omit what their purpose
 requires. Later expression must preserve this plan, so make editorial choices
 here instead of expecting the renderer to discard an overstuffed plan.
+recipient_goal states the actual contribution, not merely 'tell the recipient
+about this subject'. Put the substantive angle into the recipient-facing contents
+too; a goal outside them cannot supply missing meaning later. Useful explanation,
+a worthwhile surprise, a practical possibility or a grounded open question can
+serve that role. Do not invent implications, personal history or enthusiasm, or
+force a question or explicit relevance slogan into every share. Importance beyond
+the profile can be sufficient; a keyword match or recent date alone is not.
 Preserve who/what a claim concerns, the measured quantity and its units, conditions
 and time relationships. Nearby sentences do not establish those relationships.
 When the source is ambiguous, retain the qualification or omit an unnecessary

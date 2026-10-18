@@ -20,6 +20,9 @@ from alive_kernel.deliberation import PolicyContext
 from alive_kernel.planning_runtime import PlanningRuntime, PlanningRuntimeError
 from alive_kernel.events import EventEnvelope
 from alive_kernel.agenda import AgendaProjection, AgendaProposal, AgendaItemKind, AgendaAuthority
+from alive_kernel.discovery_opportunities import DiscoveryOpportunityIngestor,DiscoveryCandidate
+from alive_kernel.deliberation_synthesis import DeliberationSynthesizer,DeliberationContextChanged
+from alive_kernel.cognition_cycle import CognitionCycleCoordinator
 from types import SimpleNamespace
 
 
@@ -68,6 +71,61 @@ def temporal_boundaries(root):
     assert bounds['not_before'] is None and datetime.fromisoformat(bounds['target_deadline'])>now
 
 
+async def selected_meaning(root,modern):
+    """Select the reviewed plan, never let a polished illustrative draft mask it."""
+    root=root/('modern' if modern else 'legacy')
+    journal=ExperienceJournal(root/'experience.sqlite3')
+    owner='user:synthetic'; reader=DiscoveryOpportunityIngestor(journal)
+    source=reader.ingest(DiscoveryCandidate(source='synthetic',title='Synthetic learning resource',
+        summary='A public learning resource, eligibility unknown.',url='https://example.invalid/learning',
+        observed_at=datetime.now(timezone.utc)),subject=owner)
+    plan=dict(version=2,recipient_goal='Explain the known participation limit',speech_act='inform',
+        contents=[dict(kind='caveat',text='PRIVATE_ACTUAL_MEANING: eligibility is unknown.')],
+        behavior_constraints=[])
+    async def generate(**kwargs):
+        proposal=dict(agenda_item_id=source.agenda_item_id,kind='share',
+            text='PRIVATE_ILLUSTRATIVE_DRAFT: everyone can attend.',topic='synthetic',
+            dimensions={k:dict(value=.5,reason='synthetic') for k in (
+                'user_value','urgency','novelty','confidence','risk','interruption_cost')})
+        if modern: proposal['communication_plan']=plan
+        return SimpleNamespace(model='synthetic/generator',choices=[SimpleNamespace(
+            message=SimpleNamespace(content=json.dumps(dict(candidates=[proposal]))))])
+    synth=OpportunitySynthesizer(journal,content_vault=reader.vault)
+    generated=await synth.run(subject=owner,operation_id='interpret',call=generate,recipient_meaning=modern)
+    candidate=generated.candidates[0]
+    selector=DeliberationSynthesizer(journal,content_vault=reader.vault)
+    try:
+        selector.validate_candidate_sources((candidate.action,),{candidate.action.content_id:candidate.content},
+            'user:foreign',Sensitivity.PRIVATE)
+    except DeliberationContextChanged: pass
+    else: raise AssertionError('foreign owner resolved a recipient plan')
+    calls=[]
+    async def choose(**kwargs):
+        calls.append(kwargs)
+        items=json.loads(kwargs['messages'][1]['content'].split('\n',1)[-1])
+        actual=next(item for item in items if item['candidate_id']==candidate.action.candidate_id)
+        if modern:
+            assert actual['content']=={'communication_plan':plan}
+            assert 'PRIVATE_ILLUSTRATIVE_DRAFT' not in kwargs['messages'][1]['content']
+        else:
+            assert actual['content']==dict(candidate.content)
+        return SimpleNamespace(model='synthetic/selector',choices=[SimpleNamespace(
+            message=SimpleNamespace(content=json.dumps(dict(candidate_id=candidate.action.candidate_id,
+                rationale='synthetic contribution, not a real quality judgment'))))])
+    coordinator=CognitionCycleCoordinator(journal,content_vault=reader.vault)
+    selected=await coordinator.plan_with_model(cycle_id='meaning',subject=owner,candidates=generated.candidates,
+        policy_context=PolicyContext(can_interrupt=True),call=choose)
+    assert len(calls)==1 and selected.selection_event_id
+    # Prompt-only view: retained frame/action still equals its original contract.
+    stored=coordinator.deliberation.inspect(selected.frame_event_id.removeprefix('deliberation.frame:'),
+        clearance=Sensitivity.PRIVATE)
+    assert dict(stored.candidate_contents)[candidate.action.content_id]==candidate.content
+    assert synth.load_completed(subject=owner,operation_id='interpret')==generated
+    for path in root.glob('*.sqlite3*'):
+        assert b'PRIVATE_ACTUAL_MEANING' not in path.read_bytes()
+        assert b'PRIVATE_ILLUSTRATIVE_DRAFT' not in path.read_bytes()
+
+
 def main():
     plan = dict(version=1, recipient_goal='说明活动的适用范围', speech_act='inform', contents=[
         dict(kind='fact', text='这是受邀活动。'),
@@ -112,6 +170,8 @@ def main():
         assert mixed[1][0]['communication_plan']['contents'][1]['kind'] == 'negation'
         asyncio.run(rejected_plan(Path(folder)))
         temporal_boundaries(Path(folder))
+        asyncio.run(selected_meaning(Path(folder),True))
+        asyncio.run(selected_meaning(Path(folder),False))
     print('HERMES_ALIVE_COMMUNICATION_PLAN_OK')
     return 0
 

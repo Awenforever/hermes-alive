@@ -13,6 +13,19 @@ boundary against contact/content remains relevant to purpose; do not confuse
 that boundary with a statement that preferences alone are not a sending grant.
 Factual support is a separate assessment. Decide whether the recipient-facing
 meaning serves a useful current purpose, not just whether every statement is true.
+For unsolicited discovery, distinguish a substantive recipient contribution from
+topic-matching source compression. What understanding, worthwhile surprise,
+practical possibility or grounded question makes this worth attention now?
+The plan should carry that contribution, not just name a relevant subject in its
+goal and list facts about it. More details, a new publication date or high model
+scores do not establish that value. Do not demand invented personal relevance,
+an emotional hook, an explicit 'why you care' section, advice or a closing question.
+A well-chosen explanation can itself be valuable; judge this evidence and context,
+not whether it resembles a summary. Requested reports, direct answers and admitted
+reminders have different purposes and may need detail. Important or worthwhile
+out-of-profile discoveries remain eligible without a profile-match justification.
+Mark a concrete goal/content mismatch unsupported; if recipient value is genuinely
+unknown, mark uncertain rather than endorsing the generator's proposed goal.
 The communication_plan is the actual meaning contract for later expression;
 an illustrative draft is not the contract. Test every planned content unit:
 does it help the person understand the subject or respond appropriately, or is it
