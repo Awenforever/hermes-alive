@@ -69,6 +69,25 @@ authorize an Alive/Core/email deployment or a second restart after rollback.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-18 — ADR0167 is now committed/pushed as7724c90. Its actual tree0662bad
+passes full isolated portable CI (62 retained logs); this is not production or
+fresh-dependency-install acceptance. ADR0168 addresses the demonstrated recall
+blind spot without a second model layer: fair owner-scoped source rotation before
+SQL LIMIT, budgeted complete source representations, current interest context,
+and the existing model's relevance judgment. Scan provenance is retained; unknown
+material is not negative feedback. Repair pins its original evidence, and later
+review/expression/reconsideration see the matching window. The nine-entry case,
+43-entry rotation and long-excerpt budget tests pass in isolation. Live semantic
+selection and broader qualification remain required. Internet-search discovery,
+large invalid inventories, long-term actual usefulness and deployment remain open.
+Actual r5 makes one Qwen3.8 call over nine public materials and selects the
+lowest-priority, last-inserted relevant directory, then reopens without inference.
+It is not full-chain acceptance: a legacy draft's verification-attribution concern
+remains open for recipient-plan/independent final review. New explicit preferences
+restart advisory scan position; ten recent task facts must not evict the profile
+or falsely restart scanning. Typed preference retrieval has been prioritized while
+retaining provenance/authority checks. Broad regression of this tree is pending.
+
 2026-10-18 — ADR0167 introduces one model-mediated opportunity JSON correction,
 not punctuation repair or repeated new cycles. Original invalid output/model is
 retained encrypted and causally bound; both calls share the stage deadline and

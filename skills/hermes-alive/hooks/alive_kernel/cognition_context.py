@@ -46,8 +46,13 @@ class CognitionContextReader:
             if after < target and after <= before:
                 raise ValueError("memory context projection made no progress")
         accepted = []
-        for item in self.memory.retrieve(subject=subject, clearance=clearance, limit=512,
-                                        kinds=(MemoryKind.PREFERENCE, MemoryKind.FACT, MemoryKind.COMMITMENT)):
+        preferences=self.memory.retrieve(subject=subject,clearance=clearance,limit=512,
+            kinds=(MemoryKind.PREFERENCE,))
+        situational=self.memory.retrieve(subject=subject,clearance=clearance,limit=512,
+            kinds=(MemoryKind.FACT,MemoryKind.COMMITMENT))
+        # Keep typed, durable preferences from being displaced by a run of
+        # recent task facts. This is not inference that every chat is an interest.
+        for item in (*preferences,*situational):
             if item.authority is not MemoryAuthority.USER_EXPLICIT or item.content_status is not ContentStatus.AVAILABLE:
                 continue
             origin = self.journal.get(item.created_from_event_id)

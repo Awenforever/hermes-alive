@@ -208,7 +208,7 @@ class SourceSupportReviewer:
         if candidate is None:
             raise SourceSupportError('candidate is not part of retained interpretation')
         start = self.journal.get('opportunity.synthesis:' + interpretation_id + ':started')
-        sources = self.interpreter.reader.active_evidence(subject=subject, clearance=clearance,
+        sources = self.interpreter.reader.active_evidence(subject=subject, clearance=clearance,limit=32,
             observation_event_ids=tuple(start.event.payload['observation_event_ids']))
         context = self.interpreter.context_reader.read(subject=subject, clearance=clearance)
         advice = self.interpreter.learning_reader.read(subject=subject, clearance=clearance)

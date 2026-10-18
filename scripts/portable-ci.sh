@@ -108,6 +108,7 @@ run_and_require run_shadow_final_quality.py '^HERMES_ALIVE_SHADOW_FINAL_QUALITY_
 run_and_require run_alive_kernel_expression_runtime.py '^HERMES_ALIVE_KERNEL_EXPRESSION_RUNTIME_OK$'
 run_and_require run_alive_kernel_opportunity_synthesis.py '^HERMES_ALIVE_KERNEL_OPPORTUNITY_SYNTHESIS_OK$'
 run_and_require run_opportunity_protocol_recovery.py '^HERMES_ALIVE_OPPORTUNITY_PROTOCOL_RECOVERY_OK$'
+run_and_require run_interest_recall_window.py '^HERMES_ALIVE_INTEREST_RECALL_WINDOW_OK$'
 run_and_require run_alive_kernel_source_support.py '^HERMES_ALIVE_KERNEL_SOURCE_SUPPORT_OK$'
 run_and_require run_source_support_history.py '^HERMES_ALIVE_SOURCE_SUPPORT_HISTORY_OK$'
 run_and_require run_legacy_dream_retirement.py '^HERMES_ALIVE_LEGACY_DREAM_RETIREMENT_OK$'

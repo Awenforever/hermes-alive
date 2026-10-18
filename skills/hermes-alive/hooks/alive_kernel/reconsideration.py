@@ -38,7 +38,8 @@ class ReconsiderationStore:
             raise ValueError('bounded reconsideration needs explicit host configuration')
         clearance = Sensitivity(parameters.get('sensitivity', Sensitivity.PRIVATE))
         now = self.now()
-        evidence = self.synth.reader.active_evidence(subject=subject, clearance=clearance, limit=8)
+        evidence = self.synth.reader.active_evidence(subject=subject, clearance=clearance, limit=32,
+            source_cursor=self.synth._source_cursor(subject,clearance))
         readers = (self.synth.context_reader, self.synth.learning_reader, self.synth.history_reader,
                    self.synth.action_reader, self.synth.feedback_reader)
         # Callback identity cannot certify model routing. Host configuration must

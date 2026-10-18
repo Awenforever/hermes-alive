@@ -528,7 +528,8 @@ class DiscoveryOpportunityIngestor:
 
     def active_evidence(self, *, subject: str, clearance: Sensitivity,
                         limit: int = 8,
-                        observation_event_ids: tuple[str, ...] | None = None) -> tuple[OpportunityEvidence, ...]:
+                        observation_event_ids: tuple[str, ...] | None = None,
+                        source_cursor: int | None = None) -> tuple[OpportunityEvidence, ...]:
         """Read authenticated current discovery content, scoped before LIMIT.
 
         The caller supplies a Hermes-authorized principal, never a model-proposed
@@ -537,6 +538,9 @@ class DiscoveryOpportunityIngestor:
         owner = _bounded(subject, "subject", 128, required=True)
         if not _IDENTITY_RE.fullmatch(owner) or not 1 <= limit <= 32:
             raise DiscoveryOpportunityError("invalid evidence subject or limit")
+        if source_cursor is not None and (type(source_cursor) is not int or source_cursor<0
+                                         or observation_event_ids is not None):
+            raise DiscoveryOpportunityError('invalid discovery source cursor')
         pinned_ids = None
         if observation_event_ids is not None:
             if (not isinstance(observation_event_ids, tuple)
@@ -565,6 +569,7 @@ class DiscoveryOpportunityIngestor:
             subject=owner, kinds=(AgendaItemKind.OPPORTUNITY,),
             states=(AgendaState.ACTIVE,), clearance=clearance, as_of=now, limit=1000,
             item_ids=pinned_ids,
+            source_cursor=source_cursor,
         )
         for item in items:
             if item.content_status is not AgendaContentStatus.AVAILABLE:

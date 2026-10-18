@@ -662,6 +662,7 @@ class AgendaProjection:
         subject: str | None = None,
         kinds: Iterable[AgendaItemKind] | None = None,
         item_ids: Iterable[str] | None = None,
+        source_cursor: int | None = None,
     ) -> list[AgendaRecord]:
         clearance = Sensitivity(clearance)
         allowed = _SENSITIVITY_ORDER[: _SENSITIVITY_ORDER.index(clearance) + 1]
@@ -690,6 +691,18 @@ class AgendaProjection:
                 return []
             extra += f" AND item_id IN ({','.join('?' for _ in selected_ids)})"
             extra_parameters.extend(selected_ids)
+        order = 'CASE WHEN due_at IS NULL THEN 1 ELSE 0 END, due_at ASC, priority DESC, created_at ASC'
+        order_parameters = []
+        if source_cursor is not None:
+            if (type(source_cursor) is not int or source_cursor < 0 or subject is None
+                    or item_ids is not None or kinds is None
+                    or selected_kinds!=(AgendaItemKind.OPPORTUNITY,)):
+                raise AgendaValidationError('source scan requires an explicit owner/opportunity scope')
+            source_sequence = '(SELECT COALESCE(MAX(e.sequence),0) FROM agenda_sources_v1 s JOIN experience_events e ON e.event_id=s.event_id WHERE s.item_id=agenda_items_v1.item_id)'
+            # Scope in WHERE, rotate before LIMIT: collector popularity must not
+            # permanently hide a lower-priority observation beyond the first page.
+            order = f'CASE WHEN {source_sequence}>? THEN 0 ELSE 1 END, {source_sequence}, item_id'
+            order_parameters = [source_cursor]
         query = f"""
             SELECT * FROM agenda_items_v1
             WHERE state IN ({','.join('?' for _ in selected_states)})
@@ -697,12 +710,11 @@ class AgendaProjection:
               AND (available_at IS NULL OR available_at <= ?)
               AND (expires_at IS NULL OR expires_at > ?)
               {extra}
-            ORDER BY CASE WHEN due_at IS NULL THEN 1 ELSE 0 END,
-                     due_at ASC, priority DESC, created_at ASC
+            ORDER BY {order}
             LIMIT ?
         """
         parameters = [*(value.value for value in selected_states), *(v.value for v in allowed)]
-        parameters.extend((now.isoformat(), now.isoformat(), *extra_parameters, limit))
+        parameters.extend((now.isoformat(), now.isoformat(), *extra_parameters, *order_parameters, limit))
         with closing(self._connect()) as connection:
             return [self._record(connection, row) for row in connection.execute(query, parameters)]
 

@@ -103,7 +103,7 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
                 summary=summary,published_at=None,origin_kind='commitment',
                 authority_is_not_execution_permission=True)))
 
-    def active_evidence(self, *, subject, clearance, limit=8, observation_event_ids=None):
+    def active_evidence(self, *, subject, clearance, limit=8, observation_event_ids=None, source_cursor=None):
         if (not isinstance(subject,str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}',subject)
                 or type(limit) is not int or not 1<=limit<=32):
             raise ValueError('invalid cognitive opportunity scope')
@@ -111,7 +111,7 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
         if observation_event_ids==():
             return ()
         discoveries = super().active_evidence(subject=subject,clearance=clearance,limit=limit,
-                                              observation_event_ids=observation_event_ids)
+                                              observation_event_ids=observation_event_ids,source_cursor=source_cursor)
         commitments=self.commitments(subject=subject,clearance=clearance,limit=limit,
                                      observation_event_ids=observation_event_ids)
         if observation_event_ids is not None:
@@ -120,6 +120,12 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
         if not discoveries:
             return commitments[:limit]
         reserved=min(len(commitments),max(1,limit//2))
+        if source_cursor is not None:
+            combined=[]
+            for index in range(max(reserved,len(discoveries))):
+                if index<reserved: combined.append(commitments[index])
+                if index<len(discoveries): combined.append(discoveries[index])
+            return tuple((*combined,*commitments[reserved:]))[:limit]
         combined=(*commitments[:reserved],*discoveries[:limit-reserved],*commitments[reserved:])
         return tuple(combined)[:limit]
 

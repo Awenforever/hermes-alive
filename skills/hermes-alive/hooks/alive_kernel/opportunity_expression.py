@@ -63,7 +63,7 @@ class OpportunityExpressionStore(SemanticReviewStore):
             # Current ranking is for new search, not revalidation of retained intent.
             active = OpportunitySynthesizer(self.journal, content_vault=self.content_vault,
                 context_vault=self.context_vault).reader.active_evidence(
-                    subject=subject, clearance=source.event.sensitivity, limit=8,
+                    subject=subject, clearance=source.event.sensitivity, limit=32,
                     observation_event_ids=tuple(original_start.event.payload['observation_event_ids']))
             original_url = next(item.content['url'] for item in active
                                 if item.agenda_item_id == candidate.agenda_item_id)

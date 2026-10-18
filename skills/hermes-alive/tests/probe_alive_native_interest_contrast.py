@@ -24,6 +24,7 @@ def arguments():
     parser.add_argument('--fixture', type=Path, required=True)
     parser.add_argument('--protocol-fault-report', type=Path,
         help='Explicit synthetic fault injection: replay one prior failed output, call only the real corrector')
+    parser.add_argument('--interest-only',action='store_true',help='One prospective interest-A interpretation, at most one protocol correction')
     parser.add_argument('--output', type=Path, required=True)
     return parser.parse_args()
 
@@ -81,7 +82,7 @@ async def exercise(args):
             title=item['title'], url=item['url'], summary=item['excerpt'],
             priority_hint=item['priority_hint'], observed_at=datetime.now(timezone.utc)), subject=owner)
         identities[receipt.agenda_item_id] = item['title']
-    limit=1 if prior_fault else 10
+    limit=1 if prior_fault else 2 if args.interest_only else 10
     report = dict(fixture=spec, synthetic_owner=owner, logical_calls=0, logical_call_limit=limit, cases=[],
         fault_injection=bool(prior_fault), replayed_fault_responses=0,stage_invocations=0,
         material_ids=identities, sends=0, semantic_accuracy_proven=False,
@@ -118,7 +119,7 @@ async def exercise(args):
             timeout_seconds=185, max_calls=limit)
         current_memory = None
         try:
-            phases=('interest-a',) if prior_fault else ('baseline', 'interest-a', 'corrected-b', 'reopened-b', 'withdrawn-b')
+            phases=('interest-a',) if prior_fault or args.interest_only else ('baseline', 'interest-a', 'corrected-b', 'reopened-b', 'withdrawn-b')
             for phase in phases:
                 # All phases retain the same observations. Restart/withdrawal must
                 # change memory reads, not secretly rebuild a favorable source pool.
