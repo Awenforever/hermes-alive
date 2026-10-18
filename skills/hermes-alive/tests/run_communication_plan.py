@@ -84,6 +84,10 @@ def main():
         value = deepcopy(plan); value[field] = bad; invalid.append(value)
     value = deepcopy(plan); value['contents'][1]['protected_literals'] = []; invalid.append(value)
     value = deepcopy(plan); value['contents'][0]['kind'] = 'proposed_content'; invalid.append(value)
+    value = deepcopy(plan); value['contents'][0] = dict(kind='link',text='原文地址',
+        protected_literals=['https://example.invalid/reference']); invalid.append(value)
+    value = deepcopy(plan); value['contents'][0] = dict(kind='fact',text='公开的学习资料',
+        protected_literals=['public learning resource']); invalid.append(value)
     for value in invalid:
         try: validate_communication_plan(value, action_kind='share')
         except (TypeError, ValueError): pass

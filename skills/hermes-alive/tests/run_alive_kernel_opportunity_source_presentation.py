@@ -62,7 +62,7 @@ async def exercise(root):
     assert historical.candidates[0].content['operation']['text'] == original
     assert reopened.load_completed(subject='user:test', operation_id='historical') == historical
     coordinator = CognitionCycleCoordinator(journal, content_vault=reader.vault)
-    async def verify_meaning(value, cycle_id, url):
+    async def verify_meaning(value, cycle_id, url, *, planned=False):
         async def choose(**_kw):
             return SimpleNamespace(model='synthetic/selector', choices=[SimpleNamespace(message=SimpleNamespace(
                 content=json.dumps({'candidate_id': value.candidates[0].action.candidate_id,
@@ -73,7 +73,8 @@ async def exercise(root):
         expressions = OpportunityExpressionStore(journal, content_vault=reader.vault)
         record = expressions.define_for_selection(selection_event_id=selected.selection_event_id, subject='user:test')
         meaning = expressions.meanings.resolve(record.event.event_id)
-        assert meaning.atoms[0].text == original and not meaning.atoms[0].protected_literals
+        assert meaning.atoms[0].text == ('这是公开的合成学习资料。' if planned else original)
+        assert not meaning.atoms[0].protected_literals
         assert meaning.atoms[1].kind is SemanticAtomKind.LINK
         assert meaning.atoms[1].protected_literals == (url,)
         assert journal.get(selected.frame_event_id).event.canonical_json() == frame
@@ -88,6 +89,31 @@ async def exercise(root):
     long_result = await interpreter.run(subject='user:test', operation_id='long-source', call=generate)
     assert len(long_result.candidates[0].content['operation']['text']) > 1600
     await verify_meaning(long_result, 'long-source', long_url)
+    # Source protection is host-owned even when a model supplies only semantic
+    # content, with no URL duplication or translated source phrase as a literal.
+    plan=dict(version=2,recipient_goal='分享公开学习资料',speech_act='share',
+        contents=[dict(kind='fact',text='这是公开的合成学习资料。')],behavior_constraints=[])
+    async def semantic_generate(**kw):
+        prompt=json.loads(kw['messages'][1]['content'])
+        assert prompt['stage_contract']['source_link_binding']=='canonical_source_v1'
+        assert 'canonical URL in a separate plan content' in kw['messages'][0]['content']
+        response=await generate(**kw)
+        document=json.loads(response.choices[0].message.content)
+        document['candidates'][0]['communication_plan']=plan
+        return SimpleNamespace(model='synthetic/meaning',choices=[SimpleNamespace(
+            message=SimpleNamespace(content=json.dumps(document)))])
+    planned=await interpreter.run(subject='user:test',operation_id='meaning-source',
+        call=semantic_generate,recipient_meaning=True)
+    assert planned.rejected_count==0 and len(planned.candidates)==1
+    assert long_url in planned.candidates[0].content['operation']['text']
+    await verify_meaning(planned,'meaning-source-cycle',long_url,planned=True)
+    retained=interpreter.vault.resolve_json('opportunity-proposals:meaning-source',
+        expected_subject='user:test',expected_purpose='opportunity.candidates')
+    assert retained['proposals'][0]['communication_plan']==plan
+    checkpoint=journal.last_sequence()
+    assert OpportunitySynthesizer(ExperienceJournal(root/'journal.sqlite3')).load_completed(
+        subject='user:test',operation_id='meaning-source')==planned
+    assert journal.last_sequence()==checkpoint
     assert _present_source(original, 'https://example.invalid/a>b', 'canonical_source_v1') == (
         original + '\n\n来源：https://example.invalid/a>b')
     try:

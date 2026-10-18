@@ -4,6 +4,14 @@ Status: active
 
 Last reviewed: 2026-10-18
 
+ADR0173 clarifies the existing model/host boundary: semantic plans need not repeat
+the canonical URL that the host already binds and protects. Literal validators
+are unchanged. Focused tests pass; actual private-profile revalidation reaches
+source/purpose review and a reasoned silence decision, not final expression or a
+useful sample. Do not count this as a clean full-chain round. Next improve actual
+discovery substance with existing host search/extraction, not forced sending or
+additional reviewer machinery. Full canonical regression is pending at this entry.
+
 Current continuation correction: ADR0172 records actual Core reproduction of a
 one-iteration/length-continuation conflict. Corrected isolated runtime/tests
 e797f18 pass focused Core qualification: reasoning-only continuation can complete;

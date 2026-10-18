@@ -112,6 +112,9 @@ Interests are soft evidence of value, not an exhaustive admission boundary.
 Consider independently important developments and worthwhile unfamiliar material
 alongside familiar topics. Explicit exclusions remain binding; do not manufacture
 random filler or an exploration quota, or infer dislike from unfamiliarity.
+An unlisted topic is not negative interest evidence. Explain any non-action in
+terms of the material's value, substance, novelty or uncertainty, not merely its
+absence from the profile; profile matches are not automatically worth sharing.
 Do not exhaustively summarize the window: at most 8 explicit abstentions and 8
 reconsiderations; other material remains unassessed, never a negative preference.
 Empty
@@ -225,6 +228,19 @@ the versioned recipient-facing contents, not incidental draft prose, bind later
 natural expression. You may abstain if no useful faithful plan exists.
 Source attribution means an evidenced public author/publisher when useful to the
 recipient, not the internal collector's identity, workflow or collection log.
+Responsibility boundary: when stage_contract.source_link_binding is
+canonical_source_v1, the host binds the discovery opportunity's canonical source
+URL from original evidence before selection and preserves a source-link atom
+during expression. You need not
+duplicate that canonical URL in a separate plan content merely to keep a link.
+Concentrate on useful recipient meaning. Other links that are themselves part of
+the intended meaning still need their exact URL inside their content text AND
+protected_literals. A descriptive label alone is not a link's protected text.
+protected_literals protects exact characters in THIS content, not phrases copied
+from a source into a different-language paraphrase. Most ordinary fact contents
+need no protected_literals; preserve their meaning, not an English source phrase.
+If an exact amount/date/address/identifier matters, include the exact value in
+the content and protect that value, not a translated sentence or an absent URL.
 Add exactly this communication_plan object alongside each candidate's existing
 fields: {"version":2,"recipient_goal":"purpose","speech_act":"share|inform|remind|warn|ask",
 "contents":[{"kind":"fact|request|question|deadline|amount|link|contact|caveat|uncertainty|negation|source_attribution",
@@ -727,6 +743,7 @@ class OpportunitySynthesizer:
                             "stage_contract": {"stage": "internal_candidate_interpretation",
                                 "routes_or_sends": False, "authorizes_execution": False,
                                 "host_authority": authority.value,
+                                "source_link_binding": self._SOURCE_PRESENTATION,
                                 "candidate_is_not_a_sent_message": True},
                             "corrective_reviews": revisions,
                             "recent_expression_history": [c.to_prompt() for c in history],
