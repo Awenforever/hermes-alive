@@ -49,6 +49,23 @@ async def test(root):
     assert reviewer.verify_current(receipt.event_id, subject='user:test',
         interpretation_id='history-review', candidate_id=candidate_id)['verdict'] == 'unsupported'
     assert not journal.read(event_type='action.attempted')
+    async def correlated_review(**kwargs):
+        kwargs['route_info']['provider']='synthetic-review-provider'
+        return response('synthetic-generator',{'verdict':'unsupported',
+            'unsupported_claims':['Generated wording is not a sending receipt.'],
+            'uncertainties':[],'reason':'Same-family advisory, not independent proof.'})
+    correlated=await reviewer.run(subject='user:test',interpretation_id='history-review',
+        candidate_id=candidate_id,operation_id='correlated-history',call=correlated_review,
+        resolve_domain=lambda model:model,require_independence=False)
+    from alive_kernel.source_support import SourceSupportError
+    try:
+        reviewer.load_current(correlated.event_id,subject='user:test',
+            interpretation_id='history-review',candidate_id=candidate_id)
+    except SourceSupportError: pass
+    else: raise AssertionError('correlated receipt silently promoted on recovery')
+    recovered=reviewer.load_current(correlated.event_id,subject='user:test',
+        interpretation_id='history-review',candidate_id=candidate_id,allow_correlated=True)
+    assert recovered==correlated and not recovered.independent and not recovered.safe_for_automatic_delivery
 
 
 if __name__ == '__main__':

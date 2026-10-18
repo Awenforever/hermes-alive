@@ -23,6 +23,7 @@ class AutonomousCycleResult:
     submission: object = field(default=None,repr=False)
     external_delivery_proven: bool = False
     reconsideration_event_id: str | None = None
+    quality_assessment: object = field(default=None,repr=False)
 
 
 class AutonomousCycleRuntime:
@@ -93,12 +94,17 @@ class AutonomousCycleRuntime:
                     return AutonomousCycleResult('waiting_for_change',reconciliation,
                         reconsideration_event_id=waiting.event.event_id)
         if not execute:
-            expression = await self.preparation.expression.run(**parameters)
+            assessed=await self.preparation.assess(**parameters)
+            expression=assessed.expression
+            if assessed.quality_disposition.startswith('final_'):
+                return AutonomousCycleResult('content_review_attention',reconciliation,
+                    expression=expression,quality_assessment=assessed)
             if capture is not None and expression.planning.action_kind=='silence':
                 self.reconsideration.remember(subject=subject,configuration_id=cognition_configuration_id,
                     before=before,after=capture(),planning=expression.planning)
             return AutonomousCycleResult('silence' if expression.planning.action_kind=='silence'
-                else 'shadow_selected',reconciliation,expression=expression)
+                else 'shadow_selected',reconciliation,expression=expression,
+                quality_assessment=assessed if parameters.get('grounding',False) else None)
         if any(key in authorization_parameters for key in parameters):
             raise ValueError('authorization cannot override cycle planning')
         prepared = await self.preparation.prepare(**parameters,**authorization_parameters)

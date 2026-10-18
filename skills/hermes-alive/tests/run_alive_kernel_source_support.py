@@ -78,6 +78,15 @@ async def exercise(root,mode):
     else:
         assert mode in ('supported','unsupported','ambiguous-terminal')
         assert not receipt.safe_for_automatic_delivery
+        recovered=SourceSupportReviewer(journal).load_current(receipt.event_id,subject='user:test',
+            interpretation_id='generate',candidate_id=candidate_id)
+        assert recovered==receipt and not recovered.safe_for_automatic_delivery
+        for owner,interpretation,target in (('user:other','generate',candidate_id),
+                ('user:test','foreign-operation',candidate_id),('user:test','generate','foreign-candidate')):
+            try:
+                reviewer.load_current(receipt.event_id,subject=owner,interpretation_id=interpretation,candidate_id=target)
+            except SourceSupportError: pass
+            else: raise AssertionError('foreign review receipt recovered')
         assert reviewer.verify_current(receipt.event_id,subject='user:test',interpretation_id='generate',
             candidate_id=candidate_id)['verdict']==('supported' if mode=='ambiguous-terminal' else mode)
         assert reviewer.verify_current(receipt.event_id,subject='user:other',interpretation_id='generate',
@@ -111,6 +120,10 @@ async def exercise(root,mode):
         reader.vault.erase_item(journal.get(source.observation_event_id).event.payload['content']['content_id'])
         assert reviewer.verify_current(receipt.event_id,subject='user:test',interpretation_id='generate',
             candidate_id=candidate_id) is None
+        try:
+            reviewer.load_current(receipt.event_id,subject='user:test',interpretation_id='generate',candidate_id=candidate_id)
+        except SourceSupportError: pass
+        else: raise AssertionError('erased source review recovered from labels alone')
     expected_calls=0 if mode=='start-race' else 1
     assert len(calls)==expected_calls
     try:

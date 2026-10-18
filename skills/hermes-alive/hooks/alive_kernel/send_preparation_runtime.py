@@ -8,6 +8,15 @@ from .outcomes import OutcomeProjection
 
 
 @dataclass(frozen=True, slots=True)
+class ExpressionQualityResult:
+    expression: ExpressionRuntimeResult
+    final_review_event_id: str | None = None
+    quality_disposition: str = 'not_reviewed'
+    initial_final_review_event_id: str | None = None
+    repair_disposition: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class SendPreparationResult:
     expression: ExpressionRuntimeResult
     authorization: ActionAuthorizationDecision | None = None
@@ -67,7 +76,8 @@ manufactures them from model output or reviews, nor falls back to another body.
                 candidate_id=expressed.expression_event_id, operation_id=operation,
                 call=parameters['call'], resolve_domain=resolver,
                 reviewer_model=parameters.get('grounding_model') or parameters.get('requested_model'),
-                require_independence=required, clearance=clearance)
+                require_independence=required, clearance=clearance,
+                timeout_seconds=parameters.get('model_timeout_seconds') or 40)
         event_id = prefix + ':completed'
         findings = reviewer.verify_current(event_id, subject=subject, interpretation_id=origin,
             candidate_id=expressed.expression_event_id, allow_correlated=not required, clearance=clearance)
@@ -78,6 +88,43 @@ manufactures them from model output or reviews, nor falls back to another body.
                 or resolver(payload['reviewer_model']) != payload['reviewer_domain']):
             raise ValueError('final review model scope changed')
         return event_id, findings['verdict']
+
+    async def assess(self, *, allow_repair=True, **expression_parameters):
+        """Assess actual final wording without route, permission, attempt or IO.
+
+        Shadow and executable cycles share this exact quality path. Approval
+        here cannot manufacture the independent execution contracts in prepare.
+        """
+        if type(allow_repair) is not bool:
+            raise ValueError('invalid final wording repair mode')
+        expressed=await self.expression.run(**expression_parameters)
+        if expressed.planning.action_kind=='silence':
+            return ExpressionQualityResult(expressed)
+        final_event,quality=None,'not_reviewed'
+        initial_final,repair=None,None
+        if expression_parameters.get('grounding',False):
+            if expressed.review_disposition=='rejected':
+                return ExpressionQualityResult(expressed,expressed.review_event_id,'final_semantic_rejected')
+            final_event,quality=await self._review_final(expressed,expression_parameters)
+            if quality!='supported':
+                initial_final=final_event
+                if not allow_repair:
+                    return ExpressionQualityResult(expressed,final_event,'final_'+quality,
+                        initial_final,'disabled')
+                try:
+                    corrected=await self.expression.run(**{**expression_parameters,
+                        'correction_review_event_id':initial_final})
+                    if corrected.review_disposition=='rejected':
+                        return ExpressionQualityResult(corrected,corrected.review_event_id,
+                            'final_semantic_rejected',initial_final,'completed')
+                    final_event,quality=await self._review_final(corrected,expression_parameters)
+                    expressed,repair=corrected,'completed'
+                except Exception:
+                    return ExpressionQualityResult(expressed,initial_final,
+                        'final_repair_unavailable',initial_final,'unavailable')
+                if quality!='supported':
+                    return ExpressionQualityResult(expressed,final_event,'final_'+quality,initial_final,repair)
+        return ExpressionQualityResult(expressed,final_event,quality,initial_final,repair)
 
     async def prepare(self, *, authorization_operation_id, route_binding_id,
                       confirmation_event_id=None, delegation_event_id=None,
@@ -107,45 +154,15 @@ manufactures them from model output or reviews, nor falls back to another body.
             raise ValueError('host route unavailable before planning')
         # Final authorization still revalidates this route after all model work;
         # this check does not mint a lease, consent, delegation or send permit.
-        expressed = await self.expression.run(**expression_parameters)
-        if expressed.planning.action_kind == 'silence':
-            return SendPreparationResult(expressed)
-        subject = expression_parameters['subject']
-        final_event, quality = None, 'not_reviewed'
-        initial_final, repair = None, None
-        if expression_parameters.get('grounding', False):
-            if expressed.review_disposition == 'rejected':
-                return SendPreparationResult(expressed, final_review_event_id=expressed.review_event_id,
-                                              quality_disposition='final_semantic_rejected')
-            final_event, quality = await self._review_final(expressed, expression_parameters)
-            if quality != 'supported':
-                initial_final = final_event
-                if confirmation_event_id is not None:
-                    # Exact confirmed wording is immutable. A fresh confirmation
-                    # workflow, not this automatic repair, must own any rewrite.
-                    return SendPreparationResult(expressed, final_review_event_id=final_event,
-                        quality_disposition='final_' + quality, initial_final_review_event_id=initial_final,
-                        repair_disposition='requires_new_confirmation')
-                try:
-                    corrected = await self.expression.run(**{**expression_parameters,
-                        'correction_review_event_id':initial_final})
-                    if corrected.review_disposition == 'rejected':
-                        return SendPreparationResult(corrected,
-                            final_review_event_id=corrected.review_event_id,
-                            quality_disposition='final_semantic_rejected',
-                            initial_final_review_event_id=initial_final, repair_disposition='completed')
-                    final_event, quality = await self._review_final(corrected, expression_parameters)
-                    expressed, repair = corrected, 'completed'
-                except Exception:
-                    # An unresolved or failed repair is explicit attention, not
-                    # successful silence or permission to reuse rejected wording.
-                    return SendPreparationResult(expressed, final_review_event_id=initial_final,
-                        quality_disposition='final_repair_unavailable',
-                        initial_final_review_event_id=initial_final, repair_disposition='unavailable')
-                if quality != 'supported':
-                    return SendPreparationResult(expressed, final_review_event_id=final_event,
-                        quality_disposition='final_' + quality,
-                        initial_final_review_event_id=initial_final, repair_disposition=repair)
+        assessed=await self.assess(allow_repair=confirmation_event_id is None,**expression_parameters)
+        expressed=assessed.expression
+        final_event,quality=assessed.final_review_event_id,assessed.quality_disposition
+        initial_final,repair=assessed.initial_final_review_event_id,assessed.repair_disposition
+        if confirmation_event_id is not None and repair=='disabled':
+            repair='requires_new_confirmation'
+        if expressed.planning.action_kind=='silence' or quality.startswith('final_'):
+            return SendPreparationResult(expressed,final_review_event_id=final_event,
+                quality_disposition=quality,initial_final_review_event_id=initial_final,repair_disposition=repair)
         witness = None
         if final_event is not None:
             _subject, origin, _clearance = self._expression_origin(expressed)

@@ -4,6 +4,7 @@ The host supplies the current policy, model capability and authority on every
 entry. Started but uncompleted provider operations are not repeated implicitly.
 """
 from dataclasses import dataclass
+import math
 import re
 
 from .cognition_cycle import CognitionCycleCoordinator
@@ -15,6 +16,12 @@ from .opportunity_synthesis import OpportunitySynthesizer
 
 class PlanningRuntimeError(ValueError):
     """A cycle cannot be recovered as the same current intent."""
+
+
+def validate_model_timeout(value):
+    if value is not None and (type(value) not in (int,float) or not math.isfinite(value)
+                              or not 1<=value<=240):
+        raise PlanningRuntimeError('model timeout must be finite and within host stage bounds')
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,7 +54,7 @@ watcher and not a complete production loop. It creates no channel queues.
 
     async def _ground_candidates(self, generated, *, subject, interpretation_id,
             call, reviewer_model, sensitivity, resolve_domain, require_independence,
-            purpose=False):
+            purpose=False, model_timeout_seconds=None):
         from .source_support import SourceSupportReviewer
         from .communication_purpose import CommunicationPurposeReviewer
         reviewer_class = CommunicationPurposeReviewer if purpose else SourceSupportReviewer
@@ -66,7 +73,7 @@ watcher and not a complete production loop. It creates no channel queues.
                         candidate_id=candidate_id, operation_id=key, call=call,
                         reviewer_model=reviewer_model, clearance=sensitivity,
                         resolve_domain=resolve_domain, require_independence=require_independence,
-                        protocol_recovery=True)
+                        protocol_recovery=True,timeout_seconds=model_timeout_seconds or 40)
                 except Exception:
                     # Isolate one provider/proposal failure, never retry it implicitly.
                     pass
@@ -95,7 +102,9 @@ watcher and not a complete production loop. It creates no channel queues.
                   call, requested_model=None, authority=ActionAuthority.NONE,
                   sensitivity=Sensitivity.PRIVATE, grounding=False,
                   grounding_model=None, resolve_grounding_domain=None,
-                  require_independent_grounding=False, recipient_meaning=False):
+                  require_independent_grounding=False, recipient_meaning=False,
+                  model_timeout_seconds=None):
+        validate_model_timeout(model_timeout_seconds)
         if type(recipient_meaning) is not bool:
             raise PlanningRuntimeError('invalid recipient meaning mode')
         if type(grounding) is not bool or type(require_independent_grounding) is not bool:
@@ -133,6 +142,8 @@ watcher and not a complete production loop. It creates no channel queues.
                 'require_independence':require_independent_grounding, 'method':'source-support-v1'}
         if recipient_meaning:
             binding['recipient_meaning'] = 'recipient-meaning-v1'
+        if model_timeout_seconds is not None:
+            binding['model_timeout_seconds']=model_timeout_seconds
         digest = self.synth.vault.digest_json({'operation': operation_id, 'subject': subject})[:40]
         start_id = 'planning.runtime:' + digest + ':started'
         prior = self.journal.get(start_id)
@@ -161,7 +172,7 @@ watcher and not a complete production loop. It creates no channel queues.
         else:
             generated = await self.synth.run(subject=subject, operation_id=interpret_id,
                 call=call, requested_model=requested_model, authority=authority, clearance=sensitivity,
-                recipient_meaning=recipient_meaning)
+                recipient_meaning=recipient_meaning,timeout_seconds=model_timeout_seconds or 60)
         candidates, reviews, repair, repair_disposition = generated.candidates, (), None, None
         if recipient_meaning and generated.rejected_count and not candidates:
             raise PlanningRuntimeError('recipient meaning unavailable; malformed proposals are not qualified silence')
@@ -170,7 +181,7 @@ watcher and not a complete production loop. It creates no channel queues.
             review_parameters = dict(subject=subject, call=call,
                 reviewer_model=grounding_model or requested_model, sensitivity=sensitivity,
                 resolve_domain=resolve_grounding_domain or (lambda model:'unqualified-family'),
-                require_independence=require_independent_grounding)
+                require_independence=require_independent_grounding,model_timeout_seconds=model_timeout_seconds)
             candidates, reviews, failures = await self._ground_candidates(generated,
                 interpretation_id=interpret_id, **review_parameters)
             if recipient_meaning and candidates:
@@ -193,7 +204,7 @@ watcher and not a complete production loop. It creates no channel queues.
                         repair = await self.synth.run(subject=subject, operation_id=repair_id,
                             call=call, requested_model=requested_model, authority=authority,
                             clearance=sensitivity, revision_event_ids=rejected,
-                            recipient_meaning=recipient_meaning)
+                            recipient_meaning=recipient_meaning,timeout_seconds=model_timeout_seconds or 60)
                     # A repair can address rejected intents, not expand the host's work scope.
                     from dataclasses import replace
                     if recipient_meaning and repair.rejected_count and not repair.candidates:

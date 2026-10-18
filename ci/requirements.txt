@@ -1,1 +1,3 @@
 PyYAML==6.0.3
+# Match the current plugin.yaml runtime contract for encrypted-kernel tests.
+cryptography==50.0.0

@@ -22,10 +22,13 @@ parser.add_argument('--reviewer-model',required=True)
 parser.add_argument('--timeout-seconds',type=float,default=40)
 parser.add_argument('--allow-correlated-review',action='store_true')
 parser.add_argument('--repair',action='store_true')
+parser.add_argument('--reuse-review-receipt')
 parser.add_argument('--output',type=Path,required=True)
 args=parser.parse_args()
 if not math.isfinite(args.timeout_seconds) or not 1<=args.timeout_seconds<=240:
     parser.error('timeout must be finite and between 1 and 240 seconds')
+if args.reuse_review_receipt and not args.repair:
+    parser.error('retained review reuse requires explicit repair mode')
 sys.path[:0]=[str(args.core.resolve(strict=True)),str(Path(__file__).resolve().parents[1]/'hooks')]
 
 
@@ -55,6 +58,10 @@ async def exercise():
     retained=OpportunitySynthesizer(journal,content_vault=vault).load_completed(subject=owner,operation_id=interpretation)
     assert len(retained.candidates)==1
     candidate=retained.candidates[0].action.candidate_id
+    reviewer=SourceSupportReviewer(journal,content_vault=vault)
+    recovered=reviewer.load_current(args.reuse_review_receipt,subject=owner,
+        interpretation_id=interpretation,candidate_id=candidate,
+        allow_correlated=args.allow_correlated_review) if args.reuse_review_receipt else None
     projection=json.loads(args.model_projection.read_text())
     home=args.output/'host'; home.mkdir(mode=0o700)
     workers=args.output/'workers'; workers.mkdir(mode=0o700)
@@ -63,6 +70,7 @@ async def exercise():
         generator_model=retained.actual_model,independent_review_proven=False,
         automatic_delivery_authority=False,semantic_accuracy_proven=False,
         correlated_diagnostic=args.allow_correlated_review,calls=[])
+    report['retained_review_reused']=args.reuse_review_receipt
     def save():
         path=args.output/'report.json'
         path.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
@@ -78,7 +86,7 @@ async def exercise():
         caller=HostNativeCaller(subject=owner,profile_id=binding.profile_id,operation_id=binding.operation_id,
             acquire=acquire,interpreter=sys.executable,core=args.core,private_root=workers,
             environment=dict(os.environ),timeout_seconds=max(120,args.timeout_seconds+5),
-            max_calls=3 if args.repair else 1)
+            max_calls=(2 if recovered else 3) if args.repair else 1)
         async def call(**kwargs):
             report['logical_calls']+=1
             item=dict(task=kwargs['task'],snapshot=json.loads(kwargs['messages'][1]['content']))
@@ -87,23 +95,23 @@ async def exercise():
             result=await caller(**kwargs)
             item.update(actual_model=result.model,actual_provider=result.native_completion.provider,
                 raw_response=result.choices[0].message.content)
-            if report['logical_calls']==1:
+            if report['logical_calls']==1 and recovered is None:
                 report.update(actual_model=result.model,actual_provider=result.native_completion.provider,
                     raw_review=result.choices[0].message.content)
             save()
             return result
         try:
-            result=await SourceSupportReviewer(journal,content_vault=vault).run(subject=owner,interpretation_id=interpretation,
+            result=recovered or await reviewer.run(subject=owner,interpretation_id=interpretation,
                 candidate_id=candidate,operation_id='native-retained-independent-review',call=call,
                 resolve_domain=family,reviewer_model=args.reviewer_model,
                 require_independence=not args.allow_correlated_review,
                 timeout_seconds=args.timeout_seconds)
             report.update(verdict=result.verdict,independent_review_proven=result.independent,
-                receipt_event_id=result.event_id)
+                receipt_event_id=result.event_id,actual_reviewer_model=result.actual_reviewer_model)
             if args.repair and result.verdict in ('unsupported','uncertain'):
                 synth=OpportunitySynthesizer(journal,content_vault=vault)
                 repaired=await synth.run(subject=owner,operation_id='native-retained-v2-repair',call=call,
-                    recipient_meaning=True,revision_event_ids=(result.event_id,))
+                    recipient_meaning=True,revision_event_ids=(result.event_id,),timeout_seconds=args.timeout_seconds)
                 report['repair']=dict(candidates=len(repaired.candidates),abstentions=len(repaired.abstentions),
                     rejected=repaired.rejected_count,actual_model=repaired.actual_model,
                     proposals=[synth.retained_proposal(receipt_event_id=repaired.receipt_event_id,

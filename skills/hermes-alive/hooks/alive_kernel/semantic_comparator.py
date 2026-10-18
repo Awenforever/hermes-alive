@@ -37,6 +37,9 @@ personal experiences, feelings or user preferences. Humor must not change the
 meaning or trivialize a warning. Language, when supplied, is a host-selected
 language code; otherwise preserve the meaning's language. Avoid mechanical
 atom labels, boilerplate or explanatory preambles.
+Use readable compact Markdown where useful: short lists for distinct points and
+descriptive inline links rather than isolated bare URLs. Formatting must preserve
+all protected literals and material meaning; do not add headings just for decoration.
 When expression_context is supplied, recipient_goal explains the communicative
 purpose; behavior_constraints constrain agent behavior but are not additional
 recipient-facing claims to recite. Preserve all meaning atoms, including material

@@ -5,7 +5,7 @@ import re
 from .event_store import EventConflictError
 from .events import EventEnvelope, _thaw_json
 from .opportunity_expression import OpportunityExpressionStore
-from .planning_runtime import PlanningRuntime, PlanningRuntimeResult
+from .planning_runtime import PlanningRuntime, PlanningRuntimeResult, validate_model_timeout
 from .semantic_comparator import SemanticComparator
 
 
@@ -54,7 +54,11 @@ class ExpressionRuntime:
         return existing
 
     async def run(self, *, resolve_domain, renderer_model=None, reviewer_model=None,
-                  language=None, correction_review_event_id=None, **planning_parameters):
+                  language=None, correction_review_event_id=None, model_timeout_seconds=None,
+                  **planning_parameters):
+        validate_model_timeout(model_timeout_seconds)
+        if model_timeout_seconds is not None:
+            planning_parameters={**planning_parameters,'model_timeout_seconds':model_timeout_seconds}
         # Reject malformed host options before planning can spend on a provider.
         for model in (renderer_model, reviewer_model):
             if model is not None and (not isinstance(model, str) or not re.fullmatch(
@@ -85,6 +89,8 @@ class ExpressionRuntime:
             'meaning_event_id': meaning.event.event_id,
             'renderer_model': renderer_model, 'reviewer_model': reviewer_model, 'language': language,
             'style_digest': self.store.content_vault.digest_json(style), 'delivery_authorized': False}
+        if model_timeout_seconds is not None:
+            binding['model_timeout_seconds']=model_timeout_seconds
         if planning_parameters.get('grounding', False):
             binding['require_independence'] = independent
         correction = None
@@ -141,7 +147,8 @@ class ExpressionRuntime:
                     call=planning_parameters['call'], resolve_domain=resolve_domain,
                     renderer_model=renderer_model, reviewer_model=reviewer_model,
                     language=language, operation_id=operation, require_independence=independent,
-                    correction_review_event_id=correction_review_event_id)
+                    correction_review_event_id=correction_review_event_id,
+                    timeout_seconds=model_timeout_seconds or 60)
                 candidate_id, review_id = comparison.candidate.event_id, comparison.review.event_id
             completed = self._bound_record(done_id, 'expression.runtime_completed', subject,
                 meaning.event.sensitivity, start_id,

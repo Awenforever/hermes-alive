@@ -1463,6 +1463,9 @@ class DispatchOutbox:
             raise DispatchOutboxError("launch content or route differs from authorization")
 
     def _channel_observation_owner(self, execution, current):
+        return self._channel_observation_context(execution,current)[0]
+
+    def _channel_observation_context(self, execution, current):
         """Shared ownership gate for reports; never infer external effects."""
         lease = execution.lease
         if lease.capability != "hermes.channel.send":
@@ -1486,7 +1489,7 @@ class DispatchOutbox:
                     sensitivity=lease.sensitivity, generation=lease.generation)
                 or current < start.event.observed_at):
             raise DispatchOutboxError("CLI observation does not own an authenticated start")
-        return lease
+        return lease,start
 
     def record_chunk_observation(self, execution, observer, *, now=None):
         """Persist a closed local trace, NOT a delivery result or permission.
@@ -1496,7 +1499,7 @@ class DispatchOutbox:
         """
         from .chunk_observation import OwnedChunkObserver
         current = self._utc(now)
-        lease = self._channel_observation_owner(execution, current)
+        lease,start = self._channel_observation_context(execution, current)
         if (not isinstance(observer, OwnedChunkObserver) or not observer._entered
                 or not observer._closed or observer.active
                 or observer.attempt_binding != ('action.attempt:' + lease.attempt_id, execution.start_event_id)
@@ -1534,7 +1537,8 @@ class DispatchOutbox:
                     or existing.event.source != 'alive.dispatch.chunk.observation'
                     or existing.event.actor != 'system:alive-dispatch'
                     or existing.event.subject != lease.subject or existing.event.sensitivity != lease.sensitivity
-                    or existing.event.causation_id != execution.start_event_id):
+                    or existing.event.causation_id != execution.start_event_id
+                    or existing.event.observed_at < start.event.observed_at):
                 raise EventConflictError('chunk observation already has different evidence')
             return existing
         return self.journal.append(EventEnvelope(event_id=event_id, event_type='transport.chunk.observed',
@@ -1554,7 +1558,7 @@ class DispatchOutbox:
         from .transport_receipts import classify_cli_report, reported_message_reference
         report = classify_cli_report(stdout, exit_code)
         current = self._utc(now)
-        lease = self._channel_observation_owner(execution, current)
+        lease,start = self._channel_observation_context(execution, current)
         payload = {**report.to_document(), "dispatch_id": lease.dispatch_id,
                    "attempt_id": lease.attempt_id, "start_event_id": execution.start_event_id,
                    "lease_generation": lease.generation,

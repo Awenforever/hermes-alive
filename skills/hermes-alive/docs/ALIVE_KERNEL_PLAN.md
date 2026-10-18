@@ -2,7 +2,34 @@
 
 Status: active
 
-Last reviewed: 2026-10-16
+Last reviewed: 2026-10-18
+
+### Product correction: recipient value before further framework expansion
+
+2026-10-18 — The owner reports that deployed Alive shares uninteresting material.
+An executable pipeline and model approval are not evidence of a useful companion.
+The historical 35% estimate below is not a current measured completion percentage.
+Foundations are substantial; longitudinal personalized usefulness remains unproven,
+and the experimental kernel has not replaced the production legacy runtime.
+
+The next bounded milestone is specified in
+`PERSONALIZATION_DELIVERY_PLAN.md`: explicit/private cold start, noise-resistant
+memory, accessible and diverse discovery, semantic recipient-value selection,
+and feedback over time. Do not add infrastructure merely to broaden the framework.
+Personal interests supplied in this conversation belong in private operator
+records, never distributed defaults, fixtures or hardcoded topic dictionaries.
+Domestic content is a configurable discovery preference, not an inference that
+all Chinese-speaking users have the same location, access or taste.
+
+Open engineering blocker: the actual isolated portable suite found an undefined
+`start` in retained CLI-observation replay. A local uncommitted correction now
+reuses the authenticated execution context; recovery, chunk publication and learned
+context tests pass on an isolated read-only/no-network container. A negative test
+also rejects an observation timestamp before its authenticated start. The first
+test launch lacked a writable isolated profile and failed before tests; the
+corrected launch used only tmpfs profile data. Full verification is pending. Earlier
+targeted passes and a final-review model's approval do not erase this failed run.
+No production deployment, real message or restart is authorized by this plan.
 
 ### Delivery milestones and ownership (user clarification, 2026-10-14)
 
@@ -41,6 +68,35 @@ windows remain explicit and independent: an approved Enhance restart does not
 authorize an Alive/Core/email deployment or a second restart after rollback.
 
 ### Current integration milestone: delivery evidence and attributed feedback
+
+2026-10-17 — ADR0164 continues the actual r10 independent receipt without
+repeating its review. Native revision rejects sharing the fictional resource
+and abstains for lack of recipient value, rather than patching the old wording.
+Receipt recovery revalidates retained evidence/independence, not just labels.
+Composed planning/expression now admit an explicit host stage timeout, with old
+defaults unchanged and owned-worker limits still enforced. Public evidence plus
+a synthetic owner exercises actual composed recipient-plan→source/purpose
+review→selection→expression→review runtime, without a channel sender.
+The first six-call public expression case reaches rendering but its final
+review falls back to the generator's family and is correctly refused. Actual
+wording also exposes collector metadata entering the meaning plan while purpose
+review judges the cleaner illustrative draft. Interpretation now separates
+collector provenance; purpose v2 assesses the actual plan only. Changed-method
+r2 completes six calls and reopens without inference. It does not erase r1's
+failure or prove final evidence quality.
+Neither safe rejection nor one complete useful share proves sustained learning,
+the deployed autonomous loop, migration or production acceptance.
+
+2026-10-17 — ADR0165 exposes and closes a shadow/executable coverage gap: shadow
+previously bypassed the separate final-source review. Both now use one quality/
+bounded-repair path, with authorization and transport still independent. Offline
+shadow tests forbid route acquisition/authorization and inspect canonical action
+events. Real r3 consumes r2's retained expression and adds only one actual Qwen3.8
+final-source call; reopening spends none. Qwen marks it supported, but manual
+review retains an actor-attribution concern about claiming 'I verified' from
+externally gathered evidence. Next use contrasting who-observed/who-acted cases,
+not keyword bans, extra blind retries, or a model approval as a zero-error grade.
+All real cases terminal, credentials removed, no production changes or sends.
 
 2026-10-17 — ADR0163 preserves the failed longitudinal candidate and reviews a
 private copy rather than rerunning or rewriting its history. Correlated review

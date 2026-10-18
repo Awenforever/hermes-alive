@@ -54,7 +54,14 @@ run_and_require() {
   local marker="$2"
   local log="${CI_HOME}/$(basename "${test_file}").log"
 
-  "${PYTHON}" "${SKILL}/tests/${test_file}" > "${log}" 2>&1
+  if "${PYTHON}" "${SKILL}/tests/${test_file}" > "${log}" 2>&1; then
+    :
+  else
+    local test_status=$?
+    cat "${log}" >&2
+    printf 'portable_ci_test_failed=%s:exit=%s\n' "${test_file}" "${test_status}" >&2
+    return "${test_status}"
+  fi
   grep -Eq "${marker}" "${log}" || {
     cat "${log}" >&2
     printf 'portable_ci_marker_missing=%s:%s\n' "${test_file}" "${marker}" >&2
@@ -97,6 +104,11 @@ run_and_require run_autonomous_host_runtime.py '^HERMES_ALIVE_AUTONOMOUS_HOST_RU
 run_and_require run_expression_history.py '^HERMES_ALIVE_EXPRESSION_HISTORY_OK$'
 run_and_require run_final_wording_preparation.py '^HERMES_ALIVE_FINAL_WORDING_PREPARATION_OK$'
 run_and_require run_final_wording_repair.py '^HERMES_ALIVE_FINAL_WORDING_REPAIR_OK$'
+run_and_require run_shadow_final_quality.py '^HERMES_ALIVE_SHADOW_FINAL_QUALITY_OK$'
+run_and_require run_alive_kernel_expression_runtime.py '^HERMES_ALIVE_KERNEL_EXPRESSION_RUNTIME_OK$'
+run_and_require run_alive_kernel_opportunity_synthesis.py '^HERMES_ALIVE_KERNEL_OPPORTUNITY_SYNTHESIS_OK$'
+run_and_require run_alive_kernel_source_support.py '^HERMES_ALIVE_KERNEL_SOURCE_SUPPORT_OK$'
+run_and_require run_source_support_history.py '^HERMES_ALIVE_SOURCE_SUPPORT_HISTORY_OK$'
 run_and_require run_legacy_dream_retirement.py '^HERMES_ALIVE_LEGACY_DREAM_RETIREMENT_OK$'
 run_and_require run_alive_kernel_memory.py '^HERMES_ALIVE_KERNEL_MEMORY_OK$'
 run_and_require run_circadian.py '^HERMES_ALIVE_CIRCADIAN_CORE_RESULT=PASS$'

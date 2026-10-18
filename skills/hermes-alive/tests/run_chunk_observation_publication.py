@@ -2,9 +2,11 @@
 """Closed local trace publication with real kernel starts, no real transport."""
 import asyncio
 from dataclasses import replace
+from datetime import timedelta
 from pathlib import Path
 import sys
 import tempfile
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'hooks'))
 from alive_kernel import DispatchOutbox, DispatchOutboxError, ExperienceJournal, Sensitivity
@@ -49,6 +51,15 @@ async def exercise(root, interrupted=False):
     replay = reopened.record_chunk_observation(execution, observer)
     assert replay.sequence == record.sequence and replay.event.canonical_json() == record.event.canonical_json()
     assert journal.last_sequence() == before
+    original_get = reopened.journal.get
+    damaged = replace(record, event=replace(record.event,
+        observed_at=original_get(execution.start_event_id).event.observed_at-timedelta(seconds=1)))
+    def damaged_read(event_id):
+        return damaged if event_id == record.event.event_id else original_get(event_id)
+    with patch.object(reopened.journal, 'get', side_effect=damaged_read):
+        try: reopened.record_chunk_observation(execution, observer)
+        except EventConflictError: pass
+        else: raise AssertionError('observation predating authenticated start accepted')
     attempt = journal.get('action.attempt:' + lease.attempt_id)
     assert not DispatchEvidenceVerifier(journal, outbox.protector).verify(record, attempt)
     for bad in (observe(subject='user:other'), observe(current_route={**route,'chat_id':'elsewhere'}),

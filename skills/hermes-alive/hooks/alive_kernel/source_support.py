@@ -188,6 +188,19 @@ class SourceSupportReviewer:
         except Exception:
             return None
 
+    def load_current(self, event_id, *, subject, interpretation_id, candidate_id,
+                     clearance=Sensitivity.PRIVATE, allow_correlated=False):
+        """Recover verified current evidence, never reopen a spent model operation."""
+        findings=self.verify_current(event_id,subject=subject,interpretation_id=interpretation_id,
+            candidate_id=candidate_id,clearance=clearance,allow_correlated=allow_correlated)
+        if findings is None:
+            raise SourceSupportError('retained source review is unavailable or no longer current')
+        payload=self.journal.get(event_id).event.payload
+        return SourceSupportReceipt(event_id,findings['verdict'],payload['reviewer_model'],
+            payload['snapshot_digest'],payload.get('independent_review',
+                payload['reviewer_domain']!=payload['generator_domain']
+                and payload['reviewer_model']!=payload['generator_model']))
+
     def snapshot(self, *, subject, interpretation_id, candidate_id, clearance=Sensitivity.PRIVATE):
         result = self.interpreter.load_completed(subject=subject, operation_id=interpretation_id,
                                                 clearance=clearance)

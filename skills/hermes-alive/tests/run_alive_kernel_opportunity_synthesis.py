@@ -75,6 +75,9 @@ async def exercise(root: Path) -> None:
         assert kwargs["task"] == "alive_opportunity_candidates"
         assert "OTHER_OWNER_PRIVATE_TITLE" not in kwargs["messages"][1]["content"]
         assert "OWN_PRIVATE_TITLE" in kwargs["messages"][1]["content"]
+        data=json.loads(kwargs['messages'][1]['content'])
+        assert data['opportunities'][0]['provenance_metadata']['collector']=='synthetic source'
+        assert 'source' not in data['opportunities'][0]
         escalated = {**proposal(own.agenda_item_id), "authority": "system_critical"}
         invalid_dimension = proposal(own.agenda_item_id)
         invalid_dimension["dimensions"]["risk"]["value"] = True

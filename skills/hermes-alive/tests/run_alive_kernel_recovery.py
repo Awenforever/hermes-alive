@@ -465,6 +465,7 @@ def main() -> int:
         real_get = journal.get
         for altered in (
             replace(cli_observation.event, source="different.producer"),
+            replace(cli_observation.event,observed_at=real_get(execution.start_event_id).event.observed_at-timedelta(seconds=1)),
             replace(cli_observation.event, payload={**dict(cli_observation.event.payload),
                                                     "external_delivery_proven": 0}),
         ):

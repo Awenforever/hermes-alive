@@ -125,7 +125,8 @@ async def test(root, *, recipient_meaning=False, purpose_repair=False, plan_vers
                 assert data['candidate']['communication_plan']['speech_act']=='remind'
                 assert datetime.fromisoformat(data['interpretation_as_of']).utcoffset() is not None
                 assert data['time_anchor_is_not_delivery_time'] is True
-            if data.get('assessment_kind')=='recipient-purpose-v1':
+            if data.get('assessment_kind')=='recipient-purpose-v2':
+                assert 'text' not in data['candidate'] and data['candidate']['communication_plan']
                 purpose_attempts.append(data)
                 if purpose_repair and len(purpose_attempts)==1:
                     return reply(dict(verdict='unsupported',unsupported_claims=['synthetic purpose mismatch'],

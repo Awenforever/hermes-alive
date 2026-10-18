@@ -78,7 +78,7 @@ async def exercise(args):
                 if report['logical_calls']>3:
                     raise RuntimeError('learning logical budget exhausted')
                 data=json.loads(kw['messages'][1]['content'])
-                assert all(x['source']=='synthetic-public-fixture' for x in data['opportunities'])
+                assert all(x['provenance_metadata']['collector']=='synthetic-public-fixture' for x in data['opportunities'])
                 item['input']=data
                 route={}
                 response=await asyncio.wait_for(async_call_llm(**kw,route_info=route),timeout=50)

@@ -17,7 +17,7 @@ from alive_kernel.semantic_review import SemanticReviewError
 
 async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.USER_DELEGATED,
                    source_summary='Public workshop, details unverified.', draft_text=None,
-                   grounding=False, single_family=False, render_prefix=''):
+                   grounding=False, single_family=False, render_prefix='', model_timeout_seconds=None):
     journal = ExperienceJournal(root / 'experience.sqlite3')
     reader = DiscoveryOpportunityIngestor(journal)
     source = reader.ingest(DiscoveryCandidate(source='synthetic public fixture', title='Repair workshop',
@@ -27,6 +27,8 @@ async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.
     async def call(**kw):
         task = kw['task']
         calls.append(task)
+        if model_timeout_seconds is not None and task in ('alive_source_support','alive_semantic_render','alive_semantic_review'):
+            assert kw['timeout']==model_timeout_seconds
         model = 'synthetic/drafter'
         if task == 'alive_opportunity_candidates':
             value = {'candidates': []}
@@ -68,6 +70,7 @@ async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.
         return 'synthetic-render-family' if model.endswith('/renderer') else 'synthetic-review-family'
     params = dict(operation_id='one', subject='user:test', policy_context=PolicyContext(can_interrupt=True),
         call=call, authority=authority, resolve_domain=domain, language='en', grounding=grounding)
+    if model_timeout_seconds is not None: params['model_timeout_seconds']=model_timeout_seconds
     class InterruptedCommitRuntime(ExpressionRuntime):
         def _bound_record(self, event_id, kind, *args):
             if kind == 'expression.runtime_completed':
@@ -99,6 +102,12 @@ async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.
             raise AssertionError('outer completion crash was not injected')
         runtime = ExpressionRuntime(ExperienceJournal(journal.path))
     result = await runtime.run(**params)
+    count_before_invalid=len(calls)
+    for invalid in (True,0,-1,241,float('nan'),float('inf'),'90'):
+        try: await runtime.run(**{**params,'model_timeout_seconds':invalid})
+        except ValueError: pass
+        else: raise AssertionError('invalid model budget crossed planning boundary')
+    assert len(calls)==count_before_invalid
     assert not result.delivery_authorized
     if single_family:
         assert result.review_disposition == 'correlated_review'
@@ -112,6 +121,11 @@ async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.
         raise AssertionError('completed expression spent on provider again')
     assert await ExpressionRuntime(ExperienceJournal(journal.path)).run(**{**params, 'call': forbidden}) == result
     assert journal.last_sequence() == before
+    try:
+        await runtime.run(**{**params,'call':forbidden,
+            'model_timeout_seconds':91 if model_timeout_seconds==90 else 90})
+    except ValueError: pass
+    else: raise AssertionError('same operation rebound to a different stage budget')
     if return_ready:
         return journal, params, result
     if mode != 'silence':
@@ -140,4 +154,5 @@ if __name__ == '__main__':
             asyncio.run(scenario(Path(folder) / mode, mode))
         asyncio.run(scenario(Path(folder) / 'grounded-share', 'share', grounding=True))
         asyncio.run(scenario(Path(folder) / 'single-family', 'share', grounding=True, single_family=True))
+        asyncio.run(scenario(Path(folder) / 'explicit-budget', 'share', grounding=True, model_timeout_seconds=90))
     print('HERMES_ALIVE_KERNEL_EXPRESSION_RUNTIME_OK')
