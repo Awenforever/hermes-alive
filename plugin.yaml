@@ -7,7 +7,7 @@ author: Awenforever
 license: MIT
 homepage: https://github.com/Awenforever/hermes-alive
 tags: [gateway, proactive, messaging, lifecycle]
-requires_hermes: ">=0.21.3,<0.22"
+requires_hermes: ">=0.22,<0.23"
 config_schema:
   enabled:
     type: bool
