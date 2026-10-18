@@ -2,6 +2,27 @@
 
 Status: planned, not deployed or accepted. Reviewed: 2026-10-18.
 
+The experimental foundations described below partly exist; this status describes
+the integrated product outcome, not an assertion that all components are absent.
+
+## Current truth and stop-expanding rule
+
+The experimental kernel has evidence-backed, owner-scoped explicit memory,
+advisory learning and fair bounded recall of already ingested sources. A native
+interest contrast selected an otherwise hidden low-priority relevant source.
+This does not establish personalized internet discovery, chat-noise extraction,
+external-memory integration or longitudinal usefulness. Production still runs
+the legacy runtime; the owner's dissatisfaction is unresolved product evidence.
+
+A composed native expression on 2026-10-18 passed model source/purpose/final
+reviews but said that the assistant had verified a directory when its evidence
+was an operator's collection note. Keep this as a manual semantic failure, not
+a clean round. Cross-family agreement is a diagnostic, not the acceptance oracle.
+
+Do not add another memory framework, review tier, source taxonomy or planner
+before demonstrating the thin loop below. Reuse the current journal/vault,
+memory projection, collectors, host model resolver and channel transport.
+
 ## Product outcome
 
 Alive should notice something genuinely worth sharing with this recipient,
@@ -37,10 +58,77 @@ descriptions, not an exhaustive fixed topic taxonomy.
    items. Preserve some bounded exploration rather than a permanent filter bubble.
    Aggregate duplicate coverage of the same event; frequency never increases just
    because more sources exist. Distinguish verified reporting, analysis and rumor.
+   Interests are soft preferences, not an admission boundary. Independently
+   significant news and worthwhile surprises outside the profile remain eligible.
+   Explicit user exclusions/contact boundaries are different from weak interest.
+   Repeated selections must not progressively remove all out-of-profile discovery.
+   Exploration must be useful, not random filler to satisfy a numeric quota.
 6. Close the actual feedback loop with attributed natural replies and existing
    memory/outcome primitives. Keep external memory behind an adapter with explicit
    ownership, erasure/export and retrieval contracts. Do not claim an external
    memory integration is active merely because a dependency or directory exists.
+
+## Bounded implementation order
+
+1. **Explicit cold start first.** Use authorized explicit onboarding statements
+   as the initial durable profile, with correction/withdrawal and reopen tests.
+   A private intake file is not an installed memory. Keep topic, medium, depth,
+   source accessibility and delivery preferences separate; interest is not consent
+   to send, disclose private profile text to search providers, or increase volume.
+2. **Discovery before cosmetic expression.** Qualify a small domestic community/
+   video path plus international primary-source paths. Popular feeds are useful
+   exploration, not personalized retrieval. Use profile-derived queries only
+   within the host's existing disclosure/permission contract. Missing permission
+   is an explicit unqualified path, not permission to send an entire profile.
+   Record fetchability, freshness and content coverage; HTTP 200 or a title alone
+   is not sufficient evidence for a useful recommendation.
+3. **Joint model judgment, not keyword gates.** Over a bounded diverse pool, ask
+   what is new, relevant and worth interrupting for, and why. Keywords help search,
+   not prove membership. Keep event deduplication and evidence boundaries; allow
+   an honest skip. Evaluate profile-on/profile-off on identical held-out pools.
+4. **One longitudinal feedback batch.** Relate an actual reply to the actual
+   delivered share before learning. Preserve explicit user corrections over
+   hypotheses. Treat task requests, quoted content, jokes and one-off mentions
+   as context unless justified otherwise; silence alone is not dislike. Qualify
+   noisy-conversation extraction only after explicit-profile usefulness works.
+5. **Release, not more experiments.** When the ten fresh full-chain clean rounds
+   and separate usefulness checks pass, qualify lifecycle/migration/rollback,
+   request deployment authority and observe actual production feedback. If a
+   bounded batch fails, name its failing stage and next concrete correction;
+   do not substitute a new architecture or endless independent reviews.
+
+## China-accessible discovery contract
+
+This is an opt-in network/source preference, never a nationality inference.
+Modestly raise the chance of relevant domestic community coverage without a hard
+percentage or a daily hot-topic quota. Retain international originals, technical
+depth and non-work interests. Domestic access, editorial reliability and recipient
+interest are independent dimensions. An accessible low-quality repost must not
+beat a relevant original simply because it is domestic; attributable accessible
+coverage may accompany an unavailable original without inventing a mirror.
+
+Start with a small measured portfolio, not registration on every platform. For
+video, distinguish the publisher's description/transcript from actually watching
+the video. A popular-list API returning 412 is unavailable, not an invitation to
+evade controls. Record degradation and continue other authorized sources. Test
+China direct access independently of the NAS proxy and of recipient accessibility.
+Community rumors may be interesting but must stay rumors until independently
+supported; the owner's illustrative rumor is not news evidence or a fact to store.
+
+## Memory boundary and controllability
+
+Keep durable explicit preferences, tentative inferred interests and short-lived
+task context separate. Each usable memory needs owner, origin, time and status;
+expiry/withdrawal must affect retrieval, not just an archived text field. Allow
+inspection, correction, forgetting and portable export. Do not infer political
+allegiance, sensitive traits or unconditional trust from topic interest.
+
+External storage supplies persistence/retrieval, not correct interpretation by
+itself. HaloHolographic or another provider may be connected through the existing
+adapter boundary only after ownership, retrieval, deletion and migration behavior
+are verified. A new service or graph database is not a prerequisite for the first
+useful release. Public defaults remain neutral and configurable; private owner
+examples must not enter defaults, onboarding recommendations or public fixtures.
 
 ## Finite acceptance batch
 
@@ -51,6 +139,10 @@ versus non-research interests; accessible domestic versus unavailable original;
 rumor versus verified fact; and restart with retained corrections. Compare the
 same candidate pools with and without profile context, and inspect reasons and
 actual final messages. Different family review is useful, not ground truth.
+Include a repeated-cycle control where an important out-of-profile event and a
+worthwhile unfamiliar item compete with routine profile-matching content: the
+profile must not categorically exclude them. Inspect longitudinal concentration,
+not just whether one exploratory item ever appeared. Respect explicit exclusions.
 
 Keep technical error-free runs separate from usefulness assessment. Record each
 wrong inference, misleading claim, irrelevant choice and unwanted repetition;
@@ -75,3 +167,11 @@ transport. Fix safety/data loss and measured user-facing blockers first.
 - [Generative Agents](https://arxiv.org/abs/2304.03442): observations, reflection
   and planning inform behavior; a research architecture does not prove this
   product's recommendation quality or safety.
+- [Values of Exploration in Recommender Systems](https://research.google/pubs/values-of-exploration-in-recommender-systems/):
+  assess relevance alongside diversity, novelty and serendipity. A small exploration
+  budget is an engineering starting point, not evidence that this product has
+  learned the recipient's interests. No engagement-maximizing objective is adopted.
+
+Primary research references were rechecked on 2026-10-18. Their benchmark results
+do not establish Alive's production quality; borrow the principles, measure this
+implementation, and avoid importing an entire stack solely for its name.

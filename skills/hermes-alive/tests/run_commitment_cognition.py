@@ -126,6 +126,8 @@ async def test(root, *, recipient_meaning=False, purpose_repair=False, plan_vers
                 assert datetime.fromisoformat(data['interpretation_as_of']).utcoffset() is not None
                 assert data['time_anchor_is_not_delivery_time'] is True
             if data.get('assessment_kind')=='recipient-purpose-v2':
+                assert data['assessment_scope']['kind']=='recipient_purpose'
+                assert data['assessment_scope']['execution_authorization_evaluated'] is False
                 assert 'text' not in data['candidate'] and data['candidate']['communication_plan']
                 purpose_attempts.append(data)
                 if purpose_repair and len(purpose_attempts)==1:

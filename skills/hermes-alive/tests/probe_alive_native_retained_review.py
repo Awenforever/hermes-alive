@@ -5,11 +5,13 @@ Preserve the original experiment, never invent a verdict or provider family.
 import argparse
 import asyncio
 from contextlib import ExitStack
+from dataclasses import asdict
 import json
 import math
 import os
 import re
 from pathlib import Path
+from types import SimpleNamespace
 import shutil
 import sys
 
@@ -18,10 +20,17 @@ parser.add_argument('--allow-live-models',action='store_true',required=True)
 parser.add_argument('--core',type=Path,required=True)
 parser.add_argument('--original',type=Path,required=True)
 parser.add_argument('--model-projection',type=Path,required=True)
-parser.add_argument('--reviewer-model',required=True)
+parser.add_argument('--reviewer-model')
+parser.add_argument('--subject',default='user:synthetic-native-longitudinal')
+parser.add_argument('--interpretation',default='native-longitudinal:pause-withdrawn')
+parser.add_argument('--journal-name',choices=('kernel.sqlite3','experience.sqlite3'),default='kernel.sqlite3')
+parser.add_argument('--vault-layout',choices=('shared-outcome','discovery-default'),default='shared-outcome')
 parser.add_argument('--timeout-seconds',type=float,default=40)
 parser.add_argument('--allow-correlated-review',action='store_true')
 parser.add_argument('--repair',action='store_true')
+parser.add_argument('--repair-model',help='Host-resolved model for a fresh interpretation, not the reviewer')
+parser.add_argument('--repair-model-projection',type=Path,help='Explicit model-only host scope for generation tasks')
+parser.add_argument('--replay-proposal-report',type=Path,help='Controlled comparison: replay a fingerprinted prior proposal, not fresh generation')
 parser.add_argument('--reuse-review-receipt')
 parser.add_argument('--output',type=Path,required=True)
 args=parser.parse_args()
@@ -29,6 +38,14 @@ if not math.isfinite(args.timeout_seconds) or not 1<=args.timeout_seconds<=240:
     parser.error('timeout must be finite and between 1 and 240 seconds')
 if args.reuse_review_receipt and not args.repair:
     parser.error('retained review reuse requires explicit repair mode')
+if args.repair_model and not args.repair:
+    parser.error('a repair model requires explicit repair mode')
+if args.repair_model_projection and (not args.repair or args.repair_model):
+    parser.error('a generation projection requires repair mode without a competing model override')
+if args.replay_proposal_report and (args.repair or args.reuse_review_receipt):
+    parser.error('proposal replay is a separate single-review comparison')
+if not args.subject.startswith('user:synthetic-'):
+    parser.error('this experiment only accepts explicitly synthetic owners')
 sys.path[:0]=[str(args.core.resolve(strict=True)),str(Path(__file__).resolve().parents[1]/'hooks')]
 
 
@@ -47,14 +64,40 @@ async def exercise():
     from alive_kernel.native_core_acquisition import CoreScopedModelAcquirer
     from alive_kernel.native_host_caller import HostModelBinding,HostNativeCaller
     from alive_kernel.source_support import SourceSupportReviewer
+    (args.original/'kernel'/args.journal_name).resolve(strict=True)
     args.output.mkdir(mode=0o700,parents=True,exist_ok=False)
     shutil.copytree(args.original/'kernel',args.output/'kernel')
-    journal=ExperienceJournal(args.output/'kernel/kernel.sqlite3')
-    owner='user:synthetic-native-longitudinal'
-    interpretation='native-longitudinal:pause-withdrawn'
+    journal=ExperienceJournal(args.output/'kernel'/args.journal_name)
+    owner=args.subject
+    interpretation=args.interpretation
     # The original prepare_case explicitly shared its outcome vault with
     # discovery/hypotheses. Preserve that host choice; never invent a new vault.
-    vault=OutcomeProjection(journal).content_vault
+    vault=(OutcomeProjection(journal).content_vault if args.vault_layout=='shared-outcome'
+           else OpportunitySynthesizer(journal).vault)
+    replayed_generation=None
+    if args.replay_proposal_report:
+        import hashlib
+        from alive_kernel.model_json import parse_model_json,ModelJSONError
+        prior=json.loads(args.replay_proposal_report.read_text(encoding='utf-8'))
+        if len(prior.get('repair',{}).get('proposals',[]))!=1:
+            raise ValueError('one retained native repaired proposal required')
+        chosen=[]
+        for item in prior.get('calls',[]):
+            if item.get('task')!='alive_opportunity_candidates' or not item.get('raw_response'): continue
+            if hashlib.sha256(item['raw_response'].encode()).hexdigest()!=item['completion_evidence']['content_sha256']:
+                raise ValueError('replayed proposal differs from native completion')
+            try: value=parse_model_json(item['raw_response'])
+            except ModelJSONError: continue
+            if value.get('candidates')==prior['repair']['proposals']: chosen.append(item)
+        if len(chosen)!=1: raise ValueError('one exact native proposal completion required')
+        replayed_generation=chosen[0]
+        async def replay(**_):
+            return SimpleNamespace(model=replayed_generation['actual_model'],choices=[SimpleNamespace(
+                message=SimpleNamespace(content=replayed_generation['raw_response']))])
+        interpretation+=':replayed'
+        replay_result=await OpportunitySynthesizer(journal,content_vault=vault).run(subject=owner,
+            operation_id=interpretation,call=replay,recipient_meaning=True)
+        if len(replay_result.candidates)!=1: raise ValueError('replayed proposal is not current admissible material')
     retained=OpportunitySynthesizer(journal,content_vault=vault).load_completed(subject=owner,operation_id=interpretation)
     assert len(retained.candidates)==1
     candidate=retained.candidates[0].action.candidate_id
@@ -63,6 +106,12 @@ async def exercise():
         interpretation_id=interpretation,candidate_id=candidate,
         allow_correlated=args.allow_correlated_review) if args.reuse_review_receipt else None
     projection=json.loads(args.model_projection.read_text())
+    repair_projection=json.loads(args.repair_model_projection.read_text()) if args.repair_model_projection else projection
+    active_projection=projection
+    secrets=dict(projection['environment'])
+    for key,value in repair_projection['environment'].items():
+        if key in secrets and secrets[key]!=value: raise ValueError('conflicting model credential scope')
+        secrets[key]=value
     home=args.output/'host'; home.mkdir(mode=0o700)
     workers=args.output/'workers'; workers.mkdir(mode=0o700)
     binding=HostModelBinding(owner,'profile:synthetic','operation:retained-review','generation:1')
@@ -70,6 +119,8 @@ async def exercise():
         generator_model=retained.actual_model,independent_review_proven=False,
         automatic_delivery_authority=False,semantic_accuracy_proven=False,
         correlated_diagnostic=args.allow_correlated_review,calls=[])
+    report['replayed_generation']=bool(replayed_generation)
+    if replayed_generation: report['prior_generation_completion']=replayed_generation['completion_evidence']
     report['retained_review_reused']=args.reuse_review_receipt
     def save():
         path=args.output/'report.json'
@@ -79,21 +130,34 @@ async def exercise():
     with ExitStack() as stack:
         token=set_hermes_home_override(home); stack.callback(reset_hermes_home_override,token)
         token=set_multiplex_context(True); stack.callback(reset_multiplex_context,token)
-        token=set_secret_scope(projection['environment'],profile_home=str(home)); stack.callback(reset_secret_scope,token)
+        token=set_secret_scope(secrets,profile_home=str(home)); stack.callback(reset_secret_scope,token)
         acquire=CoreScopedModelAcquirer(profile_home=home,read_binding=lambda:binding,
-            read_configuration=lambda:projection['config'],read_credential_names=lambda **_:tuple(projection['environment']),
+            read_configuration=lambda:active_projection['config'],read_credential_names=lambda **_:tuple(active_projection['environment']),
             identity='Synthetic evidence review. No private user data or delivery authority.')
         caller=HostNativeCaller(subject=owner,profile_id=binding.profile_id,operation_id=binding.operation_id,
             acquire=acquire,interpreter=sys.executable,core=args.core,private_root=workers,
             environment=dict(os.environ),timeout_seconds=max(120,args.timeout_seconds+5),
-            max_calls=(2 if recovered else 3) if args.repair else 1)
+            max_calls=(3 if recovered else 4) if args.repair else 1)
         async def call(**kwargs):
+            nonlocal active_projection
+            active_projection=repair_projection if kwargs['task']=='alive_opportunity_candidates' else projection
             report['logical_calls']+=1
-            item=dict(task=kwargs['task'],snapshot=json.loads(kwargs['messages'][1]['content']))
+            item=dict(task=kwargs['task'],snapshot=json.loads(kwargs['messages'][1]['content']),
+                host_model_scope='generation' if kwargs['task']=='alive_opportunity_candidates' else 'review')
             report['calls'].append(item)
             save()
-            result=await caller(**kwargs)
+            try:
+                result=await caller(**kwargs)
+            except Exception as error:
+                item['error_class']=type(error).__name__
+                for key in ('worker_error_class','worker_error_stage'):
+                    value=getattr(error,key,None)
+                    if isinstance(value,str) and re.fullmatch(r'[A-Za-z][A-Za-z0-9_]{0,63}',value):
+                        item[key]=value
+                save()
+                raise
             item.update(actual_model=result.model,actual_provider=result.native_completion.provider,
+                completion_evidence=asdict(result.native_completion),
                 raw_response=result.choices[0].message.content)
             if report['logical_calls']==1 and recovered is None:
                 report.update(actual_model=result.model,actual_provider=result.native_completion.provider,
@@ -111,6 +175,7 @@ async def exercise():
             if args.repair and result.verdict in ('unsupported','uncertain'):
                 synth=OpportunitySynthesizer(journal,content_vault=vault)
                 repaired=await synth.run(subject=owner,operation_id='native-retained-v2-repair',call=call,
+                    requested_model=args.repair_model,
                     recipient_meaning=True,revision_event_ids=(result.event_id,),timeout_seconds=args.timeout_seconds)
                 report['repair']=dict(candidates=len(repaired.candidates),abstentions=len(repaired.abstentions),
                     rejected=repaired.rejected_count,actual_model=repaired.actual_model,

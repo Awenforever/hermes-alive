@@ -21,14 +21,15 @@ records, never distributed defaults, fixtures or hardcoded topic dictionaries.
 Domestic content is a configurable discovery preference, not an inference that
 all Chinese-speaking users have the same location, access or taste.
 
-Open engineering blocker: the actual isolated portable suite found an undefined
-`start` in retained CLI-observation replay. A local uncommitted correction now
-reuses the authenticated execution context; recovery, chunk publication and learned
-context tests pass on an isolated read-only/no-network container. A negative test
-also rejects an observation timestamp before its authenticated start. The first
-test launch lacked a writable isolated profile and failed before tests; the
-corrected launch used only tmpfs profile data. Full verification is pending. Earlier
-targeted passes and a final-review model's approval do not erase this failed run.
+Current engineering status: the retained CLI-observation replay correction and
+ADR0168 fair recall are committed in 037c291; its canonical tree eba418e passed
+the complete isolated portable suite (63 logs). This is not fresh-dependency,
+production or usefulness acceptance. Earlier failures remain historical evidence.
+The current uncommitted review-scope experiments passed four adjacent suites,
+but the full native expression's manual inspection exposes unsupported first-person
+verification attribution despite model approval. ADR0169 records that failure.
+Do not add more review layers to manufacture a green score. Prioritize the bounded
+personalization/discovery/feedback milestone in PERSONALIZATION_DELIVERY_PLAN.md.
 No production deployment, real message or restart is authorized by this plan.
 
 ### Delivery milestones and ownership (user clarification, 2026-10-14)

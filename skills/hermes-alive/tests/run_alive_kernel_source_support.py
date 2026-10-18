@@ -36,7 +36,9 @@ async def exercise(root,mode):
         calls.append(kw)
         data=json.loads(kw['messages'][1]['content'])
         assert set(data)=={'interpretation_started_at','evidence','explicit_context','learned_advisory',
-            'recent_expression_history','recent_action_history','recent_feedback_context','candidate'}
+            'recent_expression_history','recent_action_history','recent_feedback_context','candidate','assessment_scope'}
+        assert data['assessment_scope']==dict(kind='source_support',execution_authorization_evaluated=False,
+            sending_performed=False,reported_source_is_not_execution_receipt=True)
         assert data['recent_action_history']==[] and data['recent_feedback_context']==[]
         assert kw['timeout']==(90 if mode=='supported' else 40)
         assert data['interpretation_started_at']==journal.get('opportunity.synthesis:generate:started').event.occurred_at.isoformat()

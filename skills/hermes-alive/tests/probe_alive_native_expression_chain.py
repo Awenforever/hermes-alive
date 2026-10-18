@@ -20,6 +20,7 @@ parser.add_argument('--core',type=Path,required=True)
 parser.add_argument('--model-projection',type=Path,required=True)
 parser.add_argument('--evidence',type=Path,required=True)
 parser.add_argument('--reviewer-model',required=True)
+parser.add_argument('--reviewer-model-projection',type=Path)
 parser.add_argument('--resume-expression',type=Path)
 parser.add_argument('--final-grounding',action='store_true')
 parser.add_argument('--output',type=Path,required=True)
@@ -66,6 +67,12 @@ async def exercise():
             subject=owner,predicate='profile.interest',value=spec['synthetic_user_context'],
             authority=MemoryAuthority.USER_EXPLICIT,source_event_ids=(inbound.event.event_id,),confidence=1),actor=owner)
     projection=json.loads(args.model_projection.read_text())
+    review_projection=json.loads(args.reviewer_model_projection.read_text()) if args.reviewer_model_projection else projection
+    active_projection=projection
+    secrets=dict(projection['environment'])
+    for key,value in review_projection['environment'].items():
+        if key in secrets and secrets[key]!=value: raise ValueError('conflicting model credential scope')
+        secrets[key]=value
     home=args.output/'host'; home.mkdir(mode=0o700)
     workers=args.output/'workers'; workers.mkdir(mode=0o700)
     binding=HostModelBinding(owner,'profile:synthetic','operation:public-expression','generation:1')
@@ -81,16 +88,21 @@ async def exercise():
     with ExitStack() as stack:
         token=set_hermes_home_override(home); stack.callback(reset_hermes_home_override,token)
         token=set_multiplex_context(True); stack.callback(reset_multiplex_context,token)
-        token=set_secret_scope(projection['environment'],profile_home=str(home)); stack.callback(reset_secret_scope,token)
+        token=set_secret_scope(secrets,profile_home=str(home)); stack.callback(reset_secret_scope,token)
         acquire=CoreScopedModelAcquirer(profile_home=home,read_binding=lambda:binding,
-            read_configuration=lambda:projection['config'],read_credential_names=lambda **_:tuple(projection['environment']),
+            read_configuration=lambda:active_projection['config'],read_credential_names=lambda **_:tuple(active_projection['environment']),
             identity='Helpful candid assistant in an isolated synthetic-owner experiment. No sending authority.')
         caller=HostNativeCaller(subject=owner,profile_id=binding.profile_id,operation_id=binding.operation_id,
             acquire=acquire,interpreter=sys.executable,core=args.core,private_root=workers,
-            environment=dict(os.environ),timeout_seconds=185,max_calls=10)
+            environment=dict(os.environ),timeout_seconds=185,max_calls=16)
+        report['logical_call_limit']=16
         async def call(**kwargs):
+            nonlocal active_projection
+            is_review=kwargs.get('model')==args.reviewer_model
+            active_projection=review_projection if is_review else projection
             report['logical_calls']+=1
-            item=dict(task=kwargs['task'],requested_model=kwargs['model'],messages=kwargs['messages'])
+            item=dict(task=kwargs['task'],requested_model=kwargs['model'],messages=kwargs['messages'],
+                host_model_scope='review' if is_review else 'generation')
             report['calls'].append(item); save()
             kwargs.setdefault('timeout',180)
             try:
@@ -99,6 +111,12 @@ async def exercise():
                     completion_evidence=asdict(response.native_completion),
                     raw_response=response.choices[0].message.content)
                 return response
+            except Exception as error:
+                item['error_class']=type(error).__name__
+                for key in ('worker_error_class','worker_error_stage'):
+                    value=getattr(error,key,None)
+                    if isinstance(value,str) and value.isidentifier(): item[key]=value
+                raise
             finally: save()
         parameters=dict(operation_id='native-public-expression:one',subject=owner,call=call,
             policy_context=PolicyContext(can_interrupt=True),authority=ActionAuthority.USER_DELEGATED,
