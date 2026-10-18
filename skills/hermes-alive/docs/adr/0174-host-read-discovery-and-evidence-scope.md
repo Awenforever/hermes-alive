@@ -1,6 +1,10 @@
 # ADR 0174: host reads into the existing discovery journal
 
-Date: 2026-10-18. Status: implemented; full canonical regression pending.
+Date: 2026-10-18. Status: implemented; full canonical regression passed.
+
+Terminal regression: commit 7067b59, canonical tree e363f0e, 65 retained logs;
+source/repository manifests and exact archive permissions pass. This uses the
+existing managed dependency environment, not fresh-dependency qualification.
 
 ## Decision
 

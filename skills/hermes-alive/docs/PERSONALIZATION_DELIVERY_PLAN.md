@@ -7,6 +7,13 @@ the integrated product outcome, not an assertion that all components are absent.
 
 ## Current truth and stop-expanding rule
 
+2026-10-18 continuation: a newly collected public batch, including deeper primary
+source reading and unrelated general discovery, still fails plan admission before
+review. ADR0175 reuses existing one-shot correction with original evidence and
+deadline; no date/phrase-specific repair or relaxed validator. Same-batch repair
+diagnostics are not fresh clean acceptance rounds. The core product milestone
+below remains the priority, not more supporting frameworks.
+
 The experimental kernel has evidence-backed, owner-scoped explicit memory,
 advisory learning and fair bounded recall of already ingested sources. A native
 interest contrast selected an otherwise hidden low-priority relevant source.

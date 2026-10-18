@@ -4,6 +4,16 @@ Status: active
 
 Last reviewed: 2026-10-18
 
+ADR0175 extends existing single-shot model recovery to inadmissible recipient
+plans, rather than adding literal-specific prompt patches or weakening checks.
+Focused tests include withdrawal/cancellation/timeout, false recovery evidence,
+mixed proposals and explicit abstention. A new public-source batch reaches actual
+generation but fails plan admission; its failure is retained, not called silence
+or a clean round. Same-batch live follow-up and full regression are pending here.
+No additional memory/planner/reviewer framework or production change is made.
+ADR0174's final canonical regression passed at commit 7067b59/tree e363f0e with
+65 retained logs; its pending-at-entry statement below is historical.
+
 ADR0174 connects owner-bound host search/original reads to existing journalled
 discovery observations, retaining general sources and distinguishing listing/page
 scope from verification. Real isolated reads produce eight observations without

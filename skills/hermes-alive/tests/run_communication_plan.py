@@ -14,7 +14,7 @@ from alive_kernel.cognition_opportunities import CognitionOpportunityReader
 from alive_kernel.event_store import ExperienceJournal
 from alive_kernel.events import Sensitivity, _freeze_json
 from alive_kernel.discovery_opportunities import OpportunityEvidence
-from alive_kernel.opportunity_synthesis import OpportunitySynthesizer
+from alive_kernel.opportunity_synthesis import OpportunitySynthesizer,OpportunitySynthesisError
 from alive_kernel.deliberation import ActionAuthority
 from alive_kernel.deliberation import PolicyContext
 from alive_kernel.planning_runtime import PlanningRuntime, PlanningRuntimeError
@@ -45,10 +45,10 @@ async def rejected_plan(root):
         try:
             await PlanningRuntime(journal).run(operation_id='bad-plan',subject=subject,call=call,
                 policy_context=PolicyContext(can_interrupt=True),recipient_meaning=True)
-        except PlanningRuntimeError as error:
-            assert 'malformed proposals' in str(error)
+        except (PlanningRuntimeError,OpportunitySynthesisError):
+            pass
         else: raise AssertionError('malformed plan became qualified silence')
-    assert calls==['alive_opportunity_candidates']
+    assert calls==['alive_opportunity_candidates']*2
 
 
 def temporal_boundaries(root):
