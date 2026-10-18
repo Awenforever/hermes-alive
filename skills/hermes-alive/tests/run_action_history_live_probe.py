@@ -32,6 +32,8 @@ async def test(root):
     text=(root/'report.json').read_text()
     report=json.loads(text)
     assert len(calls)==report['logical_calls']==4
+    assert report['protocol_recovery'] is False
+    assert all(len(case['calls'])==1 for case in report['cases'])
     assert not report['http_requests'] and report['sends']==0 and report['finished']
     assert not report['semantic_quality_qualified'] and not report['longitudinal_utility_qualified']
     assert report['cases'][1]['raw_output']=='invalid synthetic model JSON'

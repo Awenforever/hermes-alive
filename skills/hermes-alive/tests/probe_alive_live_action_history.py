@@ -24,7 +24,11 @@ UPDATE='Synthetic public organizer update: a new free online recording demonstra
 CASES=('registered-no-result','delivery-observed','failure-observed','new-method')
 
 async def run(output, *, model_call=None):
-    """Use only supplied synthetic fixtures, never the host's conversation data."""
+    """Single-pass fault observability, not a test of protocol recovery.
+
+    Recovery has its own multi-call tests. Keep intentional raw failures visible
+    here and do not silently expand the diagnostic's four-case call contract.
+    """
     if model_call is None:
         from agent.auxiliary_client import async_call_llm
         model_call=async_call_llm
@@ -36,7 +40,8 @@ async def run(output, *, model_call=None):
     logging.disable(logging.CRITICAL)
     report={'scope':'real interpretation only; initial intent and canonical IO are synthetic fixtures',
         'logical_calls':0,'http_requests':[],'cases':[],'sends':0,'finished':False,
-        'semantic_quality_qualified':False,'longitudinal_utility_qualified':False}
+        'semantic_quality_qualified':False,'longitudinal_utility_qualified':False,
+        'protocol_recovery':False}
     def save(): (ROOT/'report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2))
     original=httpx.AsyncClient.send
     async def tracked_send(client,request,*args,**kwargs):
@@ -54,7 +59,7 @@ async def run(output, *, model_call=None):
     httpx.AsyncClient.send=tracked_send
     try:
         for name in CASES:
-            entry={'case':name,'source':BASE}
+            entry={'case':name,'source':BASE,'calls':[]}
             report['cases'].append(entry); save()
             journal,params,ancestor=await scenario(ROOT/name,'share',return_ready=True,
                 source_summary=BASE,draft_text=BASE)
@@ -99,17 +104,22 @@ async def run(output, *, model_call=None):
                 if report['logical_calls']>=8: raise RuntimeError('logical-call bound exhausted')
                 report['logical_calls']+=1
                 entry['prompt']=json.loads(kwargs['messages'][1]['content']); save()
+                invocation={'prompt':entry['prompt']}
+                entry['calls'].append(invocation); save()
                 try:
                     response=await model_call(**kwargs)
                     entry['actual_model']=getattr(response,'model',None)
                     entry['raw_output']=response.choices[0].message.content
+                    invocation.update(actual_model=entry['actual_model'],raw_output=entry['raw_output'])
                     return response
                 except Exception as exc:
                     entry['provider_error_class']=type(exc).__name__
+                    invocation['provider_error_class']=type(exc).__name__
                     raise
                 finally: save()
             try:
-                result=await synth.run(subject='user:test',operation_id='actual-next-cycle',call=call)
+                result=await synth.run(subject='user:test',operation_id='actual-next-cycle',call=call,
+                    protocol_recovery=False)
                 entry.update(candidates=[{'agenda_item_id':c.action.agenda_item_id,'kind':c.action.action_kind.value,
                     'content':_thaw_json(c.content)} for c in result.candidates],
                     abstentions=[{'agenda_item_id':a.agenda_item_id,'reason':a.reason} for a in result.abstentions],

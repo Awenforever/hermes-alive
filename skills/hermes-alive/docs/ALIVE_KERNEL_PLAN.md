@@ -69,6 +69,24 @@ authorize an Alive/Core/email deployment or a second restart after rollback.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-18 — ADR0167 introduces one model-mediated opportunity JSON correction,
+not punctuation repair or repeated new cycles. Original invalid output/model is
+retained encrypted and causally bound; both calls share the stage deadline and
+recheck current memory/evidence before/after waiting. Provider failures, revocation
+and cancellation do not trigger correction. Completion recovery verifies the
+original failure artifact and rejects hidden/tampered recovery history. Four
+isolated entrances pass, including eight correction failure/lifecycle scenarios.
+Native five-phase interest comparison and broader runtime qualification remain
+required; this change alone proves neither recipient value nor production readiness.
+Actual r3 now completes five Qwen3.8 phases (abstain/A/B/reopened B/withdrawn
+abstain) with retained recovery and no sends, but no format correction is needed.
+R4 separately labels replay of r2's exact malformed response as fault injection:
+only one NEW actual Qwen correction call, admitted candidate, protocol_recovered
+and reopening without inference. No false claim of two fresh calls or a full
+autonomous chain. First broad CI fails on a single-pass diagnostic's shifted
+fault-injection sequence; it now explicitly disables recovery and preserves call
+history, retaining its original four-call assertions. Corrected broad CI pending.
+
 2026-10-18 — ADR0166 starts recipient-value qualification instead of another
 framework expansion. Native r1 holds four public reference observations constant
 across baseline, explicit A, replacement B, reopen B and withdrawal. All five

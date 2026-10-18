@@ -70,4 +70,5 @@ PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_source_support_history.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_shadow_final_quality.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_autonomous_host_runtime.py"
 PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_bilibili_content_evidence.py"
+PYTHONDONTWRITEBYTECODE=1 python3 "$ROOT/tests/run_opportunity_protocol_recovery.py"
 echo HERMES_ALIVE_PHASE_H_ALL_RESULT=PASS

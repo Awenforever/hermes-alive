@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 
 def arguments():
@@ -21,6 +22,8 @@ def arguments():
     parser.add_argument('--core', type=Path, required=True)
     parser.add_argument('--model-projection', type=Path, required=True)
     parser.add_argument('--fixture', type=Path, required=True)
+    parser.add_argument('--protocol-fault-report', type=Path,
+        help='Explicit synthetic fault injection: replay one prior failed output, call only the real corrector')
     parser.add_argument('--output', type=Path, required=True)
     return parser.parse_args()
 
@@ -37,6 +40,7 @@ async def exercise(args):
     from alive_kernel.native_host_caller import HostModelBinding, HostNativeCaller
     from alive_kernel.native_core_acquisition import CoreScopedModelAcquirer
     from alive_kernel.events import _thaw_json
+    from alive_kernel.model_json import parse_model_json,ModelJSONError
 
     spec = json.loads(args.fixture.read_text(encoding='utf-8'))
     if (set(spec) != {'materials', 'preference_a', 'preference_b'}
@@ -52,6 +56,21 @@ async def exercise(args):
             raise ValueError('explicit public material required')
     if len({m['url'] for m in spec['materials']}) != len(spec['materials']):
         raise ValueError('distinct material identities required')
+    prior_fault=None
+    if args.protocol_fault_report:
+        import hashlib
+        prior=json.loads(args.protocol_fault_report.read_text(encoding='utf-8'))
+        if prior.get('fixture')!=spec or prior.get('synthetic_owner')!='user:synthetic-interest-contrast':
+            raise ValueError('fault fixture must match the same synthetic public scenario')
+        failed=next(c for c in prior['cases'] if c['phase']=='interest-a')
+        if failed.get('error_class')!='OpportunitySynthesisError' or len(failed['calls'])!=1:
+            raise ValueError('one retained failed response required')
+        prior_fault=failed['calls'][0]
+        if hashlib.sha256(prior_fault['raw_response'].encode()).hexdigest()!=prior_fault['completion_evidence']['content_sha256']:
+            raise ValueError('retained fault text differs from its native completion')
+        try: parse_model_json(prior_fault['raw_response'])
+        except ModelJSONError: pass
+        else: raise ValueError('retained fault is valid JSON')
     args.output.mkdir(mode=0o700, parents=True, exist_ok=False)
     journal = ExperienceJournal(args.output / 'kernel' / 'experience.sqlite3')
     owner = 'user:synthetic-interest-contrast'
@@ -62,7 +81,9 @@ async def exercise(args):
             title=item['title'], url=item['url'], summary=item['excerpt'],
             priority_hint=item['priority_hint'], observed_at=datetime.now(timezone.utc)), subject=owner)
         identities[receipt.agenda_item_id] = item['title']
-    report = dict(fixture=spec, synthetic_owner=owner, logical_calls=0, cases=[],
+    limit=1 if prior_fault else 10
+    report = dict(fixture=spec, synthetic_owner=owner, logical_calls=0, logical_call_limit=limit, cases=[],
+        fault_injection=bool(prior_fault), replayed_fault_responses=0,stage_invocations=0,
         material_ids=identities, sends=0, semantic_accuracy_proven=False,
         comparison_is_not_full_chain=True)
     def save():
@@ -94,10 +115,11 @@ async def exercise(args):
         caller = HostNativeCaller(subject=owner, profile_id=binding.profile_id,
             operation_id=binding.operation_id, acquire=acquire, interpreter=sys.executable,
             core=args.core, private_root=workers, environment=dict(os.environ),
-            timeout_seconds=185, max_calls=5)
+            timeout_seconds=185, max_calls=limit)
         current_memory = None
         try:
-            for phase in ('baseline', 'interest-a', 'corrected-b', 'reopened-b', 'withdrawn-b'):
+            phases=('interest-a',) if prior_fault else ('baseline', 'interest-a', 'corrected-b', 'reopened-b', 'withdrawn-b')
+            for phase in phases:
                 # All phases retain the same observations. Restart/withdrawal must
                 # change memory reads, not secretly rebuild a favorable source pool.
                 if phase in ('interest-a', 'corrected-b'):
@@ -112,9 +134,17 @@ async def exercise(args):
                 interpreter = OpportunitySynthesizer(journal)
                 item = dict(phase=phase, calls=[]); report['cases'].append(item); save()
                 async def call(**kwargs):
-                    report['logical_calls'] += 1
+                    report['stage_invocations']+=1
                     invocation = dict(task=kwargs['task'], messages=kwargs['messages'])
                     item['calls'].append(invocation); save()
+                    if prior_fault and report['replayed_fault_responses']==0:
+                        report['replayed_fault_responses']=1
+                        invocation.update(replayed_fault=True,raw_response=prior_fault['raw_response'],
+                            prior_completion_evidence=prior_fault['completion_evidence'])
+                        save()
+                        return SimpleNamespace(model=prior_fault['actual_model'],choices=[SimpleNamespace(
+                            message=SimpleNamespace(content=prior_fault['raw_response']))])
+                    report['logical_calls'] += 1
                     kwargs['timeout'] = 180
                     response = await caller(**kwargs)
                     invocation.update(actual_model=response.model,
@@ -126,6 +156,7 @@ async def exercise(args):
                     result = await interpreter.run(subject=owner, operation_id='interest-contrast:' + phase,
                         call=call, timeout_seconds=180)
                     item.update(receipt_event_id=result.receipt_event_id, rejected_count=result.rejected_count,
+                        protocol_recovered=journal.get(result.receipt_event_id).event.payload.get('protocol_recovered',False),
                         candidates=[dict(candidate_id=c.action.candidate_id, content=_thaw_json(c.content),
                             authority=c.action.authority.value) for c in result.candidates],
                         abstentions=[asdict(a) for a in result.abstentions])
