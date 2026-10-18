@@ -328,7 +328,26 @@ class ExternalDiscovery:
             bvid = video.get("bvid", "")
             video_url = f"https://www.bilibili.com/video/{bvid}" if bvid else ""
             stat = video.get("stat", {})
-            summary = f"播放:{stat.get('view', 0)} 弹幕:{stat.get('danmaku', 0)}"
+            # Popularity is not evidence of what a video actually says. Preserve
+            # the publisher's description and its limits before model judgment.
+            description = str(video.get("desc") or "").strip()
+            author = str((video.get("owner") or {}).get("name") or "").strip()
+            truncated = len(description) > 1400
+            summary = (f"发布者：{author}\n" if author else "")
+            if description:
+                summary += "发布者提供的视频简介（未核实视频正文）：\n" + description[:1400]
+                if truncated:
+                    summary += "\n[简介已截断，未取得完整简介]"
+            else:
+                summary += "本次仅取得标题、发布者及热度信息，未取得内容简介或视频正文。"
+            summary += f"\n播放:{stat.get('view', 0)} 弹幕:{stat.get('danmaku', 0)}"
+            published_at = None
+            timestamp = video.get("pubdate")
+            if type(timestamp) in (int, float) and timestamp > 0:
+                try:
+                    published_at = datetime.fromtimestamp(timestamp, timezone.utc).isoformat()
+                except (ValueError, OverflowError, OSError):
+                    pass
             if title:
                 results.append({
                     "source": "bilibili",
@@ -336,6 +355,10 @@ class ExternalDiscovery:
                     "title": title,
                     "summary": summary,
                     "url": video_url,
+                    "published_at": published_at,
+                    "content_kind": "video",
+                    "evidence_scope": "publisher_description" if description else "listing_metadata_only",
+                    "description_truncated": truncated,
                     "image_url": (
                         video.get("pic")
                         or ""

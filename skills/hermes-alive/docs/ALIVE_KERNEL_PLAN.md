@@ -69,6 +69,22 @@ authorize an Alive/Core/email deployment or a second restart after rollback.
 
 ### Current integration milestone: delivery evidence and attributed feedback
 
+2026-10-18 — ADR0166 starts recipient-value qualification instead of another
+framework expansion. Native r1 holds four public reference observations constant
+across baseline, explicit A, replacement B, reopen B and withdrawal. All five
+actual Qwen3.8 calls complete and reopen without inference, but A wrongly treats
+no sending grant as a reason to suppress internal proposals, while B does not.
+An explicit internal-stage contract clarifies relevance versus authorization;
+fresh r2 must verify it, not relabel r1 as clean. R2 completes baseline, then its
+second actual Qwen call proposes the relevant A resource but omits the final JSON
+brace: the failed receipt records ModelJSONError, and the probe stops without
+blind retries. This partial semantic improvement is not an admitted result or
+full-chain acceptance. Both cases terminal, projections removed, no sends.
+Bilibili publisher descriptions,
+creator and date now survive admission to the model evidence, with listing-only/
+truncated/unwatched limits explicit. Personalized search and the pre-profile
+candidate-window bottleneck remain open, not solved by metadata enrichment.
+
 2026-10-17 — ADR0164 continues the actual r10 independent receipt without
 repeating its review. Native revision rejects sharing the fictional resource
 and abstains for lack of recipient value, rather than patching the old wording.
