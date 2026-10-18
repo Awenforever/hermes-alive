@@ -7,6 +7,14 @@ the integrated product outcome, not an assertion that all components are absent.
 
 ## Current truth and stop-expanding rule
 
+2026-10-18 execution qualification: the host structured facade currently lacks
+complete-generation evidence even when JSON parses. Do not substitute it blindly
+for the qualified native boundary. ADR0177 adjusts the measured generation budget
+within existing limits, preserving the overall deadline. This is prerequisite
+reliability work, not another intelligence milestone or a clean recommendation
+round. Resume the thin useful loop below after the bounded follow-up; do not
+expand review/memory frameworks to compensate for incomplete model output.
+
 2026-10-18 editorial correction: source-grounded output still reads like an
 abstract. ADR0176 fixes selection seeing a different draft from the reviewed plan,
 and refines the existing purpose criterion rather than adding another evaluator.

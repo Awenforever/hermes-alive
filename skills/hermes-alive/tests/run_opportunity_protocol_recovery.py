@@ -45,6 +45,7 @@ async def exercise(root,mode):
     calls=[]
     async def call(**kwargs):
         calls.append(kwargs)
+        assert kwargs['max_tokens']==OpportunitySynthesizer.MAX_RESPONSE_TOKENS==8192
         if mode=='provider-error': raise ConnectionError('PRIVATE_PROVIDER_ERROR')
         if len(calls)==1:
             if mode=='revoked-before-repair':
@@ -144,6 +145,7 @@ async def structure(root,mode):
     calls=[]
     async def call(**kwargs):
         calls.append(kwargs)
+        assert kwargs['max_tokens']==OpportunitySynthesizer.MAX_RESPONSE_TOKENS==8192
         if mode=='provider-error': raise ConnectionError('PRIVATE_PROVIDER_ERROR')
         if len(calls)==1:
             document=initial

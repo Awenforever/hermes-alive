@@ -306,6 +306,11 @@ class OpportunitySynthesizer:
     """Unscheduled interpretation with an explicit, trusted host model capability."""
 
     _SOURCE_PRESENTATION = "canonical_source_v1"
+    # One response can include four bounded recipient plans, dimensions and
+    # source-linked non-actions. Provider allowances may also include reasoning.
+    # 4000 repeatedly truncated this actual task. Stay within the existing native
+    # worker ceiling; no model-specific route/reasoning/configuration change.
+    MAX_RESPONSE_TOKENS = 8192
 
     def __init__(self, journal: ExperienceJournal, *, content_vault: Any = None,
                  context_vault: Any = None) -> None:
@@ -953,7 +958,8 @@ class OpportunitySynthesizer:
                     if remaining<=0:
                         raise TimeoutError('opportunity stage budget exhausted')
                     response=await asyncio.wait_for(call(task='alive_opportunity_candidates',
-                        model=requested_model,messages=messages,temperature=.2,max_tokens=4000),timeout=remaining)
+                        model=requested_model,messages=messages,temperature=.2,
+                        max_tokens=self.MAX_RESPONSE_TOKENS),timeout=remaining)
                     validate_current()
                     content,model=DeliberationSynthesizer._response(response)
                     if len(content)>32_000:

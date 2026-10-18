@@ -4,6 +4,17 @@ Status: active
 
 Last reviewed: 2026-10-18
 
+ADR0177 measures the existing host structured facade rather than assuming its
+parsed JSON proves complete generation. Actual Core controlled HTTP returns
+length/content-filter JSON without a public completion marker; the direct facade
+is not yet admitted. Keep exact native completion/strict parsing. Generation's
+measured4000-token truncation is addressed at the task level with8192, within the
+existing worker ceiling and original deadline, not a provider/model exception.
+Controlled recovery tests pass; same-source actual diagnostic and canonical full
+regression are pending at this entry. ADR0176 regression is complete at cb76d9e,
+with65 retained logs; its product usefulness and synthetic unfamiliar-case concern
+remain unresolved. No production/model/Core change or send is made.
+
 ADR0176 fixes a measured selection/meaning mismatch: selection now sees the
 authenticated recipient plan used by purpose review and expression, not its
 illustrative draft. Frame/action/history remain unchanged. Existing generation,
