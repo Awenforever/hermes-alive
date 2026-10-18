@@ -190,6 +190,7 @@ async def exercise(path: Path) -> None:
     )
     assert len(calls) == 2
     assert all(call["task"] == "alive_deliberation" for call in calls)
+    assert all(call['max_tokens']==DeliberationSynthesizer.MAX_RESPONSE_TOKENS==4000 for call in calls)
     assert all(call["model"] == "provider/requested-primary" for call in calls)
     clock = journal.get('deliberation.synthesis:selector-operation:started').event.payload['selection_as_of']
     assert f'Host selection_as_of={clock};' in calls[0]['messages'][1]['content'].split('\n',1)[0]

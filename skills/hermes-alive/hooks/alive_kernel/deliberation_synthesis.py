@@ -62,6 +62,11 @@ class DeliberationSynthesizer:
 
     MAX_FRAME_CANDIDATES = 33  # 32 actions plus mandatory silence.
     MAX_PROMPT_CHARS = 20_000
+    # Selection is short visible JSON, but provider output allowances may include
+    # reasoning. Match the other bounded cognition stages; 500 was demonstrably
+    # truncating complete selections on a configured reasoning model. This is a
+    # ceiling, not a guarantee of completion or permission to accept fragments.
+    MAX_RESPONSE_TOKENS = 4000
 
     def __init__(
         self,
@@ -426,7 +431,7 @@ class DeliberationSynthesizer:
                         {"role": "user", "content": prompt},
                     ],
                     temperature=0.1,
-                    max_tokens=500,
+                    max_tokens=self.MAX_RESPONSE_TOKENS,
                     model=requested_model or None,
                 )
                 self._revalidate_context(

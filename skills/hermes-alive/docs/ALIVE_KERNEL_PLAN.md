@@ -4,6 +4,17 @@ Status: active
 
 Last reviewed: 2026-10-18
 
+ADR0174 connects owner-bound host search/original reads to existing journalled
+discovery observations, retaining general sources and distinguishing listing/page
+scope from verification. Real isolated reads produce eight observations without
+repeated IO on reopening. A 500-token selector truncation is measured and corrected
+to the other cognition stages' bounded allowance; retained diagnostics proceed to
+an unsent expression. Manual review still rejects its exhaustive release-summary
+style despite model approvals. Improve editorial intent before immutable meaning,
+then evaluate fresh substantive contexts. Production embedding/read leases,
+autonomous query planning and full lifecycle/usefulness acceptance remain open;
+full canonical regression is pending at this entry. No production changes.
+
 ADR0173 clarifies the existing model/host boundary: semantic plans need not repeat
 the canonical URL that the host already binds and protects. Literal validators
 are unchanged. Focused tests pass; actual private-profile revalidation reaches

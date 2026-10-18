@@ -27,6 +27,7 @@ from .model_json import ModelJSONError, parse_model_json
 from .events import EventEnvelope, Sensitivity, _thaw_json
 from .expression_history import ExpressionHistoryReader
 from .action_history import ActionHistoryReader
+from .host_discovery import read_scope_metadata
 
 
 class OpportunitySynthesisError(ValueError):
@@ -145,6 +146,11 @@ send. These distinctions do not permit routing, execution or bypassing consent.
 An opportunity's provenance_metadata records how the observation was collected.
 It is not an evidenced publisher/author, a source claim, or recipient-facing
 content. Retain it for uncertainty/audit, not as a required message section.
+reported_read_scope distinguishes search snippets from page extracts, not factual
+verification. A page extract may mix article/video description with navigation,
+other items and tool notices. Attribute claims to the addressed material, not
+every sentence on its page. Page reading is not watching a video or independently
+verifying the publisher's claims; do not invent those activities.
 learned_advisory contains bounded patterns from evidenced feedback/review, not
 facts about the user, calibrated probabilities, explicit preferences or authority.
 Consider support and opposition, but never override current explicit user_context
@@ -207,6 +213,19 @@ Return only JSON: {"abstentions":[{"agenda_item_id":"supplied ID","reason":"why 
 """
 
 _PLAN_GUIDANCE = """Separate intended meaning from illustrative draft wording.
+For discretionary discovery shares, choose a substantive angle worth this
+recipient's attention, not an exhaustive compression of the source. A few closely
+related points may serve that angle; prominent statistics, feature inventories
+and promotional claims are not automatically essential meaning. Requested detailed
+reports and material qualifications are different: do not omit what their purpose
+requires. Later expression must preserve this plan, so make editorial choices
+here instead of expecting the renderer to discard an overstuffed plan.
+Preserve who/what a claim concerns, the measured quantity and its units, conditions
+and time relationships. Nearby sentences do not establish those relationships.
+When the source is ambiguous, retain the qualification or omit an unnecessary
+claim rather than invent precision. Reading a credible abstract can support its
+actual abstract-level claims without implying a full-paper review; evaluate the
+value and scope of the proposed claim, not a universal full-reading prerequisite.
 Every new communication candidate needs communication_plan version 2: recipient_goal
 (1-512 chars), speech_act (ask for kind=ask; share/inform/remind/warn for kind=share),
 1-6 whole recipient-facing contents and 0-6 behavior_constraints (each <=300 chars).
@@ -761,7 +780,7 @@ class OpportunitySynthesizer:
             prompt_data['opportunities'].append({
             "agenda_item_id": item.agenda_item_id,
             "observation_event_id": item.observation_event_id,
-            "provenance_metadata":{"collector":item.content["source"]}, "title": item.content["title"],
+            "provenance_metadata":{"collector":item.content["source"],**read_scope_metadata(item.content)}, "title": item.content["title"],
             "origin_kind":item.content.get('origin_kind','discovery'),
             "url": item.content["url"], "summary_excerpt": item.content["summary"][:1800],
             "published_at": item.content.get("published_at"),
