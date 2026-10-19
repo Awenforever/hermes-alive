@@ -7,6 +7,15 @@ the integrated product outcome, not an assertion that all components are absent.
 
 ## Current truth and stop-expanding rule
 
+ADR0184 adds real-Core composition evidence for feedback/recovery/forgetting:
+the original quote and tentative interpretation enter the first cycle together,
+restart does not reinterpret them, and erasure removes both from later cognition.
+Controlled model responses establish plumbing only, not useful adaptation or
+permission to read private conversations. Explicit interests stay soft, private,
+and limited to consented isolated tests; never exported as distribution defaults.
+Next prioritize actual host embedding and useful fresh situations rather than
+creating another scheduler or repeatedly sampling the same recommendation.
+
 ADR0183 corrects a measured review-completion resource mismatch, not the person's
 preferences: unavailable truncated reviews must not masquerade as negative user
 interest or purpose. Larger finite completion allowance does not extend the shared

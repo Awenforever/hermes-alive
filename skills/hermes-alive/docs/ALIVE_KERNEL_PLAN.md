@@ -4,6 +4,15 @@ Status: active
 
 Last reviewed: 2026-10-19
 
+ADR0184 passes a composed real-Core/native-worker shadow cycle with controlled
+model HTTP: tentative feedback, complete expression, crash before host close,
+restart without repeated inference, then feedback erasure and a new source cycle.
+Fifteen controlled protocol calls and no physical sends prove wiring, not actual
+model quality, installed scheduling or a fresh acceptance round. No new scheduler,
+automatic permanent profile learning or production changes. Packaging qualification
+is pending at this entry. Continue useful fresh scenarios and actual host embedding,
+longitudinal memory/agenda/outcomes and the original lifecycle/acceptance gates.
+
 ADR0183 addresses measured incomplete source/purpose reviews with the existing8192
 completion ceiling, preserving exact-completion rejection. Two exact-original-task
 Qwen diagnostics return complete supported reviews under the same180s limit;
