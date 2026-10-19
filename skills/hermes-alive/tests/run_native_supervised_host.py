@@ -1,5 +1,6 @@
 """Portable supervised-loop composition; fake supervisor/driver, no model calls."""
 import asyncio
+from contextlib import asynccontextmanager
 from pathlib import Path
 import sys
 import tempfile
@@ -12,10 +13,18 @@ from alive_kernel.native_cognition_host import NativeCognitionHost
 from alive_kernel.native_worker_protocol import NativeWorkerError
 
 async def main(root):
+    scope={'active':False,'entered':0,'exited':0}
+    @asynccontextmanager
+    async def profile_scope():
+        assert not scope['active']
+        scope['active']=True;scope['entered']+=1
+        try:yield
+        finally:scope['active']=False;scope['exited']+=1
     class BoundDriver(Driver):
         def __init__(self,journal):
             super().__init__(journal);self.callers=[]
         async def cycle(self,**kwargs):
+            assert scope['active']
             caller=kwargs['expression_parameters']['call']
             assert caller.operation_id==kwargs['operation_id']
             self.callers.append(caller)
@@ -26,7 +35,7 @@ async def main(root):
     host=AutonomousHostRuntime(driver,subject='user:synthetic',configuration_id='supervised-test')
     native=NativeCognitionHost(host,profile_id='profile:synthetic',profile_home=root,
         read_configuration=lambda:{},read_credential_names=lambda **_:(),interpreter=sys.executable,
-        core=root,private_root=root,environment={},resolve_domain=lambda *labels:'synthetic')
+        core=root,private_root=root,environment={},resolve_domain=lambda *labels:'synthetic',profile_scope=profile_scope)
     supervisor=Supervisor()
     kwargs=dict(build_parameters=lambda:{'expression_parameters':{}},stop=asyncio.Event(),
         max_cycles=2,interval_seconds=0)
@@ -38,6 +47,7 @@ async def main(root):
     assert result['completed_cycles']==2 and result['exit_reason']=='budget'
     assert len(driver.callers)==2 and driver.callers[0] is not driver.callers[1]
     assert len(set(driver.operations))==2 and not host.running
+    assert scope=={'active':False,'entered':2,'exited':2}
     driver.block=True;driver.entered.clear()
     task=native.start(supervisor,**kwargs)
     await driver.entered.wait()
@@ -49,10 +59,12 @@ async def main(root):
     except asyncio.CancelledError:pass
     else:raise AssertionError('cancellation became success')
     assert driver.cleaned and not host.running and not native.pending
+    assert scope=={'active':False,'entered':3,'exited':3}
     assert host.open_cycle().operation_id==driver.operations[-1]
     driver.block=False
     result=await native.start(supervisor,**kwargs)
     assert result['completed_cycles']==2 and not host.running
+    assert scope=={'active':False,'entered':5,'exited':5}
     class FailingSupervisor:
         def spawn_task(self,coro,*,name):raise RuntimeError('synthetic host start refusal')
     try:native.start(FailingSupervisor(),**kwargs)

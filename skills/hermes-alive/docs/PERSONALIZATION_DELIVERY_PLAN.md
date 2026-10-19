@@ -7,6 +7,12 @@ the integrated product outcome, not an assertion that all components are absent.
 
 ## Current truth and stop-expanding rule
 
+ADR0187 refreshes the explicitly bound owner's Core scope each background cycle,
+not just at startup. Personalization cannot keep using old credentials or borrow
+a different profile after rotation. Actual Core getter/loop comparisons prove
+configuration freshness, not model output quality; the full native unload proof
+and canonical qualification must still pass before this candidate is retained.
+
 ADR0186 composes the actual Core task supervisor with per-cycle native authority
 and the existing bounded loop, without a second scheduler. Unload/reload must not
 leave an old user's model work alive or turn interrupted output into a preference.

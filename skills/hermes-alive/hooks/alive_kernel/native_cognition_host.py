@@ -14,7 +14,8 @@ from .native_worker_protocol import NativeWorkerError,canonical,identifier
 class NativeCognitionHost:
     def __init__(self,host,*,profile_id,profile_home,read_configuration,
                  read_credential_names,interpreter,core,private_root,environment,
-                 resolve_domain,identity='',entrypoint=None,timeout_seconds=90,max_calls=16):
+                 resolve_domain,identity='',entrypoint=None,timeout_seconds=90,max_calls=16,
+                 profile_scope=None):
         if not callable(resolve_domain):
             raise NativeWorkerError('host model family resolver required')
         self.host=host
@@ -24,6 +25,9 @@ class NativeCognitionHost:
         self.worker=dict(interpreter=interpreter,core=core,private_root=private_root,
             environment=environment,entrypoint=entrypoint,timeout_seconds=timeout_seconds,max_calls=max_calls)
         self.resolve_domain=resolve_domain
+        if profile_scope is not None and not callable(profile_scope):
+            raise NativeWorkerError('explicit host profile scope factory required')
+        self.profile_scope=profile_scope
         self._caller=None
         self._lock=asyncio.Lock()
         self.last_call_count=0
@@ -69,6 +73,12 @@ class NativeCognitionHost:
         return await self._caller.reap_pending(timeout_seconds=timeout_seconds)
 
     async def step(self,parameters):
+        if self.profile_scope is None:
+            return await self._step(parameters)
+        async with self.profile_scope():
+            return await self._step(parameters)
+
+    async def _step(self,parameters):
         if self._lock.locked():
             raise NativeWorkerError('native host cycle already active')
         if not isinstance(parameters,dict):

@@ -4,6 +4,15 @@ Status: active
 
 Last reviewed: 2026-10-19
 
+ADR0187 discovers a long-lived scope gap before startup wiring: copied startup
+secret mappings keep old file credentials. Actual Core launch/routed comparisons
+show per-cycle official scope refresh observes rotation and restores parent scope
+without changing ambient environment. Native host accepts the explicit scope
+factory; source-only supervision tests cover release on cancellation. Repeat the
+actual Core-worker unload proof from the final archive; packaging is pending here.
+This is not all-provider renewal, startup installation or useful recommendation
+acceptance. Continue real lifecycle binding and the full original kernel goal.
+
 ADR0186 connects the existing bounded host loop to NativeCognitionHost.step and
 Core PluginContext.spawn_task. Actual Core unload during a held native request
 cancels/reaps it, retains the interrupted cycle and does not silently spend again.

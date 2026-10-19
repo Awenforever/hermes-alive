@@ -33,6 +33,7 @@ async def main():
     from alive_kernel.autonomous_host_runtime import AutonomousHostRuntime
     from alive_kernel.native_cognition_host import NativeCognitionHost
     from alive_kernel.native_worker_protocol import NativeWorkerError
+    from alive_kernel.native_core_scope import core_profile_cycle_scope
     from probe_alive_live_feedback import prepare_case
     fixture,owner,_=prepare_case(a.output/'kernel',dict(id='supervised-native-host',
         sent='Synthetic earlier message.',reply='SYNTHETIC_CONTEXT_156: no permanent inference authorized.'))
@@ -55,7 +56,8 @@ async def main():
         read_configuration=load_config_readonly,read_credential_names=lambda **_:('OWNER_MAIN_KEY',),
         interpreter=sys.executable,core=a.core,private_root=workers,environment=dict(os.environ),
         resolve_domain=lambda *labels:'synthetic-family',identity='SYNTHETIC_PERSONA_156',
-        entrypoint=package/'tests/fixtures/native-worker-http-bootstrap.py',timeout_seconds=60)
+        entrypoint=package/'tests/fixtures/native-worker-http-bootstrap.py',timeout_seconds=60,
+        profile_scope=lambda:core_profile_cycle_scope(home))
     manifest=PluginManifest(name='alive_supervision_probe',version='0',description='',source='user')
     def manager_context():
         manager=PluginManager(scope_key=str(home.resolve()))
