@@ -14,6 +14,32 @@ before lifecycle installation.
 
 ## Preconditions
 
+### Experimental kernel shadow mode (development branch only)
+
+Do not silently select this mode for ordinary installs or turn it into delivery.
+When an operator explicitly requests kernel shadow validation, explain that it
+uses the configured model but cannot send messages. Ask for approval of model
+calls and a bounded duration/cycle count. Use the current already-authorized
+Hermes conversation user ID as `--user-id`; never ask the user to invent an
+internal subject ID or copy another account's identity. In CLI-only installation,
+ask which existing authorized user is intended if it cannot be determined.
+
+After confirmation, run these commands with the resolved values:
+
+```text
+hermes alive kernel-setup --user-id <current-authorized-id> --confirm-model-calls --max-cycles <approved-count>
+hermes alive install-runtime --engine kernel-shadow
+```
+
+Do not request keys or
+create a plugin model configuration: the Core auxiliary task
+`hermes_alive_kernel` owns routing/auth/fallback. An optional model alias remains
+subject to Core's override permission. Restart only with operator approval.
+Uninstall/reinstall preserves configuration/state and the chosen engine. A
+configuration/installation PASS is not live model or recommendation acceptance.
+Generic403 switching and all API completion modes are not yet qualified; retain
+those limitations and do not publish this experimental mode as production-ready.
+
 Before installation:
 
 1. confirm Hermes is installed and `HERMES_HOME` is writable;

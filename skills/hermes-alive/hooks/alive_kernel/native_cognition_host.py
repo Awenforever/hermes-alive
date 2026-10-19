@@ -15,7 +15,7 @@ class NativeCognitionHost:
     def __init__(self,host,*,profile_id,profile_home,read_configuration,
                  read_credential_names,interpreter,core,private_root,environment,
                  resolve_domain,identity='',entrypoint=None,timeout_seconds=90,max_calls=16,
-                 profile_scope=None):
+                 profile_scope=None,caller_factory=None):
         if not callable(resolve_domain):
             raise NativeWorkerError('host model family resolver required')
         self.host=host
@@ -28,6 +28,9 @@ class NativeCognitionHost:
         if profile_scope is not None and not callable(profile_scope):
             raise NativeWorkerError('explicit host profile scope factory required')
         self.profile_scope=profile_scope
+        if caller_factory is not None and not callable(caller_factory):
+            raise NativeWorkerError('explicit current host caller factory required')
+        self.caller_factory=caller_factory
         self._caller=None
         self._lock=asyncio.Lock()
         self.last_call_count=0
@@ -103,9 +106,12 @@ class NativeCognitionHost:
                     revision=hashlib.sha256(canonical(dict(policy=policy.event_id,
                         revision=policy.revision,configuration=self.host.configuration_id))).hexdigest()
                     return HostModelBinding(self.host.subject,self.profile_id,cycle.operation_id,revision)
-                acquire=CoreScopedModelAcquirer(read_binding=read_binding,**self.acquisition)
-                self._caller=HostNativeCaller(subject=self.host.subject,profile_id=self.profile_id,
-                    operation_id=cycle.operation_id,acquire=acquire,**self.worker)
+                if self.caller_factory is None:
+                    acquire=CoreScopedModelAcquirer(read_binding=read_binding,**self.acquisition)
+                    self._caller=HostNativeCaller(subject=self.host.subject,profile_id=self.profile_id,
+                        operation_id=cycle.operation_id,acquire=acquire,**self.worker)
+                else:
+                    self._caller=self.caller_factory(cycle=cycle,read_binding=read_binding)
                 return {**parameters,'expression_parameters':{**expression,'call':self._caller,
                     'resolve_domain':self.resolve_domain}}
             try:

@@ -4,6 +4,18 @@ Status: active
 
 Last reviewed: 2026-10-19
 
+ADR0189 removes manual Python host attachment: explicit consent/config -> actual
+plugin CLI/engine install -> disk startup -> current Core model facade -> durable
+reload and preserved reinstall state. Core owns auth/routes/fallback through its
+task slot; raw SDK finish metadata is retained through a qualified private ABI,
+not inferred from parsed JSON. Controlled401 fallback passes; generic403 does not
+switch under current Core policy and remains an explicit release gap. Default
+installs stay legacy, no production activation. Final canonical qualification is
+pending here; managed dependency warnings and other API shapes are not hidden.
+Next wire actual bounded host source reads and evaluate useful complete fresh
+sharing/feedback, while preserving all original memory/agenda/outcome/lifecycle/
+migration and production acceptance gates. Do not call fixture startup intelligence.
+
 ADR0188 now exercises the actual installed plugin and disk startup hook in two
 Core profiles: current plugin-generation binding -> supervised native task,
 duplicate suppression, foreign attachment refusal and real in-flight unload.

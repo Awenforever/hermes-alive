@@ -19,6 +19,12 @@ def configure_kernel_gateway_host(native,**parameters):
 async def kernel_gateway_startup():
     if _gateway_host_binding is None:
         raise RuntimeError('current plugin instance has not registered')
+    if _gateway_host_binding.native is None and not _gateway_host_binding.closed:
+        from .tool_receipt_bridge import _kernel_module
+        assembled=_kernel_module('core_shadow_assembly').assemble(_gateway_host_binding.context)
+        if assembled is not None:
+            native,parameters=assembled
+            _gateway_host_binding.attach(native,**parameters)
     return await _gateway_host_binding.startup()
 
 

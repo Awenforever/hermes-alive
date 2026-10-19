@@ -57,7 +57,7 @@ def _kernel_module(module_name="tool_receipts"):
         spec.submodule_search_locations = [str(root)]
         package = importlib.util.module_from_spec(spec)
         sys.modules[package_name] = package
-    if module_name not in {"tool_receipts", "admitted_inbound"}:
+    if module_name not in {"tool_receipts", "admitted_inbound", "core_shadow_assembly"}:
         raise ValueError("unknown embedded observer module")
     return importlib.import_module(f"{package_name}.{module_name}")
 

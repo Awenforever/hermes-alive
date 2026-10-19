@@ -38,6 +38,16 @@ def main() -> int:
             constants = types.ModuleType("hermes_constants")
             constants.get_hermes_home = lambda: home
             sys.modules["hermes_constants"] = constants
+            core_config={}
+            core_package=types.ModuleType('hermes_cli');core_package.__path__=[]
+            config_module=types.ModuleType('hermes_cli.config');config_module.load_config_readonly=lambda:core_config
+            state_module=types.ModuleType('hermes_cli.plugins_state')
+            def save_setting(plugin,segments,value):
+                core_config.setdefault('plugins',{}).setdefault('entries',{}).setdefault(plugin,{}).setdefault('settings',{})[segments[0]]=value
+            state_module.save_plugin_setting=save_setting
+            sys.modules['hermes_cli']=core_package
+            sys.modules['hermes_cli.config']=config_module
+            sys.modules['hermes_cli.plugins_state']=state_module
             spec = importlib.util.spec_from_file_location("alive_plugin_cli_test", CLI)
             assert spec and spec.loader
             module = importlib.util.module_from_spec(spec)
@@ -70,6 +80,18 @@ def main() -> int:
             manifest = json.loads(Path(installed["manifest"]).read_text(encoding="utf-8"))
             assert manifest["manifest_version"] == 1
             assert manifest["hook_hashes"]
+            core_config['plugins']={'entries':{'hermes-alive':{'settings':{
+                'kernel_shadow':{'enabled':False,'consent':'model_calls_no_delivery','subject':'user:synthetic'}}}}}
+            assert command(module,'enable')['enabled'] is True
+            assert core_config['plugins']['entries']['hermes-alive']['settings']['kernel_shadow']['enabled'] is True
+            assert command(module,'disable')['enabled'] is False
+            assert core_config['plugins']['entries']['hermes-alive']['settings']['kernel_shadow']['enabled'] is False
+            output=io.StringIO()
+            with contextlib.redirect_stdout(output):
+                assert module.alive_command(Namespace(alive_action='install-runtime',engine='kernel-shadow'))==0
+            assert json.loads(output.getvalue())['engine']=='kernel-shadow'
+            assert (hook/'handler.py').read_text(encoding='utf-8')==(REPO/'skills/hermes-alive/hooks/kernel_gateway_handler.py').read_text(encoding='utf-8')
+            assert command(module,'install-runtime')['engine']=='kernel-shadow'
 
             state_marker = state / "preferences" / "keep.json"
             state_marker.parent.mkdir(parents=True, exist_ok=True)

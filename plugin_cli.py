@@ -33,17 +33,27 @@ def _shared_target() -> Path:
 def register_cli(parser: argparse.ArgumentParser) -> None:
     actions = parser.add_subparsers(dest="alive_action")
     actions.add_parser("status", help="Show installation and enablement state")
-    actions.add_parser("install-runtime", help="Install or refresh the profile-scoped gateway hook")
+    install=actions.add_parser("install-runtime", help="Install or refresh the profile-scoped gateway hook")
+    install.add_argument('--engine',choices=('legacy','kernel-shadow'),default=None)
+    kernel=actions.add_parser('kernel-setup',help='Configure non-sending experimental kernel; model consent required')
+    owner=kernel.add_mutually_exclusive_group(required=True)
+    owner.add_argument('--subject',help='Existing private kernel owner identity')
+    owner.add_argument('--user-id',help='Current authorized Hermes user ID; stored only as a local pseudonym')
+    kernel.add_argument('--confirm-model-calls',action='store_true')
+    kernel.add_argument('--max-cycles',type=int,default=1)
+    kernel.add_argument('--interval-seconds',type=float,default=600)
+    kernel.add_argument('--model',default=None,help='Optional Hermes model alias; empty inherits Core')
     actions.add_parser("uninstall-runtime", help="Remove owned runtime code while preserving user state")
     actions.add_parser("enable", help="Enable proactive delivery")
     actions.add_parser("disable", help="Disable proactive delivery")
     parser.set_defaults(func=alive_command)
 
 
-def _install_runtime() -> int:
+def _install_runtime(engine=None) -> int:
     lifecycle = _source() / "scripts" / "hermes-alive-lifecycle.py"
     result = subprocess.run(
-        [sys.executable, str(lifecycle), "install", "--hermes-home", str(_home())],
+        [sys.executable, str(lifecycle), "install", "--hermes-home", str(_home()),
+         *(['--engine',engine] if engine is not None else [])],
         text=True,
         capture_output=True,
         timeout=180,
@@ -64,6 +74,8 @@ def _install_runtime() -> int:
         "source": str(_home() / "skills" / "hermes-alive"),
         "manifest": str(manifest_path),
         "backup_tag": manifest.get("backup_tag"),
+        "engine": manifest.get('engine','legacy'),
+        "restart_required": True,
     }))
     return 0
 
@@ -125,6 +137,12 @@ def _read_config() -> dict:
 
 
 def _set_enabled(enabled: bool) -> None:
+    from hermes_cli.config import load_config_readonly
+    core=load_config_readonly()
+    shadow=(((core.get('plugins') or {}).get('entries') or {}).get('hermes-alive') or {}).get('settings',{}).get('kernel_shadow')
+    if isinstance(shadow,dict) and shadow.get('consent')=='model_calls_no_delivery':
+        from hermes_cli.plugins_state import save_plugin_setting
+        save_plugin_setting('hermes-alive',('kernel_shadow',),{**shadow,'enabled':enabled})
     config = _read_config()
     values = config.get("values") if isinstance(config.get("values"), dict) else {}
     values["enabled"] = enabled
@@ -151,6 +169,13 @@ def _set_enabled(enabled: bool) -> None:
 
 
 def _effective_enabled() -> bool:
+    manifest_path=_shared_target()/'install/manifest.json'
+    if manifest_path.is_file():
+        manifest=json.loads(manifest_path.read_text(encoding='utf-8'))
+        if manifest.get('engine')=='kernel-shadow':
+            from hermes_cli.config import load_config_readonly
+            shadow=(((load_config_readonly().get('plugins') or {}).get('entries') or {}).get('hermes-alive') or {}).get('settings',{}).get('kernel_shadow',{})
+            return shadow.get('enabled') is True and shadow.get('consent')=='model_calls_no_delivery'
     marker = _enabled_file()
     if marker.is_file():
         try:
@@ -166,7 +191,22 @@ def _effective_enabled() -> bool:
 def alive_command(args: argparse.Namespace) -> int:
     action = getattr(args, "alive_action", None)
     if action == "install-runtime":
-        return _install_runtime()
+        return _install_runtime(getattr(args,'engine',None))
+    if action == 'kernel-setup':
+        if not getattr(args,'confirm_model_calls',False):
+            print(json.dumps({'ok':False,'confirmation_required':True,'physical_delivery':False}))
+            return 2
+        from .tool_receipt_bridge import _kernel_module
+        assembly=_kernel_module('core_shadow_assembly')
+        subject=(assembly.subject_for_user(_home(),args.user_id) if getattr(args,'user_id',None)
+                 else getattr(args,'subject',None))
+        settings=dict(enabled=True,consent='model_calls_no_delivery',subject=subject,
+            max_cycles=args.max_cycles,interval_seconds=args.interval_seconds,model=args.model)
+        assembly.validate_settings(settings)
+        from hermes_cli.plugins_state import save_plugin_setting
+        save_plugin_setting('hermes-alive',('kernel_shadow',),settings)
+        print(json.dumps({'ok':True,'model_calls_authorized':True,'physical_delivery':False,'restart_required':True}))
+        return 0
     if action == "uninstall-runtime":
         return _uninstall_runtime()
     if action == "enable":
@@ -186,6 +226,7 @@ def alive_command(args: argparse.Namespace) -> int:
                     "hook_installed": (_hook_target() / "HOOK.yaml").is_file(),
                     "enabled": _effective_enabled(),
                     "state_root": str(_shared_target()),
+                    "live_runtime_verified": False,
                 },
                 indent=2,
             )

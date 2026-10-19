@@ -7,6 +7,14 @@ the integrated product outcome, not an assertion that all components are absent.
 
 ## Current truth and stop-expanding rule
 
+ADR0189 reconstructs the explicitly consented owner host from persistent Core
+settings after actual plugin reload/reinstall, without copying owner presets or
+tokens. Different profiles with identical model labels retain different keys and
+endpoints. Transport metadata checks reject partial replies;401 fallback follows
+Core, generic403 remains an unresolved Core-path difference. No actual preference
+quality round or long-term adaptation is proved. Complete host discovery and
+fresh useful outcomes next instead of adding more evaluators or prompt rules.
+
 ADR0188 binds real disk startup to the currently loaded profile-owned plugin
 generation and native shadow host, rather than a process-global default context.
 Two installed code-copy profiles pass controlled startup/unload; configuration-
