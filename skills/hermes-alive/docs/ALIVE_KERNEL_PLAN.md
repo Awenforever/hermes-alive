@@ -4,6 +4,17 @@ Status: active
 
 Last reviewed: 2026-10-19
 
+ADR0180 pins new modern candidates as internal recipient intents, not executable
+illustrative drafts. Factual review now joins purpose/selection/expression on the
+retained plan; final source review still checks actual wording. First authorization,
+retained-permit recovery and dispatch use the same current-selection guard to
+require a final expression, whose identity and authority remain independently
+validated. Historical no-mode operations retain their snapshots and behavior.
+Focused adjacent tests and read-only historical replay pass; canonical qualification
+is pending at this entry. ADR0179 passed at a04dde1 with66 retained logs. No actual
+usefulness/production acceptance is claimed. Next inspect the new complete path,
+not additional judges or repeated samples until approval.
+
 ADR0179 separates corrective action targets from the original admitted evidence
 window. Focused planning tests and a read-only actual retained-state audit pass:
 new repairs preserve original pages, exclude later/foreign sources and cannot add

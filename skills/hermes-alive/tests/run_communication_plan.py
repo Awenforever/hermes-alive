@@ -121,12 +121,67 @@ async def selected_meaning(root,modern):
         clearance=Sensitivity.PRIVATE)
     assert dict(stored.candidate_contents)[candidate.action.content_id]==candidate.content
     assert synth.load_completed(subject=owner,operation_id='interpret')==generated
+    assert synth.requires_expression(receipt_event_id=generated.receipt_event_id,
+        subject=owner,clearance=Sensitivity.PRIVATE) is modern
+    from alive_kernel.source_support import SourceSupportReviewer
+    snapshot,_=SourceSupportReviewer(journal,content_vault=reader.vault).snapshot(
+        subject=owner,interpretation_id='interpret',candidate_id=candidate.action.candidate_id)
+    if modern:
+        assert snapshot['candidate']['communication_plan']==plan
+        assert 'text' not in snapshot['candidate']
+        assert 'PRIVATE_ILLUSTRATIVE_DRAFT' not in json.dumps(snapshot)
+    else:
+        assert 'PRIVATE_ILLUSTRATIVE_DRAFT' in snapshot['candidate']['text']
+    selector.validate_selection_sources(selected.selection_event_id,owner=owner,sensitivity=Sensitivity.PRIVATE)
+    if modern:
+        try:
+            selector.validate_selection_sources(selected.selection_event_id,owner=owner,
+                sensitivity=Sensitivity.PRIVATE,execution=True)
+        except DeliberationContextChanged as error:
+            assert 'requires a validated final expression' in str(error)
+        else: raise AssertionError('internal recipient intent admitted as executable draft')
+    else:
+        selector.validate_selection_sources(selected.selection_event_id,owner=owner,
+            sensitivity=Sensitivity.PRIVATE,execution=True)
+    # Supplied IDs still require independent exact-expression verification in the
+    # authorizer/outbox; this provenance check only establishes content mode.
+    selector.validate_selection_sources(selected.selection_event_id,owner=owner,
+        sensitivity=Sensitivity.PRIVATE,execution=True,expression_event_id='expression:synthetic')
+    from alive_kernel.action_authorization import SendTimeAuthorizer
+    authorizer=SendTimeAuthorizer(journal,content_vault=reader.vault)
+    decision=authorizer.evaluate(selection_event_id=selected.selection_event_id,subject=owner,
+        capability='hermes.channel.send',operation_id='no-expression')
+    assert not decision.authorized
+    assert ('generated_inputs_not_current' in decision.reasons) is modern
+    replay=authorizer.evaluate(selection_event_id=selected.selection_event_id,subject=owner,
+        capability='hermes.channel.send',operation_id='no-expression')
+    assert replay.authorized is False
+    forged=authorizer.evaluate(selection_event_id=selected.selection_event_id,subject=owner,
+        capability='hermes.channel.send',operation_id='fake-expression',
+        expression_event_id='expression:synthetic')
+    assert not forged.authorized and 'exact_expression_confirmation_required' in forged.reasons
+    from alive_kernel.dispatch_outbox import DispatchOutbox,DispatchOutboxError
+    outbox=DispatchOutbox(journal,content_vault=reader.vault)
+    authorization=journal.get(decision.event_id)
+    if modern:
+        try: outbox._validate_selection_inputs(authorization)
+        except DispatchOutboxError: pass
+        else: raise AssertionError('dispatch accepted an internal recipient intent')
+    else: outbox._validate_selection_inputs(authorization)
     for path in root.glob('*.sqlite3*'):
         assert b'PRIVATE_ACTUAL_MEANING' not in path.read_bytes()
         assert b'PRIVATE_ILLUSTRATIVE_DRAFT' not in path.read_bytes()
 
 
 def main():
+    for mode,bundle_mode,meaning in ((None,'expression-required-v1',True),
+            ('expression-required-v1',None,True),('future-mode','future-mode',True),
+            ('expression-required-v1','expression-required-v1',False)):
+        start=SimpleNamespace(event=SimpleNamespace(payload=dict(
+            recipient_meaning=meaning,interpreter_method=dict(recipient_execution=mode))))
+        try: OpportunitySynthesizer._validate_recipient_execution(start,dict(recipient_execution=bundle_mode))
+        except OpportunitySynthesisError: pass
+        else: raise AssertionError('unbound or unknown recipient execution mode accepted')
     plan = dict(version=1, recipient_goal='说明活动的适用范围', speech_act='inform', contents=[
         dict(kind='fact', text='这是受邀活动。'),
         dict(kind='negation', text='活动不向公众开放。', protected_literals=['不向公众开放'])],

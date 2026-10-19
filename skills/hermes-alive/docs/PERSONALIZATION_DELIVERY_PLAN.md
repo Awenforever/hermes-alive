@@ -7,6 +7,12 @@ the integrated product outcome, not an assertion that all components are absent.
 
 ## Current truth and stop-expanding rule
 
+ADR0180 removes competing semantic views for new internal recipient intents and
+requires an exact validated expression at execution boundaries, preserving old
+retained operations. This addresses content continuity, not whether a technically
+faithful news item is worth sharing. Keep actual usefulness separate from mechanism
+tests; the ten fresh clean complete rounds remain unfulfilled. No production deploy.
+
 2026-10-19: faithful quoted-interest intake in the private harness is verified at
 vault, memory and prepared-input boundaries. This removes an experimental profile
 confound, not the public durable-intake problem. The complete fresh shadow message

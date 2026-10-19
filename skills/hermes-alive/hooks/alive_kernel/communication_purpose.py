@@ -69,7 +69,7 @@ class CommunicationPurposeReviewer(SourceSupportReviewer):
         # Purpose qualifies the plan actually consumed by expression, not its
         # illustrative prose. Keeping both let a good-looking draft mask bad
         # planned units which the renderer then correctly preserved.
-        del data['candidate']['text']
+        data['candidate'].pop('text', None)
         data['assessment_kind'] = 'recipient-purpose-v2'
         data['assessment_scope']={**data['assessment_scope'],'kind':'recipient_purpose'}
         return data, result

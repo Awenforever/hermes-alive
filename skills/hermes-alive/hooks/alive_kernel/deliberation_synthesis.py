@@ -285,7 +285,8 @@ class DeliberationSynthesizer:
             )
 
     def validate_selection_sources(self, selection_event_id: str, *,
-                                   owner: str, sensitivity: Sensitivity) -> None:
+                                   owner: str, sensitivity: Sensitivity,
+                                   execution: bool = False, expression_event_id: str | None = None) -> None:
         """Recheck original generated inputs without granting execution authority.
 
         Call outside journal writer transactions: evidence readers may project
@@ -318,8 +319,20 @@ class DeliberationSynthesizer:
                     or stored.selection.candidate.candidate_id
                     != selection.event.payload.get("candidate_id")):
                 raise DeliberationContextChanged("selection no longer current")
-            self.validate_candidate_sources((stored.selection.candidate,),
+            plans = self.validate_candidate_sources((stored.selection.candidate,),
                 dict(stored.candidate_contents), owner, sensitivity)
+            if execution and expression_event_id is None and stored.selection.candidate.candidate_id in plans:
+                from .opportunity_synthesis import OpportunitySynthesizer
+                candidate = stored.selection.candidate
+                receipts = {e for name in (
+                    'user_value', 'urgency', 'novelty', 'confidence', 'interruption_cost', 'risk')
+                    for e in getattr(candidate.dimensions, name).evidence_event_ids
+                    if e.startswith('opportunity.synthesis:') and e.endswith(':completed')}
+                interpreter = OpportunitySynthesizer(self.journal, content_vault=self.vault,
+                                                     context_vault=self.context_vault)
+                if any(interpreter.requires_expression(receipt_event_id=receipt, subject=owner,
+                        clearance=sensitivity) for receipt in receipts):
+                    raise DeliberationContextChanged('recipient intent requires a validated final expression')
         except DeliberationContextChanged:
             raise
         except Exception as exc:

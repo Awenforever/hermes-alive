@@ -98,7 +98,8 @@ class DispatchOutbox:
                 context_vault=self.context_vault).validate_selection_sources(
                     str(authorization.event.payload.get("selection_event_id") or ""),
                     owner=str(authorization.event.subject),
-                    sensitivity=authorization.event.sensitivity)
+                    sensitivity=authorization.event.sensitivity, execution=True,
+                    expression_event_id=authorization.event.payload.get('expression_event_id'))
             expression_id = authorization.event.payload.get("expression_event_id")
             witness = authorization.event.payload.get("final_wording_witness")
             if witness is not None:

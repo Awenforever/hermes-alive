@@ -227,7 +227,8 @@ class SendTimeAuthorizer:
                 DeliberationSynthesizer(self.journal,
                     content_vault=self.deliberation.content_vault,
                     context_vault=self.context_vault).validate_selection_sources(
-                        selection_event_id, owner=subject, sensitivity=event.sensitivity)
+                        selection_event_id, owner=subject, sensitivity=event.sensitivity,
+                        execution=True, expression_event_id=expression_event_id)
                 if expression_event_id is not None:
                     from .opportunity_expression import OpportunityExpressionStore
                     expressed, _expiry = OpportunityExpressionStore(self.journal,
@@ -435,7 +436,8 @@ class SendTimeAuthorizer:
                 DeliberationSynthesizer(self.journal,
                     content_vault=self.deliberation.content_vault,
                     context_vault=self.context_vault).validate_selection_sources(
-                        selection_event_id, owner=owner, sensitivity=sensitivity)
+                        selection_event_id, owner=owner, sensitivity=sensitivity,
+                        execution=True, expression_event_id=expression_event_id)
             except DeliberationContextChanged:
                 reasons.append("generated_inputs_not_current")
             if candidate.action_kind is ActionKind.SILENCE:

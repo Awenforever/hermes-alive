@@ -707,6 +707,7 @@ class OpportunitySynthesizer:
                         expected_purpose="opportunity.candidates", expected_sensitivity=clearance)
             if self.vault.digest_json(bundle) != ref.digest:
                 raise OpportunitySynthesisError("opportunity bundle digest mismatch")
+            self._validate_recipient_execution(start, bundle)
             count, rejected = receipt.event.payload["candidate_count"], receipt.event.payload["rejected_count"]
             if type(count) is not int or not 0 <= count <= 4 or type(rejected) is not int or not 0 <= rejected <= 4-count:
                 raise OpportunitySynthesisError("invalid completed counts")
@@ -756,6 +757,25 @@ class OpportunitySynthesizer:
                 reconsiderations, rejected_hints)
         except Exception:
             raise OpportunitySynthesisError("retained opportunity completion is not recoverable") from None
+
+    @staticmethod
+    def _validate_recipient_execution(start, bundle):
+        mode = start.event.payload.get('interpreter_method', {}).get('recipient_execution')
+        if (mode != bundle.get('recipient_execution')
+                or mode not in (None, 'expression-required-v1')
+                or (mode is not None and start.event.payload.get('recipient_meaning') is not True)):
+            raise OpportunitySynthesisError('recipient execution contract mismatch')
+        return mode
+
+    def requires_expression(self, *, receipt_event_id, subject, clearance):
+        """Resolve a retained intent contract, never infer it from a model field."""
+        receipt = self.journal.get(receipt_event_id)
+        if receipt is None or receipt.event.subject != subject:
+            raise OpportunitySynthesisError('recipient execution scope unavailable')
+        operation = receipt_event_id.removeprefix('opportunity.synthesis:').removesuffix(':completed')
+        self.load_completed(subject=subject, operation_id=operation, clearance=clearance)
+        start = self.journal.get(receipt.event.causation_id)
+        return start.event.payload.get('interpreter_method', {}).get('recipient_execution') == 'expression-required-v1'
 
     def _validate_protocol_recovery(self,start,receipt,subject,clearance):
         recovered=receipt.event.payload.get('protocol_recovered',False)
@@ -896,6 +916,7 @@ class OpportunitySynthesizer:
         system_prompt = _PROMPT+('\n'+_PLAN_GUIDANCE if recipient_meaning else '')+(
             '\n'+_COMMITMENT_GUIDANCE if any(e.content.get('origin_kind')=='commitment' for e in evidence) else '')
         method = dict(protocol='recipient-plan-v2' if recipient_meaning else 'legacy-draft-v1',
+            recipient_execution='expression-required-v1' if recipient_meaning else None,
             kind='model_prompt' if evidence else 'system_no_material',
             system_prompt_sha256=hashlib.sha256(system_prompt.encode()).hexdigest() if evidence else None,
             requested_model=requested_model if evidence else None,
@@ -1020,6 +1041,7 @@ class OpportunitySynthesizer:
                 abstentions, as_of)
             bundle = self.vault.put_json(
                 {"proposals": list(drafts), "proposal_indices": list(indices),
+                 "recipient_execution":method['recipient_execution'],
                  "source_presentation": self._SOURCE_PRESENTATION,
                  "reconsiderations":[{'agenda_item_id':r.agenda_item_id,'after_seconds':r.after_seconds,
                                       'reason':r.reason} for r in reconsiderations],

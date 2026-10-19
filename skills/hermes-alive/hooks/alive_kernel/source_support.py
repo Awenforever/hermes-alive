@@ -247,6 +247,10 @@ class SourceSupportReviewer:
             candidate_id=candidate_id, subject=subject, clearance=clearance)
         if 'communication_plan' in proposal:
             data['candidate']['communication_plan'] = proposal['communication_plan']
+            if start.event.payload.get('interpreter_method', {}).get('recipient_execution') == 'expression-required-v1':
+                # Modern intent has one semantic object. Its retained illustrative
+                # draft is provenance, not a second recipient message to assess.
+                del data['candidate']['text']
             data['interpretation_as_of'] = start.event.payload.get('interpretation_as_of')
             data['time_anchor_is_not_delivery_time'] = True
         if len(json.dumps(data, ensure_ascii=False)) > 40000:
