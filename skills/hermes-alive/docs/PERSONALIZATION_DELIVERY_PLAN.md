@@ -1,11 +1,20 @@
 # Personalized discovery: bounded delivery plan
 
-Status: planned, not deployed or accepted. Reviewed: 2026-10-18.
+Status: planned, not deployed or accepted. Reviewed: 2026-10-19.
 
 The experimental foundations described below partly exist; this status describes
 the integrated product outcome, not an assertion that all components are absent.
 
 ## Current truth and stop-expanding rule
+
+2026-10-19: faithful quoted-interest intake in the private harness is verified at
+vault, memory and prepared-input boundaries. This removes an experimental profile
+confound, not the public durable-intake problem. The complete fresh shadow message
+is still not useful/precise enough. ADR0179 fixes measured loss of already-admitted
+evidence during repair, separately from permissible action targets, without
+rewriting historical scopes. Next audit draft/plan consistency across existing
+consumers and improve the actual useful loop; neither technical completion nor
+judge agreement counts as one of the required ten clean complete rounds.
 
 2026-10-18 review-contract correction: a complete prompt and one bounded protocol
 correction remove a measured hidden interface rule, not legitimate criticism.

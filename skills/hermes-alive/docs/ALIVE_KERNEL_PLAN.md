@@ -2,7 +2,18 @@
 
 Status: active
 
-Last reviewed: 2026-10-18
+Last reviewed: 2026-10-19
+
+ADR0179 separates corrective action targets from the original admitted evidence
+window. Focused planning tests and a read-only actual retained-state audit pass:
+new repairs preserve original pages, exclude later/foreign sources and cannot add
+sibling action targets; historical one-source repairs and review receipts remain
+unchanged. Canonical regression is pending at this entry. ADR0178 regression
+passed at96d845f with66 retained logs. Fresh quoted-interest experimentation reaches
+complete shadow preparation, but manual review still finds news-inventory style
+and a model/product-family scope concern. No new clean acceptance round is earned.
+Next audit draft/plan meaning across existing consumers, not more judges or phrase
+patches. Keep the full product goal active and production unchanged.
 
 ADR0178 completes the semantic-review prompt/validator contract and adds one
 model-mediated correction only for invalid review shape, under the original

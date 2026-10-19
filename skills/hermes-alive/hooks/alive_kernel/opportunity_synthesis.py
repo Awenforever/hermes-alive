@@ -429,12 +429,17 @@ class OpportunitySynthesizer:
             review_start=self.journal.get(review.event.causation_id)
             generated=self.journal.get(review_start.event.causation_id)
             original=self.journal.get(generated.event.causation_id)
-            proposal=self.retained_proposal(receipt_event_id=generated.event.event_id,
+            self.retained_proposal(receipt_event_id=generated.event.event_id,
                 candidate_id=review.event.payload['candidate_id'],subject=subject,clearance=clearance)
             sources=self.reader.active_evidence(subject=subject,clearance=clearance,limit=32,
                 observation_event_ids=tuple(original.event.payload['observation_event_ids']))
-            identities.extend(s.observation_event_id for s in sources
-                if s.agenda_item_id==proposal['agenda_item_id'])
+            # The reviewed interpretation already admitted this bounded window.
+            # Repair targets are enforced separately by PlanningRuntime; they are
+            # not an evidence filter. Keeping only a target's listing discarded
+            # its already-read original page and manufactured missing evidence.
+            # Never query the latest pool here: later/foreign sources are not part
+            # of the original grant or the retained corrective context.
+            identities.extend(s.observation_event_id for s in sources)
         pins=tuple(dict.fromkeys(identities))
         if len(pins)>32:
             raise OpportunitySynthesisError('repair source scope exceeds its original bounded window')
