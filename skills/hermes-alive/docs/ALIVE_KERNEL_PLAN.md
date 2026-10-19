@@ -4,6 +4,18 @@ Status: active
 
 Last reviewed: 2026-10-19
 
+ADR0183 addresses measured incomplete source/purpose reviews with the existing8192
+completion ceiling, preserving exact-completion rejection. Two exact-original-task
+Qwen diagnostics return complete supported reviews under the same180s limit;
+neither rewrites a historical failure nor counts as a fresh clean round. Source
+review correction now shares its original stage deadline instead of renewing it,
+and cancellation records a terminal failure. Controlled recovery tests pass;
+canonical and full changed-task qualification are pending at this entry. ADR0182
+passed at7a5c66f with66 retained logs. Its actual new-source case selected silence
+after two unavailable purpose reviews, so produced no final expression and earned
+no clean complete round. Return to real recipient value, not budget tuning forever;
+all original long-term kernel and production-acceptance requirements stay active.
+
 ADR0182 makes the source situation explicit upstream and in new review snapshots:
 discovery defaults to conversational contribution but consults explicit requests
 for detail; commitments follow their admitted request, unknown scope stays unknown.

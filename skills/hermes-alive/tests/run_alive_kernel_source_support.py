@@ -40,7 +40,7 @@ async def exercise(root,mode):
         assert data['assessment_scope']==dict(kind='source_support',execution_authorization_evaluated=False,
             sending_performed=False,reported_source_is_not_execution_receipt=True)
         assert data['recent_action_history']==[] and data['recent_feedback_context']==[]
-        assert kw['timeout']==(90 if mode=='supported' else 40)
+        assert 0 < kw['timeout'] <= (90 if mode=='supported' else 40)
         assert data['interpretation_started_at']==journal.get('opportunity.synthesis:generate:started').event.occurred_at.isoformat()
         assert 'published_at' in data['evidence'][0]
         assert data['evidence'][0]['excerpt'].endswith('unverified.')

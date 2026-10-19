@@ -28,7 +28,10 @@ async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.
         task = kw['task']
         calls.append(task)
         if model_timeout_seconds is not None and task in ('alive_source_support','alive_semantic_render','alive_semantic_review'):
-            assert kw['timeout']==model_timeout_seconds
+            if task=='alive_source_support':
+                assert 0 < kw['timeout'] <= model_timeout_seconds
+            else:
+                assert kw['timeout']==model_timeout_seconds
         model = 'synthetic/drafter'
         if task == 'alive_opportunity_candidates':
             value = {'candidates': []}

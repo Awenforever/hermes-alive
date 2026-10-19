@@ -7,6 +7,13 @@ the integrated product outcome, not an assertion that all components are absent.
 
 ## Current truth and stop-expanding rule
 
+ADR0183 corrects a measured review-completion resource mismatch, not the person's
+preferences: unavailable truncated reviews must not masquerade as negative user
+interest or purpose. Larger finite completion allowance does not extend the shared
+deadline, add retries or weaken admission. Original-context diagnostic success is
+not sufficient evidence of useful end-to-end wording. Complete the changed-task
+check, then new real scenarios and the full memory/agenda/feedback/host objective.
+
 ADR0182 supplies existing source situation to editorial choice and review instead
 of guessing a report request from an article or imposing brevity on all users.
 The new public pool includes domestic community content, relevant remote-sensing

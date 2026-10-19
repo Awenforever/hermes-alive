@@ -93,7 +93,11 @@ class SourceSupportReceipt:
 
 
 class SourceSupportReviewer:
-    max_tokens = 2500
+    # Completion allowance includes provider-side reasoning on some host models.
+    # Real source/purpose reviews exhausted 2500, then Core returned stitched
+    # visible continuations. Keep exact-completion admission and the same stage
+    # deadline/call count; use the existing worker ceiling, not a model exception.
+    max_tokens = 8192
 
     @property
     def review_prompt(self):
@@ -313,10 +317,13 @@ class SourceSupportReviewer:
                      'prompt_digest':prompt_digest,
                      'require_independence':require_independence,
                      'timeout_seconds':timeout_seconds,
+                     'deadline_policy':'shared-stage-v1',
+                     'completion_token_allowance':self.max_tokens,
                      'protocol_recovery_enabled':protocol_recovery,
                      'generator_model':generated.actual_model,'delivery_authority_granted':False}, **base))
         if not started.created:
             raise SourceSupportError('source-support operation already attempted')
+        deadline = asyncio.get_running_loop().time() + timeout_seconds
         try:
             bundle = ContentReference.from_event_payload(self.journal.get(generated.receipt_event_id).event.payload['content'])
             messages = [{'role':'system','content':self.review_prompt},{'role':'user',
@@ -335,9 +342,12 @@ class SourceSupportReviewer:
                     if self.vault.digest_json(invalid)!=invalid_ref.digest:
                         raise SourceSupportError('source-review invalid-output evidence unavailable')
                 route = {}
+                remaining = deadline - asyncio.get_running_loop().time()
+                if remaining <= 0:
+                    raise TimeoutError('source-review stage budget exhausted')
                 response = await asyncio.wait_for(call(task='alive_source_support', model=reviewer_model,
                     messages=messages, temperature=0, max_tokens=self.max_tokens,
-                    timeout=timeout_seconds, route_info=route), timeout=timeout_seconds+10)
+                    timeout=remaining, route_info=route), timeout=remaining)
                 current, result = self.snapshot(subject=subject, interpretation_id=interpretation_id,
                                                  candidate_id=candidate_id, clearance=clearance)
                 if (self.vault.digest_json(current)!=digest or result!=generated
@@ -387,7 +397,7 @@ class SourceSupportReviewer:
                     'protocol_recovered':recovered,
                     'world_truth_proven':False,'delivery_authority_granted':False}, **base))
             return SourceSupportReceipt(record.event.event_id, findings['verdict'], model, digest, independent)
-        except Exception as exc:
+        except BaseException as exc:
             self.journal.append(EventEnvelope(event_id=prefix+':failed',
                 event_type='opportunity.source_support_failed', causation_id=prefix+':started',
                 payload={'error_class':type(exc).__name__,'delivery_authority_granted':False}, **base))
