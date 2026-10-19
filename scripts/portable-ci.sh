@@ -103,6 +103,7 @@ run_and_require run_native_host_caller.py '^HERMES_ALIVE_NATIVE_HOST_CALLER_UNIT
 run_and_require run_native_core_scope_contract.py '^HERMES_ALIVE_NATIVE_CORE_SCOPE_CONTRACT_OK$'
 run_and_require run_autonomous_host_runtime.py '^HERMES_ALIVE_AUTONOMOUS_HOST_RUNTIME_OK$'
 run_and_require run_native_supervised_host.py '^HERMES_ALIVE_NATIVE_SUPERVISED_HOST_UNIT_OK$'
+run_and_require run_gateway_host_binding.py '^HERMES_ALIVE_GATEWAY_HOST_BINDING_UNIT_OK$'
 run_and_require run_expression_history.py '^HERMES_ALIVE_EXPRESSION_HISTORY_OK$'
 run_and_require run_final_wording_preparation.py '^HERMES_ALIVE_FINAL_WORDING_PREPARATION_OK$'
 run_and_require run_final_wording_repair.py '^HERMES_ALIVE_FINAL_WORDING_REPAIR_OK$'

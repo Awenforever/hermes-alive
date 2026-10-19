@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+from types import SimpleNamespace
 
 
 REPO = Path(__file__).resolve().parents[3]
@@ -22,6 +23,11 @@ class FakePluginContext:
     def __init__(self) -> None:
         self.hooks: dict[str, object] = {}
         self.cli: dict[str, object] = {}
+        self._manager=SimpleNamespace(scope_key=str(Path.cwd()))
+        self.unload=[]
+
+    def on_unload(self,callback):
+        self.unload.append(callback)
 
     def register_hook(self, name, callback):
         self.hooks[name] = callback

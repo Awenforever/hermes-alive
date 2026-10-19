@@ -4,6 +4,16 @@ Status: active
 
 Last reviewed: 2026-10-19
 
+ADR0188 now exercises the actual installed plugin and disk startup hook in two
+Core profiles: current plugin-generation binding -> supervised native task,
+duplicate suppression, foreign attachment refusal and real in-flight unload.
+No legacy watcher is started by the adapter. Explicit trusted host assembly is
+still required; installer/onboarding-driven assembly and legacy migration remain
+open, not hidden behind the startup PASS. Missing retained PyYAML/tzdata warnings
+also mean this is not fresh PM installation proof. Final canonical qualification
+is pending here. Prioritize the full installed vertical path and actual recipient
+value, without further judge/framework expansion or dropping the original scope.
+
 ADR0187 discovers a long-lived scope gap before startup wiring: copied startup
 secret mappings keep old file credentials. Actual Core launch/routed comparisons
 show per-cycle official scope refresh observes rotation and restores parent scope

@@ -7,6 +7,12 @@ the integrated product outcome, not an assertion that all components are absent.
 
 ## Current truth and stop-expanding rule
 
+ADR0188 binds real disk startup to the currently loaded profile-owned plugin
+generation and native shadow host, rather than a process-global default context.
+Two installed code-copy profiles pass controlled startup/unload; configuration-
+driven automatic assembly and normal fresh dependency provisioning remain open.
+Do not convert that wiring proof into personalized utility or production readiness.
+
 ADR0187 refreshes the explicitly bound owner's Core scope each background cycle,
 not just at startup. Personalization cannot keep using old credentials or borrow
 a different profile after rotation. Actual Core getter/loop comparisons prove
