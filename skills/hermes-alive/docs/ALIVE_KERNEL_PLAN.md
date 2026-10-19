@@ -4,6 +4,16 @@ Status: active
 
 Last reviewed: 2026-10-19
 
+ADR0186 connects the existing bounded host loop to NativeCognitionHost.step and
+Core PluginContext.spawn_task. Actual Core unload during a held native request
+cancels/reaps it, retains the interrupted cycle and does not silently spend again.
+Explicit pause/reenable recovers into bounded cycles; this is not autonomous
+transient-error recovery or installed startup. Canonical packaging is pending at
+this entry. Next qualify the real lifecycle embedding and auditable bounded
+recovery, source-read capabilities and useful fresh sharing; do not count fixture
+cancellation as intelligence or shrink the full memory/agenda/outcome/production
+acceptance goal to task supervision.
+
 ADR0185 finds and corrects a real host prerequisite: official Core's launch scope
 has an explicit home override but no optional secret-home stamp. Acquisition now
 admits that shape only for the matching routing-process home; routed, unbound and

@@ -7,6 +7,12 @@ the integrated product outcome, not an assertion that all components are absent.
 
 ## Current truth and stop-expanding rule
 
+ADR0186 composes the actual Core task supervisor with per-cycle native authority
+and the existing bounded loop, without a second scheduler. Unload/reload must not
+leave an old user's model work alive or turn interrupted output into a preference.
+Controlled cancellation passes; installed startup and automatic bounded recovery
+still need work. No model fixture or task-ledger PASS establishes recipient value.
+
 ADR0185 corrects launch-profile scope rejection using actual Core binders, not
 another private model configuration. Personalization must run with the correct
 current user's scope, never borrow process credentials or a different profile.

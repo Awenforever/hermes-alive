@@ -59,6 +59,13 @@ async def test(root):
     result = await recovered.run(build_parameters=lambda:{},stop=stop,max_cycles=2,interval_seconds=0)
     assert result['completed_cycles']==2 and result['exit_reason']=='budget'
     assert len(journal.read(event_type='autonomous.host.closed'))==before+2
+    stepped=[]
+    async def bound_step(parameters):
+        stepped.append(parameters)
+        return await recovered.step_bound(lambda _cycle:parameters)
+    result=await recovered.run(build_parameters=lambda:{},stop=asyncio.Event(),max_cycles=2,
+        interval_seconds=0,cycle_step=bound_step)
+    assert result['completed_cycles']==2 and stepped==[{},{}]
     other = AutonomousHostRuntime(Driver(journal),subject='user:other',configuration_id='config')
     assert other.open_cycle().operation_id not in restarted.operations
     # Cooperative shutdown interrupts active work but does not close/fabricate it.

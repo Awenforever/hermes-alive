@@ -128,10 +128,11 @@ class AutonomousHostRuntime:
             self.close_cycle(cycle,result)
             return result
 
-    async def run(self,*,build_parameters,stop,max_cycles,interval_seconds=60):
+    async def run(self,*,build_parameters,stop,max_cycles,interval_seconds=60,cycle_step=None):
         if (self.running or type(max_cycles) is not int or not 1<=max_cycles<=1000
                 or type(interval_seconds) not in (int,float) or not 0<=interval_seconds<=86400
-                or not callable(build_parameters) or not isinstance(stop,asyncio.Event)):
+                or not callable(build_parameters) or not isinstance(stop,asyncio.Event)
+                or cycle_step is not None and not callable(cycle_step)):
             raise ValueError('explicit bounded cooperative host lifetime required')
         self.running = True
         completed = 0
@@ -140,7 +141,10 @@ class AutonomousHostRuntime:
                 async def invoke():
                     parameters = build_parameters()
                     if hasattr(parameters,'__await__'): parameters = await parameters
-                    return await self.step(parameters)
+                    # A native host supplies its per-cycle capability binder;
+                    # identity/mode/cursor still belong to step_bound below it.
+                    step=self.step if cycle_step is None else cycle_step
+                    return await step(parameters)
                 active = asyncio.create_task(invoke())
                 stopped = asyncio.create_task(stop.wait())
                 try:
