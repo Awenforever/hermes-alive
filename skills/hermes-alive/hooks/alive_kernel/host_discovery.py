@@ -20,6 +20,10 @@ class HostDiscoveryError(ValueError):
     pass
 
 
+class HostReadUncertainError(HostDiscoveryError):
+    """Host wait ended without proving that its physical read settled."""
+
+
 def read_scope_metadata(content):
     """Collector-reported scope, never a claim of independent verification."""
     attrs=content.get('attributes')
@@ -183,6 +187,9 @@ class HostDiscoveryReader:
                                 or kind=='extract' and len(items)!=1):
                             raise HostDiscoveryError('host source result count differs from request')
                     except asyncio.CancelledError:
+                        self._uncertain=True
+                        raise
+                    except HostReadUncertainError:
                         self._uncertain=True
                         raise
                     except Exception:

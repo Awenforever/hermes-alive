@@ -7,6 +7,12 @@ the integrated product outcome, not an assertion that all components are absent.
 
 ## Current truth and stop-expanding rule
 
+ADR0190 adds the existing discovery reader's Core tool adapter and retains actual
+off-thread read lifetime across wait cancellation/timeout. This is not autonomous
+query planning or useful recommendation proof. Qualify the actual Core bridge,
+then integrate approved public discovery with the owner cycle; do not enable web
+disclosure from model-only consent or add another collector/provider framework.
+
 ADR0189 reconstructs the explicitly consented owner host from persistent Core
 settings after actual plugin reload/reinstall, without copying owner presets or
 tokens. Different profiles with identical model labels retain different keys and

@@ -11,7 +11,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'hooks'))
 
 async def exercise(root):
     from alive_kernel import ExperienceJournal, DiscoveryOpportunityIngestor, DiscoveryCandidate, Sensitivity
-    from alive_kernel.host_discovery import HostDiscoveryReader, HostDiscoveryError, read_scope_metadata
+    from alive_kernel.host_discovery import HostDiscoveryReader, HostDiscoveryError, HostReadUncertainError, read_scope_metadata
     journal=ExperienceJournal(root/'experience.sqlite3')
     ingestor=DiscoveryOpportunityIngestor(journal)
     general=ingestor.ingest(DiscoveryCandidate(source='synthetic-general',title='Outside current interests',
@@ -35,6 +35,18 @@ async def exercise(root):
     def reader(owner='user:test'):
         return HostDiscoveryReader(ingestor,subject=owner,search=search,extract=extract,
             allow_url=allowed,is_current=lambda:current[0])
+    async def uncertain_search(*args,**kwargs):
+        raise HostReadUncertainError('physical worker still reading')
+    uncertain=HostDiscoveryReader(ingestor,subject='user:test',search=uncertain_search,
+        extract=extract,allow_url=allowed,is_current=lambda:True)
+    done_before=len(journal.read(event_type='discovery.host_read_completed'))
+    try:await uncertain.collect(operation_id='uncertain-physical-read',queries=('PUBLIC_QUERY',))
+    except HostReadUncertainError:pass
+    else:raise AssertionError('physical uncertainty treated as settled failure')
+    assert len(journal.read(event_type='discovery.host_read_completed'))==done_before
+    try:await uncertain.collect(operation_id='uncertain-physical-read',queries=('PUBLIC_QUERY',))
+    except HostDiscoveryError:pass
+    else:raise AssertionError('uncertain physical read replayed')
     host=reader()
     parameters=dict(queries=('PRIVATE_QUERY',),read_urls=('https://example.invalid/one',))
     result=await host.collect(operation_id='first',**parameters)
