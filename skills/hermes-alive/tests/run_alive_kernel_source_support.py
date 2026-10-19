@@ -59,7 +59,7 @@ async def exercise(root,mode):
     args=dict(subject='user:test',interpretation_id='generate',candidate_id=candidate_id,
         operation_id='review',call=review,resolve_domain=lambda model:model)
     with patch.object(reviewer,'snapshot',side_effect=AssertionError('invalid budget read private evidence')):
-        for timeout in (True,0,-1,241,float('nan'),float('inf'),'40'):
+        for timeout in (True,0,-1,601,float('nan'),float('inf'),'40'):
             try: await reviewer.run(**args,timeout_seconds=timeout)
             except SourceSupportError: pass
             else: raise AssertionError('invalid source review budget accepted')

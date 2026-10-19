@@ -13,6 +13,7 @@ from .autonomy_policy import AutonomyPolicyProjection
 from .deliberation import PolicyContext
 from .autonomous_cycle_runtime import AutonomousCycleRuntime
 from .autonomous_host_runtime import AutonomousHostRuntime
+from .model_timeouts import DEFAULT_REQUEST_SECONDS,DEFAULT_STAGE_SECONDS
 
 
 def subject_for_user(home,user_id):
@@ -66,7 +67,9 @@ def assemble(context):
         from hermes_cli.fallback_config import get_fallback_chain
         # Forward Core's normalized current chain into its own task slot. Do not
         # persist a copied chain in plugin settings or implement retries here.
-        defaults={'provider':'auto','model':'','timeout':90,
+        # Background work must allow ordinary ~100s reasoning responses.
+        # Core auxiliary user configuration and candidate timeouts still win.
+        defaults={'provider':'auto','model':'','timeout':DEFAULT_REQUEST_SECONDS,
             'fallback_chain':get_fallback_chain(load_config_readonly())}
         revision=canonical(defaults)
         if task_state.get('revision')!=revision:
@@ -94,6 +97,7 @@ def assemble(context):
         profile_scope=lambda:core_profile_cycle_scope(home),
         caller_factory=lambda *,cycle,read_binding:CorePluginModelCaller(context,read_binding=read_binding,refresh_task=refresh_task))
     parameters=dict(expression_parameters={'requested_model':model,'grounding':True,
-        'recipient_meaning':True,'require_independent_grounding':False},resolve_binding=lambda _:None,
+        'recipient_meaning':True,'require_independent_grounding':False,
+        'model_timeout_seconds':DEFAULT_STAGE_SECONDS},resolve_binding=lambda _:None,
         interpret_feedback=True,reconsider_after_seconds=600)
     return native,dict(build_parameters=lambda:parameters,max_cycles=max_cycles,interval_seconds=interval)

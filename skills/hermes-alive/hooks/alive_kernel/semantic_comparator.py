@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from .model_timeouts import MAX_STAGE_SECONDS
 import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -263,8 +264,8 @@ class SemanticComparator:
         operation = str(operation_id or uuid4())
         if not _ID.fullmatch(operation):
             raise SemanticReviewError("invalid comparison operation ID")
-        if not 0 < timeout_seconds <= 300:
-            raise SemanticReviewError("comparison timeout must be in (0, 300]")
+        if not 0 < timeout_seconds <= MAX_STAGE_SECONDS:
+            raise SemanticReviewError("comparison timeout exceeds finite stage bounds")
         if language is not None and (not isinstance(language, str)
                 or not re.fullmatch(r"[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8}){0,3}", language)):
             raise SemanticReviewError("invalid host language code")

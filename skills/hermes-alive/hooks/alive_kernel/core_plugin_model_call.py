@@ -11,6 +11,7 @@ from types import SimpleNamespace
 
 from .native_worker_protocol import NativeWorkerError,canonical
 from .native_host_snapshot import CONFIG_FIELDS,AGENT_FIELDS,_validate_model_overrides
+from .model_timeouts import DEFAULT_STAGE_SECONDS,MAX_STAGE_SECONDS
 
 
 class CorePluginModelCaller:
@@ -70,12 +71,14 @@ class CorePluginModelCaller:
         facade=self.context.llm
         if any(not callable(getattr(facade,name,None)) for name in ('_gate','_invoke_async','_finish')):
             raise NativeWorkerError('Core raw completion contract unavailable')
-        limits=90 if timeout is None else timeout
-        if type(limits) not in (int,float) or not 0<limits<=240:
+        # This argument bounds the entire logical stage, not each request in
+        # Core's retry/fallback ladder. Core retains its task/candidate timeouts.
+        limits=DEFAULT_STAGE_SECONDS if timeout is None else timeout
+        if type(limits) not in (int,float) or not 0<limits<=MAX_STAGE_SECONDS:
             raise NativeWorkerError('Core model call requires a bounded timeout')
         # Mirror Core's public acomplete pipeline, preserving raw metadata before
         # _finish drops it. Core still performs every override/task trust check.
-        agent,kw=facade._gate(None,model,None,None,self.task_key,messages,temperature,max_tokens,limits)
+        agent,kw=facade._gate(None,model,None,None,self.task_key,messages,temperature,max_tokens,None)
         current();self.calls+=1
         self._active=asyncio.create_task(facade._invoke_async(kw))
         try:
@@ -83,7 +86,7 @@ class CorePluginModelCaller:
             response=invoked[2]
             current()
             # Recheck current Core override permissions, without another request.
-            facade._gate(None,model,None,None,self.task_key,messages,temperature,max_tokens,limits)
+            facade._gate(None,model,None,None,self.task_key,messages,temperature,max_tokens,None)
             choices=getattr(response,'choices',None)
             if not isinstance(choices,list) or len(choices)!=1:
                 raise NativeWorkerError('Core response is not one native text choice')

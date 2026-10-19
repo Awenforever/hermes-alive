@@ -7,6 +7,16 @@ the integrated product outcome, not an assertion that all components are absent.
 
 ## Current truth and stop-expanding rule
 
+ADR0191 fixes measured stage/request deadline conflation so Core's existing task
+and fallback request budgets are honored within a separately bounded stage. Main
+validation uses the owner's current primary/backup, not an optional review family.
+Controlled timeout recovery is not real model availability or recipient value;
+finish qualification and return to source-guided useful messages and feedback.
+Owner499/92–99s-success evidence rejects the initial60s candidate default. The
+opt-in host now forwards coherent180s Core request/600s whole-stage budgets
+through generation and both review paths, retaining explicit user budgets and
+Core-owned recovery. No short outer40/60s default may silently cut that path.
+
 ADR0190 adds the existing discovery reader's Core tool adapter and retains actual
 off-thread read lifetime across wait cancellation/timeout. This is not autonomous
 query planning or useful recommendation proof. Qualify the actual Core bridge,

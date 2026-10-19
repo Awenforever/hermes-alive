@@ -30,6 +30,7 @@ async def main(home):
     class Facade:
         response=reply();blocked=False;calls=0;alter_text=False
         def _gate(self,*args):
+            assert args[-1] is None,'stage deadline must not override Core request timeout'
             if args[1]=='denied':raise PermissionError('synthetic Core override refusal')
             return None,{}
         async def _invoke_async(self,kw):

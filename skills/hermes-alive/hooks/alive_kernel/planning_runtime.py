@@ -12,6 +12,7 @@ from .deliberation import ActionAuthority, PolicyContext
 from .event_store import EventConflictError
 from .events import EventEnvelope, Sensitivity, _thaw_json
 from .opportunity_synthesis import OpportunitySynthesizer
+from .model_timeouts import MAX_STAGE_SECONDS
 
 
 class PlanningRuntimeError(ValueError):
@@ -20,7 +21,7 @@ class PlanningRuntimeError(ValueError):
 
 def validate_model_timeout(value):
     if value is not None and (type(value) not in (int,float) or not math.isfinite(value)
-                              or not 1<=value<=240):
+                              or not 1<=value<=MAX_STAGE_SECONDS):
         raise PlanningRuntimeError('model timeout must be finite and within host stage bounds')
 
 

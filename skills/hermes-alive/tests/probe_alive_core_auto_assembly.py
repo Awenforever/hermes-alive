@@ -108,6 +108,9 @@ async def main():
             registry=HookRegistry();registry.discover_and_load()
             assert (await registry.emit_collect('gateway:startup',{}))[0]['status']=='started'
             binding=module._gateway_host_binding
+            assert binding.arguments['build_parameters']()['expression_parameters']['model_timeout_seconds']==600
+            from agent.auxiliary_task_config import _get_auxiliary_task_config
+            assert _get_auxiliary_task_config('hermes_alive_kernel')['timeout']==180
             assert (await binding.task)['completed_cycles']==2
             assert len(requests)==1 and requests[0]['model']=='configured-primary'
             assert manager.unload('hermes-alive') is True

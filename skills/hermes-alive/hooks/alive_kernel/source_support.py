@@ -13,6 +13,7 @@ from .semantic_comparator import SemanticComparator
 from .model_json import parse_model_json
 from .host_discovery import read_scope_metadata
 from .communication_plan import communication_situation
+from .model_timeouts import MAX_STAGE_SECONDS
 
 
 class SourceSupportError(ValueError):
@@ -293,7 +294,7 @@ class SourceSupportReviewer:
                   call, resolve_domain, reviewer_model=None, clearance=Sensitivity.PRIVATE,
                   require_independence=True, protocol_recovery=False, timeout_seconds=40):
         if (type(timeout_seconds) not in (int,float) or not math.isfinite(timeout_seconds)
-                or not 1<=timeout_seconds<=240):
+                or not 1<=timeout_seconds<=MAX_STAGE_SECONDS):
             raise SourceSupportError('source review timeout outside host budget')
         if type(require_independence) is not bool or type(protocol_recovery) is not bool:
             raise SourceSupportError('invalid review independence requirement')

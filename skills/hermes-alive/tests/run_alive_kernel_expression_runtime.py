@@ -106,7 +106,7 @@ async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.
         runtime = ExpressionRuntime(ExperienceJournal(journal.path))
     result = await runtime.run(**params)
     count_before_invalid=len(calls)
-    for invalid in (True,0,-1,241,float('nan'),float('inf'),'90'):
+    for invalid in (True,0,-1,601,float('nan'),float('inf'),'90'):
         try: await runtime.run(**{**params,'model_timeout_seconds':invalid})
         except ValueError: pass
         else: raise AssertionError('invalid model budget crossed planning boundary')
@@ -158,4 +158,5 @@ if __name__ == '__main__':
         asyncio.run(scenario(Path(folder) / 'grounded-share', 'share', grounding=True))
         asyncio.run(scenario(Path(folder) / 'single-family', 'share', grounding=True, single_family=True))
         asyncio.run(scenario(Path(folder) / 'explicit-budget', 'share', grounding=True, model_timeout_seconds=90))
+        asyncio.run(scenario(Path(folder) / 'background-budget', 'share', grounding=True, model_timeout_seconds=600))
     print('HERMES_ALIVE_KERNEL_EXPRESSION_RUNTIME_OK')

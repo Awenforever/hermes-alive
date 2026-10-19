@@ -28,6 +28,7 @@ from .events import EventEnvelope, Sensitivity, _thaw_json
 from .expression_history import ExpressionHistoryReader
 from .action_history import ActionHistoryReader
 from .host_discovery import read_scope_metadata
+from .model_timeouts import MAX_STAGE_SECONDS
 
 
 class OpportunitySynthesisError(ValueError):
@@ -960,7 +961,7 @@ class OpportunitySynthesizer:
         if requested_model is not None and not re.fullmatch(
                 r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}", requested_model):
             raise OpportunitySynthesisError("invalid requested model")
-        if not 0 < timeout_seconds <= 300:
+        if not 0 < timeout_seconds <= MAX_STAGE_SECONDS:
             raise OpportunitySynthesisError("invalid model timeout")
         authority = ActionAuthority(authority)  # Trusted host input, never a model field.
         commitment_digest=self._commitment_digest(subject,clearance)
