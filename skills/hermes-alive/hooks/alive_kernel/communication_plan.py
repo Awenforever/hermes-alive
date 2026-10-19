@@ -77,3 +77,13 @@ def validate_recipient_intent(raw, *, action_kind):
             raise ValueError('invalid recipient intent source URL')
     validate_communication_plan(raw['communication_plan'], action_kind=action_kind)
     return raw
+
+
+def communication_situation(origin_kind):
+    """Host source scope, not an inferred user preference or a length quota."""
+    if origin_kind == 'discovery':
+        return dict(kind='discovery_share',default_presentation='conversational_contribution',
+                    requested_detail='consult_explicit_context')
+    if origin_kind == 'commitment':
+        return dict(kind='admitted_commitment',detail_from_original_request=True)
+    return dict(kind='unclassified',requested_detail='unknown')

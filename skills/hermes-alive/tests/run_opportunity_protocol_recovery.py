@@ -73,11 +73,12 @@ async def exercise(root,mode):
         if mode=='cancelled': assert isinstance(error,asyncio.CancelledError)
         if mode=='timeout': assert failed.event.payload['error_class']=='TimeoutError'
         expected=1 if mode in ('provider-error','disabled','revoked-before-repair') else 2
-        assert len(calls)==expected,(mode,len(calls))
+        spent=len(calls)
+        assert (0 <= spent <= 2) if mode=='timeout' else spent==expected,(mode,spent,expected)
         try: await synth.run(**args)
         except OpportunitySynthesisError: pass
         else: raise AssertionError('terminal failure was respent')
-        assert len(calls)==expected
+        assert len(calls)==spent,(mode,len(calls),spent)
     else:
         assert mode=='success' and len(calls)==2
         assert result.actual_model=='synthetic/corrector' and len(result.candidates)==1
@@ -175,14 +176,15 @@ async def structure(root,mode):
             if mode=='cancelled': assert isinstance(error,asyncio.CancelledError)
         else: raise AssertionError('invalid/unassessed correction became a success')
         expected=1 if mode in ('provider-error','revoked-before-repair') else 2
-        assert len(calls)==expected
+        spent=len(calls)
+        assert (0 <= spent <= 2) if mode=='timeout' else spent==expected,(mode,spent,expected)
         failed=journal.get('opportunity.synthesis:structure:'+mode+':failed')
         assert failed is not None
         if mode=='timeout': assert failed.event.payload['error_class']=='TimeoutError'
         try: await synth.run(**args)
         except OpportunitySynthesisError: pass
         else: raise AssertionError('terminal structural failure was respent')
-        assert len(calls)==expected
+        assert len(calls)==spent,(mode,len(calls),spent)
     else:
         result=await synth.run(**args)
         assert len(calls)==(1 if mode in ('mixed','empty','disabled') else 2)
@@ -220,8 +222,38 @@ async def structure(root,mode):
         assert b'PRIVATE_VALID_MEANING' not in path.read_bytes()
 
 
+async def exhausted_budget_before_correction(root):
+    """A correction is not owed an invocation after the shared deadline expires."""
+    journal=ExperienceJournal(root/'experience.sqlite3');owner='user:synthetic'
+    reader=DiscoveryOpportunityIngestor(journal)
+    reader.ingest(DiscoveryCandidate(source='synthetic-fixture',title='Synthetic resource',
+        summary='Synthetic public reference.',url='https://example.invalid/budget',
+        observed_at=datetime.now(timezone.utc)),subject=owner)
+    synth=OpportunitySynthesizer(journal,content_vault=reader.vault)
+    loop=asyncio.get_running_loop();offset=[0];calls=[]
+    clock=SimpleNamespace(time=lambda:loop.time()+offset[0])
+    async def call(**kwargs):
+        calls.append(kwargs['task']);offset[0]=3600
+        return response('{"candidates":')
+    args=dict(subject=owner,operation_id='spent-before-correction',call=call,timeout_seconds=60)
+    with patch('alive_kernel.opportunity_synthesis.asyncio.get_running_loop',return_value=clock):
+        try: await synth.run(**args)
+        except OpportunitySynthesisError: pass
+        else: raise AssertionError('expired shared stage budget was reset for correction')
+    assert len(calls)==1
+    failed=journal.get('opportunity.synthesis:spent-before-correction:failed')
+    assert failed.event.payload['error_class']=='TimeoutError'
+    assert journal.get('opportunity.synthesis:spent-before-correction:protocol-recovery')
+    before=journal.last_sequence()
+    try: await synth.run(**args)
+    except OpportunitySynthesisError: pass
+    else: raise AssertionError('expired terminal operation was respent')
+    assert len(calls)==1 and journal.last_sequence()==before
+
+
 if __name__=='__main__':
     with tempfile.TemporaryDirectory(prefix='alive-protocol-recovery-') as folder:
+        asyncio.run(exhausted_budget_before_correction(Path(folder)/'exhausted-budget'))
         for mode in ('success','twice-invalid','disabled','provider-error','revoked-before-repair',
                      'revoked-during-repair','cancelled','timeout'):
             asyncio.run(exercise(Path(folder)/mode,mode))

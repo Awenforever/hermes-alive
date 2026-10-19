@@ -7,6 +7,15 @@ the integrated product outcome, not an assertion that all components are absent.
 
 ## Current truth and stop-expanding rule
 
+ADR0182 supplies existing source situation to editorial choice and review instead
+of guessing a report request from an article or imposing brevity on all users.
+The new public pool includes domestic community content, relevant remote-sensing
+science and a worthwhile outside-profile control. No quota forces selection, and
+source publication dates remain evidence, not query-year assumptions. Qualify
+actual usefulness, not source-count diversity or schema validity. Historical review
+snapshots must stay recoverable; autonomous host embedding/read leases and the
+full memory/agenda/outcome/feedback/lifecycle objective remain open.
+
 ADR0181 gives new modern generation one responsibility: choose and describe useful
 recipient meaning, not write a second illustrative message. Evidence and deadline
 are unchanged, execution remains exact-final-expression-only, and historical

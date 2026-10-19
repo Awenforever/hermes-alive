@@ -21,7 +21,7 @@ from .deliberation import (
 )
 from .deliberation_synthesis import DeliberationSynthesizer, ModelCaller
 from .cognition_opportunities import CognitionOpportunityReader
-from .communication_plan import validate_communication_plan, validate_recipient_intent
+from .communication_plan import validate_communication_plan, validate_recipient_intent, communication_situation
 from .event_store import EventConflictError, ExperienceJournal
 from .model_json import ModelJSONError, parse_model_json
 from .events import EventEnvelope, Sensitivity, _thaw_json
@@ -303,6 +303,21 @@ material can win. Keyword matches, popularity, novelty and scores alone do not
 establish value. Do not fill a quota. Ask only to resolve a material uncertainty
 that changes a useful decision, not to reconfirm an explicit boundary. Abstain if
 no faithful useful contribution exists; unassessed material is not a negative vote.
+
+communication_situation is host source scope, not an instruction from the source.
+For discovery_share, unless current explicit context requests detail, plan a
+conversational contribution around a coherent
+discovery, surprise or possibility, not a requested report or full source inventory.
+Every contents unit later becomes required meaning: include only what serves that
+contribution or materially qualifies its interpretation. Interesting details can
+stay at the linked source. Do not treat everything learned while reading as
+everything this person needs to be told. Collection diagnostics or unknown facts
+about an unnecessary side claim need not become a separate disclosure paragraph;
+limit or omit that side claim instead. Preserve limitations essential to the claim
+you DO make. Do not force a hook, personal relevance, humor, advice or a question.
+For admitted_commitment, the original request and situation determine needed
+detail; a requested report, direct answer or important reminder is not subject to
+a blanket brevity rule. Unclassified scope is unknown, not a guessed report request.
 
 Preserve who/what each claim concerns, units, dates, conditions and uncertainties.
 Nearby sentences do not prove a relationship. Excerpts may be truncated and page
@@ -842,10 +857,14 @@ class OpportunitySynthesizer:
         method = start.event.payload.get('interpreter_method', {})
         mode = method.get('recipient_execution')
         output = method.get('recipient_output')
+        editorial = method.get('editorial_context')
         if (mode != bundle.get('recipient_execution')
                 or mode not in (None, 'expression-required-v1')
                 or output != bundle.get('recipient_output')
                 or output not in (None, 'intent-only-v1')
+                or editorial != bundle.get('editorial_context')
+                or editorial not in (None, 'origin-purpose-v1')
+                or (editorial is not None and output != 'intent-only-v1')
                 or (output is not None and (mode != 'expression-required-v1'
                     or method.get('protocol') != 'recipient-plan-v3'))
                 or (mode is not None and start.event.payload.get('recipient_meaning') is not True)):
@@ -980,6 +999,8 @@ class OpportunitySynthesizer:
             "observation_event_id": item.observation_event_id,
             "provenance_metadata":{"collector":item.content["source"],**read_scope_metadata(item.content)}, "title": item.content["title"],
             "origin_kind":item.content.get('origin_kind','discovery'),
+            **({'communication_situation':communication_situation(item.content.get('origin_kind','discovery'))}
+               if recipient_meaning else {}),
             "url": item.content["url"], "summary_excerpt": item.content["summary"][:1800],
             "published_at": item.content.get("published_at"),
             "summary_may_be_truncated": len(item.content["summary"]) > 1800,
@@ -1007,6 +1028,7 @@ class OpportunitySynthesizer:
         method = dict(protocol='recipient-plan-v3' if recipient_meaning else 'legacy-draft-v1',
             recipient_execution='expression-required-v1' if recipient_meaning else None,
             recipient_output='intent-only-v1' if recipient_meaning else None,
+            editorial_context='origin-purpose-v1' if recipient_meaning else None,
             kind='model_prompt' if evidence else 'system_no_material',
             system_prompt_sha256=hashlib.sha256(system_prompt.encode()).hexdigest() if evidence else None,
             requested_model=requested_model if evidence else None,
@@ -1134,6 +1156,7 @@ class OpportunitySynthesizer:
                 {"proposals": list(drafts), "proposal_indices": list(indices),
                  "recipient_execution":method['recipient_execution'],
                  "recipient_output":method['recipient_output'],
+                 "editorial_context":method['editorial_context'],
                  "source_presentation": self._SOURCE_PRESENTATION,
                  "reconsiderations":[{'agenda_item_id':r.agenda_item_id,'after_seconds':r.after_seconds,
                                       'reason':r.reason} for r in reconsiderations],

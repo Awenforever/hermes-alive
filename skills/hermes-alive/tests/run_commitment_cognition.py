@@ -95,6 +95,7 @@ async def test(root, *, recipient_meaning=False, purpose_repair=False, plan_vers
             if recipient_meaning:
                 assert method['recipient_output']=='intent-only-v1'
                 assert method['recipient_execution']=='expression-required-v1'
+                assert method['editorial_context']=='origin-purpose-v1'
             assert method['system_prompt_sha256']==hashlib.sha256(kwargs['messages'][0]['content'].encode()).hexdigest()
             assert method['requested_model']==kwargs.get('model')
             item=json.loads(kwargs['messages'][1]['content'])['opportunities'][0]
@@ -102,6 +103,8 @@ async def test(root, *, recipient_meaning=False, purpose_repair=False, plan_vers
             if purpose_repair and generation['corrective_reviews']:
                 assert generation['corrective_reviews'][0]['critique']['reason']=='synthetic-purpose-mismatch'
             assert item['origin_kind']=='commitment' and item['url']==''
+            if recipient_meaning:
+                assert item['communication_situation']==dict(kind='admitted_commitment',detail_from_original_request=True)
             assert json.loads(item['summary_excerpt'])['commitment']['constraint']=='只提醒，不代为提交'
             bounds=json.loads(item['summary_excerpt'])['temporal_bounds']
             assert bounds['not_before'] is None

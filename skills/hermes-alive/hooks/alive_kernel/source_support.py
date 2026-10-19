@@ -12,6 +12,7 @@ from .opportunity_synthesis import OpportunitySynthesizer
 from .semantic_comparator import SemanticComparator
 from .model_json import parse_model_json
 from .host_discovery import read_scope_metadata
+from .communication_plan import communication_situation
 
 
 class SourceSupportError(ValueError):
@@ -246,6 +247,9 @@ class SourceSupportReviewer:
             data['candidate']['text'] = _thaw_json(candidate.content)['operation']['text']
         proposal = self.interpreter.retained_proposal(receipt_event_id=result.receipt_event_id,
             candidate_id=candidate_id, subject=subject, clearance=clearance)
+        if start.event.payload.get('interpreter_method', {}).get('editorial_context') == 'origin-purpose-v1':
+            source = next(item for item in sources if item.agenda_item_id == candidate.action.agenda_item_id)
+            data['communication_situation'] = communication_situation(source.content.get('origin_kind','discovery'))
         if 'communication_plan' in proposal:
             data['candidate']['communication_plan'] = proposal['communication_plan']
             if start.event.payload.get('interpreter_method', {}).get('recipient_execution') == 'expression-required-v1':

@@ -9,7 +9,7 @@ import sys
 import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'hooks'))
-from alive_kernel.communication_plan import validate_communication_plan, plan_atoms, expression_context
+from alive_kernel.communication_plan import validate_communication_plan, plan_atoms, expression_context, communication_situation
 from alive_kernel.cognition_opportunities import CognitionOpportunityReader
 from alive_kernel.event_store import ExperienceJournal
 from alive_kernel.events import Sensitivity, _freeze_json, _thaw_json
@@ -91,7 +91,11 @@ async def selected_meaning(root,modern):
             proposal['communication_plan']=plan
             del proposal['text']
             assert 'Do NOT write a draft text' in kwargs['messages'][0]['content']
-            assert len(kwargs['messages'][0]['content']) < 6500
+            assert len(kwargs['messages'][0]['content']) < 7000
+            prompt=json.loads(kwargs['messages'][1]['content'])
+            assert prompt['opportunities'][0]['communication_situation']==dict(
+                kind='discovery_share',default_presentation='conversational_contribution',
+                requested_detail='consult_explicit_context')
         return SimpleNamespace(model='synthetic/generator',choices=[SimpleNamespace(
             message=SimpleNamespace(content=json.dumps(dict(candidates=[proposal]))))])
     synth=OpportunitySynthesizer(journal,content_vault=reader.vault)
@@ -146,6 +150,8 @@ async def selected_meaning(root,modern):
         subject=owner,interpretation_id='interpret',candidate_id=candidate.action.candidate_id)
     if modern:
         assert snapshot['candidate']['communication_plan']==plan
+        assert snapshot['communication_situation']==dict(kind='discovery_share',
+            default_presentation='conversational_contribution',requested_detail='consult_explicit_context')
         assert 'text' not in snapshot['candidate']
         assert 'PRIVATE_ILLUSTRATIVE_DRAFT' not in json.dumps(snapshot)
     else:
@@ -192,6 +198,8 @@ async def selected_meaning(root,modern):
 
 
 def main():
+    assert communication_situation('commitment')==dict(kind='admitted_commitment',detail_from_original_request=True)
+    assert communication_situation('unknown')==dict(kind='unclassified',requested_detail='unknown')
     for method,bundle in (
         (dict(recipient_execution='expression-required-v1',recipient_output='intent-only-v1',protocol='recipient-plan-v2'),
             dict(recipient_execution='expression-required-v1',recipient_output='intent-only-v1')),

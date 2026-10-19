@@ -4,6 +4,18 @@ Status: active
 
 Last reviewed: 2026-10-19
 
+ADR0182 makes the source situation explicit upstream and in new review snapshots:
+discovery defaults to conversational contribution but consults explicit requests
+for detail; commitments follow their admitted request, unknown scope stays unknown.
+No blanket brevity rule, extra judge or hard interest filter is added. A previous
+actual complete shadow chain replays unchanged with0 calls/events/sends. The plan
+must select meaning before expression, not make every source fact mandatory and
+then ask the renderer to omit it. Controlled deadline tests also stop requiring
+correction to start after the shared budget expires; production timing is unchanged.
+Fresh public original-page evaluation and canonical qualification are pending at
+this entry. ADR0181 passed at376f98b with66 retained logs. Continue the full goal;
+model approval and curated CLI tests alone are not production acceptance.
+
 ADR0181 removes redundant illustrative prose from new recipient-plan-v3 generation
 and uses one concise modern task rather than legacy-plus-modern instructions.
 The internal content is now a non-executable intent envelope, never placeholder
