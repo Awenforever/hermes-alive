@@ -668,6 +668,7 @@ class SemanticReviewStore:
         actor: str,
         observed_at: datetime | None = None,
         require_independence: bool = True,
+        protocol_recovery_event_id: str | None = None,
     ) -> StoredReviewReceipt:
         if type(require_independence) is not bool:
             raise SemanticReviewError('invalid independence mode')
@@ -728,6 +729,10 @@ class SemanticReviewStore:
             "route_authority_granted": False,
             "delivery_authority_granted": False,
         }
+        if protocol_recovery_event_id is not None:
+            if not isinstance(protocol_recovery_event_id,str) or not _ID_RE.fullmatch(protocol_recovery_event_id):
+                raise SemanticReviewError('invalid semantic protocol recovery reference')
+            payload['protocol_recovery_event_id']=protocol_recovery_event_id
         payload["integrity_authenticator"] = self.protector.authenticate_json(
             "message.semantic_review.v1",
             self._authentication_document("message.semantic_review.v1", payload),
@@ -822,6 +827,9 @@ class SemanticReviewStore:
                     or (not review.structurally_independent and (required or not allow_correlated))):
                 return None
             assessment = _assess_review(document, candidate.text, review, require_independence=required)
+            from .semantic_comparator import SemanticComparator
+            if not SemanticComparator.verify_protocol_recovery_v1(self,record,candidate,document):
+                return None
             return (
                 StoredReviewReceipt(
                     event.event_id,

@@ -4,6 +4,17 @@ Status: active
 
 Last reviewed: 2026-10-18
 
+ADR0178 completes the semantic-review prompt/validator contract and adds one
+model-mediated correction only for invalid review shape, under the original
+review-stage deadline. Valid negative judgments remain negative. Recovery proof
+is encrypted, candidate-bound and authenticated into final receipts; reopening
+revalidates original failure, scope and erasure without new inference. Focused
+mechanics and adjacent suites pass. One original-context Qwen diagnostic produces
+a valid negative review, not approval or a clean full-chain result. Canonical
+regression is pending at this entry. ADR0177 regression passed at6a08f93 with65
+retained logs. Continue toward useful complete fresh scenarios, not more judges
+or repeated sampling of the same failed operation. Production remains unchanged.
+
 ADR0177 measures the existing host structured facade rather than assuming its
 parsed JSON proves complete generation. Actual Core controlled HTTP returns
 length/content-filter JSON without a public completion marker; the direct facade

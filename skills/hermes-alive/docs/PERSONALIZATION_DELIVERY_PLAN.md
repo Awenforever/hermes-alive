@@ -7,6 +7,13 @@ the integrated product outcome, not an assertion that all components are absent.
 
 ## Current truth and stop-expanding rule
 
+2026-10-18 review-contract correction: a complete prompt and one bounded protocol
+correction remove a measured hidden interface rule, not legitimate criticism.
+ADR0178's actual original-context diagnostic is valid but negative. Do not equate
+format recovery with good wording, proof of usefulness or a fresh acceptance
+round. Keep historical failures intact; next qualify complete fresh messages and
+their real recipient contribution before expanding architectures or source lists.
+
 2026-10-18 execution qualification: the host structured facade currently lacks
 complete-generation evidence even when JSON parses. Do not substitute it blindly
 for the qualified native boundary. ADR0177 adjusts the measured generation budget
