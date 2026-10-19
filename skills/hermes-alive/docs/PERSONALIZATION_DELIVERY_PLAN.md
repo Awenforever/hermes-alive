@@ -7,6 +7,12 @@ the integrated product outcome, not an assertion that all components are absent.
 
 ## Current truth and stop-expanding rule
 
+ADR0185 corrects launch-profile scope rejection using actual Core binders, not
+another private model configuration. Personalization must run with the correct
+current user's scope, never borrow process credentials or a different profile.
+Controlled native success is a prerequisite only: actual background embedding,
+fresh useful recommendations and longitudinal learning/forgetting still need proof.
+
 ADR0184 adds real-Core composition evidence for feedback/recovery/forgetting:
 the original quote and tentative interpretation enter the first cycle together,
 restart does not reinterpret them, and erasure removes both from later cognition.

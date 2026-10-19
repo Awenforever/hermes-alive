@@ -4,6 +4,15 @@ Status: active
 
 Last reviewed: 2026-10-19
 
+ADR0185 finds and corrects a real host prerequisite: official Core's launch scope
+has an explicit home override but no optional secret-home stamp. Acquisition now
+admits that shape only for the matching routing-process home; routed, unbound and
+foreign scopes remain rejected. Actual Core single/multiplex launch and routed
+native calls pass with controlled HTTP. Full living-cycle composition under that
+real launch binder and canonical packaging are pending at this entry. This does
+not install a scheduler or qualify all provider auth/renewal. Keep the original
+useful long-term kernel, ten fresh complete rounds and production acceptance gates.
+
 ADR0184 passes a composed real-Core/native-worker shadow cycle with controlled
 model HTTP: tentative feedback, complete expression, crash before host close,
 restart without repeated inference, then feedback erasure and a new source cycle.

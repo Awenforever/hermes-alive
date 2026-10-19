@@ -100,6 +100,7 @@ run_and_require run_native_worker_protocol.py '^HERMES_ALIVE_NATIVE_WORKER_PROTO
 run_and_require run_native_host_snapshot.py '^HERMES_ALIVE_NATIVE_HOST_SNAPSHOT_OK$'
 run_and_require run_native_client_policy.py '^HERMES_ALIVE_NATIVE_CLIENT_POLICY_OK$'
 run_and_require run_native_host_caller.py '^HERMES_ALIVE_NATIVE_HOST_CALLER_UNIT_OK$'
+run_and_require run_native_core_scope_contract.py '^HERMES_ALIVE_NATIVE_CORE_SCOPE_CONTRACT_OK$'
 run_and_require run_autonomous_host_runtime.py '^HERMES_ALIVE_AUTONOMOUS_HOST_RUNTIME_OK$'
 run_and_require run_expression_history.py '^HERMES_ALIVE_EXPRESSION_HISTORY_OK$'
 run_and_require run_final_wording_preparation.py '^HERMES_ALIVE_FINAL_WORDING_PREPARATION_OK$'

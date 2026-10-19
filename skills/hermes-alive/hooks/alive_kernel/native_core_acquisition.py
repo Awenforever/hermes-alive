@@ -27,15 +27,26 @@ class CoreScopedModelAcquirer:
         self.unauthenticated_endpoints=unauthenticated_endpoints
 
     def _scope(self):
-        from hermes_constants import get_hermes_home
+        from hermes_constants import (get_hermes_home,get_hermes_home_override,
+                                      get_routing_process_hermes_home)
         from agent.secret_scope import current_secret_scope, current_secret_scope_home
         # A launch-profile environment alone is not a credential capability.
         scope=current_secret_scope()
         home=current_secret_scope_home()
-        if (scope is None or home is None
-                or Path(home).resolve()!=self.profile_home
-                or Path(get_hermes_home()).resolve()!=self.profile_home):
+        if scope is None or Path(get_hermes_home()).resolve()!=self.profile_home:
             raise NativeWorkerError('current Core profile scope is unavailable or foreign')
+        if home is not None:
+            if Path(home).resolve()!=self.profile_home:
+                raise NativeWorkerError('current Core profile scope is unavailable or foreign')
+        else:
+            # Core's launch_profile_runtime_scope binds an explicit home override
+            # and its own secret mapping, but intentionally omits the optional
+            # foreign-home stamp. Never extend this exception to a routed home
+            # or an unbound process: ambient HERMES_HOME is not a capability.
+            override=get_hermes_home_override()
+            if (override is None or Path(override).resolve()!=self.profile_home
+                    or Path(get_routing_process_hermes_home()).resolve()!=self.profile_home):
+                raise NativeWorkerError('current Core profile scope is unavailable or foreign')
         return scope
 
     def _configuration(self):
