@@ -1,0 +1,31 @@
+name: Hermes compatibility
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 当前分发支持的核心版本；插件适配新核心后再加目标
+        hermes: ["v0.21.6"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate against Hermes ${{ matrix.hermes }}
+        run: |
+          docker run --rm --entrypoint sh \
+            -v "$PWD:/plugin:ro" \
+            -e HERMES_HOME=/tmp/hh \
+            nousresearch/hermes-agent:${{ matrix.hermes }} -c '
+              set -e
+              mkdir -p /tmp/hh/plugins/gate
+              cp -a /plugin/. /tmp/hh/plugins/gate/
+              hermes plugins validate --json /tmp/hh/plugins/gate
+              hermes plugins doctor --ci /tmp/hh/plugins/gate
+            '
