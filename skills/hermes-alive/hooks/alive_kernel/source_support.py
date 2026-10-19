@@ -241,8 +241,9 @@ class SourceSupportReviewer:
             'recent_expression_history':[c.to_prompt() for c in history],
             'recent_action_history':[a.to_prompt() for a in actions],
             'recent_feedback_context':[f.to_prompt() for f in feedback],
-            'candidate':{'id':candidate_id, 'kind':candidate.action.action_kind.value,
-                'text':_thaw_json(candidate.content)['operation']['text']}}
+            'candidate':{'id':candidate_id, 'kind':candidate.action.action_kind.value}}
+        if start.event.payload.get('interpreter_method', {}).get('recipient_output') != 'intent-only-v1':
+            data['candidate']['text'] = _thaw_json(candidate.content)['operation']['text']
         proposal = self.interpreter.retained_proposal(receipt_event_id=result.receipt_event_id,
             candidate_id=candidate_id, subject=subject, clearance=clearance)
         if 'communication_plan' in proposal:
@@ -250,7 +251,7 @@ class SourceSupportReviewer:
             if start.event.payload.get('interpreter_method', {}).get('recipient_execution') == 'expression-required-v1':
                 # Modern intent has one semantic object. Its retained illustrative
                 # draft is provenance, not a second recipient message to assess.
-                del data['candidate']['text']
+                data['candidate'].pop('text', None)
             data['interpretation_as_of'] = start.event.payload.get('interpretation_as_of')
             data['time_anchor_is_not_delivery_time'] = True
         if len(json.dumps(data, ensure_ascii=False)) > 40000:

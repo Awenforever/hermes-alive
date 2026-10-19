@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 from .action_contract import parse_action_contract
 from .content_vault import ContentReference
-from .communication_plan import validate_communication_plan, plan_atoms, expression_context
+from .communication_plan import validate_communication_plan, plan_atoms, expression_context, validate_recipient_intent
 from .deliberation import ActionKind, SideEffect
 from .deliberation_synthesis import DeliberationSynthesizer
 from .events import _thaw_json
@@ -46,9 +46,11 @@ class OpportunityExpressionStore(SemanticReviewStore):
             DeliberationSynthesizer(self.journal, content_vault=self.content_vault,
                 context_vault=self.context_vault).validate_candidate_sources(
                     (candidate,), dict(stored.candidate_contents), subject, source.event.sensitivity)
-            contract = parse_action_contract(
-                _thaw_json(dict(stored.candidate_contents)[candidate.content_id]),
-                capability='hermes.channel.send')
+            selected_content = _thaw_json(dict(stored.candidate_contents)[candidate.content_id])
+            if 'recipient_intent_version' in selected_content:
+                validate_recipient_intent(selected_content, action_kind=candidate.action_kind.value)
+            else:
+                parse_action_contract(selected_content, capability='hermes.channel.send')
             evidence = tuple(dict.fromkeys((selection_event_id, *(e
                 for name in ('user_value','urgency','novelty','confidence','risk','interruption_cost')
                 for e in getattr(candidate.dimensions, name).evidence_event_ids))))
@@ -80,8 +82,8 @@ class OpportunityExpressionStore(SemanticReviewStore):
             # Source-aware action presentation can exceed the 1600-character model
             # wording budget. Keep the original wording and canonical link as
             # separate atoms, not one oversized alleged model utterance.
-            text = original['text']
-            literals = (original_url,) if original_url and original_url in text else ()
+            text = original.get('text')
+            literals = (original_url,) if original_url and isinstance(text, str) and original_url in text else ()
         except Exception:
             raise SemanticReviewError('original opportunity evidence is unavailable') from None
         if expiry is None or expiry <= datetime.now(timezone.utc):
@@ -93,6 +95,8 @@ class OpportunityExpressionStore(SemanticReviewStore):
         else:
             # Retained legacy proposals keep the exact old draft binding. Never
             # retroactively reinterpret a confirmed or historic draft as a plan.
+            if not isinstance(text, str) or not text:
+                raise SemanticReviewError('legacy proposal has no original draft')
             atoms = (SemanticAtom('proposed-message', SemanticAtomKind.PROPOSED_CONTENT,
                                  text, evidence, literals),)
         if original_url and not any(original_url in a.protected_literals for a in atoms):

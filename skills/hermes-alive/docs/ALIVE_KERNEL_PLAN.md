@@ -4,6 +4,18 @@ Status: active
 
 Last reviewed: 2026-10-19
 
+ADR0181 removes redundant illustrative prose from new recipient-plan-v3 generation
+and uses one concise modern task rather than legacy-plus-modern instructions.
+The internal content is now a non-executable intent envelope, never placeholder
+message text; final expression remains model-generated and separately validated.
+Output/admission versions are pinned in start and encrypted bundle. Old structural
+recovery reopens with identical content and no new events/inference. Focused
+adjacent and recovery suites pass; canonical and actual changed-task diagnostic
+are pending at this entry. ADR0180 passed at d56652a with66 retained logs. Its
+Qwen timeout remains a failure, not silence or evidence the model is unavailable.
+Preserve the original full product goal and return to actual useful messages,
+not prompt-framework expansion or repeated sampling until approval.
+
 ADR0180 pins new modern candidates as internal recipient intents, not executable
 illustrative drafts. Factual review now joins purpose/selection/expression on the
 retained plan; final source review still checks actual wording. First authorization,

@@ -129,11 +129,11 @@ async def structure(root,mode):
         value='Synthetic structural recovery preference.',authority=MemoryAuthority.USER_EXPLICIT,
         source_event_ids=(inbound.event.event_id,),confidence=1)
     memory.append_proposal(preference,actor=owner)
-    proposal=dict(agenda_item_id=source.agenda_item_id,kind='share',text='PRIVATE_VALID_MEANING',topic='synthetic',
+    proposal=dict(agenda_item_id=source.agenda_item_id,kind='share',topic='synthetic',
         dimensions={k:dict(value=.5,reason='Synthetic judgment') for k in (
             'user_value','urgency','novelty','confidence','risk','interruption_cost')},
         communication_plan=dict(version=2,recipient_goal='Share a public resource',speech_act='share',
-            contents=[dict(kind='fact',text='Synthetic public resource.')],behavior_constraints=[]))
+            contents=[dict(kind='fact',text='PRIVATE_VALID_MEANING: Synthetic public resource.')],behavior_constraints=[]))
     broken=deepcopy(proposal)
     broken['communication_plan']['contents'][0]['protected_literals']=['PRIVATE_ABSENT_LITERAL']
     initial=dict(candidates=[broken])

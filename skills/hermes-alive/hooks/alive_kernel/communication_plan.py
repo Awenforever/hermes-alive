@@ -4,6 +4,7 @@ Structural validation is not semantic support, user consent or send authority.
 Plans belong to their immutable opportunity proposal, not to a mutable style cache.
 """
 import json
+from urllib.parse import urlsplit
 
 from .semantic_rendering import MessageSpeechAct, SemanticAtom, SemanticAtomKind, LiteralPolicy
 
@@ -60,3 +61,19 @@ def expression_context(plan):
     return dict(method='recipient-meaning-v'+str(plan['version']), recipient_goal=plan['recipient_goal'],
         behavior_constraints=plan['behavior_constraints'],
         constraints_are_not_recipient_content=True, authority_granted=False)
+
+
+def validate_recipient_intent(raw, *, action_kind):
+    """An internal semantic envelope, deliberately NOT a channel action contract."""
+    if (not isinstance(raw, dict) or set(raw) != {
+            'recipient_intent_version', 'action_kind', 'communication_plan', 'source_url'}
+            or type(raw['recipient_intent_version']) is not int or raw['recipient_intent_version'] != 1
+            or raw['action_kind'] != action_kind or not isinstance(raw['source_url'], str)
+            or len(raw['source_url']) > 4096):
+        raise ValueError('invalid recipient intent')
+    if raw['source_url']:
+        url = urlsplit(raw['source_url'])
+        if url.scheme not in ('http', 'https') or not url.hostname:
+            raise ValueError('invalid recipient intent source URL')
+    validate_communication_plan(raw['communication_plan'], action_kind=action_kind)
+    return raw

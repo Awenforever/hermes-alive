@@ -9,6 +9,7 @@ from typing import Any, Iterable
 
 from .content_vault import ContentIntegrityError, ContentVault
 from .action_contract import ActionContractError, parse_action_contract
+from .communication_plan import validate_recipient_intent
 from .deliberation import (
     ActionCandidate,
     ActionKind,
@@ -63,6 +64,12 @@ class CycleCandidate:
         except (TypeError, ValueError) as exc:
             raise CognitionCycleError("cycle content must be finite JSON") from exc
         maximum = self.MAX_CONTENT_CHARS
+        if isinstance(normalized, dict) and 'recipient_intent_version' in normalized:
+            try:
+                validate_recipient_intent(normalized, action_kind=self.action.action_kind.value)
+            except ValueError as error:
+                raise CognitionCycleError('invalid internal recipient intent') from error
+            maximum = self.MAX_CHANNEL_CONTENT_CHARS
         if self.action.side_effect is SideEffect.COMMUNICATION:
             try:
                 parse_action_contract(normalized, capability='hermes.channel.send')

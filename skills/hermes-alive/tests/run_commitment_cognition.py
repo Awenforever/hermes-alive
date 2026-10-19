@@ -91,7 +91,10 @@ async def test(root, *, recipient_meaning=False, purpose_repair=False, plan_vers
             current_start=journal.read(event_type='opportunity.synthesis_started')[-1]
             method=current_start.event.payload['interpreter_method']
             assert method['kind']=='model_prompt'
-            assert method['protocol']==('recipient-plan-v2' if recipient_meaning else 'legacy-draft-v1')
+            assert method['protocol']==('recipient-plan-v3' if recipient_meaning else 'legacy-draft-v1')
+            if recipient_meaning:
+                assert method['recipient_output']=='intent-only-v1'
+                assert method['recipient_execution']=='expression-required-v1'
             assert method['system_prompt_sha256']==hashlib.sha256(kwargs['messages'][0]['content'].encode()).hexdigest()
             assert method['requested_model']==kwargs.get('model')
             item=json.loads(kwargs['messages'][1]['content'])['opportunities'][0]

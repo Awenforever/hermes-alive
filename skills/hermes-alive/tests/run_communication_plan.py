@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'hooks'))
 from alive_kernel.communication_plan import validate_communication_plan, plan_atoms, expression_context
 from alive_kernel.cognition_opportunities import CognitionOpportunityReader
 from alive_kernel.event_store import ExperienceJournal
-from alive_kernel.events import Sensitivity, _freeze_json
+from alive_kernel.events import Sensitivity, _freeze_json, _thaw_json
 from alive_kernel.discovery_opportunities import OpportunityEvidence
 from alive_kernel.opportunity_synthesis import OpportunitySynthesizer,OpportunitySynthesisError
 from alive_kernel.deliberation import ActionAuthority
@@ -87,12 +87,24 @@ async def selected_meaning(root,modern):
             text='PRIVATE_ILLUSTRATIVE_DRAFT: everyone can attend.',topic='synthetic',
             dimensions={k:dict(value=.5,reason='synthetic') for k in (
                 'user_value','urgency','novelty','confidence','risk','interruption_cost')})
-        if modern: proposal['communication_plan']=plan
+        if modern:
+            proposal['communication_plan']=plan
+            del proposal['text']
+            assert 'Do NOT write a draft text' in kwargs['messages'][0]['content']
+            assert len(kwargs['messages'][0]['content']) < 6500
         return SimpleNamespace(model='synthetic/generator',choices=[SimpleNamespace(
             message=SimpleNamespace(content=json.dumps(dict(candidates=[proposal]))))])
     synth=OpportunitySynthesizer(journal,content_vault=reader.vault)
     generated=await synth.run(subject=owner,operation_id='interpret',call=generate,recipient_meaning=modern)
     candidate=generated.candidates[0]
+    if modern:
+        assert candidate.content['recipient_intent_version']==1
+        assert 'operation' not in candidate.content
+        from alive_kernel.action_contract import parse_action_contract,ActionContractError
+        try: parse_action_contract(dict(candidate.content),capability='hermes.channel.send')
+        except ActionContractError: pass
+        else: raise AssertionError('internal meaning admitted as a channel contract')
+        from alive_kernel.opportunity_expression import OpportunityExpressionStore
     selector=DeliberationSynthesizer(journal,content_vault=reader.vault)
     try:
         selector.validate_candidate_sources((candidate.action,),{candidate.action.content_id:candidate.content},
@@ -119,8 +131,14 @@ async def selected_meaning(root,modern):
     # Prompt-only view: retained frame/action still equals its original contract.
     stored=coordinator.deliberation.inspect(selected.frame_event_id.removeprefix('deliberation.frame:'),
         clearance=Sensitivity.PRIVATE)
-    assert dict(stored.candidate_contents)[candidate.action.content_id]==candidate.content
+    assert _thaw_json(dict(stored.candidate_contents)[candidate.action.content_id])==_thaw_json(candidate.content)
     assert synth.load_completed(subject=owner,operation_id='interpret')==generated
+    if modern:
+        meaning=OpportunityExpressionStore(journal,content_vault=reader.vault).define_for_selection(
+            selection_event_id=selected.selection_event_id,subject=owner)
+        assert meaning.event.event_type=='message.meaning_defined'
+        assert 'text' not in synth.retained_proposal(receipt_event_id=generated.receipt_event_id,
+            candidate_id=candidate.action.candidate_id,subject=owner,clearance=Sensitivity.PRIVATE)
     assert synth.requires_expression(receipt_event_id=generated.receipt_event_id,
         subject=owner,clearance=Sensitivity.PRIVATE) is modern
     from alive_kernel.source_support import SourceSupportReviewer
@@ -174,6 +192,16 @@ async def selected_meaning(root,modern):
 
 
 def main():
+    for method,bundle in (
+        (dict(recipient_execution='expression-required-v1',recipient_output='intent-only-v1',protocol='recipient-plan-v2'),
+            dict(recipient_execution='expression-required-v1',recipient_output='intent-only-v1')),
+        (dict(recipient_execution='expression-required-v1',recipient_output='intent-only-v1',protocol='recipient-plan-v3'),
+            dict(recipient_execution='expression-required-v1')),
+        (dict(recipient_output='intent-only-v1',protocol='recipient-plan-v3'),dict(recipient_output='intent-only-v1'))):
+        start=SimpleNamespace(event=SimpleNamespace(payload=dict(recipient_meaning=True,interpreter_method=method)))
+        try: OpportunitySynthesizer._validate_recipient_execution(start,bundle)
+        except OpportunitySynthesisError: pass
+        else: raise AssertionError('unbound draft-free output contract accepted')
     for mode,bundle_mode,meaning in ((None,'expression-required-v1',True),
             ('expression-required-v1',None,True),('future-mode','future-mode',True),
             ('expression-required-v1','expression-required-v1',False)):

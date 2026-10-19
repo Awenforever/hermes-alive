@@ -7,6 +7,13 @@ the integrated product outcome, not an assertion that all components are absent.
 
 ## Current truth and stop-expanding rule
 
+ADR0181 gives new modern generation one responsibility: choose and describe useful
+recipient meaning, not write a second illustrative message. Evidence and deadline
+are unchanged, execution remains exact-final-expression-only, and historical
+contracts recover without inference. The measured Qwen timeout motivates removing
+redundancy, but prompt size is not proven to be its cause. Qualify the changed task
+on actual source/recipient value before claiming improvement or a clean round.
+
 ADR0180 removes competing semantic views for new internal recipient intents and
 requires an exact validated expression at execution boundaries, preserving old
 retained operations. This addresses content continuity, not whether a technically
