@@ -111,7 +111,8 @@ class HostDiscoveryReader:
             raise HostDiscoveryError('read observation is not current')
         return ingested.observation_event_id
 
-    async def collect(self, *, operation_id, queries=(), read_urls=(), limit=3):
+    async def collect(self, *, operation_id, queries=(), read_urls=(), limit=3,
+                      inquiry_item_ids=()):
         identifier(operation_id)
         if (not isinstance(queries,tuple) or not isinstance(read_urls,tuple)
                 or len(queries)>3 or len(read_urls)>2 or not queries and not read_urls
@@ -123,6 +124,16 @@ class HostDiscoveryReader:
             raise HostDiscoveryError('owned host read is busy or uncertain')
         self._current()
         request=dict(queries=list(queries),read_urls=list(read_urls),limit=limit)
+        from .discovery_inquiry import DiscoveryInquiryContext
+        inquiry_context = DiscoveryInquiryContext(self.ingestor)
+        inquiries = inquiry_context.read(subject=self.subject, clearance=Sensitivity.PRIVATE,
+                                         item_ids=inquiry_item_ids)
+        if inquiry_item_ids:
+            request['tentative_discovery_tasks'] = inquiries
+        def check_inquiries():
+            if inquiry_context.read(subject=self.subject, clearance=Sensitivity.PRIVATE,
+                                    item_ids=inquiry_item_ids) != inquiries:
+                raise HostDiscoveryError('reading task changed during host read')
         vault=self.ingestor.vault
         operation=vault.digest_json(dict(subject=self.subject,operation_id=operation_id))[:40]
         prefix='discovery.host-read:'+operation
@@ -147,6 +158,7 @@ class HostDiscoveryReader:
                 if {e.observation_event_id for e in evidence}!=set(ids):
                     raise HostDiscoveryError('host discovery receipt sources are no longer current')
             self._current()
+            check_inquiries()
             return HostDiscoveryResult(tuple(done.event.payload['observations']),
                 done.event.payload['failures'],done.event.event_id,
                 tuple(tuple(x) for x in done.event.payload.get('read_outcomes',())))
@@ -164,6 +176,7 @@ class HostDiscoveryReader:
             for kind,values in (('search',queries),('extract',read_urls)):
                 for index,value in enumerate(values):
                     self._current()
+                    check_inquiries()
                     try:
                         if kind=='extract':
                             parts=urlsplit(value)
@@ -175,6 +188,7 @@ class HostDiscoveryReader:
                         raw=await (self.search(value,limit=limit) if kind=='search'
                                    else self.extract([value],char_limit=6000))
                         self._current()
+                        check_inquiries()
                         document=self._document(raw)
                         if kind=='search':
                             data=document.get('data')
@@ -193,7 +207,7 @@ class HostDiscoveryReader:
                         self._uncertain=True
                         raise
                     except Exception:
-                        self._current(); failures+=1
+                        self._current(); check_inquiries(); failures+=1
                         outcomes.append((kind,index,'read_failed')); continue
                     before_failures=failures
                     for item in items:
@@ -207,6 +221,7 @@ class HostDiscoveryReader:
                     outcomes.append((kind,index,'partial_or_refused' if failures>before_failures
                         else 'observed' if items else 'empty'))
             self._current()
+            check_inquiries()
             done=journal.append(EventEnvelope(event_id=prefix+':completed',event_type='discovery.host_read_completed',
                 causation_id=prefix+':started',**common,payload=dict(
                     observations=list(dict.fromkeys(observations)),failures=failures,read_outcomes=outcomes,

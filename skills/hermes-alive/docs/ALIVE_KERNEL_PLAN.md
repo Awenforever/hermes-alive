@@ -2,7 +2,18 @@
 
 Status: active
 
-Last reviewed: 2026-10-19
+Last reviewed: 2026-10-20
+
+ADR0192 connects tentative reading questions through the existing encrypted
+agenda, explicitly pinned authorized host reads and actual planning/synthesis.
+Model rationale remains revisable, not user memory, facts or action permission.
+Recovery and post-await checks bind current task/source content, withdrawal and
+erasure. Controlled integration is not useful autonomous sharing; canonical full
+qualification is pending at this entry. Next run a fresh real public-source path
+and assemble bounded discovery into the consented host loop. Do not repeat prompt
+contrasts on the old pool or turn model notes into permanent owner interests.
+All original external/noisy-memory, agenda/outcome/reflection, portability,
+migration, ten fresh complete rounds and production acceptance gates remain.
 
 ADR0189 removes manual Python host attachment: explicit consent/config -> actual
 plugin CLI/engine install -> disk startup -> current Core model facade -> durable

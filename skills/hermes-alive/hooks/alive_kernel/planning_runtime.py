@@ -104,6 +104,7 @@ watcher and not a complete production loop. It creates no channel queues.
                   sensitivity=Sensitivity.PRIVATE, grounding=False,
                   grounding_model=None, resolve_grounding_domain=None,
                   require_independent_grounding=False, recipient_meaning=False,
+                  inquiry_item_ids=(),
                   model_timeout_seconds=None):
         validate_model_timeout(model_timeout_seconds)
         if type(recipient_meaning) is not bool:
@@ -143,6 +144,9 @@ watcher and not a complete production loop. It creates no channel queues.
                 'require_independence':require_independent_grounding, 'method':'source-support-v1'}
         if recipient_meaning:
             binding['recipient_meaning'] = 'recipient-meaning-v1'
+        self.synth.inquiries.identities(inquiry_item_ids)
+        if inquiry_item_ids:
+            binding['discovery_inquiry_item_ids'] = list(inquiry_item_ids)
         if model_timeout_seconds is not None:
             binding['model_timeout_seconds']=model_timeout_seconds
         digest = self.synth.vault.digest_json({'operation': operation_id, 'subject': subject})[:40]
@@ -173,7 +177,8 @@ watcher and not a complete production loop. It creates no channel queues.
         else:
             generated = await self.synth.run(subject=subject, operation_id=interpret_id,
                 call=call, requested_model=requested_model, authority=authority, clearance=sensitivity,
-                recipient_meaning=recipient_meaning,timeout_seconds=model_timeout_seconds or 60)
+                recipient_meaning=recipient_meaning,timeout_seconds=model_timeout_seconds or 60,
+                inquiry_item_ids=inquiry_item_ids)
         candidates, reviews, repair, repair_disposition = generated.candidates, (), None, None
         if recipient_meaning and generated.rejected_count and not candidates:
             raise PlanningRuntimeError('recipient meaning unavailable; malformed proposals are not qualified silence')
@@ -205,7 +210,8 @@ watcher and not a complete production loop. It creates no channel queues.
                         repair = await self.synth.run(subject=subject, operation_id=repair_id,
                             call=call, requested_model=requested_model, authority=authority,
                             clearance=sensitivity, revision_event_ids=rejected,
-                            recipient_meaning=recipient_meaning,timeout_seconds=model_timeout_seconds or 60)
+                            recipient_meaning=recipient_meaning,timeout_seconds=model_timeout_seconds or 60,
+                            inquiry_item_ids=inquiry_item_ids)
                     # A repair can address rejected intents, not expand the host's work scope.
                     from dataclasses import replace
                     if recipient_meaning and repair.rejected_count and not repair.candidates:
