@@ -4,6 +4,18 @@ Status: active
 
 Last reviewed: 2026-10-20
 
+ADR0193 fixes a measured deep-read evidence loss: actual extracts were retained
+but locally cut to1800 characters before synthesis and review, omitting evidence
+directly relevant to the reading question. New operations share one recorded
+bounded-extraction policy; historical operations retain their original scope,
+and total recall/fairness bounds remain. Controlled encrypted snapshots pass;
+canonical qualification pending at writing. The fresh real trial has no final
+message: its private recorder broke caller-visible route metadata, correctly
+rejected by runtime guards. Correct instrumentation, retain the failed history,
+and continue real useful sharing/installed discovery, not another judge or phrase
+patch. One actual generation used the configured official fallback; do not infer
+its cause from elapsed time. Original acceptance scope and ten fresh rounds stay.
+
 ADR0192 connects tentative reading questions through the existing encrypted
 agenda, explicitly pinned authorized host reads and actual planning/synthesis.
 Model rationale remains revisable, not user memory, facts or action permission.

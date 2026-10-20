@@ -11,7 +11,7 @@ from .events import EventEnvelope, Sensitivity, _thaw_json
 from .opportunity_synthesis import OpportunitySynthesizer
 from .semantic_comparator import SemanticComparator
 from .model_json import parse_model_json
-from .host_discovery import read_scope_metadata
+from .host_discovery import read_scope_metadata, source_prompt_excerpt
 from .communication_plan import communication_situation
 from .model_timeouts import MAX_STAGE_SECONDS
 
@@ -237,9 +237,11 @@ class SourceSupportReviewer:
             'assessment_scope':{'kind':'source_support','execution_authorization_evaluated':False,
                 'sending_performed':False,'reported_source_is_not_execution_receipt':True},
             'evidence': [{'event_id':s.observation_event_id, 'title':s.content['title'],
-            'url':s.content['url'], 'excerpt':s.content['summary'][:1800],
+            'url':s.content['url'], 'excerpt':source_prompt_excerpt(s.content,
+                policy=start.event.payload.get('interpreter_method',{}).get('source_excerpt_policy')),
             'published_at':s.content.get('published_at'),
-            'excerpt_may_be_truncated':len(s.content['summary'])>1800,
+            'excerpt_may_be_truncated':len(s.content['summary'])>len(source_prompt_excerpt(s.content,
+                policy=start.event.payload.get('interpreter_method',{}).get('source_excerpt_policy'))),
             'provenance_metadata':{'collector':s.content['source'],**read_scope_metadata(s.content),**(
                 {'origin_kind':s.content['origin_kind']} if 'origin_kind' in s.content else {})}} for s in sources],
             'explicit_context':[c.to_prompt() for c in context],

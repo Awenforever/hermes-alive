@@ -35,6 +35,23 @@ def read_scope_metadata(content):
         video_consumption_proven=False,page_may_contain_navigation=attrs['read_scope']=='webpage_extract')
 
 
+SOURCE_EXCERPT_POLICY = 'retained-web-extract-v1'
+
+
+def source_prompt_excerpt(content, *, policy=None):
+    """Versioned evidence window shared by interpretation and factual review.
+
+    The bound covers the stored extraction, not an entire page or independent
+    verification. Ordinary listings and admitted commitments keep their existing
+    window. Old operation receipts without a policy retain their exact scope.
+    """
+    if policy not in (None, SOURCE_EXCERPT_POLICY):
+        raise HostDiscoveryError('unknown source excerpt policy')
+    depth = (policy == SOURCE_EXCERPT_POLICY
+             and read_scope_metadata(content).get('reported_read_scope') == 'webpage_extract')
+    return content['summary'][:8192 if depth else 1800]
+
+
 @dataclass(frozen=True)
 class HostDiscoveryResult:
     observation_ids: tuple[str, ...]

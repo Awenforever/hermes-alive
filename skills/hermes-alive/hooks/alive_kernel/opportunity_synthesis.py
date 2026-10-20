@@ -27,7 +27,7 @@ from .model_json import ModelJSONError, parse_model_json
 from .events import EventEnvelope, Sensitivity, _thaw_json
 from .expression_history import ExpressionHistoryReader
 from .action_history import ActionHistoryReader
-from .host_discovery import read_scope_metadata
+from .host_discovery import read_scope_metadata, source_prompt_excerpt, SOURCE_EXCERPT_POLICY
 from .model_timeouts import MAX_STAGE_SECONDS
 
 
@@ -1013,9 +1013,11 @@ class OpportunitySynthesizer:
             "origin_kind":item.content.get('origin_kind','discovery'),
             **({'communication_situation':communication_situation(item.content.get('origin_kind','discovery'))}
                if recipient_meaning else {}),
-            "url": item.content["url"], "summary_excerpt": item.content["summary"][:1800],
+            "url": item.content["url"], "summary_excerpt": source_prompt_excerpt(
+                item.content, policy=SOURCE_EXCERPT_POLICY),
             "published_at": item.content.get("published_at"),
-            "summary_may_be_truncated": len(item.content["summary"]) > 1800,
+            "summary_may_be_truncated": len(item.content["summary"]) > len(source_prompt_excerpt(
+                item.content, policy=SOURCE_EXCERPT_POLICY)),
             })
             packed=json.dumps(prompt_data,ensure_ascii=False,separators=(',',':'))
             if len(packed)>budget:
@@ -1053,6 +1055,7 @@ class OpportunitySynthesizer:
             protocol_recovery=protocol_recovery,
             structure_recovery='proposal-shape-v2' if protocol_recovery and recipient_meaning else None,
             source_presentation=self._SOURCE_PRESENTATION,
+            source_excerpt_policy=SOURCE_EXCERPT_POLICY,
             recovery_prompt_digest=hashlib.sha256(_PROTOCOL_RECOVERY_PROMPT.encode()).hexdigest())
         receipt_id = f"opportunity.synthesis:{operation_id}:completed"
         base = dict(source="alive.opportunity-synthesis", actor="system:alive-interpreter",
