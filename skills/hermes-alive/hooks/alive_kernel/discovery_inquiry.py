@@ -6,6 +6,7 @@ of the old one, never rewriting the question behind a completed interpretation.
 """
 from collections.abc import Mapping
 from datetime import datetime, timezone
+import re
 
 from .agenda import (AgendaAuthority, AgendaContentStatus, AgendaItemKind,
                      AgendaProposal, AgendaState)
@@ -19,11 +20,17 @@ class DiscoveryInquiryError(ValueError):
 
 
 class DiscoveryInquiryContext:
-    def __init__(self, reader):
+    def __init__(self, reader, *, context_vault=None):
         self.reader = reader
         self.agenda = reader.agenda
         self.journal = reader.journal
         self.vault = reader.vault
+        from .cognition_context import CognitionContextReader
+        self.owner_context = CognitionContextReader(self.journal,content_vault=context_vault)
+
+    def context_digest(self, *, subject, clearance=Sensitivity.PRIVATE):
+        return self.vault.digest_json([c.to_prompt() for c in
+            self.owner_context.read(subject=subject,clearance=clearance)])
 
     @staticmethod
     def identities(item_ids):
@@ -36,9 +43,13 @@ class DiscoveryInquiryContext:
         return item_ids
 
     def remember(self, *, item_id, subject, question, value_hypothesis,
-                 source_event_ids, model_actor, expires_at):
+                 source_event_ids, model_actor, expires_at, expected_context_digest):
         """Record a settled model choice, without calling a model or executing IO."""
         self.identities((item_id,))
+        if (not isinstance(expected_context_digest,str)
+                or not re.fullmatch(r'[0-9a-f]{64}',expected_context_digest)
+                or expected_context_digest != self.context_digest(subject=subject)):
+            raise DiscoveryInquiryError('owner context changed since reading choice')
         if (not isinstance(model_actor, str) or not model_actor.startswith('model:')
                 or not model_actor[6:] or not isinstance(question, str)
                 or not 1 <= len(question.strip()) <= 1200
@@ -57,10 +68,12 @@ class DiscoveryInquiryContext:
             raise DiscoveryInquiryError('reading task cannot outlive its sources')
         proposal = AgendaProposal(item_id=item_id, kind=AgendaItemKind.OPPORTUNITY,
             subject=subject, authority=AgendaAuthority.MODEL_PROPOSAL,
-            details=dict(context_kind='discovery-inquiry-v1', question=question,
-                         value_hypothesis=value_hypothesis),
+            details=dict(context_kind='discovery-inquiry-v2', question=question,
+                         value_hypothesis=value_hypothesis,
+                         owner_context_digest=expected_context_digest),
             source_event_ids=source_event_ids, confidence=.5, expires_at=expires_at)
-        record = self.agenda.append_proposal(proposal, actor=model_actor)
+        record = self.agenda.append_proposal(proposal, actor=model_actor,
+            correlation_id='inquiry-context:'+expected_context_digest)
         self.agenda.apply(record)
         return self.read(subject=subject, clearance=Sensitivity.PRIVATE, item_ids=(item_id,))[0]
 
@@ -68,6 +81,13 @@ class DiscoveryInquiryContext:
         self.identities(item_ids)
         if not item_ids:
             return []
+        current_context_digest = self.context_digest(subject=subject,clearance=clearance)
+        # Check the context revision before the agenda decrypts derived text.
+        for item_id in item_ids:
+            origin = self.journal.get('agenda.proposal:'+item_id)
+            if (origin is None or origin.event.subject != subject
+                    or origin.event.correlation_id != 'inquiry-context:'+current_context_digest):
+                raise DiscoveryInquiryError('reading task lacks current owner-context provenance')
         # Use the existing agenda checkpoint, not a second task projection.
         target = self.journal.last_sequence()
         while self.journal.checkpoint(self.agenda.CHECKPOINT) < target:
@@ -96,11 +116,13 @@ class DiscoveryInquiryContext:
                     or item.authority is not AgendaAuthority.MODEL_PROPOSAL
                     or item.content_status is not AgendaContentStatus.AVAILABLE
                     or not isinstance(details, Mapping)
-                    or set(details) != {'context_kind', 'question', 'value_hypothesis'}
-                    or details.get('context_kind') != 'discovery-inquiry-v1'
+                    or set(details) != {'context_kind', 'question', 'value_hypothesis', 'owner_context_digest'}
+                    or details.get('context_kind') != 'discovery-inquiry-v2'
                     or any(not isinstance(details.get(k), str) or not 1 <= len(details[k].strip()) <= 1200
                            for k in ('question', 'value_hypothesis'))):
                 raise DiscoveryInquiryError('reading task provenance unavailable')
+            if details['owner_context_digest'] != current_context_digest:
+                raise DiscoveryInquiryError('reading task owner context changed or was forgotten')
             ref = ContentReference.from_event_payload(payload['content'])
             sources = tuple(payload.get('source_event_ids', ()))
             if (ref.content_id != 'agenda:' + item_id or ref.content_id != item.content_id
@@ -120,6 +142,7 @@ class DiscoveryInquiryContext:
             result.append(dict(item_id=item_id, proposal_event_id=event.event_id,
                 model_actor=event.actor, source_event_ids=list(sources),
                 question=details['question'], value_hypothesis=details['value_hypothesis'],
+                owner_context_digest=details['owner_context_digest'],
                 updated_at=item.updated_at.isoformat(), expires_at=item.expires_at.isoformat(),
                 authority='tentative_model_note_not_user_instruction', revisable_after_reading=True,
                 grants_execution_or_disclosure=False))

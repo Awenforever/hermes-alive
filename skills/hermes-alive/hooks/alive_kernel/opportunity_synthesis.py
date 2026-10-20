@@ -403,7 +403,7 @@ class OpportunitySynthesizer:
         self.reader = CognitionOpportunityReader(journal, content_vault=content_vault)
         self.vault = self.reader.vault
         from .discovery_inquiry import DiscoveryInquiryContext
-        self.inquiries = DiscoveryInquiryContext(self.reader)
+        self.inquiries = DiscoveryInquiryContext(self.reader,context_vault=context_vault)
         # Discovery and typed memory have independent default vault locations.
         # Sharing them must be a host choice, not an implicit migration.
         self.context_reader = CognitionContextReader(journal, content_vault=context_vault)

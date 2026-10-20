@@ -67,11 +67,13 @@ class HostDiscoveryReader:
     must reject new work while any physical read lease is uncertain. Cancellation
     also retires this instance. An incomplete durable operation is not retried.
     """
-    def __init__(self, ingestor, *, subject, search, extract, allow_url, is_current):
+    def __init__(self, ingestor, *, subject, search, extract, allow_url, is_current,
+                 context_vault=None):
         self.subject=identifier(subject)
         if not all(callable(f) for f in (search,extract,allow_url,is_current)):
             raise HostDiscoveryError('explicit host read capabilities required')
         self.ingestor=ingestor
+        self.context_vault=context_vault
         self.search,self.extract,self.allow_url,self.is_current=search,extract,allow_url,is_current
         self._busy=False
         self._uncertain=False
@@ -142,7 +144,7 @@ class HostDiscoveryReader:
         self._current()
         request=dict(queries=list(queries),read_urls=list(read_urls),limit=limit)
         from .discovery_inquiry import DiscoveryInquiryContext
-        inquiry_context = DiscoveryInquiryContext(self.ingestor)
+        inquiry_context = DiscoveryInquiryContext(self.ingestor,context_vault=self.context_vault)
         inquiries = inquiry_context.read(subject=self.subject, clearance=Sensitivity.PRIVATE,
                                          item_ids=inquiry_item_ids)
         if inquiry_item_ids:

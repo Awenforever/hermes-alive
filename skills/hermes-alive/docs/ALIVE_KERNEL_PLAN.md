@@ -4,6 +4,16 @@ Status: active
 
 Last reviewed: 2026-10-20
 
+ADR0194 closes a reproduced derived-memory reuse gap: an old reading rationale
+could retain a forgotten owner's preference even in a newly created operation.
+The task now binds the explicit owner-context snapshot captured BEFORE choice,
+with a revision hash checked before task decryption, IO or prompting. Custom
+vault scope is explicit; unbound prototype tasks are retained but not silently
+rebound. This is refusal of stale reuse, not proof of all derivative/backup/Halo
+physical erasure. Focus/full qualification pending at writing. The real public
+trial remains on its original archive; assess its actual final wording rather
+than altering it mid-flight. All original acceptance goals remain.
+
 ADR0193 fixes a measured deep-read evidence loss: actual extracts were retained
 but locally cut to1800 characters before synthesis and review, omitting evidence
 directly relevant to the reading question. New operations share one recorded

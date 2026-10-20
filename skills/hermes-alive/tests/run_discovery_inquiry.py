@@ -31,6 +31,7 @@ async def exercise(root, mode):
         question='PRIVATE_QUESTION: What changed in the conservation method?',
         value_hypothesis='A useful outside-profile history discovery, not an inferred preference.',
         source_event_ids=(seed.observation_event_id,), model_actor='model:synthetic',
+        expected_context_digest=context.context_digest(subject='user:test'),
         expires_at=datetime.now(timezone.utc) + timedelta(hours=1))
     expected = context.remember(**params)
     assert context.remember(**params) == expected  # Exact replay, no inference.
