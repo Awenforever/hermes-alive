@@ -102,6 +102,13 @@ class DispatchOutbox:
                     expression_event_id=authorization.event.payload.get('expression_event_id'))
             expression_id = authorization.event.payload.get("expression_event_id")
             witness = authorization.event.payload.get("final_wording_witness")
+            if expression_id and witness is None:
+                from .opportunity_expression import OpportunityExpressionStore
+                if OpportunityExpressionStore(self.journal,content_vault=self.vault,
+                        context_vault=self.context_vault).requires_final_source_review(
+                            selection_event_id=str(authorization.event.payload['selection_event_id']),
+                            subject=str(authorization.event.subject)):
+                    raise DispatchOutboxError('discovery expression requires current final wording review')
             if witness is not None:
                 from .expression_support import ExpressionSourceSupportReviewer
                 ExpressionSourceSupportReviewer(self.journal, content_vault=self.vault,

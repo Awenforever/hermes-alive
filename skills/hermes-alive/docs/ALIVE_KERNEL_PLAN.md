@@ -4,6 +4,17 @@ Status: active
 
 Last reviewed: 2026-10-20
 
+ADR0195 changes the discovery-specific intent/authoring responsibility, not a set
+of forbidden phrases or topics. A scoped v3 editorial brief is not an immutable
+fact inventory: the actual author uses original evidence, and the existing final
+checkpoint must assess actual source support and recipient value. Confirmation,
+cached authorization and dispatch cannot omit that witness. Other purposes and
+historical meaning/recovery contracts remain strict. Controlled encrypted tests
+pass; canonical/fresh real-content qualification pending at this entry. No
+recipient-quality round is credited. Next qualify the source and actual new
+content, then complete installed autonomous discovery and the full long-term
+memory/agenda/outcome/reflection/portability/production acceptance goal.
+
 ADR0194 closes a reproduced derived-memory reuse gap: an old reading rationale
 could retain a forgotten owner's preference even in a newly created operation.
 The task now binds the explicit owner-context snapshot captured BEFORE choice,

@@ -102,7 +102,11 @@ manufactures them from model output or reviews, nor falls back to another body.
             return ExpressionQualityResult(expressed)
         final_event,quality=None,'not_reviewed'
         initial_final,repair=None,None
-        if expression_parameters.get('grounding',False):
+        required = (expressed.expression_event_id is not None and
+            self.expression.store.requires_final_source_review(
+                selection_event_id=expressed.planning.selection_event_id,
+                subject=expression_parameters['subject']))
+        if expression_parameters.get('grounding',False) or required:
             if expressed.review_disposition=='rejected':
                 return ExpressionQualityResult(expressed,expressed.review_event_id,'final_semantic_rejected')
             final_event,quality=await self._review_final(expressed,expression_parameters)

@@ -64,6 +64,13 @@ watcher and not a complete production loop. It creates no channel queues.
         eligible, reviews, failures = [], [], 0
         for candidate in generated.candidates:
             candidate_id = candidate.action.candidate_id
+            proposal = self.synth.retained_proposal(receipt_event_id=generated.receipt_event_id,
+                candidate_id=candidate_id,subject=subject,clearance=sensitivity)
+            if proposal.get('communication_plan',{}).get('version') == 3:
+                # A source-led brief is not recipient wording or a fact inventory.
+                # Its actual expression MUST pass the final source/value gate.
+                eligible.append(candidate)
+                continue
             key = ('planning-purpose:' if purpose else 'planning-ground:') + self.synth.vault.digest_json({
                 'interpretation':interpretation_id, 'candidate':candidate_id})[:40]
             prefix = 'opportunity.source-support:' + key

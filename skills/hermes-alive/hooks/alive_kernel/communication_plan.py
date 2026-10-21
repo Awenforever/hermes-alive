@@ -17,10 +17,12 @@ def _policy(plan, item):
 def validate_communication_plan(raw, *, action_kind):
     if (not isinstance(raw, dict) or set(raw) != {
             'version', 'recipient_goal', 'speech_act', 'contents', 'behavior_constraints'}
-            or type(raw['version']) is not int or raw['version'] not in (1,2)
+            or type(raw['version']) is not int or raw['version'] not in (1,2,3)
             or not isinstance(raw['recipient_goal'], str)
             or not 1 <= len(raw['recipient_goal']) <= 512
-            or not isinstance(raw['contents'], list) or not 1 <= len(raw['contents']) <= 6
+            or not isinstance(raw['contents'], list)
+            or (raw['version'] != 3 and not 1 <= len(raw['contents']) <= 6)
+            or (raw['version'] == 3 and raw['contents'] != [])
             or not isinstance(raw['behavior_constraints'], list)
             or len(raw['behavior_constraints']) > 6
             or any(not isinstance(x, str) or not 1 <= len(x) <= 300
@@ -32,6 +34,9 @@ def validate_communication_plan(raw, *, action_kind):
                 MessageSpeechAct.REMIND, MessageSpeechAct.WARN} if action_kind == 'share' else set())
     if speech not in allowed:
         raise ValueError('communication speech act changes selected action')
+    if raw['version'] == 3 and (action_kind != 'share' or speech not in (
+            MessageSpeechAct.SHARE,MessageSpeechAct.INFORM)):
+        raise ValueError('editorial source brief cannot replace a request, reminder or warning')
     for index, item in enumerate(raw['contents']):
         if (not isinstance(item, dict) or not {'kind', 'text'} <= set(item)
                 or set(item) - {'kind', 'text', 'protected_literals'}

@@ -362,6 +362,15 @@ The host binds the canonical source URL separately; do not repeat it merely to
 retain provenance. Other meaningful links need their exact URL in text and literals.
 Use dated anchors rather than delivery-relative claims that can become false.
 
+For a DISCRETIONARY discovery_share with share/inform speech act, use version3
+with the same keys but contents:[]: this is a tentative editorial brief, NOT an
+inventory of facts the recipient must hear. Propose the substantive possible
+contribution in recipient_goal. The eventual author receives original evidence
+and chooses what to say; actual wording is reviewed for source support and value.
+Do not turn reading notes or routine operating disclaimers into required meaning.
+Use version2 for requests, admitted commitments, requested reports, reminders and
+warnings; their explicit meaning must not be relaxed into an editorial brief.
+
 Abstentions: {"agenda_item_id":"supplied ID","reason":"1-512 chars"}, grounded
 in actual value/evidence/boundaries, not merely an unlisted interest or no send
 grant. Reconsiderations: {"agenda_item_id":"explicitly abstained ID",
@@ -557,7 +566,7 @@ class OpportunitySynthesizer:
                     receipt_id: str, authority: ActionAuthority, context: tuple = (),
                     indices: tuple[int, ...] | None = None, learning: tuple = (),
                     source_presentation: str = "model_text_v1", feedback: tuple = (),
-                    recipient_meaning: bool = False, diagnostics=None,
+                    recipient_meaning: bool = False, diagnostics=None, allow_editorial_brief=False,
                     intent_only: bool = False) -> tuple[tuple, tuple, int, tuple]:
         if source_presentation not in _SOURCE_PRESENTATIONS:
             raise OpportunitySynthesisError("unknown source presentation policy")
@@ -590,11 +599,17 @@ class OpportunitySynthesizer:
                     stage='communication_plan'
                     if not recipient_meaning:
                         raise ValueError('communication plan requires its explicit binding mode')
+                    if (not isinstance(raw['communication_plan'],dict) or
+                            raw['communication_plan'].get('version') not in ((1,2,3) if allow_editorial_brief else (1,2))):
+                        raise ValueError('invalid communication plan')
                     validate_communication_plan(raw['communication_plan'], action_kind=raw['kind'])
                 elif recipient_meaning:
                     stage='communication_plan'
                     raise ValueError('recipient meaning is required, no legacy draft fallback')
                 source = sources[raw["agenda_item_id"]]
+                if (raw.get('communication_plan',{}).get('version') == 3
+                        and source.content.get('origin_kind','discovery') != 'discovery'):
+                    raise ValueError('editorial source brief requires discovery provenance')
                 stage='dimensions'
                 scores = []
                 for name in _DIMENSIONS:
@@ -646,7 +661,7 @@ class OpportunitySynthesizer:
 
     def _structure_findings_v1(self, document, evidence, operation, receipt_id, authority,
                                *, recipient_meaning, source_presentation, as_of, require_assessment=False,
-                               intent_only=False):
+                               intent_only=False, allow_editorial_brief=False):
         """Pure admission probe, shared with recovery proof; no storage or IO.
 
         Keep this validation contract available when introducing a successor:
@@ -656,7 +671,7 @@ class OpportunitySynthesizer:
         try:
             candidates,_,rejected,_=self._candidates(document,evidence,operation,receipt_id,authority,
                 recipient_meaning=recipient_meaning,source_presentation=source_presentation,diagnostics=findings,
-                intent_only=intent_only)
+                intent_only=intent_only,allow_editorial_brief=allow_editorial_brief)
         except OpportunitySynthesisError as error:
             if str(error) not in ('invalid opportunity candidate envelope','invalid proposal identity indices'):
                 raise
@@ -823,7 +838,8 @@ class OpportunitySynthesizer:
                 evidence, operation_id, receipt.event.event_id, authority, context, tuple(indices), learning,
                 source_presentation=bundle.get("source_presentation", "model_text_v1"),feedback=feedback,
                 recipient_meaning=start.event.payload.get('recipient_meaning',False),
-                intent_only=bundle.get('recipient_output') == 'intent-only-v1')
+                intent_only=bundle.get('recipient_output') == 'intent-only-v1',
+                allow_editorial_brief=start.event.payload.get('interpreter_method',{}).get('discovery_authoring')=='source-led-v1')
             if invalid or len(candidates) != count:
                 raise OpportunitySynthesisError("completed proposals no longer valid")
             abstentions, invalid_abstentions = self._abstentions(
@@ -866,12 +882,16 @@ class OpportunitySynthesizer:
         mode = method.get('recipient_execution')
         output = method.get('recipient_output')
         editorial = method.get('editorial_context')
+        authoring = method.get('discovery_authoring')
         if (mode != bundle.get('recipient_execution')
                 or mode not in (None, 'expression-required-v1')
                 or output != bundle.get('recipient_output')
                 or output not in (None, 'intent-only-v1')
                 or editorial != bundle.get('editorial_context')
                 or editorial not in (None, 'origin-purpose-v1')
+                or authoring != bundle.get('discovery_authoring')
+                or authoring not in (None,'source-led-v1')
+                or (authoring is not None and output != 'intent-only-v1')
                 or (editorial is not None and output != 'intent-only-v1')
                 or (output is not None and (mode != 'expression-required-v1'
                     or method.get('protocol') != 'recipient-plan-v3'))
@@ -928,9 +948,12 @@ class OpportunitySynthesizer:
             raise OpportunitySynthesisError('structural recovery lacks parseable original output') from None
         if not structural:
             raise OpportunitySynthesisError('protocol recovery did not originate in invalid JSON')
-        if method.get('structure_recovery') not in ('proposal-shape-v1', 'proposal-shape-v2'):
+        if method.get('structure_recovery') not in ('proposal-shape-v1', 'proposal-shape-v2','proposal-shape-v3'):
             raise OpportunitySynthesisError('unknown structural recovery validation contract')
-        intent_only = method.get('structure_recovery') == 'proposal-shape-v2'
+        intent_only = method.get('structure_recovery') in ('proposal-shape-v2','proposal-shape-v3')
+        authoring = method.get('structure_recovery') == 'proposal-shape-v3'
+        if authoring != (method.get('discovery_authoring') == 'source-led-v1'):
+            raise OpportunitySynthesisError('structural recovery editorial contract mismatch')
         if intent_only != (method.get('recipient_output') == 'intent-only-v1'):
             raise OpportunitySynthesisError('structural recovery output contract mismatch')
         evidence=self.reader.active_evidence(subject=subject,clearance=clearance,limit=32,
@@ -939,7 +962,8 @@ class OpportunitySynthesizer:
             ActionAuthority(start.event.payload['host_authority']),
             recipient_meaning=start.event.payload.get('recipient_meaning') is True,
             source_presentation=method.get('source_presentation'),
-            as_of=datetime.fromisoformat(start.event.payload['interpretation_as_of']),intent_only=intent_only)
+            as_of=datetime.fromisoformat(start.event.payload['interpretation_as_of']),intent_only=intent_only,
+            allow_editorial_brief=authoring)
         if not findings or not isinstance(invalid.get('failure_diagnostics'),list):
             raise OpportunitySynthesisError('structural recovery did not originate in rejected proposals')
         final_ref=ContentReference.from_event_payload(receipt.event.payload['content'])
@@ -950,7 +974,7 @@ class OpportunitySynthesizer:
                 recipient_meaning=start.event.payload.get('recipient_meaning') is True,
                 source_presentation=method.get('source_presentation'),
                 as_of=datetime.fromisoformat(start.event.payload['interpretation_as_of']),require_assessment=True,
-                intent_only=intent_only):
+                intent_only=intent_only,allow_editorial_brief=authoring):
             raise OpportunitySynthesisError('structural recovery has no qualified assessment')
 
     async def run(self, *, subject: str, operation_id: str, call: ModelCaller,
@@ -1049,11 +1073,12 @@ class OpportunitySynthesizer:
             recipient_execution='expression-required-v1' if recipient_meaning else None,
             recipient_output='intent-only-v1' if recipient_meaning else None,
             editorial_context='origin-purpose-v1' if recipient_meaning else None,
+            discovery_authoring='source-led-v1' if recipient_meaning else None,
             kind='model_prompt' if evidence else 'system_no_material',
             system_prompt_sha256=hashlib.sha256(system_prompt.encode()).hexdigest() if evidence else None,
             requested_model=requested_model if evidence else None,
             protocol_recovery=protocol_recovery,
-            structure_recovery='proposal-shape-v2' if protocol_recovery and recipient_meaning else None,
+            structure_recovery='proposal-shape-v3' if protocol_recovery and recipient_meaning else None,
             source_presentation=self._SOURCE_PRESENTATION,
             source_excerpt_policy=SOURCE_EXCERPT_POLICY,
             recovery_prompt_digest=hashlib.sha256(_PROTOCOL_RECOVERY_PROMPT.encode()).hexdigest())
@@ -1133,7 +1158,8 @@ class OpportunitySynthesizer:
                         if protocol_recovery and recipient_meaning:
                             findings=self._structure_findings_v1(document,evidence,operation_id,receipt_id,authority,
                                 recipient_meaning=recipient_meaning,source_presentation=self._SOURCE_PRESENTATION,
-                                as_of=as_of,require_assessment=structural_failure,intent_only=True)
+                                as_of=as_of,require_assessment=structural_failure,intent_only=True,
+                                allow_editorial_brief=True)
                             if findings: raise OpportunityStructureError(findings)
                     except (ModelJSONError,OpportunityStructureError) as error:
                         if attempt or not protocol_recovery:
@@ -1173,6 +1199,7 @@ class OpportunitySynthesizer:
                 feedback=feedback,
                 recipient_meaning=recipient_meaning,
                 intent_only=recipient_meaning,
+                allow_editorial_brief=recipient_meaning,
             )
             abstentions, rejected_abstentions = self._abstentions(
                 document.get("abstentions", []), evidence, document["candidates"])
@@ -1183,6 +1210,7 @@ class OpportunitySynthesizer:
                  "recipient_execution":method['recipient_execution'],
                  "recipient_output":method['recipient_output'],
                  "editorial_context":method['editorial_context'],
+                 "discovery_authoring":method['discovery_authoring'],
                  "source_presentation": self._SOURCE_PRESENTATION,
                  "reconsiderations":[{'agenda_item_id':r.agenda_item_id,'after_seconds':r.after_seconds,
                                       'reason':r.reason} for r in reconsiderations],

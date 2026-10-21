@@ -83,15 +83,16 @@ class ExpressionRuntime:
         start_id = 'expression.runtime:' + digest + ':started'
         done_id = 'expression.runtime:' + digest + ':completed'
         style = self.comparator._style(subject, 'proactive_social')
+        discovery = self.store.requires_final_source_review(selection_event_id=planned.selection_event_id,subject=subject)
         independent = (planning_parameters.get('require_independent_grounding', False)
-                       if planning_parameters.get('grounding', False) else True)
+                       if planning_parameters.get('grounding', False) or discovery else True)
         binding = {'selection_event_id': planned.selection_event_id,
             'meaning_event_id': meaning.event.event_id,
             'renderer_model': renderer_model, 'reviewer_model': reviewer_model, 'language': language,
             'style_digest': self.store.content_vault.digest_json(style), 'delivery_authorized': False}
         if model_timeout_seconds is not None:
             binding['model_timeout_seconds']=model_timeout_seconds
-        if planning_parameters.get('grounding', False):
+        if planning_parameters.get('grounding', False) or discovery:
             binding['require_independence'] = independent
         correction = None
         if correction_review_event_id is not None:

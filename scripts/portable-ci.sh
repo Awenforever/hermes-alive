@@ -134,6 +134,7 @@ run_and_require run_discovery_observation_boundary.py '^HERMES_ALIVE_DISCOVERY_O
 run_and_require run_host_discovery.py '^HERMES_ALIVE_HOST_DISCOVERY_OK$'
 run_and_require run_discovery_inquiry.py '^HERMES_ALIVE_DISCOVERY_INQUIRY_OK$'
 run_and_require run_inquiry_owner_context.py '^HERMES_ALIVE_INQUIRY_OWNER_CONTEXT_OK$'
+run_and_require run_discovery_authoring.py '^HERMES_ALIVE_DISCOVERY_AUTHORING_OK$'
 run_and_require run_source_excerpt_scope.py '^HERMES_ALIVE_SOURCE_EXCERPT_SCOPE_OK$'
 run_and_require run_core_discovery_tools.py '^HERMES_ALIVE_CORE_DISCOVERY_TOOLS_OK$'
 run_and_require run_rich_content_model_attribution_v1.py '^HERMES_ALIVE_RICH_CONTENT_MODEL_ATTRIBUTION_RESULT=PASS([[:space:]]|$)'

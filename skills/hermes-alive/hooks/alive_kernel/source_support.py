@@ -104,6 +104,9 @@ class SourceSupportReviewer:
     def review_prompt(self):
         return PROMPT
 
+    def prompt_for_snapshot(self, snapshot):
+        return self.review_prompt
+
     def parse_findings(self, text, snapshot):
         return self.findings(text)
 
@@ -156,7 +159,7 @@ class SourceSupportReviewer:
                     or payload['generator_model'] != generated.actual_model
                     or payload['snapshot_digest'] != start.event.payload['snapshot_digest']
                     or payload['prompt_digest'] != start.event.payload['prompt_digest']
-                    or payload['prompt_digest'] != hashlib.sha256(self.review_prompt.encode()).hexdigest()
+                    or payload['prompt_digest'] != hashlib.sha256(self.prompt_for_snapshot(data).encode()).hexdigest()
                     or self.vault.digest_json(data) != payload['snapshot_digest']
                     or not payload['reviewer_domain'] or not payload['generator_domain']
                     or payload['delivery_authority_granted'] or payload['world_truth_proven']):
@@ -308,7 +311,8 @@ class SourceSupportReviewer:
         if not generator_domain:
             raise SourceSupportError('generator independence domain is unknown')
         digest = self.vault.digest_json(snapshot)
-        prompt_digest = hashlib.sha256(self.review_prompt.encode()).hexdigest()
+        review_prompt = self.prompt_for_snapshot(snapshot)
+        prompt_digest = hashlib.sha256(review_prompt.encode()).hexdigest()
         prefix = 'opportunity.source-support:' + operation_id
         if self.journal.get(prefix + ':started') is not None:
             raise SourceSupportError('source-support operation already attempted')
@@ -329,14 +333,15 @@ class SourceSupportReviewer:
         deadline = asyncio.get_running_loop().time() + timeout_seconds
         try:
             bundle = ContentReference.from_event_payload(self.journal.get(generated.receipt_event_id).event.payload['content'])
-            messages = [{'role':'system','content':self.review_prompt},{'role':'user',
+            messages = [{'role':'system','content':review_prompt},{'role':'user',
                          'content':json.dumps(snapshot, ensure_ascii=False)}]
             recovered = False
             for attempt in range(2 if protocol_recovery else 1):
                 current, result = self.snapshot(subject=subject, interpretation_id=interpretation_id,
                     candidate_id=candidate_id, clearance=clearance)
                 if (self.vault.digest_json(current)!=digest or result!=generated
-                        or resolve_domain(generated.actual_model)!=generator_domain):
+                        or resolve_domain(generated.actual_model)!=generator_domain
+                        or self.prompt_for_snapshot(current)!=review_prompt):
                     raise SourceSupportError('source-review context changed before inference')
                 if recovered:
                     invalid = self.vault.resolve_json(invalid_ref.content_id, expected_subject=subject,
@@ -355,7 +360,7 @@ class SourceSupportReviewer:
                                                  candidate_id=candidate_id, clearance=clearance)
                 if (self.vault.digest_json(current)!=digest or result!=generated
                         or resolve_domain(generated.actual_model)!=generator_domain
-                        or hashlib.sha256(self.review_prompt.encode()).hexdigest()!=prompt_digest):
+                        or hashlib.sha256(self.prompt_for_snapshot(current).encode()).hexdigest()!=prompt_digest):
                     raise SourceSupportError('source-review context changed during model wait')
                 text, model, provider = SemanticComparator._response(response, route)
                 domain = resolve_domain(model)
@@ -381,7 +386,7 @@ class SourceSupportReviewer:
                     if not recovery.created:
                         raise SourceSupportError('source-review recovery already attempted')
                     # Fresh evidence is reconsidered; never mutate an invalid verdict in code.
-                    messages = [{'role':'system','content':self.review_prompt + '\n' + PROTOCOL_RECOVERY_PROMPT},
+                    messages = [{'role':'system','content':review_prompt + '\n' + PROTOCOL_RECOVERY_PROMPT},
                         {'role':'user','content':json.dumps({'original_evidence':snapshot,
                             'invalid_review':text}, ensure_ascii=False)}]
                     recovered = True

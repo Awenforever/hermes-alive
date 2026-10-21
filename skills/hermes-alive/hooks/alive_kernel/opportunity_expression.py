@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from .action_contract import parse_action_contract
 from .content_vault import ContentReference
 from .communication_plan import validate_communication_plan, plan_atoms, expression_context, validate_recipient_intent
+from .host_discovery import source_prompt_excerpt, read_scope_metadata
 from .deliberation import ActionKind, SideEffect
 from .deliberation_synthesis import DeliberationSynthesizer
 from .events import _thaw_json
@@ -91,6 +92,10 @@ class OpportunityExpressionStore(SemanticReviewStore):
         plan = original.get('communication_plan')
         if plan is not None:
             validate_communication_plan(plan, action_kind=candidate.action_kind.value)
+            if plan['version'] == 3:
+                selected_source = next(item for item in active if item.agenda_item_id == candidate.agenda_item_id)
+                if selected_source.content.get('origin_kind','discovery') != 'discovery':
+                    raise SemanticReviewError('editorial brief lacks discovery provenance')
             atoms = plan_atoms(plan, evidence=evidence)
         else:
             # Retained legacy proposals keep the exact old draft binding. Never
@@ -109,7 +114,37 @@ class OpportunityExpressionStore(SemanticReviewStore):
 
     def expression_context_for_selection(self, selection_event_id, subject):
         *_, plan = self._selected_draft(selection_event_id, subject)
-        return expression_context(plan) if plan is not None else None
+        if plan is None or plan['version'] != 3:
+            return expression_context(plan) if plan is not None else None
+        source, stored, _atoms, _expiry, _plan = self._selected_draft(selection_event_id,subject)
+        candidate = stored.selection.candidate
+        # Recover only the immutable original evidence window, not today's pool.
+        completion = next(e for e in candidate.dimensions.user_value.evidence_event_ids
+                          if e.startswith('opportunity.synthesis:') and e.endswith(':completed'))
+        start = self.journal.get(self.journal.get(completion).event.causation_id)
+        interpreter = OpportunitySynthesizer(self.journal,content_vault=self.content_vault,
+            context_vault=self.context_vault)
+        interpreter.load_completed(subject=subject,operation_id=completion.removeprefix(
+            'opportunity.synthesis:').removesuffix(':completed'),clearance=source.event.sensitivity)
+        original = interpreter.reader.active_evidence(subject=subject,clearance=source.event.sensitivity,
+            limit=32,observation_event_ids=tuple(start.event.payload['observation_event_ids']))
+        url = next(e.content['url'] for e in original if e.agenda_item_id == candidate.agenda_item_id)
+        policy = start.event.payload.get('interpreter_method',{}).get('source_excerpt_policy')
+        return dict(method='discovery-source-authoring-v1',recipient_goal=plan['recipient_goal'],
+            behavior_constraints=plan['behavior_constraints'],brief_is_advisory=True,
+            authority_granted=False,final_source_and_value_review_required=True,
+            user_context=[c.to_prompt() for c in interpreter.context_reader.read(
+                subject=subject,clearance=source.event.sensitivity)],
+            tentative_reading_tasks=interpreter.inquiries.read(subject=subject,clearance=source.event.sensitivity,
+                item_ids=tuple(start.event.payload.get('discovery_inquiry_item_ids',()))),
+            source_evidence=[dict(event_id=e.observation_event_id,title=e.content['title'],
+                url=e.content['url'],excerpt=source_prompt_excerpt(e.content,policy=policy),
+                provenance_metadata={'collector':e.content['source'],**read_scope_metadata(e.content)},
+                published_at=e.content.get('published_at')) for e in original if e.content['url']==url])
+
+    def requires_final_source_review(self, *, selection_event_id, subject):
+        *_, plan = self._selected_draft(selection_event_id,subject)
+        return plan is not None and plan['version'] == 3
 
     @staticmethod
     def _speech(stored, plan):
