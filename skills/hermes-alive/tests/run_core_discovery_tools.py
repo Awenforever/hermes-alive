@@ -30,6 +30,9 @@ async def exercise(home):
         return CoreDiscoveryTools(ctx,read_binding=lambda:state[0],
             approved_queries=('public','held','revoked'),timeout_seconds=timeout)
     host=make()
+    default=CoreDiscoveryTools(ctx,read_binding=lambda:state[0],approved_queries=('public',))
+    assert default.timeout_seconds==180  # Whole host stage must not cap Core's120s extraction at60s.
+    default.close()
     assert json.loads(await host.search('public',limit=1))['success']
     try:await host.search('PRIVATE_MEMORY_NOT_APPROVED',limit=1)
     except HostDiscoveryError:pass

@@ -31,6 +31,20 @@ hermes alive kernel-setup --user-id <current-authorized-id> --confirm-model-call
 hermes alive install-runtime --engine kernel-shadow
 ```
 
+Public discovery requires separate permission. Model-call consent alone does
+not authorize web searches or disclosure of private profile/chat content. Explain
+what public topics will be searched and obtain approval of one to three public
+search phrases. Convert the user's ordinary-language choices into those phrases;
+do not ask them to design flags. Never derive or expand externally disclosed
+queries from private memory without separate approval. With confirmed scope,
+add repeated `--public-query "<approved public search>"` and
+`--confirm-public-reads` to the same `kernel-setup` command above. This authorizes
+only those exact searches and bounded reading of selected public results, not
+delivery. Without both phrases and confirmation, setup does not enable reads.
+Hermes still owns search availability, URL safety and tool/provider setup; report
+missing prerequisites rather than installing a second search backend. The model
+may choose not to read/share; a topic match is not a required message.
+
 Do not request keys or
 create a plugin model configuration: the Core auxiliary task
 `hermes_alive_kernel` owns routing/auth/fallback. An optional model alias remains

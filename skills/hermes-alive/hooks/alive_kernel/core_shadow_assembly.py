@@ -28,7 +28,7 @@ def validate_settings(settings):
     if not isinstance(settings,dict) or settings.get('enabled') is not True:
         raise ValueError('explicit enabled shadow settings required')
     if (settings.get('consent')!='model_calls_no_delivery'
-            or set(settings)-{'enabled','consent','subject','max_cycles','interval_seconds','model'}):
+            or set(settings)-{'enabled','consent','subject','max_cycles','interval_seconds','model','public_discovery'}):
         raise ValueError('explicit shadow model consent and supported settings required')
     subject=identifier(settings.get('subject'))
     max_cycles=settings.get('max_cycles',1)
@@ -38,13 +38,28 @@ def validate_settings(settings):
             or type(interval) not in (int,float) or not 0<=interval<=86400
             or model is not None and (not isinstance(model,str) or not model.strip() or len(model)>512)):
         raise ValueError('bounded shadow schedule and optional Core model alias required')
+    if 'public_discovery' in settings:
+        public_discovery_settings(settings['public_discovery'])
     return subject,max_cycles,interval,model
+
+
+def public_discovery_settings(value):
+    if (not isinstance(value,dict) or set(value)!={'consent','queries'}
+            or value['consent']!='approved_public_queries_no_delivery'
+            or not isinstance(value['queries'],list) or not 1<=len(value['queries'])<=3
+            or any(not isinstance(q,str) or not q.strip() or len(q)>128 for q in value['queries'])
+            or len(set(value['queries']))!=len(value['queries'])):
+        raise ValueError('separate explicit consent and bounded public search queries required')
+    return dict(consent=value['consent'],queries=list(value['queries']))
 
 
 def normalize_settings(settings):
     subject,max_cycles,interval,model=validate_settings(settings)
-    return dict(enabled=True,consent='model_calls_no_delivery',subject=subject,
+    normalized=dict(enabled=True,consent='model_calls_no_delivery',subject=subject,
         max_cycles=max_cycles,interval_seconds=float(interval),model=model)
+    if 'public_discovery' in settings:
+        normalized['public_discovery']=public_discovery_settings(settings['public_discovery'])
+    return normalized
 
 
 def assemble(context):
@@ -61,9 +76,11 @@ def assemble(context):
         raise ValueError('shadow setup belongs to another Core profile')
     task_state={}
     consent_snapshot=canonical(settings)
-    def refresh_task():
+    def validate_consent():
         if canonical(normalize_settings(context.get_config('kernel_shadow',{})))!=consent_snapshot:
             raise ValueError('configured shadow consent changed; new host assembly required')
+    def refresh_task():
+        validate_consent()
         from hermes_cli.fallback_config import get_fallback_chain
         # Forward Core's normalized current chain into its own task slot. Do not
         # persist a copied chain in plugin settings or implement retries here.
@@ -90,11 +107,20 @@ def assemble(context):
     configuration='core-shadow:'+hashlib.sha256(canonical(settings)).hexdigest()[:24]
     host=AutonomousHostRuntime(AutonomousCycleRuntime(journal,content_vault=vault),
         subject=subject,configuration_id=configuration,execute=False)
+    preparation=None
+    if 'public_discovery' in settings:
+        from .configured_discovery_cycle import ConfiguredDiscoveryCycle
+        from .discovery_opportunities import DiscoveryOpportunityIngestor
+        preparation=ConfiguredDiscoveryCycle(context,
+            DiscoveryOpportunityIngestor(journal,content_vault=vault),subject=subject,
+            approved_queries=tuple(settings['public_discovery']['queries']),
+            validate_consent=validate_consent)
     native=NativeCognitionHost(host,profile_id='profile:'+identity,profile_home=home,
         read_configuration=load_config_readonly,read_credential_names=lambda **_:(),
         interpreter=sys.executable,core=Path(hermes_cli.__file__).resolve().parent.parent,
         private_root=root,environment={},resolve_domain=lambda *labels:'unverified-family',
         profile_scope=lambda:core_profile_cycle_scope(home),
+        preparation=preparation,
         caller_factory=lambda *,cycle,read_binding:CorePluginModelCaller(context,read_binding=read_binding,refresh_task=refresh_task))
     parameters=dict(expression_parameters={'requested_model':model,'grounding':True,
         'recipient_meaning':True,'require_independent_grounding':False,

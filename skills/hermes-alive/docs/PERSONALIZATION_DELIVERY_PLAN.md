@@ -7,6 +7,14 @@ the integrated product outcome, not an assertion that all components are absent.
 
 ## Current truth and stop-expanding rule
 
+ADR0197 assembles separately consented public discovery after actual installed
+cycle/profile/policy binding. It reuses Core tools and existing durable reader,
+agenda, model facade and final assessment, rather than a manual source seed or
+another discovery framework. Reading intent remains internal, not user memory.
+Focused controlled installed startup reached final expression; enhanced/full
+qualification and actual fresh public/model quality still pending at writing.
+Finish that vertical path before expanding prompts, source providers or judges.
+
 ADR0196 responds to a real source-led authorship trial, not another speculative
 judge. Private research intent remains in research/selection trace but is no
 longer promoted into recipient purpose at writing or final assessment. The single

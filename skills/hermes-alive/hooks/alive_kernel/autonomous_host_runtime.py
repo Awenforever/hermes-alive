@@ -115,18 +115,39 @@ class AutonomousHostRuntime:
             raise ValueError('cycle-bound parameter factory required')
         async with self.lock:
             cycle = self.open_cycle()
-            parameters=build_parameters(cycle)
-            if hasattr(parameters,'__await__'): parameters=await parameters
-            if (not isinstance(parameters,dict) or any(key in parameters for key in
-                    ('subject','operation_id','execute','reconciliation_cursor','cognition_configuration_id'))):
-                raise ValueError('host owns cycle identity/mode/cursor')
-            parameters = dict(parameters)
-            if parameters.get('reconsider_after_seconds') is not None:
-                parameters['cognition_configuration_id'] = self.configuration_id
-            result = await self.runtime.cycle(**parameters,subject=self.subject,operation_id=cycle.operation_id,
-                execute=self.execute,reconciliation_cursor=cycle.reconciliation_cursor)
-            self.close_cycle(cycle,result)
-            return result
+            phase='preparation'
+            try:
+                parameters=build_parameters(cycle)
+                if hasattr(parameters,'__await__'): parameters=await parameters
+                if (not isinstance(parameters,dict) or any(key in parameters for key in
+                        ('subject','operation_id','execute','reconciliation_cursor','cognition_configuration_id'))):
+                    raise ValueError('host owns cycle identity/mode/cursor')
+                parameters = dict(parameters)
+                if parameters.get('reconsider_after_seconds') is not None:
+                    parameters['cognition_configuration_id'] = self.configuration_id
+                phase='cognition'
+                result = await self.runtime.cycle(**parameters,subject=self.subject,operation_id=cycle.operation_id,
+                    execute=self.execute,reconciliation_cursor=cycle.reconciliation_cursor)
+                phase='completion'
+                self.close_cycle(cycle,result)
+                return result
+            except BaseException as error:
+                # Diagnostic observation, not completion/retry/send authority.
+                # Never persist exception messages, queries, provider URLs or
+                # credential-bearing traceback text in the plaintext journal.
+                payload=dict(subject=self.subject,lane=self.lane,configuration_id=self.configuration_id,
+                    cycle_event_id=cycle.event_id,operation_id=cycle.operation_id,phase=phase,
+                    failure_class=type(error).__name__,
+                    cause_class=type(error.__cause__).__name__ if error.__cause__ is not None else None,
+                    authority_granted=False,external_delivery_proven=False)
+                payload['integrity_authenticator']=self.protector.authenticate_json('autonomous.host.failed.v1',payload)
+                try:
+                    self.journal.append(EventEnvelope(event_type='autonomous.host.failed',source='alive.autonomous-host',
+                        actor='system:alive-host',subject=self.subject,sensitivity=Sensitivity.PRIVATE,
+                        correlation_id=self.lane,causation_id=cycle.event_id,payload=payload))
+                except Exception:
+                    pass  # A diagnostic write must not replace the original failure/cancellation.
+                raise
 
     async def run(self,*,build_parameters,stop,max_cycles,interval_seconds=60,cycle_step=None):
         if (self.running or type(max_cycles) is not int or not 1<=max_cycles<=1000
@@ -152,8 +173,9 @@ class AutonomousHostRuntime:
                     if not active.done():
                         return {'completed_cycles':completed,'exit_reason':'stopped','external_delivery_proven':False}
                     try: active.result()
-                    except Exception:
-                        return {'completed_cycles':completed,'exit_reason':'cycle_failed','external_delivery_proven':False}
+                    except Exception as error:
+                        return {'completed_cycles':completed,'exit_reason':'cycle_failed',
+                            'failure_class':type(error).__name__,'external_delivery_proven':False}
                     completed += 1
                 finally:
                     for task in (active,stopped):

@@ -43,6 +43,8 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
     kernel.add_argument('--max-cycles',type=int,default=1)
     kernel.add_argument('--interval-seconds',type=float,default=600)
     kernel.add_argument('--model',default=None,help='Optional Hermes model alias; empty inherits Core')
+    kernel.add_argument('--public-query',action='append',help='Approved public search text; repeat up to three times')
+    kernel.add_argument('--confirm-public-reads',action='store_true',help='Authorize only these public queries and reading their results')
     actions.add_parser("uninstall-runtime", help="Remove owned runtime code while preserving user state")
     actions.add_parser("enable", help="Enable proactive delivery")
     actions.add_parser("disable", help="Disable proactive delivery")
@@ -196,12 +198,19 @@ def alive_command(args: argparse.Namespace) -> int:
         if not getattr(args,'confirm_model_calls',False):
             print(json.dumps({'ok':False,'confirmation_required':True,'physical_delivery':False}))
             return 2
+        queries=getattr(args,'public_query',None)
+        public_consent=getattr(args,'confirm_public_reads',False)
+        if bool(queries)!=bool(public_consent):
+            print(json.dumps({'ok':False,'public_query_confirmation_required':True,'physical_delivery':False}))
+            return 2
         from .tool_receipt_bridge import _kernel_module
         assembly=_kernel_module('core_shadow_assembly')
         subject=(assembly.subject_for_user(_home(),args.user_id) if getattr(args,'user_id',None)
                  else getattr(args,'subject',None))
         settings=dict(enabled=True,consent='model_calls_no_delivery',subject=subject,
             max_cycles=args.max_cycles,interval_seconds=args.interval_seconds,model=args.model)
+        if queries:
+            settings['public_discovery']=dict(consent='approved_public_queries_no_delivery',queries=queries)
         assembly.validate_settings(settings)
         from hermes_cli.plugins_state import save_plugin_setting
         save_plugin_setting('hermes-alive',('kernel_shadow',),settings)

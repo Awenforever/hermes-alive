@@ -38,6 +38,13 @@ async def test(root):
     try: await host.step({})
     except RuntimeError: pass
     else: raise AssertionError('failed cycle became completion')
+    failed=journal.read(event_type='autonomous.host.failed')[-1].event
+    payload=dict(failed.payload);signature=payload.pop('integrity_authenticator')
+    assert payload['failure_class']=='RuntimeError' and payload['phase']=='cognition'
+    assert payload['subject']=='user:one' and payload['authority_granted'] is False
+    assert 'synthetic private failure' not in repr(payload)
+    assert host.protector.verify_json('autonomous.host.failed.v1',payload,signature)
+    assert failed.causation_id==payload['cycle_event_id']
     operation = first.operations[-1]
     restarted = Driver(ExperienceJournal(journal.path))
     recovered = AutonomousHostRuntime(restarted,subject='user:one',configuration_id='config')

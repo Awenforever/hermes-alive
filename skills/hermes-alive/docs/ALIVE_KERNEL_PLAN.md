@@ -2,7 +2,27 @@
 
 Status: active
 
-Last reviewed: 2026-10-21
+Last reviewed: 2026-10-22
+
+ADR0197 connects public discovery to the actual installed, profile-bound native
+cycle instead of manually seeding private probes. Public query permission is
+separate from model permission; original observations, durable reading selection
+and encrypted inquiry feed the existing cognition/final-assessment loop. Pending
+physical reads belong to host lifetime and cannot be treated as cancelled IO.
+Controlled focused paths pass; enhanced and canonical qualification pending at
+writing. Actual Core installed startup reached final expression with controlled
+tools/model HTTP, not real intelligence or a quality round. Next qualify and run
+fresh useful outcomes through this installed path, then connect sustained inquiry,
+memory/outcomes/reflection/feedback. Preserve every original acceptance gate.
+
+Two real installed attempts stopped before model work: one public read exceeded
+the local60s wait, although Core's legal extraction dispatch defaults120s and
+the isolated container lacked the NAS proxy (proxy204/direct timeout verified).
+Do not treat either as qualified silence or a model failure. Separate total host
+read budget from Core request/rescue budgets; retain physical settlement guards
+and record safe failure phase/class in the journal. Qualify the revised default
+and a correctly networked installed trial without modifying production, retrying
+an uncertain old operation or claiming a longer timeout proves content quality.
 
 ADR0196 separates internal research rationale from recipient authorship and final
 assessment inputs, while retaining encrypted provenance and historical replay.

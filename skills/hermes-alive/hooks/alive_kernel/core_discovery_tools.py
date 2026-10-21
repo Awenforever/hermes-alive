@@ -12,18 +12,25 @@ from pathlib import Path
 from .host_discovery import HostDiscoveryError,HostReadUncertainError
 
 
+DEFAULT_READ_STAGE_SECONDS=180
+MAX_READ_STAGE_SECONDS=600
+
+
 class CoreDiscoveryTools:
-    def __init__(self, context, *, read_binding, approved_queries, timeout_seconds=60):
+    def __init__(self, context, *, read_binding, approved_queries, timeout_seconds=DEFAULT_READ_STAGE_SECONDS):
         if (not callable(read_binding) or not isinstance(approved_queries, tuple)
                 or len(approved_queries)>3 or any(not isinstance(q,str) or not q.strip()
                 or len(q)>128 for q in approved_queries)
                 or type(timeout_seconds) not in (int,float)
-                or not math.isfinite(timeout_seconds) or not 0<timeout_seconds<=120):
+                or not math.isfinite(timeout_seconds) or not 0<timeout_seconds<=MAX_READ_STAGE_SECONDS):
             raise HostDiscoveryError('explicit bounded approved public queries required')
         self.context=context
         self.home=Path(context._manager.scope_key).resolve()
         self.read_binding=read_binding
         self.approved_queries=approved_queries
+        # Independent total host wait, not a provider request timeout. Core's
+        # ordinary extract dispatch alone may take120s, followed by its rescue.
+        # A60s host cap falsely retired legitimate requests before Core settled.
         self.timeout_seconds=timeout_seconds
         self._active=None
         self._closed=False

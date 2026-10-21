@@ -137,6 +137,7 @@ run_and_require run_inquiry_owner_context.py '^HERMES_ALIVE_INQUIRY_OWNER_CONTEX
 run_and_require run_discovery_authoring.py '^HERMES_ALIVE_DISCOVERY_AUTHORING_OK$'
 run_and_require run_source_excerpt_scope.py '^HERMES_ALIVE_SOURCE_EXCERPT_SCOPE_OK$'
 run_and_require run_core_discovery_tools.py '^HERMES_ALIVE_CORE_DISCOVERY_TOOLS_OK$'
+run_and_require run_configured_discovery_cycle.py '^HERMES_ALIVE_CONFIGURED_DISCOVERY_CYCLE_OK$'
 run_and_require run_rich_content_model_attribution_v1.py '^HERMES_ALIVE_RICH_CONTENT_MODEL_ATTRIBUTION_RESULT=PASS([[:space:]]|$)'
 run_and_require run_runtime_disable_contract.py '^HERMES_ALIVE_RUNTIME_DISABLE_CONTRACT_RESULT=PASS$'
 run_and_require run_plugin_cli_portable.py '^HERMES_ALIVE_PLUGIN_CLI_PORTABLE_RESULT=PASS$'
