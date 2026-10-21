@@ -55,7 +55,8 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
             content_vault=self.vault, context_vault=context_vault)
 
     def prompt_for_snapshot(self, snapshot):
-        if snapshot.get('expression_binding',{}).get('assessment_mode') == 'discovery-source-and-value-v1':
+        if snapshot.get('expression_binding',{}).get('assessment_mode') in (
+                'discovery-source-and-value-v1','discovery-source-and-value-v2'):
             return _DISCOVERY_FINAL_PROMPT_V1
         return super().prompt_for_snapshot(snapshot)
 
@@ -174,6 +175,12 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
         if data['candidate'].get('communication_plan',{}).get('version') == 3:
             data['expression_binding']['assessment_mode'] = 'discovery-source-and-value-v1'
             data['assessment_scope']['kind'] = 'final_discovery_source_and_value'
+            context = self.expressions.expression_context_for_selection(expression.selection_event_id,subject)
+            if context['method'] == 'discovery-source-authoring-v2':
+                # Evaluate actual source/context/text, not whether the author
+                # carried out the generating model's proposed research purpose.
+                data['candidate'].pop('communication_plan')
+                data['expression_binding']['assessment_mode'] = 'discovery-source-and-value-v2'
         if correction is not None:
             data['expression_binding']['correction'] = correction
         if len(json.dumps(data, ensure_ascii=False)) > 40000:

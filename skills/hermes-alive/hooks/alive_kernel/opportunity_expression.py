@@ -130,7 +130,7 @@ class OpportunityExpressionStore(SemanticReviewStore):
             limit=32,observation_event_ids=tuple(start.event.payload['observation_event_ids']))
         url = next(e.content['url'] for e in original if e.agenda_item_id == candidate.agenda_item_id)
         policy = start.event.payload.get('interpreter_method',{}).get('source_excerpt_policy')
-        return dict(method='discovery-source-authoring-v1',recipient_goal=plan['recipient_goal'],
+        context = dict(method='discovery-source-authoring-v1',recipient_goal=plan['recipient_goal'],
             behavior_constraints=plan['behavior_constraints'],brief_is_advisory=True,
             authority_granted=False,final_source_and_value_review_required=True,
             user_context=[c.to_prompt() for c in interpreter.context_reader.read(
@@ -141,6 +141,14 @@ class OpportunityExpressionStore(SemanticReviewStore):
                 url=e.content['url'],excerpt=source_prompt_excerpt(e.content,policy=policy),
                 provenance_metadata={'collector':e.content['source'],**read_scope_metadata(e.content)},
                 published_at=e.content.get('published_at')) for e in original if e.content['url']==url])
+        if start.event.payload.get('interpreter_method',{}).get('discovery_authoring') == 'source-led-v2':
+            # Research rationale remains in the encrypted agenda/proposal trace.
+            # Do not promote it into the recipient's purpose by asking the author
+            # (or its reviewer) to satisfy an agent-invented research assignment.
+            context['method'] = 'discovery-source-authoring-v2'
+            for field in ('recipient_goal','behavior_constraints','tentative_reading_tasks','brief_is_advisory'):
+                context.pop(field, None)
+        return context
 
     def requires_final_source_review(self, *, selection_event_id, subject):
         *_, plan = self._selected_draft(selection_event_id,subject)

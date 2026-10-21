@@ -2,7 +2,17 @@
 
 Status: active
 
-Last reviewed: 2026-10-20
+Last reviewed: 2026-10-21
+
+ADR0196 separates internal research rationale from recipient authorship and final
+assessment inputs, while retaining encrypted provenance and historical replay.
+Real source-led-v3 execution completed, but manual quality review rejected its
+research-note outcome; one input-only contrast improved that issue without
+producing an accepted share. No quality round credited. This boundary change is
+not a complete content solution. Qualify it, then prioritize installed autonomous
+discovery and actual fresh useful outcomes; do not grow prompt/judge variants.
+The full original memory/agenda/outcome/reflection/migration/production scope
+below remains open and must not be replaced by component-test success.
 
 ADR0195 changes the discovery-specific intent/authoring responsibility, not a set
 of forbidden phrases or topics. A scoped v3 editorial brief is not an immutable

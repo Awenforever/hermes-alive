@@ -7,6 +7,14 @@ the integrated product outcome, not an assertion that all components are absent.
 
 ## Current truth and stop-expanding rule
 
+ADR0196 responds to a real source-led authorship trial, not another speculative
+judge. Private research intent remains in research/selection trace but is no
+longer promoted into recipient purpose at writing or final assessment. The single
+role contrast did not produce accepted content. Keep historical replay intact,
+qualify the role boundary, then complete the installed discovery vertical slice
+and evaluate fresh contributions. Do not call an input-boundary PASS personality,
+long-term learning, recipient value or a clean complete quality round.
+
 ADR0191 fixes measured stage/request deadline conflation so Core's existing task
 and fallback request budgets are honored within a separately bounded stage. Main
 validation uses the owner's current primary/backup, not an optional review family.

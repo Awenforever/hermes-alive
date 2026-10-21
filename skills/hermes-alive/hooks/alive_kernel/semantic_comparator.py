@@ -146,7 +146,7 @@ class SemanticComparator:
     @staticmethod
     def _review_contract(meaning, text, context):
         original = dict(meaning=meaning,candidate=text)
-        if context and context.get('method') == 'discovery-source-authoring-v1':
+        if context and context.get('method') in ('discovery-source-authoring-v1','discovery-source-authoring-v2'):
             original['source_context'] = context
             return original, _DISCOVERY_REVIEW_PROMPT_V1, 'semantic-source-findings-v1'
         return original, _REVIEW_PROMPT_V1, 'semantic-findings-v1'
@@ -337,7 +337,8 @@ class SemanticComparator:
         context_reader = getattr(self.store, 'expression_context_for_selection', None)
         expression_context = (context_reader(selection_event_id, subject)
                               if context_reader is not None else None)
-        discovery = bool(expression_context and expression_context.get('method')=='discovery-source-authoring-v1')
+        discovery = bool(expression_context and expression_context.get('method') in (
+            'discovery-source-authoring-v1','discovery-source-authoring-v2'))
         prompt = json.dumps({"meaning": meaning, "presentation": style,
                              "language": language,
                              **({'expression_context':expression_context} if expression_context else {}),

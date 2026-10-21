@@ -31,6 +31,9 @@ from .host_discovery import read_scope_metadata, source_prompt_excerpt, SOURCE_E
 from .model_timeouts import MAX_STAGE_SECONDS
 
 
+_DISCOVERY_AUTHORING = 'source-led-v2'
+
+
 class OpportunitySynthesisError(ValueError):
     """Opportunity interpretation failed without granting action authority."""
 
@@ -839,7 +842,7 @@ class OpportunitySynthesizer:
                 source_presentation=bundle.get("source_presentation", "model_text_v1"),feedback=feedback,
                 recipient_meaning=start.event.payload.get('recipient_meaning',False),
                 intent_only=bundle.get('recipient_output') == 'intent-only-v1',
-                allow_editorial_brief=start.event.payload.get('interpreter_method',{}).get('discovery_authoring')=='source-led-v1')
+                allow_editorial_brief=start.event.payload.get('interpreter_method',{}).get('discovery_authoring') in ('source-led-v1','source-led-v2'))
             if invalid or len(candidates) != count:
                 raise OpportunitySynthesisError("completed proposals no longer valid")
             abstentions, invalid_abstentions = self._abstentions(
@@ -890,7 +893,7 @@ class OpportunitySynthesizer:
                 or editorial != bundle.get('editorial_context')
                 or editorial not in (None, 'origin-purpose-v1')
                 or authoring != bundle.get('discovery_authoring')
-                or authoring not in (None,'source-led-v1')
+                or authoring not in (None,'source-led-v1','source-led-v2')
                 or (authoring is not None and output != 'intent-only-v1')
                 or (editorial is not None and output != 'intent-only-v1')
                 or (output is not None and (mode != 'expression-required-v1'
@@ -952,7 +955,7 @@ class OpportunitySynthesizer:
             raise OpportunitySynthesisError('unknown structural recovery validation contract')
         intent_only = method.get('structure_recovery') in ('proposal-shape-v2','proposal-shape-v3')
         authoring = method.get('structure_recovery') == 'proposal-shape-v3'
-        if authoring != (method.get('discovery_authoring') == 'source-led-v1'):
+        if authoring != (method.get('discovery_authoring') in ('source-led-v1','source-led-v2')):
             raise OpportunitySynthesisError('structural recovery editorial contract mismatch')
         if intent_only != (method.get('recipient_output') == 'intent-only-v1'):
             raise OpportunitySynthesisError('structural recovery output contract mismatch')
@@ -1073,7 +1076,7 @@ class OpportunitySynthesizer:
             recipient_execution='expression-required-v1' if recipient_meaning else None,
             recipient_output='intent-only-v1' if recipient_meaning else None,
             editorial_context='origin-purpose-v1' if recipient_meaning else None,
-            discovery_authoring='source-led-v1' if recipient_meaning else None,
+            discovery_authoring=_DISCOVERY_AUTHORING if recipient_meaning else None,
             kind='model_prompt' if evidence else 'system_no_material',
             system_prompt_sha256=hashlib.sha256(system_prompt.encode()).hexdigest() if evidence else None,
             requested_model=requested_model if evidence else None,
