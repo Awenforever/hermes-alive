@@ -4,6 +4,7 @@ The host supplies the current policy, model capability and authority on every
 entry. Started but uncompleted provider operations are not repeated implicitly.
 """
 from dataclasses import dataclass
+from datetime import timedelta,datetime
 import math
 import re
 
@@ -52,6 +53,36 @@ watcher and not a complete production loop. It creates no channel queues.
                                            context_vault=context_vault)
         self.coordinator = CognitionCycleCoordinator(journal,
             content_vault=self.synth.vault, context_vault=context_vault)
+
+    async def _recall_feedback(self,*,subject,operation_id,start,call,model,clearance,inquiry_item_ids,timeout_seconds):
+        from .feedback_recall import FeedbackRecallSelector
+        from .content_vault import ContentReference
+        def capture():
+            context=self.synth.context_reader.read(subject=subject,clearance=clearance)
+            recent=self.synth.feedback_reader.read(subject=subject,clearance=clearance)
+            sources=self.synth.reader.active_evidence(subject=subject,clearance=clearance,limit=32)
+            inquiries=self.synth.inquiries.read(subject=subject,clearance=clearance,item_ids=inquiry_item_ids)
+            query=dict(as_of=start.event.occurred_at.isoformat(),
+                current_user_context=[v.to_prompt() for v in context],
+                recent_feedback_context=[v.to_prompt() for v in recent],
+                current_inquiries=inquiries,
+                opportunities=[dict(observation_event_id=v.observation_event_id,title=v.content['title'],
+                    summary_preview=v.content['summary'][:512],preview_only=True,
+                    origin_kind=v.content.get('origin_kind','discovery')) for v in sources],
+                authority_granted=False,complete_inventory=False)
+            expiry=min((start.event.occurred_at+timedelta(hours=1),
+                *(v.expires_at for v in sources),*(datetime.fromisoformat(v.retention_until) for v in recent),
+                *(datetime.fromisoformat(v['expires_at']) for v in inquiries)))
+            for value in context:
+                record=self.journal.get(value.proposal_event_id)
+                ref=ContentReference.from_event_payload(record.event.payload['content'])
+                if ref.retention_until is not None:expiry=min(expiry,ref.retention_until)
+            return query,expiry
+        query,expiry=capture()
+        result=await FeedbackRecallSelector(self.synth.feedback_reader).run(subject=subject,
+            operation_id=operation_id,query=query,validate_query=lambda:capture()[0],retention_until=expiry,
+            call=call,model=model,clearance=clearance,timeout_seconds=timeout_seconds)
+        return tuple(result['outcome_event_ids'])
 
     async def _ground_candidates(self, generated, *, subject, interpretation_id,
             call, reviewer_model, sensitivity, resolve_domain, require_independence,
@@ -112,10 +143,13 @@ watcher and not a complete production loop. It creates no channel queues.
                   grounding_model=None, resolve_grounding_domain=None,
                   require_independent_grounding=False, recipient_meaning=False,
                   inquiry_item_ids=(),research_read_receipt_ids=(),recalled_feedback_event_ids=(),
+                  semantic_feedback_recall=False,
                   model_timeout_seconds=None):
         validate_model_timeout(model_timeout_seconds)
         if type(recipient_meaning) is not bool:
             raise PlanningRuntimeError('invalid recipient meaning mode')
+        if type(semantic_feedback_recall) is not bool or semantic_feedback_recall and recalled_feedback_event_ids:
+            raise PlanningRuntimeError('choose semantic or explicit feedback recall, not both')
         if type(grounding) is not bool or type(require_independent_grounding) is not bool:
             raise PlanningRuntimeError('invalid grounding mode')
         if grounding_model is not None and (not isinstance(grounding_model, str) or not re.fullmatch(
@@ -151,6 +185,9 @@ watcher and not a complete production loop. It creates no channel queues.
                 'require_independence':require_independent_grounding, 'method':'source-support-v1'}
         if recipient_meaning:
             binding['recipient_meaning'] = 'recipient-meaning-v1'
+        if semantic_feedback_recall:
+            from .feedback_recall import FeedbackRecallSelector
+            binding['semantic_feedback_recall']=FeedbackRecallSelector.METHOD
         self.synth.inquiries.identities(inquiry_item_ids)
         if not isinstance(recalled_feedback_event_ids,tuple):
             raise PlanningRuntimeError('exact feedback references must be a tuple')
@@ -191,6 +228,11 @@ watcher and not a complete production loop. It creates no channel queues.
         interpret_id = 'runtime-interpret:' + digest
         cycle_id = 'runtime-cycle:' + digest
         select_id = 'runtime-select:' + digest
+        if semantic_feedback_recall:
+            recalled_feedback_event_ids=await self._recall_feedback(subject=subject,
+                operation_id='runtime-feedback:'+digest,start=prior,call=call,model=requested_model,
+                clearance=sensitivity,inquiry_item_ids=inquiry_item_ids,
+                timeout_seconds=model_timeout_seconds or 600)
         if self.journal.get('opportunity.synthesis:' + interpret_id + ':started') is not None:
             generated = self.synth.load_completed(subject=subject, operation_id=interpret_id,
                 authority=authority, clearance=sensitivity)

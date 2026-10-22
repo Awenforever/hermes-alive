@@ -1,6 +1,6 @@
 # ADR0200 — Recall attributed feedback without inventing a permanent profile
 
-Status: partial implementation; qualification and automatic selection pending
+Status: partial implementation; semantic selection qualification and installed activation pending
 
 ## Observed gap
 
@@ -51,10 +51,57 @@ model-written paraphrase. Repair operations keep the same reference scope.
 
 No recall marker means the original historical contract. Old operations cannot
 gain new context, new model work or new authority merely by reopening under
-new code. Exact reference selection is currently a host input; an automatic
-model selector and its durable acquisition/recovery wiring remain unfinished.
-This partial consumer is NOT a claim that ordinary installed cognition now
-automatically retrieves all relevant older feedback.
+new code. Exact reference selection remains available as a host input. The new
+explicit semantic_feedback_recall option invokes the inherited model before
+interpretation; ordinary installed activation is not yet configured or qualified.
+This is NOT a claim that ordinary installed cognition automatically retrieves
+all relevant older feedback.
+
+## Bounded semantic selection, not another profile writer
+
+The first chronological implementation failed an actual inherited-model trial:
+the model read only the first page and guessed unobserved older replies were
+repetitions. It missed an explicit qualified preference on the second page.
+Controlled paging tests did not expose this semantic acquisition failure. Keep
+that trial rejected; do not cure it with a topic word or another judge.
+
+The optional selector receives the current inquiry, source previews, explicit
+context and recent literal corrections. Acquisition now uses bounded recency
+plus older/middle sequence strata BEFORE the single selection call, so the model
+can inspect nonrecent evidence rather than guessing whether to read it. At most
+four index windows, sixteen eligible pairs per window, and deduplicated previews
+are presented. Preview limits128/256 characters for delivered/reply text remain
+explicit index-only truncation; they cannot support facts or preference updates.
+The entire query/index must fit120000 encoded bytes or the operation is incomplete,
+not silently reduced to the latest page. Resolve up to four selected pairs in full
+before interpretation. No topic dictionary, embedding
+service, provider setup, preference update or transport queue is introduced.
+The same Hermes call capability owns model/auth/fallback, with one selection call
+and one finite total stage budget. Empty selection is permitted, but is
+not proof of absent interests or qualified silence by itself.
+
+Persist the operation before inference, encrypt inquiry/reasons/results and
+bind query, model request, prompt, owner/clearance, retention and bounded paging.
+Before/after waits and on recovery, verify current query and all inspected page
+digests, including unselected evidence that could affect the decision. Completed
+work reopens without inference; interrupted or failed work requires explicit
+reconciliation rather than a new implicit provider spend. The result's retention
+cannot outlive any inspected pair; query retention is bounded by its own input
+sources and an hour-long operation lifetime. Expired consent is not authorization.
+
+Coverage is always explicitly incomplete. A page budget may stop before useful
+older evidence, with a continuation need/cursor retained, not a conclusion that
+the owner has no other preferences. Peeking into other strata never advances the
+contiguous head cursor over uninspected gaps; strata are not full time coverage.
+Metadata strata can contain expired/ineligible records. Rotation/backfill across future installed
+cycles and integration with configured external memory remain unfinished.
+Do not present four chronological pages as a complete long-term memory system.
+
+Reconsideration cannot validate only unchanged selected IDs: include current
+complete exact pairs, or fingerprint the same bounded semantic archive horizon,
+and bound cache lifetime by those sources. Deleting older feedback must change
+the cache context even when the latest three replies are unchanged. This bounded
+correctness-first read path needs latency/resource measurement before activation.
 
 ## Minimize unrelated reads
 
@@ -75,9 +122,10 @@ source-linked candidate evidence, erasure during a model wait and on reopen,
 foreign reference preflight, full long qualifications and no physical sends.
 Mocks prove contract routing, not good automatic selection or user satisfaction.
 
-Next complete durable, bounded semantic selection against current inquiry and
-correction context, including paging exhaustion, contradictions and absence of
-evidence. Preserve Hermes model/auth/provider ownership and existing configured
+Next qualify semantic selection against current inquiry and correction context,
+including paging exhaustion, contradictions and absence of evidence. Measure
+actual selection quality, latency, installed activation and multi-cycle coverage,
+not only oracle routing. Preserve Hermes model/auth/provider ownership and existing configured
 external memory integration; do not create a second private memory service.
 Qualify actual installed paths and fresh real outcomes, not just helper tests.
 Sustained agenda, reflection usefulness, erasure/migration/recovery/rollback,

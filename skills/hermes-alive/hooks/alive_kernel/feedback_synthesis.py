@@ -79,7 +79,8 @@ class FeedbackSynthesizer:
         if (record is None or record.event.actor != subject
                 or record.event.source != "hermes.command.memory"
                 or record.event.sensitivity != Sensitivity.PRIVATE
-                or record.event.payload.get("enabled") is not True):
+                or record.event.payload.get("enabled") is not True
+                or record.event.expires_at is not None and record.event.expires_at<=datetime.now(timezone.utc)):
             raise FeedbackSynthesisError("feedback interpretation consent unavailable")
         return record
 

@@ -82,6 +82,7 @@ run_and_require run_alive_kernel_action_authorization.py '^HERMES_ALIVE_KERNEL_A
 run_and_require run_action_history.py '^HERMES_ALIVE_ACTION_HISTORY_OK$'
 run_and_require run_action_history_live_probe.py '^HERMES_ALIVE_ACTION_HISTORY_LIVE_PROBE_OK$'
 run_and_require run_feedback_context.py '^HERMES_ALIVE_FEEDBACK_CONTEXT_OK$'
+run_and_require run_feedback_recall.py '^HERMES_ALIVE_FEEDBACK_RECALL_OK$'
 run_and_require run_send_preflight.py '^HERMES_ALIVE_SEND_PREFLIGHT_OK$'
 run_and_require run_source_review_recovery.py '^HERMES_ALIVE_SOURCE_REVIEW_RECOVERY_OK$'
 run_and_require run_source_scope_live_probe.py '^HERMES_ALIVE_SOURCE_SCOPE_LIVE_PROBE_OK$'

@@ -7,8 +7,15 @@ Last reviewed: 2026-10-22
 ADR0200 addresses actual loss of visibility of retained feedback, not an interest
 keyword gap. Paged literal evidence and exact current resolution now have a
 planning/synthesis/review consumer under an explicitly recorded recall contract;
-old operations keep their old window. Qualification is pending. Automatic semantic
-selection/installed activation are NOT finished, so ordinary cognition cannot yet
+old operations keep their old window. The exact-pair consumer is qualified. An
+explicit model-driven selection mode now enters planning, with durable
+query/result binding and no implicit retry of interrupted inference. An actual
+first-page trial guessed unread history was repetitive and missed a retained
+boundary. Acquisition now exposes bounded recency/older/middle index strata
+before selection, rather than letting that guess suppress unseen evidence.
+It is still incomplete coverage, not a full-history profile. Its new
+qualification, real selection quality, multi-cycle continuation, resource cost
+and ordinary installed activation remain pending; ordinary cognition cannot yet
 be claimed to recall older preferences reliably. A multi-reply stress case also
 exposed unrelated outcome-body reads during delivery attribution; narrowly filter
 the existing query without weakening canonical receipt validation. Next qualify

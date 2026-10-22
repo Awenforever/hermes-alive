@@ -80,6 +80,22 @@ class ReconsiderationStore:
                         valid_until = boundary
         for item in evidence:
             valid_until = min(valid_until, item.expires_at)
+        recalled=parameters.get('recalled_feedback_event_ids',())
+        if recalled:
+            pairs=self.synth.feedback_reader.context(subject=subject,clearance=clearance,recalled_ids=recalled)
+            state['exact_recalled_feedback']=[v.to_prompt() for v in pairs]
+            valid_until=min(valid_until,*(datetime.fromisoformat(v.retention_until) for v in pairs))
+        if parameters.get('semantic_feedback_recall') is True:
+            from .feedback_recall import FeedbackRecallSelector
+            pages=[]
+            for window in FeedbackRecallSelector(self.synth.feedback_reader).windows(subject=subject,clearance=clearance):
+                page=window['page']
+                pages.append(self.synth.vault.digest_json(page))
+                for entry in page['entries']:
+                    valid_until=min(valid_until,datetime.fromisoformat(entry['retention_until']))
+            # Include content availability, not merely unchanged reference IDs.
+            # Match the selector's bounded horizon; this is not all-life recall.
+            state['semantic_feedback_archive']=pages
         digest = self.protector.authenticate_json(self.METHOD+'.context', state)
         return ReconsiderationContext(digest, int(frontier or 0), valid_until)
 
