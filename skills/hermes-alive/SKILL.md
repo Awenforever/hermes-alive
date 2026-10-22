@@ -40,7 +40,15 @@ queries from private memory without separate approval. With confirmed scope,
 add repeated `--public-query "<approved public search>"` and
 `--confirm-public-reads` to the same `kernel-setup` command above. This authorizes
 only those exact searches and bounded reading of selected public results, not
-delivery. Without both phrases and confirmation, setup does not enable reads.
+delivery. Each cycle may read at most two selected result pages. Explain the
+optional cited-source follow-up separately: after approval add
+`--confirm-cited-reads`, allowing one model-decided reading of at most two unread
+URLs actually cited in those retained extracts. Old configurations without this
+additional confirmation do not gain it on upgrade. No recursive crawl or
+additional search is authorized.
+The follow-up decision receives only the public extracts, not the user's profile
+or the private research question. A citation is not a verification certificate.
+Without both phrases and confirmation, setup does not enable reads.
 Hermes still owns search availability, URL safety and tool/provider setup; report
 missing prerequisites rather than installing a second search backend. The model
 may choose not to read/share; a topic match is not a required message.

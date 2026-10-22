@@ -44,13 +44,17 @@ def validate_settings(settings):
 
 
 def public_discovery_settings(value):
-    if (not isinstance(value,dict) or set(value)!={'consent','queries'}
+    if (not isinstance(value,dict) or not {'consent','queries'}<=set(value)
+            or set(value)-{'consent','queries','follow_citations'}
+            or ('follow_citations' in value and value['follow_citations'] is not True)
             or value['consent']!='approved_public_queries_no_delivery'
             or not isinstance(value['queries'],list) or not 1<=len(value['queries'])<=3
             or any(not isinstance(q,str) or not q.strip() or len(q)>128 for q in value['queries'])
             or len(set(value['queries']))!=len(value['queries'])):
         raise ValueError('separate explicit consent and bounded public search queries required')
-    return dict(consent=value['consent'],queries=list(value['queries']))
+    normalized=dict(consent=value['consent'],queries=list(value['queries']))
+    if 'follow_citations' in value:normalized['follow_citations']=True
+    return normalized
 
 
 def normalize_settings(settings):
@@ -114,6 +118,7 @@ def assemble(context):
         preparation=ConfiguredDiscoveryCycle(context,
             DiscoveryOpportunityIngestor(journal,content_vault=vault),subject=subject,
             approved_queries=tuple(settings['public_discovery']['queries']),
+            follow_citations=settings['public_discovery'].get('follow_citations',False),
             validate_consent=validate_consent)
     native=NativeCognitionHost(host,profile_id='profile:'+identity,profile_home=home,
         read_configuration=load_config_readonly,read_credential_names=lambda **_:(),

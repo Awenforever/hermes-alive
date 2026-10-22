@@ -45,6 +45,7 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
     kernel.add_argument('--model',default=None,help='Optional Hermes model alias; empty inherits Core')
     kernel.add_argument('--public-query',action='append',help='Approved public search text; repeat up to three times')
     kernel.add_argument('--confirm-public-reads',action='store_true',help='Authorize only these public queries and reading their results')
+    kernel.add_argument('--confirm-cited-reads',action='store_true',help='Additionally authorize one bounded follow-up of actual public citations')
     actions.add_parser("uninstall-runtime", help="Remove owned runtime code while preserving user state")
     actions.add_parser("enable", help="Enable proactive delivery")
     actions.add_parser("disable", help="Disable proactive delivery")
@@ -200,7 +201,8 @@ def alive_command(args: argparse.Namespace) -> int:
             return 2
         queries=getattr(args,'public_query',None)
         public_consent=getattr(args,'confirm_public_reads',False)
-        if bool(queries)!=bool(public_consent):
+        cited_consent=getattr(args,'confirm_cited_reads',False)
+        if bool(queries)!=bool(public_consent) or cited_consent and not (queries and public_consent):
             print(json.dumps({'ok':False,'public_query_confirmation_required':True,'physical_delivery':False}))
             return 2
         from .tool_receipt_bridge import _kernel_module
@@ -211,6 +213,7 @@ def alive_command(args: argparse.Namespace) -> int:
             max_cycles=args.max_cycles,interval_seconds=args.interval_seconds,model=args.model)
         if queries:
             settings['public_discovery']=dict(consent='approved_public_queries_no_delivery',queries=queries)
+            if cited_consent:settings['public_discovery']['follow_citations']=True
         assembly.validate_settings(settings)
         from hermes_cli.plugins_state import save_plugin_setting
         save_plugin_setting('hermes-alive',('kernel_shadow',),settings)

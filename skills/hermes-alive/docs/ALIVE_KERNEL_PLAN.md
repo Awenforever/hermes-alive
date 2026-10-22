@@ -4,6 +4,21 @@ Status: active
 
 Last reviewed: 2026-10-22
 
+ADR0198 adds one bounded cited-source follow-up to the installed public discovery
+path, not a native-agent replacement or another judge. The real installed trial
+completed, yet was not useful/faithful enough to accept. Private Core research
+traced original material; subsequent authorship still introduced unsupported
+claims, so natural persona and explicit inference labels are not a cure. New
+cycles can read up to two actually cited links, using public-only model input,
+original encrypted receipts and Core safety/model ownership. Historical started
+cycles keep their original mode and spend; no recursive search or crawl.
+Qualification is pending at writing. Next test exact replay/privacy/withdrawal
+and actual installed acquisition, then fresh real source-to-writing fidelity.
+Content-dependent depth is an explicit user preference, not a shortness quota;
+personal confirmation/source text stays private, never a public default. No
+quality rounds credited. Preserve the full objective below, including sustained
+memory/agenda/outcomes/reflection, lifecycle and production acceptance.
+
 ADR0197 connects public discovery to the actual installed, profile-bound native
 cycle instead of manually seeding private probes. Public query permission is
 separate from model permission; original observations, durable reading selection

@@ -28,10 +28,27 @@ base=dict(enabled=True,consent='model_calls_no_delivery',subject='user:test')
 assert 'public_discovery' not in normalize_settings(base)
 for value in (None,{},dict(consent='model_calls_no_delivery',queries=['public']),
               dict(consent='approved_public_queries_no_delivery',queries=[]),
-              dict(consent='approved_public_queries_no_delivery',queries=['same','same'])):
+              dict(consent='approved_public_queries_no_delivery',queries=['same','same']),
+              dict(consent='approved_public_queries_no_delivery',queries=['public'],follow_citations=1)):
     try:normalize_settings({**base,'public_discovery':value})
     except ValueError:pass
     else:raise AssertionError('model-only or invalid disclosure consent admitted')
+assert normalize_settings({**base,'public_discovery':dict(consent='approved_public_queries_no_delivery',
+    queries=['public'])})['public_discovery']==dict(consent='approved_public_queries_no_delivery',queries=['public'])
+
+reference='retained-public-page'
+linked='https://example.invalid/original?version=2'
+refs={reference:NS(content=dict(source='hermes.web.extract',summary='[Original]('+linked+')',
+                               attributes=dict(read_scope='webpage_extract')))}
+def decision(url=linked,source_ref=reference):
+    return dict(read_targets=[dict(source_ref=source_ref,url=url)],reason='Resolve the cited original claim.')
+assert ConfiguredDiscoveryCycle._followup_choice(decision(),refs,())==decision()
+for invalid,visited in ((decision(linked.split('?')[0]),()),(decision(),(linked,)),
+                        (dict(read_targets=decision()['read_targets']*2,reason='duplicate'),()),
+                        (decision(source_ref='foreign'),()),(decision('https://example.invalid/invented'),())):
+    try:ConfiguredDiscoveryCycle._followup_choice(invalid,refs,visited)
+    except HostDiscoveryError:pass
+    else:raise AssertionError('invented/truncated/repeated/foreign follow-up admitted')
 
 
 async def exercise(root,mode):
@@ -40,7 +57,7 @@ async def exercise(root,mode):
     ingestor=DiscoveryOpportunityIngestor(journal,content_vault=vault)
     memory=MemoryProjection(journal)
     preference=None
-    if mode=='forgotten-choice':
+    if mode in ('forgotten-choice','forgotten-followup','private-followup'):
         inbound=journal.append(EventEnvelope(event_type='conversation.inbound',source='synthetic',
             actor='user:test',subject='user:test',payload={'synthetic':True}))
         preference=MemoryProposal(kind=MemoryKind.PREFERENCE,subject='user:test',predicate='profile.interest',
@@ -50,9 +67,10 @@ async def exercise(root,mode):
     policy=AutonomyPolicyProjection(journal)
     policy.apply(policy.append_update(subject='user:test',actor='user:test',expected_revision=0,
         enabled=mode!='paused',context=PolicyContext(can_interrupt=True),operation_id='enable'))
-    state={'consent':True,'interrupt':mode=='replay'}
+    state={'consent':True,'interrupt':mode in ('replay','legacy-replay')}
     tools=[];models=[];unload=[];release=threading.Event();entered=threading.Event()
     url='https://example.invalid/conservation'
+    primary='https://example.invalid/original-observations'
     def dispatch(name,args):
         assert journal.read(event_type='autonomous.host.opened'),'read happened before durable cycle binding'
         assert name in ('web_search','web_extract')
@@ -61,17 +79,22 @@ async def exercise(root,mode):
             assert args==dict(query='public museum methods',limit=3)
             return json.dumps(dict(success=True,data=dict(web=[dict(url=url,title='Conservation update',
                 description='A public non-invasive conservation method is described.')])) )
-        assert args['urls']==[url]
+        assert args['urls'] in ([url],[primary])
+        if args['urls']==[primary]:
+            if mode=='followup-failed':return json.dumps(dict(results=[dict(url=primary,error='synthetic unavailable')]))
+            return json.dumps(dict(results=[dict(url=primary,title='Original observation protocol',
+                content='PRIMARY_READ_EVIDENCE: Authors describe a protocol, not independent validation.')] ))
         if mode=='uncertain-read':
             entered.set();assert release.wait(5)
         if mode=='page-failed':return json.dumps(dict(results=[dict(url=url,error='synthetic unavailable')]))
         return json.dumps(dict(results=[dict(url=url,title='Conservation update',
-            content='The museum uses non-invasive observation before intervention. DEEP_READ_EVIDENCE.')]))
+            content='The museum uses non-invasive observation before intervention. DEEP_READ_EVIDENCE.'
+                +' Navigation text.'*150+' [Original observations]('+primary+').')]))
     ctx=NS(_manager=NS(scope_key=str(root)),on_unload=unload.append,dispatch_tool=dispatch)
     def consent():
         if not state['consent']:raise HostDiscoveryError('synthetic disclosure consent withdrawn')
     def preparation():return ConfiguredDiscoveryCycle(ctx,ingestor,subject='user:test',
-        approved_queries=('public museum methods',),validate_consent=consent)
+        approved_queries=('public museum methods',),validate_consent=consent,follow_citations=mode!='unconsented-followup')
     class Runtime(AutonomousCycleRuntime):
         async def cycle(self,**kw):
             result=await super().cycle(**kw)
@@ -103,11 +126,29 @@ async def exercise(root,mode):
                 if mode=='erased-choice':
                     original=journal.get(refs[0])
                     ingestor.vault.erase_item(original.event.payload['content']['content_id'])
+            elif task=='alive_discovery_followup':
+                assert 'PRIVATE_OWNER_PREFERENCE' not in raw
+                assert 'INTERNAL_RESEARCH_QUESTION' not in raw
+                assert 'user_context' not in data and 'owner_context_digest' not in data
+                assert primary in data['sources'][0]['excerpt'], 'follow-up silently truncated deep read'
+                target=dict(source_ref=data['sources'][0]['source_ref'],url=primary)
+                if mode=='invented-followup':target['url']='https://example.invalid/never-cited'
+                if mode=='foreign-followup':target['source_ref']='another-owner-source'
+                if mode=='revoked-followup':state['consent']=False
+                if mode=='forgotten-followup':memory.forget_item(preference.proposal_id,actor='user:test',request_id='forget-followup')
+                if mode=='erased-followup':
+                    original=journal.get(target['source_ref'])
+                    ingestor.vault.erase_item(original.event.payload['content']['content_id'])
+                if mode=='interrupted-followup':raise RuntimeError('synthetic follow-up inference interrupted')
+                value=dict(read_targets=[target] if 'followup' in mode or mode in ('primary-read','replay') else [],
+                    reason='Read the cited original protocol, or stop when current scope is adequate.')
             elif task=='alive_opportunity_candidates':
                 sources=data['opportunities']
                 if mode=='abstain':value=dict(candidates=[],abstentions=[dict(agenda_item_id=e['agenda_item_id'],reason='No worthwhile contribution.') for e in sources])
                 else:
                     assert data['tentative_discovery_tasks']
+                    if mode in ('primary-read','replay','private-followup'):
+                        assert any('PRIMARY_READ_EVIDENCE' in e['summary_excerpt'] for e in sources)
                     if mode!='page-failed':assert any('DEEP_READ_EVIDENCE' in e['summary_excerpt'] for e in sources)
                     e=next((e for e in sources if 'DEEP_READ_EVIDENCE' in e['summary_excerpt']),sources[0])
                     value=dict(candidates=[dict(agenda_item_id=e['agenda_item_id'],kind='share',topic='conservation',
@@ -135,20 +176,25 @@ async def exercise(root,mode):
         caller_factory=lambda *,cycle,read_binding:Caller(cycle,read_binding),preparation=prep or preparation())
     parameters=dict(expression_parameters=dict(recipient_meaning=True,grounding=True,
         require_independent_grounding=False,model_timeout_seconds=30),resolve_binding=lambda _:None)
-    async def allow(self,target):return target==url
+    async def allow(self,target):return target in (url,primary)
     original_tools=CoreDiscoveryTools
     def bounded_tools(*args,**kw):return original_tools(*args,**kw,timeout_seconds=.03 if mode=='uncertain-read' else 2)
     with patch.dict(sys.modules,hermes_constants=NS(get_hermes_home=lambda:root)),patch.object(CoreDiscoveryTools,'allow_url',allow),patch(
             'alive_kernel.configured_discovery_cycle.CoreDiscoveryTools',side_effect=bounded_tools):
         runner=native()
-        if mode in ('invalid-choice','revoked-choice','forgotten-choice','erased-choice','uncertain-read'):
+        if mode=='legacy-replay':
+            # Emulate an operation begun before the new durable research mode.
+            # Reopen with the actual new code, not the patched historical mode.
+            runner.preparation._research_enabled=lambda cycle:False
+        if mode in ('invalid-choice','revoked-choice','forgotten-choice','erased-choice','uncertain-read',
+                    'invented-followup','foreign-followup','revoked-followup','forgotten-followup','erased-followup','interrupted-followup'):
             try:await runner.step(parameters)
-            except (HostDiscoveryError,NativeWorkerError):pass
+            except (HostDiscoveryError,NativeWorkerError,RuntimeError):pass
             else:raise AssertionError('invalid/revoked/uncertain discovery succeeded')
             assert not journal.read(event_type='autonomous.host.closed')
             failure=journal.read(event_type='autonomous.host.failed')[-1].event
             assert failure.payload['phase']=='preparation'
-            assert failure.payload['failure_class'] in ('HostDiscoveryError','HostReadUncertainError')
+            assert failure.payload['failure_class'] in ('HostDiscoveryError','HostReadUncertainError','RuntimeError')
             assert 'message' not in failure.payload and failure.payload['authority_granted'] is False
             if mode=='uncertain-read':
                 assert entered.is_set() and runner.pending
@@ -163,19 +209,21 @@ async def exercise(root,mode):
             else:raise AssertionError('incomplete/failed operation silently repeated')
             assert (len(tools),len(models))==before
         else:
-            if mode=='replay':
+            if mode in ('replay','legacy-replay'):
                 try:await runner.step(parameters)
                 except RuntimeError:pass
                 else:raise AssertionError('synthetic interruption did not occur')
                 before=(len(tools),len(models));runner=native()
             result=await runner.step(parameters)
-            if mode=='replay':assert (len(tools),len(models))==before
+            if mode in ('replay','legacy-replay'):assert (len(tools),len(models))==before
             assert result.disposition==('paused' if mode=='paused' else 'silence' if mode=='abstain' else 'shadow_selected')
             assert len(journal.read(event_type='autonomous.host.closed'))==1
             if mode=='paused':assert not tools and not models
             elif mode!='abstain':
                 assert url in result.expression.text
-                assert len(tools)==2 and models.count('alive_discovery_reading')==1
+                assert len(tools)==(3 if mode in ('primary-read','replay','followup-failed','private-followup') else 2)
+                assert models.count('alive_discovery_reading')==1
+                assert models.count('alive_discovery_followup')==(0 if mode in ('page-failed','legacy-replay','unconsented-followup') else 1)
                 assert models.count('alive_source_support')==1
             else:assert len(tools)==1
         assert not journal.read(event_type='action.attempted')
@@ -185,7 +233,9 @@ async def exercise(root,mode):
 
 
 with tempfile.TemporaryDirectory(prefix='alive-configured-discovery-') as folder:
-    for mode in ('share','replay','page-failed','abstain','paused','invalid-choice','revoked-choice','forgotten-choice','erased-choice','uncertain-read'):
+    for mode in ('share','primary-read','private-followup','followup-failed','replay','legacy-replay','unconsented-followup','page-failed','abstain','paused',
+                 'invalid-choice','revoked-choice','forgotten-choice','erased-choice','uncertain-read',
+                 'invented-followup','foreign-followup','revoked-followup','forgotten-followup','erased-followup','interrupted-followup'):
         root=Path(folder)/mode;root.mkdir()
         with patch.dict(os.environ,HERMES_HOME=str(root),HERMES_ALIVE_SHARED_DIR=str(root/'runtime')):
             asyncio.run(exercise(root,mode))

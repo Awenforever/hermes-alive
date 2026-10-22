@@ -42,7 +42,7 @@ async def main():
     from hermes_constants import get_hermes_home
     from tools.registry import registry
     from alive_kernel import ExperienceJournal
-    url='https://example.invalid/conservation';reads=[];requests=[]
+    url='https://example.invalid/conservation';primary='https://example.invalid/original-protocol';reads=[];requests=[]
     def source_handler(name):
         def handle(args,**kw):
             assert Path(get_hermes_home()).resolve()==home.resolve()
@@ -51,9 +51,13 @@ async def main():
                 assert args==dict(query='public museum methods',limit=3)
                 return json.dumps(dict(success=True,data=dict(web=[dict(url=url,title='Conservation method',
                     description='A synthetic public notice describes non-invasive observation.')])) )
-            assert args==dict(urls=[url],char_limit=6000)
-            return json.dumps(dict(results=[dict(url=url,title='Conservation method',
-                content='DEEP_READ_EVIDENCE: The museum describes non-invasive observation before intervention.')]))
+            assert args in (dict(urls=[url],char_limit=6000),dict(urls=[primary],char_limit=6000))
+            target=args['urls'][0]
+            return json.dumps(dict(results=[dict(url=target,title='Conservation method',
+                content=('DEEP_READ_EVIDENCE: The museum describes non-invasive observation before intervention. '
+                    +'Navigation. '*180+'[Original protocol]('+primary+')' if target==url else
+                    'PRIMARY_READ_EVIDENCE: Original protocol describes observing before intervention. '
+                    '[Other citation](https://example.invalid/not-authorized-third-hop)'))]))
         return handle
     for name in ('web_search','web_extract'):
         registry.register(name=name,toolset='web',schema=dict(name=name,description='Synthetic controlled source',parameters=dict(type='object')),
@@ -69,12 +73,17 @@ async def main():
         except ValueError:data=json.loads(raw.split('\n',1)[1])
         if isinstance(data,list):
             stage='select';value=dict(candidate_id=next(c['candidate_id'] for c in data if c['candidate_id'].startswith('opportunity-candidate:')),rationale='Synthetic contribution')
+        elif data.get('method')=='cited-public-followup-v1':
+            stage='followup';assert 'user_context' not in data
+            assert primary in data['sources'][0]['excerpt']
+            value=dict(read_targets=[dict(source_ref=data['sources'][0]['source_ref'],url=primary)],
+                reason='Read the actual cited original protocol before interpreting commentary.')
         elif 'sources' in data:
             stage='reading';value=dict(source_refs=[data['sources'][0]['source_ref']],question='INTERNAL_RESEARCH: What changed?',
                 value_hypothesis='A possible interesting conservation discovery, not an owner request.')
         elif 'opportunities' in data:
             stage='generate';assert data['tentative_discovery_tasks']
-            e=next(e for e in data['opportunities'] if 'DEEP_READ_EVIDENCE' in e['summary_excerpt'])
+            e=next(e for e in data['opportunities'] if 'PRIMARY_READ_EVIDENCE' in e['summary_excerpt'])
             value=dict(candidates=[dict(agenda_item_id=e['agenda_item_id'],kind='share',topic='conservation',
                 communication_plan=dict(version=3,recipient_goal='INTERNAL_GOAL',speech_act='share',contents=[],behavior_constraints=[]),
                 dimensions={n:dict(value=.1 if n in ('risk','urgency','interruption_cost') else .9,reason='Synthetic judgment')
@@ -89,7 +98,7 @@ async def main():
         elif 'meaning' in data:
             stage='author';assert data['expression_context']['method']=='discovery-source-authoring-v2'
             assert 'INTERNAL_GOAL' not in raw and 'INTERNAL_RESEARCH' not in raw
-            value='The museum describes observing before intervention: [conservation method]('+url+').'
+            value='The museum describes observing before intervention: [conservation method]('+primary+').'
         else:raise AssertionError('Unexpected model stage '+str(list(data)))
         requests.append(dict(stage=stage,model=body['model']))
         result=dict(id='synthetic-discovery',object='chat.completion',created=0,model=body['model'],
@@ -102,7 +111,8 @@ async def main():
             manager=get_plugin_manager();manager.discover_and_load()
             module=manager._plugins['hermes-alive'].module
             args=Namespace(alive_action='kernel-setup',subject=None,user_id='synthetic-discovery-user',confirm_model_calls=True,
-                public_query=['public museum methods'],confirm_public_reads=False,max_cycles=1,interval_seconds=0,model=None)
+                public_query=['public museum methods'],confirm_public_reads=False,confirm_cited_reads=True,
+                max_cycles=1,interval_seconds=0,model=None)
             before=(home/'config.yaml').read_bytes()
             with redirect_stdout(io.StringIO()):assert module.alive_command(args)==2
             assert (home/'config.yaml').read_bytes()==before and not reads and not requests
@@ -110,13 +120,14 @@ async def main():
             with redirect_stdout(io.StringIO()):assert module.alive_command(args)==0
             settings=module._gateway_host_binding.context.get_config('kernel_shadow')
             assert settings['public_discovery']['queries']==['public museum methods']
+            assert settings['public_discovery']['follow_citations'] is True
             with redirect_stdout(io.StringIO()):assert module.alive_command(Namespace(alive_action='install-runtime',engine='kernel-shadow'))==0
             # Controlled URL answers only. Production uses Core's real URL/DNS
             # checks; this network-none fixture is not URL-security qualification.
             bridge=importlib.import_module(module.__name__+'.tool_receipt_bridge')
             assembly=bridge._kernel_module('core_shadow_assembly')
             tools_class=importlib.import_module(assembly.__package__+'.core_discovery_tools').CoreDiscoveryTools
-            async def allowed(self,target):return target==url
+            async def allowed(self,target):return target in (url,primary)
             with patch.object(tools_class,'allow_url',allowed):
                 hooks=HookRegistry();hooks.discover_and_load()
                 assert (await hooks.emit_collect('gateway:startup',{}))[0]['status']=='started'
@@ -125,12 +136,13 @@ async def main():
                 assert result['completed_cycles']==1 and result['exit_reason']=='budget',result
             root=home/'plugin-data/hermes-alive/runtime/kernel'
             journal=ExperienceJournal(root/'experience.sqlite3')
-            assert len(journal.read(event_type='discovery.reading_choice_completed'))==1
+            assert len(journal.read(event_type='discovery.reading_choice_completed'))==2
             assert len(journal.read(event_type='message.model_candidate'))==1
             assert len(journal.read(event_type='autonomous.host.closed'))==1
             assert not journal.read(event_type='action.attempted')
-            assert [r['stage'] for r in requests]==['reading','generate','select','author','semantic','final'],requests
-            assert [r['name'] for r in reads]==['web_search','web_extract']
+            assert [r['stage'] for r in requests]==['reading','followup','generate','select','author','semantic','final'],requests
+            assert [r['name'] for r in reads]==['web_search','web_extract','web_extract']
+            assert reads[-1]['args']['urls']==[primary]
             assert not binding.native.pending
             assert manager.unload('hermes-alive') is True
             await asyncio.sleep(0)
