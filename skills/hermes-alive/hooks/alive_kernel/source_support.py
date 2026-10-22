@@ -233,7 +233,7 @@ class SourceSupportReviewer:
                                                      before_sequence=start.sequence)
         actions = self.interpreter.action_reader.read(subject=subject,clearance=clearance,
                                                       before_sequence=start.sequence)
-        feedback = self.interpreter.feedback_reader.read(subject=subject,clearance=clearance)
+        feedback = self.interpreter.feedback_for_start(start,subject=subject,clearance=clearance)
         # The recorded start is a historical anchor, not the exact model prompt clock.
         # Never substitute today's clock into a retained review snapshot.
         data = {'interpretation_started_at': start.event.occurred_at.isoformat(),

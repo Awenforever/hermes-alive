@@ -160,6 +160,10 @@ class OpportunityExpressionStore(SemanticReviewStore):
                 context.pop(field, None)
         if start.event.payload.get('interpreter_method',{}).get('discovery_source_review')=='bounded-group-source-v1':
             context['semantic_source_contract']='bounded-group-source-v1'
+        if start.event.payload.get('feedback_recall') is not None:
+            context['literal_feedback_context']=[v.to_prompt() for v in interpreter.feedback_for_start(
+                start,subject=subject,clearance=source.event.sensitivity)]
+            context['feedback_scope']='Attributed prior pairs, not profile facts, current instructions or action permission.'
         return context
 
     def requires_final_source_review(self, *, selection_event_id, subject):

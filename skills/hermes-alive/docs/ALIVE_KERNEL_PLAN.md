@@ -4,6 +4,18 @@ Status: active
 
 Last reviewed: 2026-10-22
 
+ADR0200 addresses actual loss of visibility of retained feedback, not an interest
+keyword gap. Paged literal evidence and exact current resolution now have a
+planning/synthesis/review consumer under an explicitly recorded recall contract;
+old operations keep their old window. Qualification is pending. Automatic semantic
+selection/installed activation are NOT finished, so ordinary cognition cannot yet
+be claimed to recall older preferences reliably. A multi-reply stress case also
+exposed unrelated outcome-body reads during delivery attribution; narrowly filter
+the existing query without weakening canonical receipt validation. Next qualify
+the full evidence path and wire bounded durable recall selection, then resume the
+full sustained agenda/memory/feedback/reflection/lifecycle/production objective.
+No clean quality rounds or production changes follow from these component tests.
+
 ADR0199 fixes an actual evidence handoff failure: an original page was read but
 lost to chronological prompt packing, and authorship saw only its selected page.
 New grouped operations bind completed read receipts/current inquiry and retain

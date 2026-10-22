@@ -128,7 +128,10 @@ class FeedbackSynthesizer:
         histories = []
         history_store = DeliveredHistoryStore(self.journal, content_vault=self.vault,
             context_vault=self.context_vault)
-        for item in self.outcomes.outcomes(attempt_id, clearance=clearance):
+        # Delivery attribution needs delivery receipts, not the private bodies
+        # of every other reply ever associated with this attempt.
+        for item in self.outcomes.outcomes(attempt_id, clearance=clearance,
+                kinds=(OutcomeKind.DELIVERY_SUCCEEDED,)):
             if item.kind is not OutcomeKind.DELIVERY_SUCCEEDED:
                 continue
             recorded = self.journal.get("outcome.record:" + item.outcome_id)

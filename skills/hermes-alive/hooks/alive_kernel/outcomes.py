@@ -980,17 +980,21 @@ class OutcomeProjection:
                     and OutcomeProjection._earlier_observation(journal, connection, record) is None)
 
     def outcomes(
-        self, attempt_id: str, *, clearance: Sensitivity
+        self, attempt_id: str, *, clearance: Sensitivity, kinds: tuple[OutcomeKind, ...] = ()
     ) -> list[OutcomeRecord]:
+        if not isinstance(kinds,tuple):
+            raise ValueError('outcome kind scope must be a tuple')
+        kinds=tuple(dict.fromkeys(OutcomeKind(value).value for value in kinds))
         allowed = list(Sensitivity)[: list(Sensitivity).index(Sensitivity(clearance)) + 1]
+        kind_filter=f" AND kind IN ({','.join('?' for _ in kinds)})" if kinds else ''
         with closing(self._connect()) as connection:
             rows = connection.execute(
                 f"""
                 SELECT * FROM action_outcomes_v1
-                WHERE attempt_id=? AND sensitivity IN ({','.join('?' for _ in allowed)})
+                WHERE attempt_id=? AND sensitivity IN ({','.join('?' for _ in allowed)}){kind_filter}
                 ORDER BY rowid
                 """,
-                (attempt_id, *(value.value for value in allowed)),
+                (attempt_id, *(value.value for value in allowed),*kinds),
             ).fetchall()
             records: list[OutcomeRecord] = []
             for row in rows:

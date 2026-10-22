@@ -755,6 +755,18 @@ class OpportunitySynthesizer:
                 item['after_seconds'],as_of+timedelta(seconds=item['after_seconds']),item['reason']))
         return tuple(accepted), len(raw)-len(accepted)
 
+    def feedback_for_start(self,start,*,subject,clearance):
+        """Reopen the recorded recall scope, never reinterpret old operations."""
+        recall=start.event.payload.get('feedback_recall')
+        if recall is None:
+            return self.feedback_reader.read(subject=subject,clearance=clearance)
+        if (not isinstance(recall,Mapping) or set(recall)!= {'method','outcome_event_ids'}
+                or recall['method']!='exact-feedback-pairs-v1'
+                or not recall['outcome_event_ids']):
+            raise OpportunitySynthesisError('unknown recorded feedback recall contract')
+        return self.feedback_reader.context(subject=subject,clearance=clearance,
+            recalled_ids=tuple(recall['outcome_event_ids']))
+
     def load_completed(self, *, subject: str, operation_id: str,
                        authority: ActionAuthority = ActionAuthority.NONE,
                        clearance: Sensitivity = Sensitivity.PRIVATE) -> OpportunitySynthesisResult:
@@ -794,7 +806,7 @@ class OpportunitySynthesizer:
             raise OpportunitySynthesisError('current commitments changed since interpretation')
         context = self.context_reader.read(subject=subject, clearance=clearance)
         learning = self.learning_reader.read(subject=subject, clearance=clearance)
-        feedback = self.feedback_reader.read(subject=subject,clearance=clearance)
+        feedback = self.feedback_for_start(start,subject=subject,clearance=clearance)
         if 'discovery_inquiry_digest' in start.event.payload:
             inquiries = self.inquiries.read(subject=subject, clearance=clearance,
                 item_ids=tuple(start.event.payload.get('discovery_inquiry_item_ids', ())))
@@ -1009,7 +1021,8 @@ class OpportunitySynthesizer:
                   timeout_seconds: float = 60, revision_event_ids: tuple = (),
                   recipient_meaning: bool = False,
                   protocol_recovery: bool = True,
-                  inquiry_item_ids: tuple = (),research_read_receipt_ids: tuple = ()) -> OpportunitySynthesisResult:
+                  inquiry_item_ids: tuple = (),research_read_receipt_ids: tuple = (),
+                  recalled_feedback_event_ids: tuple = ()) -> OpportunitySynthesisResult:
         if type(recipient_meaning) is not bool or type(protocol_recovery) is not bool:
             raise OpportunitySynthesisError('invalid recipient meaning mode')
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}", operation_id):
@@ -1034,7 +1047,8 @@ class OpportunitySynthesizer:
         learning = self.learning_reader.read(subject=subject, clearance=clearance)
         history = self.history_reader.read(subject=subject, clearance=clearance)
         actions = self.action_reader.read(subject=subject,clearance=clearance)
-        feedback = self.feedback_reader.read(subject=subject,clearance=clearance)
+        feedback = self.feedback_reader.context(subject=subject,clearance=clearance,
+            recalled_ids=recalled_feedback_event_ids)
         revisions = self._revision_context(revision_event_ids, subject, clearance)
         cursor=self._source_cursor(subject,clearance) if not revisions else None
         pool=(self._revision_sources(revision_event_ids,subject,clearance) if revisions else
@@ -1145,6 +1159,9 @@ class OpportunitySynthesizer:
                          "feedback_context_digest": self.vault.digest_json([f.to_prompt() for f in feedback]),
                          "feedback_outcome_event_ids": [f.outcome_event_id for f in feedback],
                          "feedback_source_event_ids": [f.source_event_id for f in feedback],
+                         **({'feedback_recall':{'method':'exact-feedback-pairs-v1',
+                             'outcome_event_ids':list(recalled_feedback_event_ids)}}
+                            if recalled_feedback_event_ids else {}),
                          "expression_history_digest": self.vault.digest_json([c.to_prompt() for c in history]),
                          "action_history_digest": self.vault.digest_json([a.to_prompt() for a in actions]),
                          "revision_event_ids": list(revision_event_ids),
@@ -1173,7 +1190,7 @@ class OpportunitySynthesizer:
                 raise OpportunitySynthesisError('current commitments changed during model wait')
             if self.context_reader.read(subject=subject, clearance=clearance) != context:
                 raise OpportunitySynthesisError("user context changed during model wait")
-            if self.feedback_reader.read(subject=subject,clearance=clearance) != feedback:
+            if self.feedback_for_start(start,subject=subject,clearance=clearance) != feedback:
                 raise OpportunitySynthesisError('literal feedback context changed during model wait')
             if self.learning_reader.read(subject=subject, clearance=clearance) != learning:
                 raise OpportunitySynthesisError("learned advice changed during model wait")
