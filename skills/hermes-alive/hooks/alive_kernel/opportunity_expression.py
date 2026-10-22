@@ -130,6 +130,15 @@ class OpportunityExpressionStore(SemanticReviewStore):
             limit=32,observation_event_ids=tuple(start.event.payload['observation_event_ids']))
         url = next(e.content['url'] for e in original if e.agenda_item_id == candidate.agenda_item_id)
         policy = start.event.payload.get('interpreter_method',{}).get('source_excerpt_policy')
+        mode=start.event.payload.get('interpreter_method',{}).get('discovery_authoring')
+        focus_ids=set()
+        if mode=='source-led-v3':
+            from .research_evidence import resolve_research_reads
+            focus=resolve_research_reads(interpreter.reader,subject=subject,clearance=source.event.sensitivity,
+                receipt_ids=tuple(start.event.payload['research_read_receipt_ids']),
+                inquiries=interpreter.inquiries.read(subject=subject,clearance=source.event.sensitivity,
+                    item_ids=tuple(start.event.payload.get('discovery_inquiry_item_ids',()))),before_sequence=start.sequence)
+            focus_ids={e.observation_event_id for e in focus}
         context = dict(method='discovery-source-authoring-v1',recipient_goal=plan['recipient_goal'],
             behavior_constraints=plan['behavior_constraints'],brief_is_advisory=True,
             authority_granted=False,final_source_and_value_review_required=True,
@@ -140,14 +149,17 @@ class OpportunityExpressionStore(SemanticReviewStore):
             source_evidence=[dict(event_id=e.observation_event_id,title=e.content['title'],
                 url=e.content['url'],excerpt=source_prompt_excerpt(e.content,policy=policy),
                 provenance_metadata={'collector':e.content['source'],**read_scope_metadata(e.content)},
-                published_at=e.content.get('published_at')) for e in original if e.content['url']==url])
-        if start.event.payload.get('interpreter_method',{}).get('discovery_authoring') == 'source-led-v2':
+                published_at=e.content.get('published_at')) for e in original
+                if e.content['url']==url or e.observation_event_id in focus_ids])
+        if mode in ('source-led-v2','source-led-v3'):
             # Research rationale remains in the encrypted agenda/proposal trace.
             # Do not promote it into the recipient's purpose by asking the author
             # (or its reviewer) to satisfy an agent-invented research assignment.
-            context['method'] = 'discovery-source-authoring-v2'
+            context['method'] = 'discovery-source-authoring-v3' if mode=='source-led-v3' else 'discovery-source-authoring-v2'
             for field in ('recipient_goal','behavior_constraints','tentative_reading_tasks','brief_is_advisory'):
                 context.pop(field, None)
+        if start.event.payload.get('interpreter_method',{}).get('discovery_source_review')=='bounded-group-source-v1':
+            context['semantic_source_contract']='bounded-group-source-v1'
         return context
 
     def requires_final_source_review(self, *, selection_event_id, subject):

@@ -1,11 +1,21 @@
 # Personalized discovery: bounded delivery plan
 
-Status: planned, not deployed or accepted. Reviewed: 2026-10-19.
+Status: planned, not deployed or accepted. Reviewed: 2026-10-22.
 
 The experimental foundations described below partly exist; this status describes
 the integrated product outcome, not an assertion that all components are absent.
 
 ## Current truth and stop-expanding rule
+
+Actual installed discovery/cited reads and seven Core model stages now execute,
+but source acquisition alone did not establish useful sharing: a successfully
+read original page disappeared under the old context budget. ADR0199 preserves
+the current research source group through planning and writing, with versioned
+history, privacy/erasure and background fairness. Qualify this measured handoff
+defect, not another personality prompt or judge. No clean quality round credited.
+Content-dependent depth is a legitimate explicit preference; technical depth is
+not itself a defect. Individual owner interests/wording remain private, not public
+defaults. Full sustained adaptation and production acceptance below remain open.
 
 ADR0197 assembles separately consented public discovery after actual installed
 cycle/profile/policy binding. It reuses Core tools and existing durable reader,

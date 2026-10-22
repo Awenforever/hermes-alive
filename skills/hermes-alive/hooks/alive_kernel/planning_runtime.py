@@ -111,7 +111,7 @@ watcher and not a complete production loop. It creates no channel queues.
                   sensitivity=Sensitivity.PRIVATE, grounding=False,
                   grounding_model=None, resolve_grounding_domain=None,
                   require_independent_grounding=False, recipient_meaning=False,
-                  inquiry_item_ids=(),
+                  inquiry_item_ids=(),research_read_receipt_ids=(),
                   model_timeout_seconds=None):
         validate_model_timeout(model_timeout_seconds)
         if type(recipient_meaning) is not bool:
@@ -154,6 +154,12 @@ watcher and not a complete production loop. It creates no channel queues.
         self.synth.inquiries.identities(inquiry_item_ids)
         if inquiry_item_ids:
             binding['discovery_inquiry_item_ids'] = list(inquiry_item_ids)
+        if research_read_receipt_ids:
+            from .research_evidence import resolve_research_reads
+            resolve_research_reads(self.synth.reader,subject=subject,clearance=sensitivity,
+                receipt_ids=research_read_receipt_ids,inquiries=self.synth.inquiries.read(
+                    subject=subject,clearance=sensitivity,item_ids=inquiry_item_ids))
+            binding['research_read_receipt_ids']=list(research_read_receipt_ids)
         if model_timeout_seconds is not None:
             binding['model_timeout_seconds']=model_timeout_seconds
         digest = self.synth.vault.digest_json({'operation': operation_id, 'subject': subject})[:40]
@@ -185,7 +191,7 @@ watcher and not a complete production loop. It creates no channel queues.
             generated = await self.synth.run(subject=subject, operation_id=interpret_id,
                 call=call, requested_model=requested_model, authority=authority, clearance=sensitivity,
                 recipient_meaning=recipient_meaning,timeout_seconds=model_timeout_seconds or 60,
-                inquiry_item_ids=inquiry_item_ids)
+                inquiry_item_ids=inquiry_item_ids,research_read_receipt_ids=research_read_receipt_ids)
         candidates, reviews, repair, repair_disposition = generated.candidates, (), None, None
         if recipient_meaning and generated.rejected_count and not candidates:
             raise PlanningRuntimeError('recipient meaning unavailable; malformed proposals are not qualified silence')
@@ -218,7 +224,7 @@ watcher and not a complete production loop. It creates no channel queues.
                             call=call, requested_model=requested_model, authority=authority,
                             clearance=sensitivity, revision_event_ids=rejected,
                             recipient_meaning=recipient_meaning,timeout_seconds=model_timeout_seconds or 60,
-                            inquiry_item_ids=inquiry_item_ids)
+                            inquiry_item_ids=inquiry_item_ids,research_read_receipt_ids=research_read_receipt_ids)
                     # A repair can address rejected intents, not expand the host's work scope.
                     from dataclasses import replace
                     if recipient_meaning and repair.rejected_count and not repair.candidates:

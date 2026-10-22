@@ -146,7 +146,9 @@ class SemanticComparator:
     @staticmethod
     def _review_contract(meaning, text, context):
         original = dict(meaning=meaning,candidate=text)
-        if context and context.get('method') in ('discovery-source-authoring-v1','discovery-source-authoring-v2'):
+        if context and (context.get('method') in ('discovery-source-authoring-v1','discovery-source-authoring-v2')
+                or context.get('method')=='discovery-source-authoring-v3'
+                    and context.get('semantic_source_contract')=='bounded-group-source-v1'):
             original['source_context'] = context
             return original, _DISCOVERY_REVIEW_PROMPT_V1, 'semantic-source-findings-v1'
         return original, _REVIEW_PROMPT_V1, 'semantic-findings-v1'
@@ -338,13 +340,16 @@ class SemanticComparator:
         expression_context = (context_reader(selection_event_id, subject)
                               if context_reader is not None else None)
         discovery = bool(expression_context and expression_context.get('method') in (
-            'discovery-source-authoring-v1','discovery-source-authoring-v2'))
+            'discovery-source-authoring-v1','discovery-source-authoring-v2','discovery-source-authoring-v3'))
         prompt = json.dumps({"meaning": meaning, "presentation": style,
                              "language": language,
                              **({'expression_context':expression_context} if expression_context else {}),
                              **({'correction':correction} if correction else {})},
                             ensure_ascii=False, separators=(",", ":"))
-        if len(prompt) > (80_000 if correction else 40_000):
+        from .research_evidence import RESEARCH_MESSAGE_BUDGET
+        budget=(RESEARCH_MESSAGE_BUDGET if expression_context and expression_context.get('method')
+                =='discovery-source-authoring-v3' else 80_000 if correction else 40_000)
+        if len(prompt) > budget:
             self._receipt(operation, "failed", subject, selection_event_id,
                           source.event.sensitivity, status="failed",
                           error="PromptSizeError")

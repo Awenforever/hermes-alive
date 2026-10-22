@@ -4,6 +4,19 @@ Status: active
 
 Last reviewed: 2026-10-22
 
+ADR0199 fixes an actual evidence handoff failure: an original page was read but
+lost to chronological prompt packing, and authorship saw only its selected page.
+New grouped operations bind completed read receipts/current inquiry and retain
+the whole bounded source group through interpretation, authorship and final
+assessment. Background recall remains fair, including wraparound; historical
+cursor validation is metadata-only, never forgotten-content resurrection. Old
+started operations and source-led-v1/v2 snapshots are not reinterpreted. A
+negative control reproduces omitted original evidence under the unchanged old
+packing path; current controlled qualification is ongoing. Source fidelity and
+recipient value are still unproven. Next qualify the complete group path and
+fresh actual outcomes, then return to sustained memory/agenda/feedback/reflection
+and the full lifecycle/production scope; do not grow more judges or topic rules.
+
 ADR0198 adds one bounded cited-source follow-up to the installed public discovery
 path, not a native-agent replacement or another judge. The real installed trial
 completed, yet was not useful/faithful enough to accept. Private Core research

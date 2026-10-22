@@ -32,6 +32,8 @@ from .model_timeouts import MAX_STAGE_SECONDS
 
 
 _DISCOVERY_AUTHORING = 'source-led-v2'
+_DISCOVERY_AUTHORING_MODES = ('source-led-v1','source-led-v2','source-led-v3')
+_GROUP_SOURCE_REVIEW = 'bounded-group-source-v1'
 
 
 class OpportunitySynthesisError(ValueError):
@@ -474,6 +476,14 @@ class OpportunitySynthesizer:
             if start.event.payload.get('source_scan') is not None:
                 raise OpportunitySynthesisError('source scan completion lost its provenance')
             return None
+        if isinstance(scan,Mapping) and scan.get('method')=='atomic-research-source-budget-v1':
+            from .research_evidence import research_read_headers,validate_research_scan
+            if scan!=start.event.payload.get('source_scan') or start.event.payload.get('revision_event_ids'):
+                raise OpportunitySynthesisError('research scan has changed or corrective provenance')
+            headers=research_read_headers(self.journal,subject=start.event.subject,clearance=start.event.sensitivity,
+                receipt_ids=tuple(start.event.payload.get('research_read_receipt_ids',())),before_sequence=start.sequence)
+            focus_ids=tuple(dict.fromkeys(i for _,done in headers for i in done.event.payload['observations']))
+            return validate_research_scan(self.journal,start,scan,focus_ids)
         if (not isinstance(scan,Mapping) or scan!=start.event.payload.get('source_scan') or scan.get('method')!='fair-source-budget-v1'
                 or scan.get('world_coverage_proven') is not False
                 or start.event.payload.get('revision_event_ids')
@@ -790,6 +800,13 @@ class OpportunitySynthesizer:
                 item_ids=tuple(start.event.payload.get('discovery_inquiry_item_ids', ())))
             if self.vault.digest_json(inquiries) != start.event.payload['discovery_inquiry_digest']:
                 raise OpportunitySynthesisError('reading task changed since interpretation')
+        if start.event.payload.get('research_read_receipt_ids'):
+            from .research_evidence import resolve_research_reads
+            focus=resolve_research_reads(self.reader,subject=subject,clearance=clearance,
+                receipt_ids=tuple(start.event.payload['research_read_receipt_ids']),inquiries=inquiries,
+                before_sequence=start.sequence)
+            if not {e.observation_event_id for e in focus}<=set(original_ids):
+                raise OpportunitySynthesisError('research evidence group lost part of its original scope')
         if self.vault.digest_json([c.to_prompt() for c in context]) != start.event.payload.get(
                 'explicit_context_digest',self.vault.digest_json([])):
             raise OpportunitySynthesisError('explicit context chronology changed since interpretation')
@@ -842,7 +859,7 @@ class OpportunitySynthesizer:
                 source_presentation=bundle.get("source_presentation", "model_text_v1"),feedback=feedback,
                 recipient_meaning=start.event.payload.get('recipient_meaning',False),
                 intent_only=bundle.get('recipient_output') == 'intent-only-v1',
-                allow_editorial_brief=start.event.payload.get('interpreter_method',{}).get('discovery_authoring') in ('source-led-v1','source-led-v2'))
+                allow_editorial_brief=start.event.payload.get('interpreter_method',{}).get('discovery_authoring') in _DISCOVERY_AUTHORING_MODES)
             if invalid or len(candidates) != count:
                 raise OpportunitySynthesisError("completed proposals no longer valid")
             abstentions, invalid_abstentions = self._abstentions(
@@ -886,6 +903,7 @@ class OpportunitySynthesizer:
         output = method.get('recipient_output')
         editorial = method.get('editorial_context')
         authoring = method.get('discovery_authoring')
+        source_review=method.get('discovery_source_review')
         if (mode != bundle.get('recipient_execution')
                 or mode not in (None, 'expression-required-v1')
                 or output != bundle.get('recipient_output')
@@ -893,7 +911,11 @@ class OpportunitySynthesizer:
                 or editorial != bundle.get('editorial_context')
                 or editorial not in (None, 'origin-purpose-v1')
                 or authoring != bundle.get('discovery_authoring')
-                or authoring not in (None,'source-led-v1','source-led-v2')
+                or authoring not in (None,*_DISCOVERY_AUTHORING_MODES)
+                or source_review!=bundle.get('discovery_source_review')
+                or source_review not in (None,'bounded-group-source-v1')
+                or source_review is not None and authoring!='source-led-v3'
+                or (authoring=='source-led-v3') != bool(start.event.payload.get('research_read_receipt_ids'))
                 or (authoring is not None and output != 'intent-only-v1')
                 or (editorial is not None and output != 'intent-only-v1')
                 or (output is not None and (mode != 'expression-required-v1'
@@ -955,7 +977,7 @@ class OpportunitySynthesizer:
             raise OpportunitySynthesisError('unknown structural recovery validation contract')
         intent_only = method.get('structure_recovery') in ('proposal-shape-v2','proposal-shape-v3')
         authoring = method.get('structure_recovery') == 'proposal-shape-v3'
-        if authoring != (method.get('discovery_authoring') in ('source-led-v1','source-led-v2')):
+        if authoring != (method.get('discovery_authoring') in _DISCOVERY_AUTHORING_MODES):
             raise OpportunitySynthesisError('structural recovery editorial contract mismatch')
         if intent_only != (method.get('recipient_output') == 'intent-only-v1'):
             raise OpportunitySynthesisError('structural recovery output contract mismatch')
@@ -987,7 +1009,7 @@ class OpportunitySynthesizer:
                   timeout_seconds: float = 60, revision_event_ids: tuple = (),
                   recipient_meaning: bool = False,
                   protocol_recovery: bool = True,
-                  inquiry_item_ids: tuple = ()) -> OpportunitySynthesisResult:
+                  inquiry_item_ids: tuple = (),research_read_receipt_ids: tuple = ()) -> OpportunitySynthesisResult:
         if type(recipient_meaning) is not bool or type(protocol_recovery) is not bool:
             raise OpportunitySynthesisError('invalid recipient meaning mode')
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}", operation_id):
@@ -1000,6 +1022,13 @@ class OpportunitySynthesizer:
             raise OpportunitySynthesisError("invalid model timeout")
         authority = ActionAuthority(authority)  # Trusted host input, never a model field.
         inquiries = self.inquiries.read(subject=subject, clearance=clearance, item_ids=inquiry_item_ids)
+        from .research_evidence import resolve_research_reads, research_scan, RESEARCH_SOURCE_BUDGET
+        if not isinstance(research_read_receipt_ids,tuple) or len(research_read_receipt_ids)>2:
+            raise OpportunitySynthesisError('invalid research read receipt scope')
+        focus=(resolve_research_reads(self.reader,subject=subject,clearance=clearance,
+            receipt_ids=research_read_receipt_ids,inquiries=inquiries) if research_read_receipt_ids else ())
+        if focus and not recipient_meaning:
+            raise OpportunitySynthesisError('research group requires source-led recipient authorship')
         commitment_digest=self._commitment_digest(subject,clearance)
         context = self.context_reader.read(subject=subject, clearance=clearance)
         learning = self.learning_reader.read(subject=subject, clearance=clearance)
@@ -1010,8 +1039,14 @@ class OpportunitySynthesizer:
         cursor=self._source_cursor(subject,clearance) if not revisions else None
         pool=(self._revision_sources(revision_event_ids,subject,clearance) if revisions else
               self.reader.active_evidence(subject=subject,clearance=clearance,limit=32,source_cursor=cursor))
+        fair_pool=pool[:32-len(focus)] if focus and not revisions else pool
+        if focus:
+            focus_ids={e.observation_event_id for e in focus}
+            if revisions and not focus_ids<={e.observation_event_id for e in pool}:
+                raise OpportunitySynthesisError('corrective research cannot enlarge original evidence')
+            pool=tuple(focus)+tuple(e for e in fair_pool if e.observation_event_id not in focus_ids)
         as_of = datetime.now(timezone.utc)
-        budget=32000 if revisions else 24000
+        budget=RESEARCH_SOURCE_BUDGET if focus else 32000 if revisions else 24000
         prompt_data={"as_of": as_of.isoformat(),
                             "stage_contract": {"stage": "internal_candidate_interpretation",
                                 "routes_or_sends": False, "authorizes_execution": False,
@@ -1049,6 +1084,8 @@ class OpportunitySynthesizer:
             packed=json.dumps(prompt_data,ensure_ascii=False,separators=(',',':'))
             if len(packed)>budget:
                 prompt_data['opportunities'].pop()
+                if focus and len(evidence)<len(focus)+bool(len(pool)>len(focus)):
+                    raise OpportunitySynthesisError('atomic research group leaves no fair source context budget')
                 break  # Do not skip a long entry forever, or truncate away its qualifications.
             evidence.append(item)
             prompt=packed
@@ -1064,6 +1101,9 @@ class OpportunitySynthesizer:
             scan=dict(method='fair-source-budget-v1',after_sequence=cursor,next_sequence=next_cursor,
                 pool_size=len(pool),window_size=len(evidence),budget_chars=24000,world_coverage_proven=False,
                 preference_digest=self._preference_digest(context))
+            if focus:
+                scan=research_scan(self.journal,focus=focus,fair_pool=fair_pool,evidence=evidence,cursor=cursor,
+                    preference_digest=self._preference_digest(context))
         system_prompt = (_INTENT_PROMPT if recipient_meaning else _PROMPT+(
             '\n'+_COMMITMENT_GUIDANCE if any(e.content.get('origin_kind')=='commitment' for e in evidence) else ''))
         if inquiries:
@@ -1076,7 +1116,8 @@ class OpportunitySynthesizer:
             recipient_execution='expression-required-v1' if recipient_meaning else None,
             recipient_output='intent-only-v1' if recipient_meaning else None,
             editorial_context='origin-purpose-v1' if recipient_meaning else None,
-            discovery_authoring=_DISCOVERY_AUTHORING if recipient_meaning else None,
+            discovery_authoring=('source-led-v3' if focus else _DISCOVERY_AUTHORING) if recipient_meaning else None,
+            **({'discovery_source_review':_GROUP_SOURCE_REVIEW} if focus else {}),
             kind='model_prompt' if evidence else 'system_no_material',
             system_prompt_sha256=hashlib.sha256(system_prompt.encode()).hexdigest() if evidence else None,
             requested_model=requested_model if evidence else None,
@@ -1112,6 +1153,7 @@ class OpportunitySynthesizer:
                          **({'discovery_inquiry_item_ids':list(inquiry_item_ids),
                              'discovery_inquiry_digest':self.vault.digest_json(inquiries)}
                             if inquiry_item_ids else {}),
+                         **({'research_read_receipt_ids':list(research_read_receipt_ids)} if focus else {}),
                          "host_authority": authority.value, "raw_prompt_stored": False},
             ))
         except EventConflictError as exc:
@@ -1121,6 +1163,9 @@ class OpportunitySynthesizer:
         def validate_current():
             if self.inquiries.read(subject=subject, clearance=clearance, item_ids=inquiry_item_ids) != inquiries:
                 raise OpportunitySynthesisError('reading task changed during model wait')
+            if focus and resolve_research_reads(self.reader,subject=subject,clearance=clearance,
+                    receipt_ids=research_read_receipt_ids,inquiries=inquiries)!=focus:
+                raise OpportunitySynthesisError('research evidence group changed during model wait')
             if self.reader.active_evidence(subject=subject, clearance=clearance, limit=32,
                     observation_event_ids=tuple(e.observation_event_id for e in evidence) if evidence else None) != evidence:
                 raise OpportunitySynthesisError("opportunity evidence changed during model wait")
@@ -1214,6 +1259,7 @@ class OpportunitySynthesizer:
                  "recipient_output":method['recipient_output'],
                  "editorial_context":method['editorial_context'],
                  "discovery_authoring":method['discovery_authoring'],
+                 **({'discovery_source_review':method['discovery_source_review']} if focus else {}),
                  "source_presentation": self._SOURCE_PRESENTATION,
                  "reconsiderations":[{'agenda_item_id':r.agenda_item_id,'after_seconds':r.after_seconds,
                                       'reason':r.reason} for r in reconsiderations],

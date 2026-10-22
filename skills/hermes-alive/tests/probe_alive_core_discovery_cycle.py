@@ -83,22 +83,27 @@ async def main():
                 value_hypothesis='A possible interesting conservation discovery, not an owner request.')
         elif 'opportunities' in data:
             stage='generate';assert data['tentative_discovery_tasks']
-            e=next(e for e in data['opportunities'] if 'PRIMARY_READ_EVIDENCE' in e['summary_excerpt'])
+            assert any('PRIMARY_READ_EVIDENCE' in e['summary_excerpt'] for e in data['opportunities'])
+            e=next(e for e in data['opportunities'] if 'DEEP_READ_EVIDENCE' in e['summary_excerpt'])
             value=dict(candidates=[dict(agenda_item_id=e['agenda_item_id'],kind='share',topic='conservation',
                 communication_plan=dict(version=3,recipient_goal='INTERNAL_GOAL',speech_act='share',contents=[],behavior_constraints=[]),
                 dimensions={n:dict(value=.1 if n in ('risk','urgency','interruption_cost') else .9,reason='Synthetic judgment')
                     for n in ('user_value','urgency','novelty','confidence','risk','interruption_cost')})])
         elif 'expression_binding' in data:
-            stage='final';assert data['expression_binding']['assessment_mode']=='discovery-source-and-value-v2'
+            stage='final';assert data['expression_binding']['assessment_mode']=='discovery-source-and-value-v3'
             assert 'communication_plan' not in data['candidate']
             value=dict(verdict='supported',unsupported_claims=[],uncertainties=[],reason='Synthetic finding, not satisfaction.')
         elif 'meaning' in data and 'candidate' in data:
+            assert data['source_context']['semantic_source_contract']=='bounded-group-source-v1'
+            assert 'AND original source_context' in body['messages'][0]['content']
+            assert 'PRIMARY_READ_EVIDENCE' in raw and 'DEEP_READ_EVIDENCE' in raw
             stage='semantic';value=dict(atom_reviews=[dict(atom_id=x['atom_id'],preserved=True,risks=[]) for x in data['meaning']['atoms']],
                 added_claims_detected=False,speech_act_preserved=True,protected_literals_preserved=True)
         elif 'meaning' in data:
-            stage='author';assert data['expression_context']['method']=='discovery-source-authoring-v2'
+            stage='author';assert data['expression_context']['method']=='discovery-source-authoring-v3'
+            assert 'PRIMARY_READ_EVIDENCE' in raw and 'DEEP_READ_EVIDENCE' in raw
             assert 'INTERNAL_GOAL' not in raw and 'INTERNAL_RESEARCH' not in raw
-            value='The museum describes observing before intervention: [conservation method]('+primary+').'
+            value='The museum describes observing before intervention: [conservation method]('+url+').'
         else:raise AssertionError('Unexpected model stage '+str(list(data)))
         requests.append(dict(stage=stage,model=body['model']))
         result=dict(id='synthetic-discovery',object='chat.completion',created=0,model=body['model'],

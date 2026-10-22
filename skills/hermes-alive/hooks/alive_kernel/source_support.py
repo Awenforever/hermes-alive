@@ -268,7 +268,9 @@ class SourceSupportReviewer:
                 data['candidate'].pop('text', None)
             data['interpretation_as_of'] = start.event.payload.get('interpretation_as_of')
             data['time_anchor_is_not_delivery_time'] = True
-        if len(json.dumps(data, ensure_ascii=False)) > 40000:
+        from .research_evidence import RESEARCH_MESSAGE_BUDGET
+        budget=RESEARCH_MESSAGE_BUDGET if start.event.payload.get('research_read_receipt_ids') else 40000
+        if len(json.dumps(data, ensure_ascii=False)) > budget:
             raise SourceSupportError('source review exceeds prompt boundary')
         return data, result
 

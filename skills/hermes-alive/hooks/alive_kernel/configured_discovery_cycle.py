@@ -121,19 +121,28 @@ class ConfiguredDiscoveryCycle:
         return raw
 
     def _research_enabled(self,cycle):
+        return self._cycle_mode(cycle,prefix='discovery.research-cycle:',
+            kind='discovery.research_cycle_opened',payload=dict(
+                method='cited-public-followup-v1',max_followup_urls=2,authority_granted=False))
+
+    def _bundle_enabled(self,cycle):
+        return self._cycle_mode(cycle,prefix='discovery.research-group:',
+            kind='discovery.research_group_opened',payload=dict(
+                method='atomic-research-evidence-v1',authority_granted=False))
+
+    def _cycle_mode(self,cycle,*,prefix,kind,payload):
         """New durable mode; never reinterpret an already started old cycle."""
         journal,vault=self.ingestor.journal,self.ingestor.vault
         identity=vault.digest_json(dict(subject=self.subject,operation_id=cycle.operation_id+':search'))[:40]
-        event_id='discovery.research-cycle:'+identity
-        payload=dict(method='cited-public-followup-v1',max_followup_urls=2,authority_granted=False)
+        event_id=prefix+identity
         existing=journal.get(event_id)
         if existing is None:
             if journal.get('discovery.host-read:'+identity+':started') is not None:return False
-            journal.append(EventEnvelope(event_id=event_id,event_type='discovery.research_cycle_opened',
+            journal.append(EventEnvelope(event_id=event_id,event_type=kind,
                 source='alive.configured-discovery',actor='system:alive-configured-reader',
                 subject=self.subject,sensitivity=Sensitivity.PRIVATE,payload=payload))
             existing=journal.get(event_id)
-        if (existing.event.event_type!='discovery.research_cycle_opened'
+        if (existing.event.event_type!=kind
                 or existing.event.source!='alive.configured-discovery'
                 or existing.event.actor!='system:alive-configured-reader'
                 or existing.event.subject!=self.subject or existing.event.sensitivity is not Sensitivity.PRIVATE
@@ -237,6 +246,7 @@ class ConfiguredDiscoveryCycle:
             return expected
         current()
         research_enabled=self.follow_citations and self._research_enabled(cycle)
+        group_enabled=research_enabled and self._bundle_enabled(cycle)
         if self.tools is not None:self.tools.close()
         self.tools=CoreDiscoveryTools(self.context,read_binding=current,approved_queries=self.queries)
         reader=HostDiscoveryReader(self.ingestor,subject=self.subject,search=self.tools.search,
@@ -259,6 +269,7 @@ class ConfiguredDiscoveryCycle:
         read=await reader.collect(operation_id=cycle.operation_id+':read',
             read_urls=tuple(dict.fromkeys(e.content['url'] for e in selected)),inquiry_item_ids=(item_id,))
         current()
+        read_receipts=[read.receipt_id] if read.observation_ids and group_enabled else []
         if research_enabled and read.observation_ids:
             extracts=self.ingestor.active_evidence(subject=self.subject,clearance=Sensitivity.PRIVATE,
                 limit=32,observation_event_ids=read.observation_ids)
@@ -269,7 +280,9 @@ class ConfiguredDiscoveryCycle:
                 search_receipt_id=read.receipt_id,parameters=parameters,call=call,current=current,followup=True,
                 visited=tuple(dict.fromkeys(e.content['url'] for e in selected)))
             if followup['read_targets']:
-                await reader.collect(operation_id=cycle.operation_id+':followup-read',
+                followed=await reader.collect(operation_id=cycle.operation_id+':followup-read',
                     read_urls=tuple(t['url'] for t in followup['read_targets']),inquiry_item_ids=(item_id,))
+                if group_enabled:read_receipts.append(followed.receipt_id)
                 current()
-        return {**parameters,'expression_parameters':{**parameters['expression_parameters'],'inquiry_item_ids':(item_id,)}}
+        return {**parameters,'expression_parameters':{**parameters['expression_parameters'],'inquiry_item_ids':(item_id,),
+            **({'research_read_receipt_ids':tuple(read_receipts)} if read_receipts else {})}}

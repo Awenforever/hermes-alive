@@ -19,9 +19,13 @@ from alive_kernel.configured_discovery_cycle import ConfiguredDiscoveryCycle
 from alive_kernel.core_discovery_tools import CoreDiscoveryTools
 from alive_kernel.core_shadow_assembly import normalize_settings
 from alive_kernel.content_vault import ContentVault
+from alive_kernel.events import Sensitivity
 from alive_kernel.host_discovery import HostDiscoveryError,HostReadUncertainError
 from alive_kernel.native_cognition_host import NativeCognitionHost
 from alive_kernel.native_worker_protocol import NativeWorkerError
+from alive_kernel.research_evidence import research_scan,validate_research_scan,resolve_research_reads
+from alive_kernel.discovery_opportunities import DiscoveryCandidate
+from alive_kernel.semantic_comparator import SemanticComparator
 
 
 base=dict(enabled=True,consent='model_calls_no_delivery',subject='user:test')
@@ -50,13 +54,47 @@ for invalid,visited in ((decision(linked.split('?')[0]),()),(decision(),(linked,
     except HostDiscoveryError:pass
     else:raise AssertionError('invented/truncated/repeated/foreign follow-up admitted')
 
+fake_records={str(i):NS(sequence=i,event=NS(event_type='discovery.opportunity_observed',
+    subject='user:test',source='alive.discovery',actor='system:alive-discovery')) for i in range(1,7)}
+fake_journal=NS(get=fake_records.get)
+fake_sources={i:NS(observation_event_id=i) for i in fake_records}
+for cursor,order,admitted,expected in ((0,('1','2','3','4','5','6'),('6','1','2'),2),
+                                      (4,('5','6','1','2','3','4'),('6','5','1'),1)):
+    scan=research_scan(fake_journal,focus=(fake_sources['6'],),fair_pool=tuple(fake_sources[i] for i in order),
+        evidence=tuple(fake_sources[i] for i in admitted),cursor=cursor,preference_digest='synthetic')
+    assert scan['next_sequence']==expected,'priority evidence advanced past unseen background'
+    started=NS(sequence=10,event=NS(subject='user:test',payload=dict(observation_event_ids=admitted)))
+    validate_research_scan(fake_journal,started,scan,('6',))
+    try:validate_research_scan(fake_journal,started,{**scan,'next_sequence':6},('6',))
+    except HostDiscoveryError:pass
+    else:raise AssertionError('forged priority cursor accepted')
+for context,expected in ((dict(method='discovery-source-authoring-v3'),'semantic-findings-v1'),
+        (dict(method='discovery-source-authoring-v3',semantic_source_contract='bounded-group-source-v1'),'semantic-source-findings-v1')):
+    original,system,protocol=SemanticComparator._review_contract({'atoms':[]},'Synthetic text',context)
+    assert protocol==expected
+    assert ('source_context' in original)==(expected=='semantic-source-findings-v1')
+
 
 async def exercise(root,mode):
+    pressure=mode in ('budget-pressure','fair-budget-pressure')
     journal=ExperienceJournal(root/'journal.sqlite3')
     vault=ContentVault(root/'vault',backup_root=root/'backups')
     ingestor=DiscoveryOpportunityIngestor(journal,content_vault=vault)
     memory=MemoryProjection(journal)
     preference=None
+    if pressure:
+        for i in range(6):
+            event=journal.append(EventEnvelope(event_type='conversation.inbound',source='synthetic',
+                actor='user:test',subject='user:test',payload=dict(synthetic=True,index=i)))
+            proposal=MemoryProposal(kind=MemoryKind.PREFERENCE,subject='user:test',predicate='profile.synthetic.'+str(i),
+                value='SYNTHETIC_PREFERENCE_LONG '+('neutral contextual preference. '*35),
+                authority=MemoryAuthority.USER_EXPLICIT,source_event_ids=(event.event.event_id,),confidence=1)
+            memory.apply(memory.append_proposal(proposal,actor='user:test'))
+        if mode=='fair-budget-pressure':
+            for i in range(26):
+                ingestor.ingest(DiscoveryCandidate(source='synthetic-public-background',title='Background '+str(i),
+                    url='https://example.invalid/background/'+str(i),summary='Unrelated public baseline. '*100,
+                    observed_at=datetime.now(timezone.utc)),subject='user:test')
     if mode in ('forgotten-choice','forgotten-followup','private-followup'):
         inbound=journal.append(EventEnvelope(event_type='conversation.inbound',source='synthetic',
             actor='user:test',subject='user:test',payload={'synthetic':True}))
@@ -67,29 +105,34 @@ async def exercise(root,mode):
     policy=AutonomyPolicyProjection(journal)
     policy.apply(policy.append_update(subject='user:test',actor='user:test',expected_revision=0,
         enabled=mode!='paused',context=PolicyContext(can_interrupt=True),operation_id='enable'))
-    state={'consent':True,'interrupt':mode in ('replay','legacy-replay')}
+    state={'consent':True,'interrupt':mode in ('replay','legacy-replay','historical-followup-replay')}
     tools=[];models=[];unload=[];release=threading.Event();entered=threading.Event()
     url='https://example.invalid/conservation'
     primary='https://example.invalid/original-observations'
+    backgrounds=(url+'/context-1',url+'/context-2')
     def dispatch(name,args):
         assert journal.read(event_type='autonomous.host.opened'),'read happened before durable cycle binding'
         assert name in ('web_search','web_extract')
         tools.append((name,args))
         if name=='web_search':
             assert args==dict(query='public museum methods',limit=3)
-            return json.dumps(dict(success=True,data=dict(web=[dict(url=url,title='Conservation update',
-                description='A public non-invasive conservation method is described.')])) )
+            entries=[dict(url=url,title='Conservation update',description='A public non-invasive conservation method is described.')]
+            if pressure:
+                entries[0]['description']+=' Neutral listing.'*100
+                entries.extend(dict(url=u,title='Background context',description='Independent background. '*75) for u in backgrounds)
+            return json.dumps(dict(success=True,data=dict(web=entries)))
         assert args['urls'] in ([url],[primary])
         if args['urls']==[primary]:
             if mode=='followup-failed':return json.dumps(dict(results=[dict(url=primary,error='synthetic unavailable')]))
             return json.dumps(dict(results=[dict(url=primary,title='Original observation protocol',
-                content='PRIMARY_READ_EVIDENCE: Authors describe a protocol, not independent validation.')] ))
+                content='PRIMARY_READ_EVIDENCE: Authors describe a protocol, not independent validation.'
+                    +(' Original evidence.'*420 if pressure else ''))] ))
         if mode=='uncertain-read':
             entered.set();assert release.wait(5)
         if mode=='page-failed':return json.dumps(dict(results=[dict(url=url,error='synthetic unavailable')]))
         return json.dumps(dict(results=[dict(url=url,title='Conservation update',
             content='The museum uses non-invasive observation before intervention. DEEP_READ_EVIDENCE.'
-                +' Navigation text.'*150+' [Original observations]('+primary+').')]))
+                +' Navigation text.'*(410 if pressure else 150)+' [Original observations]('+primary+').')]))
     ctx=NS(_manager=NS(scope_key=str(root)),on_unload=unload.append,dispatch_tool=dispatch)
     def consent():
         if not state['consent']:raise HostDiscoveryError('synthetic disclosure consent withdrawn')
@@ -97,6 +140,11 @@ async def exercise(root,mode):
         approved_queries=('public museum methods',),validate_consent=consent,follow_citations=mode!='unconsented-followup')
     class Runtime(AutonomousCycleRuntime):
         async def cycle(self,**kw):
+            if mode=='budget-pressure' and os.getenv('ALIVE_REPRODUCE_OLD_RECALL')=='1':
+                # Negative control: same completed reads, old unchanged packing
+                # path without explicit bundle propagation. Must lose evidence.
+                parameters=dict(kw['expression_parameters']);parameters.pop('research_read_receipt_ids',None)
+                kw={**kw,'expression_parameters':parameters}
             result=await super().cycle(**kw)
             if state['interrupt']:
                 state['interrupt']=False
@@ -128,6 +176,7 @@ async def exercise(root,mode):
                     ingestor.vault.erase_item(original.event.payload['content']['content_id'])
             elif task=='alive_discovery_followup':
                 assert 'PRIVATE_OWNER_PREFERENCE' not in raw
+                assert 'SYNTHETIC_PREFERENCE_LONG' not in raw
                 assert 'INTERNAL_RESEARCH_QUESTION' not in raw
                 assert 'user_context' not in data and 'owner_context_digest' not in data
                 assert primary in data['sources'][0]['excerpt'], 'follow-up silently truncated deep read'
@@ -140,15 +189,19 @@ async def exercise(root,mode):
                     original=journal.get(target['source_ref'])
                     ingestor.vault.erase_item(original.event.payload['content']['content_id'])
                 if mode=='interrupted-followup':raise RuntimeError('synthetic follow-up inference interrupted')
-                value=dict(read_targets=[target] if 'followup' in mode or mode in ('primary-read','replay') else [],
+                value=dict(read_targets=[target] if 'followup' in mode or pressure or mode in ('primary-read','replay','erase-group-after-final') else [],
                     reason='Read the cited original protocol, or stop when current scope is adequate.')
             elif task=='alive_opportunity_candidates':
                 sources=data['opportunities']
                 if mode=='abstain':value=dict(candidates=[],abstentions=[dict(agenda_item_id=e['agenda_item_id'],reason='No worthwhile contribution.') for e in sources])
                 else:
                     assert data['tentative_discovery_tasks']
-                    if mode in ('primary-read','replay','private-followup'):
+                    if pressure or mode in ('primary-read','replay','private-followup','erase-group-after-final','historical-followup-replay'):
+                        if os.getenv('ALIVE_REPRODUCE_OLD_RECALL')=='1' and not any('PRIMARY_READ_EVIDENCE' in e['summary_excerpt'] for e in sources):
+                            print('REGRESSION_OLD_RECALL_DROPPED_PRIMARY pool='+str(data['recall_window']['pool_size'])+' window='+str(len(sources)),flush=True)
                         assert any('PRIMARY_READ_EVIDENCE' in e['summary_excerpt'] for e in sources)
+                    if pressure:
+                        assert len(raw)>24000, 'fixture did not recreate the old packing pressure'
                     if mode!='page-failed':assert any('DEEP_READ_EVIDENCE' in e['summary_excerpt'] for e in sources)
                     e=next((e for e in sources if 'DEEP_READ_EVIDENCE' in e['summary_excerpt']),sources[0])
                     value=dict(candidates=[dict(agenda_item_id=e['agenda_item_id'],kind='share',topic='conservation',
@@ -160,12 +213,20 @@ async def exercise(root,mode):
                 value=dict(candidate_id=next(c['candidate_id'] for c in choices if c['candidate_id'].startswith('opportunity-candidate:')),rationale='Synthetic contribution')
             elif task=='alive_semantic_render':
                 assert 'INTERNAL_GOAL' not in raw and 'INTERNAL_RESEARCH_QUESTION' not in raw
+                if pressure or mode in ('primary-read','replay','private-followup','erase-group-after-final'):
+                    assert 'PRIMARY_READ_EVIDENCE' in raw and 'DEEP_READ_EVIDENCE' in raw
                 value='The museum describes observing without intervention: [conservation method]('+url+').'
             elif task=='alive_semantic_review':
+                if mode not in ('page-failed','legacy-replay','unconsented-followup','historical-followup-replay'):
+                    assert data['source_context']['semantic_source_contract']=='bounded-group-source-v1'
+                    assert 'AND original source_context' in kw['messages'][0]['content']
+                    if pressure or mode in ('primary-read','replay','private-followup','erase-group-after-final'):
+                        assert 'PRIMARY_READ_EVIDENCE' in json.dumps(data['source_context'])
                 value=dict(atom_reviews=[dict(atom_id=a['atom_id'],preserved=True,risks=[]) for a in data['meaning']['atoms']],
                     added_claims_detected=False,speech_act_preserved=True,protected_literals_preserved=True)
             elif task=='alive_source_support':
-                assert data['expression_binding']['assessment_mode']=='discovery-source-and-value-v2'
+                assert data['expression_binding']['assessment_mode']==('discovery-source-and-value-v2'
+                    if mode in ('page-failed','legacy-replay','unconsented-followup','historical-followup-replay') else 'discovery-source-and-value-v3')
                 value=dict(verdict='supported',unsupported_claims=[],uncertainties=[],reason='Synthetic, not recipient satisfaction.')
             else:raise AssertionError(task)
             if 'route_info' in kw:kw['route_info']['provider']='synthetic'
@@ -176,7 +237,7 @@ async def exercise(root,mode):
         caller_factory=lambda *,cycle,read_binding:Caller(cycle,read_binding),preparation=prep or preparation())
     parameters=dict(expression_parameters=dict(recipient_meaning=True,grounding=True,
         require_independent_grounding=False,model_timeout_seconds=30),resolve_binding=lambda _:None)
-    async def allow(self,target):return target in (url,primary)
+    async def allow(self,target):return target in (url,primary,*backgrounds)
     original_tools=CoreDiscoveryTools
     def bounded_tools(*args,**kw):return original_tools(*args,**kw,timeout_seconds=.03 if mode=='uncertain-read' else 2)
     with patch.dict(sys.modules,hermes_constants=NS(get_hermes_home=lambda:root)),patch.object(CoreDiscoveryTools,'allow_url',allow),patch(
@@ -186,6 +247,7 @@ async def exercise(root,mode):
             # Emulate an operation begun before the new durable research mode.
             # Reopen with the actual new code, not the patched historical mode.
             runner.preparation._research_enabled=lambda cycle:False
+        if mode=='historical-followup-replay':runner.preparation._bundle_enabled=lambda cycle:False
         if mode in ('invalid-choice','revoked-choice','forgotten-choice','erased-choice','uncertain-read',
                     'invented-followup','foreign-followup','revoked-followup','forgotten-followup','erased-followup','interrupted-followup'):
             try:await runner.step(parameters)
@@ -209,22 +271,68 @@ async def exercise(root,mode):
             else:raise AssertionError('incomplete/failed operation silently repeated')
             assert (len(tools),len(models))==before
         else:
-            if mode in ('replay','legacy-replay'):
+            if mode in ('replay','legacy-replay','historical-followup-replay'):
                 try:await runner.step(parameters)
                 except RuntimeError:pass
                 else:raise AssertionError('synthetic interruption did not occur')
                 before=(len(tools),len(models));runner=native()
             result=await runner.step(parameters)
-            if mode in ('replay','legacy-replay'):assert (len(tools),len(models))==before
+            if mode in ('replay','legacy-replay','historical-followup-replay'):assert (len(tools),len(models))==before
             assert result.disposition==('paused' if mode=='paused' else 'silence' if mode=='abstain' else 'shadow_selected')
             assert len(journal.read(event_type='autonomous.host.closed'))==1
             if mode=='paused':assert not tools and not models
             elif mode!='abstain':
                 assert url in result.expression.text
-                assert len(tools)==(3 if mode in ('primary-read','replay','followup-failed','private-followup') else 2)
+                assert len(tools)==(3 if pressure or mode in ('primary-read','replay','followup-failed','private-followup','erase-group-after-final','historical-followup-replay') else 2)
                 assert models.count('alive_discovery_reading')==1
                 assert models.count('alive_discovery_followup')==(0 if mode in ('page-failed','legacy-replay','unconsented-followup') else 1)
                 assert models.count('alive_source_support')==1
+                if mode=='fair-budget-pressure':
+                    admitted=journal.read(event_type='opportunity.synthesis_started')[-1].event.payload
+                    scan=admitted['source_scan']
+                    assert set(scan['fair_pool_observation_ids'])-set(admitted['observation_event_ids'])
+                    assert scan['next_sequence']<max(journal.get(i).sequence for i in scan['focus_observation_ids'])
+                    assert runtime.preparation.expression.planning.synth._source_cursor('user:test',Sensitivity.PRIVATE)==scan['next_sequence']
+                if mode=='primary-read':
+                    closed=journal.read(event_type='discovery.host_read_completed')
+                    receipt_ids=tuple(r.event.event_id for r in closed[1:])
+                    opened=journal.read(event_type='autonomous.host.opened')[-1].event.payload['operation_id']
+                    item='inquiry:'+vault.digest_json(dict(cycle=opened,subject='user:test'))[:40]
+                    inquiries=runner.preparation.inquiries.read(subject='user:test',clearance=Sensitivity.PRIVATE,item_ids=(item,))
+                    assert len(resolve_research_reads(ingestor,subject='user:test',clearance=Sensitivity.PRIVATE,
+                        receipt_ids=receipt_ids,inquiries=inquiries))==2
+                    original_active=ingestor.active_evidence;resolutions=[0]
+                    def withdraw_during_resolution(**kw):
+                        result=original_active(**kw);resolutions[0]+=1
+                        return result[:-1] if resolutions[0]==3 else result
+                    with patch.object(ingestor,'active_evidence',side_effect=withdraw_during_resolution):
+                        try:resolve_research_reads(ingestor,subject='user:test',clearance=Sensitivity.PRIVATE,
+                            receipt_ids=receipt_ids,inquiries=inquiries)
+                        except HostDiscoveryError:pass
+                        else:raise AssertionError('concurrent withdrawal silently reduced an atomic group')
+                    assert resolutions[0]==3
+                    for owner,ids,notes in (('user:foreign',receipt_ids,inquiries),
+                            ('user:test',tuple(reversed(receipt_ids)),inquiries),
+                            ('user:test',(closed[0].event.event_id,),inquiries),('user:test',receipt_ids,[])):
+                        try:resolve_research_reads(ingestor,subject=owner,clearance=Sensitivity.PRIVATE,receipt_ids=ids,inquiries=notes)
+                        except HostDiscoveryError:pass
+                        else:raise AssertionError('foreign/reordered/search/unbound research receipt admitted')
+                if mode=='erase-group-after-final':
+                    candidate=journal.read(event_type='message.model_candidate')[-1].event.event_id
+                    original=next(e for e in ingestor.active_evidence(subject='user:test',clearance=Sensitivity.PRIVATE,
+                        limit=32) if e.content['url']==primary)
+                    vault.erase_item(journal.get(original.observation_event_id).event.payload['content']['content_id'])
+                    assert runtime.preparation.expression.store.resolve_model_candidate(candidate) is None
+                    # Historical fairness is metadata, not permission to decrypt
+                    # a forgotten/erased research group into the next cycle.
+                    runtime.preparation.expression.planning.synth._source_cursor('user:test',Sensitivity.PRIVATE)
+                    fresh=journal.append(EventEnvelope(event_type='conversation.inbound',source='synthetic',
+                        actor='user:test',subject='user:test',payload=dict(synthetic=True)))
+                    change=MemoryProposal(kind=MemoryKind.PREFERENCE,subject='user:test',predicate='profile.synthetic.changed',
+                        value='An explicitly changed synthetic preference.',authority=MemoryAuthority.USER_EXPLICIT,
+                        source_event_ids=(fresh.event.event_id,),confidence=1)
+                    memory.apply(memory.append_proposal(change,actor='user:test'))
+                    assert runtime.preparation.expression.planning.synth._source_cursor('user:test',Sensitivity.PRIVATE)==0
             else:assert len(tools)==1
         assert not journal.read(event_type='action.attempted')
         assert not journal.read(event_type='dispatch.externally_delivered')
@@ -233,9 +341,11 @@ async def exercise(root,mode):
 
 
 with tempfile.TemporaryDirectory(prefix='alive-configured-discovery-') as folder:
-    for mode in ('share','primary-read','private-followup','followup-failed','replay','legacy-replay','unconsented-followup','page-failed','abstain','paused',
+    modes=('budget-pressure',) if os.getenv('ALIVE_REPRODUCE_OLD_RECALL')=='1' else (
+                 'share','primary-read','private-followup','budget-pressure','fair-budget-pressure','erase-group-after-final','followup-failed','replay','legacy-replay','historical-followup-replay','unconsented-followup','page-failed','abstain','paused',
                  'invalid-choice','revoked-choice','forgotten-choice','erased-choice','uncertain-read',
-                 'invented-followup','foreign-followup','revoked-followup','forgotten-followup','erased-followup','interrupted-followup'):
+                 'invented-followup','foreign-followup','revoked-followup','forgotten-followup','erased-followup','interrupted-followup')
+    for mode in modes:
         root=Path(folder)/mode;root.mkdir()
         with patch.dict(os.environ,HERMES_HOME=str(root),HERMES_ALIVE_SHARED_DIR=str(root/'runtime')):
             asyncio.run(exercise(root,mode))
