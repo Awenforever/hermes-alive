@@ -72,3 +72,29 @@ context; it does NOT establish authenticated Alive persistence/retrieval, source
 grounding, actual consumer installation or a natural main-agent response. The
 documented pre_llm_call return channel is viable; blindly appending a delivery
 mirror into the transcript is not adopted as a substitute for the product gate.
+
+## 2026-10-24 scoped-route implementation checkpoint
+
+gateway_session_bridge and the owning GatewayHostBinding now provide exact Core
+conversation snapshots, a canonical adapter/metadata resolver for the existing
+standard-send interface, and scoped principal derivation. Actual v0.22.5
+SessionStore, routing identity and GatewayRunner helpers are used; no Core edit,
+new routing algorithm or latest-chat/default-bot scan. Native message history is
+not modified and no user turn, model call or send is initiated by scope capture.
+
+The fresh PM component experiment passes standalone lookup, unmodified origin,
+native Telegram/Slack metadata, wrong owner/home/platform/thread/receiver refusal,
+thread-local hook-envelope checks, cold-store reopen, disconnect/reconnect, reset,
+unload and a multiplexed runtime with two possible bots. The receiver remains
+authoritative even when the runtime's own different bot is online. Missing
+persisted multiplex provenance refuses rather than guessing. Scope reads can run
+on the Core hook worker; actual submission resolution requires its Gateway loop.
+
+Principal v2 distinguishes platform, receiving profile and workspace under the
+existing per-installation identity key. Physical home paths and conversation IDs
+do not define a person; historical raw-user-ID subjects are not silently merged,
+deleted or reassigned. These scopes do not grant content access or authorize IO.
+The experiment uses synthetic peers/transport and partially constructed actual
+Core objects, not a real daemon or consumer install. Retention/onboarding, exact
+share/source/outcome persistence, the actual main-turn reader and full natural
+follow-up qualification remain pending. This does not close the product gate.

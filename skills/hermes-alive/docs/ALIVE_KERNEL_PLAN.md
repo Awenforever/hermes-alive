@@ -2,7 +2,23 @@
 
 Status: active
 
-Last reviewed: 2026-10-23
+Last reviewed: 2026-10-24
+
+2026-10-24 closure slice: the new gateway_session_bridge reuses actual Core
+SessionStore exact-key lookup, restored identity, receiving-adapter selection and
+native thread/workspace metadata. It is accessible from the current owned Gateway
+binding, never a latest-chat/default-bot scan. A read-only turn scope can survive a
+transport disconnect; a physical submission still needs the owning Gateway loop
+and current connected receiver. Reset, changed realm, foreign home/user/platform,
+unclear multiplex transport and retired handles refuse. Scoped principal v2
+includes platform/receiving-profile/workspace/user under the migratable identity
+key; it does not claim bare legacy IDs are equivalent or migrate their memories.
+Actual Core helper/store tests pass for standalone and a routed runtime with TWO
+bots: the receiver, not the runtime's other bot, owns delivery. Cold-store recovery
+and actual task-local turn-envelope checks also pass. This is a routing/identity
+prerequisite, NOT owner consent, memory access, installed continuity or a natural
+main-agent response. Ordinary onboarding, retention, exact share/source/outcome
+linkage and the actual pre_llm_call reader remain the next implementation work.
 
 Owner-required closure: [ADR0210](adr/0210-share-to-main-conversation-continuity.md).
 An Alive share must be naturally discussable in the owning Hermes conversation.
@@ -20,7 +36,8 @@ or the system prefix, or triggering a new turn. This is only seam qualification;
 share persistence, outcome linkage, grounding retrieval and installed follow-up
 are still missing. Do not turn the synthetic supplied context into product proof.
 
-Current integration step: [ADR0209](adr/0209-core-channel-capability-lifetime.md).
+Current integration step: [ADR0210](adr/0210-share-to-main-conversation-continuity.md),
+following the channel acquisition/lifetime work in ADR0209.
 The preceding standard-channel portable regression has terminated successfully:
 84 suite logs, saved wrapper exit0 and container removed. Scope is exactly tree
 1fd5be7841260d6c8ec123c4022a99a3fbf74411, not later guards or channel acquisition.

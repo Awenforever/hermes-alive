@@ -16,6 +16,7 @@ class GatewayHostBinding:
         self.channels={}
         self.channel_error_class=None
         self._unsubscribe_channels=None
+        self._session_routers={}
         context.on_unload(self.close)
         read_config=getattr(context,'get_config',None)
         settings=read_config('kernel_shadow',{}) if callable(read_config) else {}
@@ -42,6 +43,26 @@ class GatewayHostBinding:
         from hermes_constants import get_hermes_home
         if Path(get_hermes_home()).resolve()!=self.home:
             raise ValueError('Gateway binding belongs to another Core profile')
+
+    def session_router(self,platform):
+        """Gateway-loop capture only; no recipient, memory or sending grant."""
+        self._require_home()
+        if self.closed or platform not in self.channels:
+            raise ValueError('current connected Core channel required')
+        adapter=self.channels[platform].adapter()
+        gateway=getattr(adapter,'gateway_runner',None)
+        if gateway is None:raise ValueError('Core Gateway routing capability unavailable')
+        from .gateway_session_bridge import CoreSessionRouter
+        previous=self._session_routers.get(platform)
+        if previous is not None:
+            from .gateway_session_bridge import SessionScopeUnavailable
+            try:old_gateway=previous._current()[0]
+            except SessionScopeUnavailable:old_gateway=None
+            if old_gateway is gateway:return previous
+            previous.close()
+        router=CoreSessionRouter(self.context,gateway)
+        self._session_routers[platform]=router
+        return router
 
     def attach(self,native,*,build_parameters,max_cycles,interval_seconds=60):
         """Trusted host assembly, not a user/model-supplied action or permission."""
@@ -80,6 +101,8 @@ class GatewayHostBinding:
 
     def close(self):
         self.closed=True
+        for router in self._session_routers.values():router.close()
+        self._session_routers.clear()
         if self._unsubscribe_channels is not None:
             self._unsubscribe_channels()
             self._unsubscribe_channels=None

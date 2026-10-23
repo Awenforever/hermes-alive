@@ -3,6 +3,29 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## Exact Core conversation scope is not a bare user ID or an authority grant
+
+2026-10-24 (Asia/Shanghai), Codex. gateway_session_bridge must use Core's actual
+persisted routing entry, restored receiving-bot identity and metadata. Resolve
+the exact admitted turn/key, not a recent session; compare runtime home, user,
+platform, workspace/thread, receiver and current conversation ID. A new/reset
+conversation cannot inherit an old scope just because its chat key is unchanged.
+Do not mutate the routing entry while restoring a snapshot or create/touch a
+session to make a lookup succeed. A disconnected receiver cannot borrow the
+runtime's other connected bot; read-only follow-up context is not an instruction
+to submit another message. Scoped principal v2 is separate from historical
+raw-user-ID ownership: no automatic memory/grant reassignment or data deletion.
+Route knowledge alone grants neither pairing/authorization, content retrieval
+nor sending. The ordinary host must still perform current Core admission and
+Alive permission/retention checks before reading content or launching IO.
+
+Keep test operation IDs separate from dependency-generation identities. A broad
+launcher rename changed an unrelated PM generation path, failing before Python
+ran. Preserve the failed launcher/exit; do not repair the good environment or
+call that a product failure. New bind mounts must fail on a missing source rather
+than implicitly create an empty directory. Snapshot and dependency inputs remain
+immutable across qualification operations.
+
 ## Registration must not materialize deferred platform configuration
 
 2026-10-23 (Asia/Shanghai), Codex; supplement to ADR0209. Manually instantiated
