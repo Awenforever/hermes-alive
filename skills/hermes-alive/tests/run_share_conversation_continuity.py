@@ -52,7 +52,7 @@ async def test(home, mode, *, exercise=None):
         adapter.gateway_runner = runner
         await adapter.connect()
         router = binding.session_router('telegram')
-        source = core.SessionSource(platform=core.Platform.TELEGRAM, chat_id='private-peer-marker',
+        source = core.SessionSource(platform=core.Platform.TELEGRAM, chat_id='-1007654321',
             user_id='private-user-marker', thread_id='7', message_id='synthetic')
         entry = runner.session_store.get_or_create_session(source)
         scope = router.capture_target(session_key=entry.session_key, user_id=source.user_id, platform='telegram')
@@ -63,6 +63,17 @@ async def test(home, mode, *, exercise=None):
         runtime = AutonomousCycleRuntime(journal)
         store = ShareContinuityStore(runtime.outbox)
         bridge = binding.attach_continuity(store, router, clearance=Sensitivity.PRIVATE)
+        core.refused(lambda:router.standard_send_parameters(scope,continuity=None,
+                                                            clearance=Sensitivity.PRIVATE))
+        core.refused(lambda:router.standard_send_parameters(scope,continuity=bridge,
+                                                            clearance=Sensitivity.PUBLIC))
+        send_parameters=router.standard_send_parameters(scope,continuity=bridge,
+                                                        clearance=Sensitivity.PRIVATE)
+        from tools.send_message_targets import resolve_send_target
+        assert send_parameters['resolve_target'] is resolve_send_target
+        assert send_parameters['extract_media'] is core.BasePlatformAdapter.extract_media
+        assert send_parameters['resolve_target']('telegram','-1007654321:7')==('-1007654321','7',None)
+        assert not received  # assembly and parser validation perform no send
         assert not store.read(scope=scope.binding_document(), clearance=Sensitivity.PRIVATE)
         if mode != 'no-consent':
             consent = store.retention.append_consent(subject=owner, actor=owner, enabled=True,
@@ -102,11 +113,7 @@ async def test(home, mode, *, exercise=None):
                 resolve_binding=lambda _:None, execute=True, channel_execution='standard', worker_id='worker',
                 authorization_parameters={'authorization_operation_id':'authorize', 'route_binding_id':'selected',
                                           'delegation_event_id':delegation.event.event_id},
-                send_parameters={'resolve_channel':lambda route:router.resolve_channel(scope,route),
-                    'clearance':Sensitivity.PRIVATE, 'profile_id':scope.runtime_profile, 'hermes_home':home,
-                    'resolve_target':lambda p,t:(source.chat_id,'7',None),
-                    'extract_media':lambda text:([],text), 'observe_profile_home':lambda:home,
-                    'continuity':bridge.for_target(scope)})
+                send_parameters=send_parameters)
         except (ContinuityUnavailable, TimeoutError):
             assert mode in ('no-consent','wrong-direction','late-off','exception')
         else:
@@ -203,7 +210,7 @@ async def test(home, mode, *, exercise=None):
         assert not reopened.read(scope=scope.binding_document(), clearance=Sensitivity.PRIVATE)
         assert store.vault.explicit_erasure_recorded(ContentReference.from_event_payload(record.event.payload['content']).content_id)
         raw = journal.path.read_bytes()
-        assert b'private-peer-marker' not in raw and b'bicycles, not cars' not in raw
+        assert b'-1007654321' not in raw and b'bicycles, not cars' not in raw
         assert not journal.read(event_type='delivery.succeeded') and len(journal.read(event_type='dispatch.started')) == 1
         binding.close()
         assert bridge.context() is None

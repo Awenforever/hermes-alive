@@ -3,6 +3,19 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## Standard submission must use Core parsing and owning continuity
+
+2026-10-24 (Asia/Shanghai), Codex. Prior standard executor fixtures supplied
+synthetic target/media callbacks; they did not qualify Core's actual parser
+boundary. CoreSessionRouter.standard_send_parameters uses resolve_send_target
+and BasePlatformAdapter.extract_media, the current home accessor and canonical
+owning adapter/thread resolver. Its continuity bridge must belong to that same
+router and clearance. Assembly has no IO or route/delegation authority. Keep
+parser callback identity assertions, legal native target/thread resolution,
+missing/wrong-clearance refusal and no-send-before-execution checks. Do not repair
+Core or weaken its parser to accept an unrealistic synthetic chat identifier.
+Actual transport remains synthetic in this fixture, not delivery/product proof.
+
 ## Continuous is an explicit lifetime, not a grant or retry policy
 
 2026-10-24 (Asia/Shanghai), Codex; ADR0212. Reuse the durable/native host loop.

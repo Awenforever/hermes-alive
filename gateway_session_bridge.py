@@ -186,3 +186,22 @@ class CoreSessionRouter:
         if metadata is not None and not isinstance(metadata,dict):
             raise SessionScopeUnavailable('Core routing metadata unavailable')
         return adapter,dict(metadata or {})
+
+    def standard_send_parameters(self,scope,*,continuity,clearance):
+        """Real Core parsers plus mandatory same-router conversation capture.
+
+        This only assembles callbacks. It grants no route, lease or delivery
+        authority and performs no model call or send.
+        """
+        from .gateway_conversation_bridge import CoreShareContinuity
+        from gateway.platforms.base import BasePlatformAdapter
+        from tools.send_message_targets import resolve_send_target
+        from hermes_constants import get_hermes_home
+        if (not isinstance(continuity,CoreShareContinuity) or continuity.router is not self
+                or continuity._closed or continuity.clearance!=clearance):
+            raise SessionScopeUnavailable('owning conversation continuity required')
+        self.resolve_channel(scope,scope.route)
+        return dict(resolve_channel=lambda route:self.resolve_channel(scope,route),
+            clearance=clearance,profile_id=scope.runtime_profile,hermes_home=self.home,
+            resolve_target=resolve_send_target,extract_media=BasePlatformAdapter.extract_media,
+            observe_profile_home=get_hermes_home,continuity=continuity.for_target(scope))

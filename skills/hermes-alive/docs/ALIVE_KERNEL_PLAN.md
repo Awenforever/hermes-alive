@@ -4,6 +4,15 @@ Status: active
 
 Last reviewed: 2026-10-24
 
+Core submission assembly (2026-10-24, Codex): CoreSessionRouter now builds the
+standard-send callbacks from Core's actual resolve_send_target and extract_media,
+with mandatory same-router continuity and clearance. It captures no grant and
+does not send. The actual Core continuity fixture now uses a valid native target
+and these real parsers rather than synthetic target/media lambdas. Qualification
+is separate from the preceding continuous-lifetime candidate. Ordinary setup to
+execution activation is still pending; do not claim this callback assembly closes
+it or any consumer/fleet/conversation-quality gate.
+
 Continuous-lifetime work (2026-10-24, Codex): ADR0212 reuses the existing native
 host loop for explicit executing-until-stop lifetimes, retaining bounded shadow
 defaults and per-cycle authority. Pause and failures exit rather than restart.
