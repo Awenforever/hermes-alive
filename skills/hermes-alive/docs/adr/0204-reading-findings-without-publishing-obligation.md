@@ -1,6 +1,6 @@
 # ADR0204 — Reading findings without a publishing obligation
 
-Status: implemented; qualification pending
+Status: controlled-qualified; real literal-anchor defect remains open
 
 ## Gap
 
@@ -61,6 +61,31 @@ establish real intelligence or better taste. Expanded tests exercise invalid and
 missing notes without dropping communication, structural correction, exact reopen,
 source erasure and old-cycle upgrade without inference. Final canonical full
 regression and real new representative tests remain required.
+
+## Contrary real evidence and next revision
+
+The exact runtime subsequently passed the complete portable regression (80 retained
+logs), expanded focused cases and actual pinned-Core installed composition. A
+fresh installed public-research cycle completed seven real logical model calls and
+reopened without inference. However, its two-part partial assessment was rejected:
+one PDF quotation repaired hard line-wrap/hyphenation present in the actual source,
+while the other matched literally. Even whitespace folding would not resolve the
+PDF word breaks. This is a host-interface defect, not evidence that the model
+could not understand the passage. The whole note correctly remained unassessed;
+no genuine partial findings reached expression in that run.
+
+The final model again endorsed the generated thematic digest. Do not count that
+as a clean quality round or claim the new notes improved expression. The actual
+trial does not establish a causal effect of admitted findings because they were
+not admitted. There were no physical sends or production changes.
+
+Revise responsibilities: the host supplies bounded stable passage references for
+the exact admitted original text; the model selects references and interprets;
+the host resolves/copies the original passages. Avoid proliferating typo, hyphen,
+whitespace or synonym repair rules, fuzzy quote substitution, or another model
+judge. Preserve the literal v1 contract for historical records rather than silently
+rescuing an originally rejected note or spending inference again. Qualification of
+that successor and a new real representative are still required.
 
 This is a persistent interpretation result under the existing completion, not yet
 cross-cycle inquiry retrieval or automatic pursuit of unresolved questions. It does

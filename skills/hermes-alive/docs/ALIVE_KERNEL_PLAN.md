@@ -11,8 +11,17 @@ Missing/invalid notes remain unassessed and do not reject a valid communication
 candidate. The existing encrypted completion retains them and authorship can see
 them as revisable notes, not an owner assignment, source truth or required outline.
 No additional model stage, memory backend, agenda completion or sending authority.
-Initial controlled installed composition passes; final negative/recovery/upgrade
-tests and exact-tree qualification remain pending. Cross-cycle inquiry continuation,
+Controlled installed composition, expanded negative/recovery/upgrade tests and
+exact runtime portable regression now pass (80 logs). A fresh real installed case
+completes seven stages and no-inference reopen, but exposes a literal-anchor flaw:
+the PDF's hard word-wrap/hyphenation differs from the model's readable quotation.
+The complete assessment correctly becomes unknown rather than fake success, yet
+the intended findings never reach expression. Therefore this trial does NOT test
+whether admitted partial findings improve writing; its final prose remains an
+unacceptable thematic digest. Next move passage identity/copying to the host and
+let the model select bounded references plus interpretation. Do not patch prose
+with hyphen/whitespace synonym heuristics or retroactively reinterpret old records.
+Cross-cycle inquiry continuation,
 useful learning and actual new sharing quality are NOT established by this step.
 
 ADR0203 changes the immediate quality investigation after an owner rejected an
