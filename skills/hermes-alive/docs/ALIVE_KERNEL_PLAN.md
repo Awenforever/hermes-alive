@@ -36,11 +36,25 @@ The original is not a zero-error round, the revision has no inherited owner rati
 and the complete quality streak remains zero. Runtime proof is dev28fea970/tree
 9772003089ec232bc6dbe9a2a00f19a74e010ca5; local correction has the separate runtime
 qualification above. Later documentation-only trees are not new runtime CI runs.
-A new installed real public-video/history discovery is in progress on707e720…;
-do not assume useful expression, corrected facts or delivery before actual results.
+A new installed real public-video/history discovery on707e720… completed seven
+logical calls, final source review and no-inference reopen, with credentials
+removed and no delivery. Actual admitted reading notes correctly identify that
+only a catalog was read and the substantive question is unresolved. The final
+message offers a resource arrangement and viewing sequence, not a content insight.
+Factual support passes; recipient value remains unqualified. Resource discovery
+can be useful, but topic/title/duration matches do not themselves prove content
+quality. Do not claim human rejection, ban resource sharing, force transcripts or
+add another judge to manufacture a verdict. Full original shown for optional
+sample-scoped calibration, not permanent preference learning or send consent.
 Next prioritize ordinary installed activation/delivery/feedback and safe legacy
 migration, not additional reviewer/framework layers. The installed assembler is
 still explicitly non-sending shadow; successful preparation is not live readiness.
+The current executing cycle is also wired to a platform-specific qualified
+publisher; its alternative chunk-observation seam is not generic platform support.
+Audit the actual current stable Core public interfaces before assembling ordinary
+delivery. Standard CLI send, plugin tool dispatch and platform actions are distinct
+contracts, not interchangeable labels. Do not require the optional transport
+enhancement plugin or build a second FIFO merely to connect the consumer loop.
 
 ADR0205 addresses a second actual early-chain failure: a model omitted a PDF's
 sentence period from a cited project URL, so the old copying/lexical contract
