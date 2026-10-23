@@ -1,7 +1,8 @@
 # ADR0208 — Submission authority and the standard channel boundary
 
 Date: 2026-10-23 (Asia/Shanghai).
-Status: development implementation; exact final regression and installed activation pending.
+Status: development implementation; final focused qualification passed, broader regression
+and installed activation pending.
 
 ## Structural defect
 
@@ -92,3 +93,18 @@ patches, model changes or remote-device changes. No release or platform acceptan
 Next close actual profile/lifecycle-bound resolver assembly, guided authority,
 feedback attribution and migration/rollback, then the real consumer matrix and
 ten consecutive complete quality rounds. The installed kernel remains shadow.
+
+## Later exact focus qualification
+
+Runtime9aecabe/tree`f003a6fb23948531d33aa08afec10e88b89c2e8c` passes seven managed
+Python suites and fourteen composed cases, repeated with actual current-Core
+BasePlatformAdapter/SendResult and in-memory transport. This includes the final
+immutable-route and authenticated-report-route checks and two further wrong
+platform/profile refusals. All focus wrappers have saved terminal exit0, except
+the preserved initial clock-fixture failure. Neither an installed Gateway resolver
+nor actual platform transport is thereby qualified.
+
+Full portable CI is running on the preceding tree
+`1fd5be7841260d6c8ec123c4022a99a3fbf74411`; its actual terminal result remains to be
+observed. Do not inherit that result onto the final two stricter guards or claim
+the final runtime has full CI, real fleet or production qualification.

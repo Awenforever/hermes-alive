@@ -13,10 +13,13 @@ provenance, current authority and the existing single-start outbox. It accepts o
 a synchronous host-owned canonical channel resolver, preserves its routing metadata
 and records a sanitized normal-return observation, not a delivered/read outcome.
 It does not import or inspect an installed Enhance plugin, split/retry messages or
-acknowledge a local return as delivery. The preceding focus snapshot passes seven
-managed-Python suites plus twelve actual-current-Core fake-transport cases. The
-final additional immutable-route/report-binding checks still need exact-tree
-qualification and full regression. Ordinary installed assembly, onboarding grants,
+acknowledge a local return as delivery. Runtime9aecabe/treef003a6fb23948531d33aa08afec10e88b89c2e8c
+passes seven exact-tree managed-Python suites and fourteen cases with actual
+current-Core BasePlatformAdapter/SendResult and an in-memory transport, including
+immutable/report-bound routes and wrong platform/profile refusal. Complete portable
+CI is running on the immediately preceding tree1fd5be7841260d6c8ec123c4022a99a3fbf74411;
+it is not yet terminal and will not qualify the final two added guards by assertion.
+Ordinary installed assembly, onboarding grants,
 real routing and feedback/migration remain pending; this is not live readiness.
 
 Current closure checkpoint: [ADR0207](adr/0207-current-core-channel-lifecycle.md).
