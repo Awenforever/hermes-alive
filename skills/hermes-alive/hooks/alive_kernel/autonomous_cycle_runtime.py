@@ -12,6 +12,7 @@ from .transport_reconciliation_runtime import TransportReconciliationRuntime
 from .reconsideration import ReconsiderationStore
 from .content_vault import ContentVaultError
 from .feedback_assimilation import FeedbackAssimilationRuntime
+from .core_context_read import context_value
 
 
 @dataclass(frozen=True,slots=True)
@@ -63,14 +64,16 @@ class AutonomousCycleRuntime:
                       'policy_context':policy.context}
         capture = None
         if reconsider_after_seconds is not None:
-            def capture():
+            def snapshot():
                 current_policy = self.reconciliation._owner_policy(subject)
                 if current_policy.event_id!=policy.event_id:
                     raise ValueError('owner policy changed during reconsideration')
                 return self.reconsideration.capture(subject=subject,
                     configuration_id=cognition_configuration_id, execute=execute, policy=current_policy,
                     parameters=expression_parameters, window_seconds=reconsider_after_seconds)
-            before = capture()
+            async def capture():
+                return await context_value(expression_parameters.get('read_context'),snapshot)
+            before = await capture()
             waiting = self.reconsideration.current(subject=subject,
                 configuration_id=cognition_configuration_id, context=before)
             if waiting is not None and waiting.event.payload['operation_id']!=operation_id:
@@ -83,7 +86,7 @@ class AutonomousCycleRuntime:
                     # Lost/stale retained proof cannot justify waiting. The host's
                     # new operation may think afresh; never resume the old spend.
                     retained = None
-                after = capture()
+                after = await capture()
                 if (retained is not None and retained.planning.action_kind=='silence'
                         and before.semantic_digest==after.semantic_digest
                         and before.owner_frontier==after.owner_frontier
@@ -101,7 +104,7 @@ class AutonomousCycleRuntime:
                     expression=expression,quality_assessment=assessed)
             if capture is not None and expression.planning.action_kind=='silence':
                 self.reconsideration.remember(subject=subject,configuration_id=cognition_configuration_id,
-                    before=before,after=capture(),planning=expression.planning)
+                    before=before,after=await capture(),planning=expression.planning)
             return AutonomousCycleResult('silence' if expression.planning.action_kind=='silence'
                 else 'shadow_selected',reconciliation,expression=expression,
                 quality_assessment=assessed if parameters.get('grounding',False) else None)
@@ -111,7 +114,7 @@ class AutonomousCycleRuntime:
         if prepared.expression.planning.action_kind=='silence':
             if capture is not None:
                 self.reconsideration.remember(subject=subject,configuration_id=cognition_configuration_id,
-                    before=before,after=capture(),planning=prepared.expression.planning)
+                    before=before,after=await capture(),planning=prepared.expression.planning)
             return AutonomousCycleResult('silence',reconciliation,prepared=prepared)
         if prepared.quality_disposition.startswith('final_'):
             return AutonomousCycleResult('content_review_attention',reconciliation,prepared=prepared)

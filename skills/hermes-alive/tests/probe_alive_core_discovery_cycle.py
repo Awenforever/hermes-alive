@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import shutil
 import sys
+import threading
 from unittest.mock import patch
 
 p=argparse.ArgumentParser(description=__doc__)
@@ -132,8 +133,18 @@ async def main():
             bridge=importlib.import_module(module.__name__+'.tool_receipt_bridge')
             assembly=bridge._kernel_module('core_shadow_assembly')
             tools_class=importlib.import_module(assembly.__package__+'.core_discovery_tools').CoreDiscoveryTools
+            context_class=importlib.import_module(assembly.__package__+'.core_context_read').CoreContextRead
+            context_reads=[]
+            original_invoke=context_class.invoke
+            async def observed_invoke(self,operation,*,read_binding):
+                def observed_operation():
+                    assert threading.current_thread() is not threading.main_thread()
+                    assert Path(get_hermes_home()).resolve()==home.resolve()
+                    context_reads.append(str(get_hermes_home()))
+                    return operation()
+                return await original_invoke(self,observed_operation,read_binding=read_binding)
             async def allowed(self,target):return target in (url,primary)
-            with patch.object(tools_class,'allow_url',allowed):
+            with patch.object(tools_class,'allow_url',allowed),patch.object(context_class,'invoke',observed_invoke):
                 hooks=HookRegistry();hooks.discover_and_load()
                 assert (await hooks.emit_collect('gateway:startup',{}))[0]['status']=='started'
                 binding=module._gateway_host_binding
@@ -149,8 +160,11 @@ async def main():
             assert [r['name'] for r in reads]==['web_search','web_extract','web_extract']
             assert reads[-1]['args']['urls']==[primary]
             assert not binding.native.pending
+            assert context_reads,'installed cognition never used Core-owned context reads'
+            context_capability=binding.native.context_reads
             assert manager.unload('hermes-alive') is True
             await asyncio.sleep(0)
+            assert context_capability._closed and not context_capability.pending
             before=journal.path.read_bytes()
             with redirect_stdout(io.StringIO()):
                 assert module.alive_command(Namespace(alive_action='uninstall-runtime'))==0
@@ -159,6 +173,7 @@ async def main():
             retained=load_config_readonly()['plugins']['entries']['hermes-alive']['settings']['kernel_shadow']
             assert retained==settings
     report=dict(installed_startup_to_final_expression=True,separate_public_consent_required=True,
+        core_profile_context_thread_reads=len(context_reads),unload_retires_context_reads=True,
         reinstall_preserves_public_consent_and_history=True,
         controlled_registry_dispatch=reads,controlled_model_stages=requests,physical_sends=0,
         actual_model_inference=False,url_safety_answers_synthetic=True,quality_rounds=0)

@@ -29,6 +29,7 @@ from .expression_history import ExpressionHistoryReader
 from .action_history import ActionHistoryReader
 from .host_discovery import read_scope_metadata, source_prompt_excerpt, SOURCE_EXCERPT_POLICY
 from .model_timeouts import MAX_STAGE_SECONDS
+from .core_context_read import context_value
 
 
 _DISCOVERY_AUTHORING = 'source-led-v2'
@@ -1081,9 +1082,11 @@ class OpportunitySynthesizer:
                   recipient_meaning: bool = False,
                   protocol_recovery: bool = True,
                   inquiry_item_ids: tuple = (),research_read_receipt_ids: tuple = (),
-                  recalled_feedback_event_ids: tuple = (),material_scope=None) -> OpportunitySynthesisResult:
+                  recalled_feedback_event_ids: tuple = (),material_scope=None,read_context=None) -> OpportunitySynthesisResult:
         if type(recipient_meaning) is not bool or type(protocol_recovery) is not bool:
             raise OpportunitySynthesisError('invalid recipient meaning mode')
+        if read_context is not None and not callable(read_context):
+            raise OpportunitySynthesisError('explicit host context read capability required')
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}", operation_id):
             raise OpportunitySynthesisError("invalid opportunity operation")
         requested_model = str(requested_model).strip() or None if requested_model is not None else None
@@ -1093,24 +1096,27 @@ class OpportunitySynthesizer:
         if not 0 < timeout_seconds <= MAX_STAGE_SECONDS:
             raise OpportunitySynthesisError("invalid model timeout")
         authority = ActionAuthority(authority)  # Trusted host input, never a model field.
-        inquiries = self.inquiries.read(subject=subject, clearance=clearance, item_ids=inquiry_item_ids)
         from .research_evidence import resolve_research_reads, research_scan, RESEARCH_SOURCE_BUDGET
         if not isinstance(research_read_receipt_ids,tuple) or len(research_read_receipt_ids)>2:
             raise OpportunitySynthesisError('invalid research read receipt scope')
-        focus=(resolve_research_reads(self.reader,subject=subject,clearance=clearance,
-            receipt_ids=research_read_receipt_ids,inquiries=inquiries) if research_read_receipt_ids else ())
-        if focus and not recipient_meaning:
-            raise OpportunitySynthesisError('research group requires source-led recipient authorship')
-        commitment_digest=self._commitment_digest(subject,clearance)
-        context = self.context_reader.read(subject=subject, clearance=clearance)
-        learning = self.learning_reader.read(subject=subject, clearance=clearance)
-        history = self.history_reader.read(subject=subject, clearance=clearance)
-        actions = self.action_reader.read(subject=subject,clearance=clearance)
-        feedback = self.feedback_reader.context(subject=subject,clearance=clearance,
-            recalled_ids=recalled_feedback_event_ids)
-        revisions = self._revision_context(revision_event_ids, subject, clearance)
-        pool,cursor,fair_pool=self.source_pool(subject=subject,clearance=clearance,focus=focus,
-            revision_event_ids=revision_event_ids,scope=material_scope)
+        def capture_inputs():
+            inquiries=self.inquiries.read(subject=subject,clearance=clearance,item_ids=inquiry_item_ids)
+            focus=(resolve_research_reads(self.reader,subject=subject,clearance=clearance,
+                receipt_ids=research_read_receipt_ids,inquiries=inquiries) if research_read_receipt_ids else ())
+            if focus and not recipient_meaning:
+                raise OpportunitySynthesisError('research group requires source-led recipient authorship')
+            commitment_digest=self._commitment_digest(subject,clearance)
+            context=self.context_reader.read(subject=subject,clearance=clearance)
+            learning=self.learning_reader.read(subject=subject,clearance=clearance)
+            history=self.history_reader.read(subject=subject,clearance=clearance)
+            actions=self.action_reader.read(subject=subject,clearance=clearance)
+            feedback=self.feedback_reader.context(subject=subject,clearance=clearance,recalled_ids=recalled_feedback_event_ids)
+            revisions=self._revision_context(revision_event_ids,subject,clearance)
+            pool,cursor,fair_pool=self.source_pool(subject=subject,clearance=clearance,focus=focus,
+                revision_event_ids=revision_event_ids,scope=material_scope)
+            return inquiries,focus,commitment_digest,context,learning,history,actions,feedback,revisions,pool,cursor,fair_pool
+        (inquiries,focus,commitment_digest,context,learning,history,actions,feedback,revisions,pool,cursor,
+            fair_pool)=await context_value(read_context,capture_inputs)
         as_of = datetime.now(timezone.utc)
         budget=RESEARCH_SOURCE_BUDGET if focus else 32000 if revisions else 24000
         prompt_data={"as_of": as_of.isoformat(),
@@ -1264,14 +1270,14 @@ class OpportunitySynthesizer:
             if evidence:
                 messages=[{'role':'system','content':system_prompt},{'role':'user','content':prompt}]
                 for attempt in range(2 if protocol_recovery else 1):
-                    validate_current()
+                    await context_value(read_context,validate_current)
                     remaining=deadline-asyncio.get_running_loop().time()
                     if remaining<=0:
                         raise TimeoutError('opportunity stage budget exhausted')
                     response=await asyncio.wait_for(call(task='alive_opportunity_candidates',
                         model=requested_model,messages=messages,temperature=.2,
                         max_tokens=self.MAX_RESPONSE_TOKENS),timeout=remaining)
-                    validate_current()
+                    await context_value(read_context,validate_current)
                     content,model=DeliberationSynthesizer._response(response)
                     if len(content)>32_000:
                         raise OpportunitySynthesisError('opportunity response exceeds boundary')
@@ -1312,7 +1318,7 @@ class OpportunitySynthesizer:
                         continue
                     break
             else:
-                validate_current()
+                await context_value(read_context,validate_current)
                 model='system/alive-no-current-material'
                 document={'candidates':[],'abstentions':[],'reconsiderations':[]}
             candidates, drafts, rejected, indices = self._candidates(

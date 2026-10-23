@@ -15,7 +15,7 @@ class NativeCognitionHost:
     def __init__(self,host,*,profile_id,profile_home,read_configuration,
                  read_credential_names,interpreter,core,private_root,environment,
                  resolve_domain,identity='',entrypoint=None,timeout_seconds=90,max_calls=16,
-                 profile_scope=None,caller_factory=None,preparation=None):
+                 profile_scope=None,caller_factory=None,preparation=None,context_reads=None):
         if not callable(resolve_domain):
             raise NativeWorkerError('host model family resolver required')
         self.host=host
@@ -35,6 +35,11 @@ class NativeCognitionHost:
                 or not callable(getattr(preparation,'reap_pending',None))):
             raise NativeWorkerError('cycle preparation must retain and settle physical work')
         self.preparation=preparation
+        if context_reads is not None and (not callable(getattr(context_reads,'invoke',None))
+                or not callable(getattr(context_reads,'ensure_available',None))
+                or not callable(getattr(context_reads,'reap_pending',None))):
+            raise NativeWorkerError('context reads must retain and settle physical work')
+        self.context_reads=context_reads
         self._caller=None
         self._lock=asyncio.Lock()
         self.last_call_count=0
@@ -74,15 +79,18 @@ class NativeCognitionHost:
     @property
     def pending(self):
         return ((self._caller.pending if self._caller is not None else ())
-                + (self.preparation.pending if self.preparation is not None else ()))
+                + (self.preparation.pending if self.preparation is not None else ())
+                + (self.context_reads.pending if self.context_reads is not None else ()))
 
     async def reap_pending(self,*,timeout_seconds=0):
         model=(await self._caller.reap_pending(timeout_seconds=timeout_seconds)
                if self._caller is not None else dict(closed=0,remaining=0))
         reads=(await self.preparation.reap_pending(timeout_seconds=timeout_seconds)
                if self.preparation is not None else dict(closed=0,remaining=0))
-        return dict(closed=model.get('closed',0)+reads.get('closed',0),
-                    remaining=model['remaining']+reads['remaining'])
+        local=(await self.context_reads.reap_pending(timeout_seconds=timeout_seconds)
+               if self.context_reads is not None else dict(closed=0,remaining=0))
+        return dict(closed=model.get('closed',0)+reads.get('closed',0)+local.get('closed',0),
+                    remaining=model['remaining']+reads['remaining']+local['remaining'])
 
     async def step(self,parameters):
         if self.profile_scope is None:
@@ -96,12 +104,13 @@ class NativeCognitionHost:
         if not isinstance(parameters,dict):
             raise NativeWorkerError('explicit cycle parameters required')
         expression=parameters.get('expression_parameters',{})
-        if not isinstance(expression,dict) or any(key in expression for key in ('call','resolve_domain')):
+        if not isinstance(expression,dict) or any(key in expression for key in ('call','resolve_domain','read_context')):
             raise NativeWorkerError('native host owns model invocation capability')
         async with self._lock:
             await self.reap_pending()
             if self.pending:
                 raise NativeWorkerError('native host retains uncertain child work')
+            if self.context_reads is not None:self.context_reads.ensure_available()
             self._caller=None
             active=[True]
             self.last_call_count=0
@@ -123,6 +132,9 @@ class NativeCognitionHost:
                     self._caller=self.caller_factory(cycle=cycle,read_binding=read_binding)
                 bound={**parameters,'expression_parameters':{**expression,'call':self._caller,
                     'resolve_domain':self.resolve_domain}}
+                async def read_context(operation):
+                    return await self.context_reads.invoke(operation,read_binding=read_binding)
+                if self.context_reads is not None:bound['expression_parameters']['read_context']=read_context
                 if (self.preparation is None
                         or not self.host.runtime.reconciliation._owner_policy(self.host.subject).enabled):return bound
                 async def prepare():
@@ -131,7 +143,8 @@ class NativeCognitionHost:
                         call=self._caller,read_binding=read_binding)
                     if (read_binding()!=expected or not isinstance(prepared,dict)
                             or prepared.get('expression_parameters',{}).get('call') is not self._caller
-                            or prepared['expression_parameters'].get('resolve_domain') is not self.resolve_domain):
+                            or prepared['expression_parameters'].get('resolve_domain') is not self.resolve_domain
+                            or self.context_reads is not None and prepared['expression_parameters'].get('read_context') is not read_context):
                         raise NativeWorkerError('cycle preparation changed current native authority')
                     return prepared
                 return prepare()

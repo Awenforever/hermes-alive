@@ -7,6 +7,7 @@ from .native_worker_protocol import identifier,canonical
 from .native_cognition_host import NativeCognitionHost
 from .native_core_scope import core_profile_cycle_scope
 from .core_plugin_model_call import CorePluginModelCaller
+from .core_context_read import CoreContextRead
 from .event_store import ExperienceJournal
 from .content_vault import ContentVault
 from .autonomy_policy import AutonomyPolicyProjection
@@ -126,6 +127,7 @@ def assemble(context):
         private_root=root,environment={},resolve_domain=lambda *labels:'unverified-family',
         profile_scope=lambda:core_profile_cycle_scope(home),
         preparation=preparation,
+        context_reads=CoreContextRead(context),
         caller_factory=lambda *,cycle,read_binding:CorePluginModelCaller(context,read_binding=read_binding,refresh_task=refresh_task))
     parameters=dict(expression_parameters={'requested_model':model,'grounding':True,
         'recipient_meaning':True,'require_independent_grounding':False,

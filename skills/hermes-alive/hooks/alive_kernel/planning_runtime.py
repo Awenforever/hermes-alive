@@ -14,6 +14,7 @@ from .event_store import EventConflictError
 from .events import EventEnvelope, Sensitivity, _thaw_json
 from .opportunity_synthesis import OpportunitySynthesizer
 from .model_timeouts import MAX_STAGE_SECONDS
+from .core_context_read import context_value
 
 
 class PlanningRuntimeError(ValueError):
@@ -55,7 +56,7 @@ watcher and not a complete production loop. It creates no channel queues.
             content_vault=self.synth.vault, context_vault=context_vault)
 
     async def _recall_feedback(self,*,subject,operation_id,start,call,model,clearance,inquiry_item_ids,
-                               research_read_receipt_ids,timeout_seconds):
+                               research_read_receipt_ids,timeout_seconds,read_context=None):
         from .feedback_recall import FeedbackRecallSelector
         from .content_vault import ContentReference
         material=start.event.payload.get('feedback_material_scope')
@@ -94,10 +95,10 @@ watcher and not a complete production loop. It creates no channel queues.
                 ref=ContentReference.from_event_payload(record.event.payload['content'])
                 if ref.retention_until is not None:expiry=min(expiry,ref.retention_until)
             return query,expiry
-        query,expiry=capture()
+        query,expiry=await context_value(read_context,capture)
         result=await FeedbackRecallSelector(self.synth.feedback_reader).run(subject=subject,
             operation_id=operation_id,query=query,validate_query=lambda:capture()[0],retention_until=expiry,
-            call=call,model=model,clearance=clearance,timeout_seconds=timeout_seconds)
+            call=call,model=model,clearance=clearance,timeout_seconds=timeout_seconds,read_context=read_context)
         return tuple(result['outcome_event_ids'])
 
     async def _ground_candidates(self, generated, *, subject, interpretation_id,
@@ -160,8 +161,10 @@ watcher and not a complete production loop. It creates no channel queues.
                   require_independent_grounding=False, recipient_meaning=False,
                   inquiry_item_ids=(),research_read_receipt_ids=(),recalled_feedback_event_ids=(),
                   semantic_feedback_recall=False,
-                  model_timeout_seconds=None):
+                  model_timeout_seconds=None,read_context=None):
         validate_model_timeout(model_timeout_seconds)
+        if read_context is not None and not callable(read_context):
+            raise PlanningRuntimeError('explicit host context read capability required')
         if type(recipient_meaning) is not bool:
             raise PlanningRuntimeError('invalid recipient meaning mode')
         if type(semantic_feedback_recall) is not bool or semantic_feedback_recall and recalled_feedback_event_ids:
@@ -233,9 +236,11 @@ watcher and not a complete production loop. It creates no channel queues.
                         or prior.event.sensitivity is not sensitivity):
                     raise PlanningRuntimeError('material scope has foreign planning provenance')
                 material=_thaw_json(prior.event.payload['feedback_material_scope'])
-                self.synth.source_pool(subject=subject,clearance=sensitivity,focus=research_focus,scope=material)
+                await context_value(read_context,lambda:self.synth.source_pool(
+                    subject=subject,clearance=sensitivity,focus=research_focus,scope=material))
             else:
-                material=self.synth.material_scope(subject=subject,clearance=sensitivity,focus=research_focus)
+                material=await context_value(read_context,lambda:self.synth.material_scope(
+                    subject=subject,clearance=sensitivity,focus=research_focus))
             binding['feedback_material_scope']=material
         if prior is None:
             event = EventEnvelope(event_id=start_id, event_type='planning.runtime_started',
@@ -261,17 +266,17 @@ watcher and not a complete production loop. It creates no channel queues.
                 operation_id='runtime-feedback:'+digest,start=prior,call=call,model=requested_model,
                 clearance=sensitivity,inquiry_item_ids=inquiry_item_ids,
                 research_read_receipt_ids=research_read_receipt_ids,
-                timeout_seconds=model_timeout_seconds or 600)
+                timeout_seconds=model_timeout_seconds or 600,read_context=read_context)
         if self.journal.get('opportunity.synthesis:' + interpret_id + ':started') is not None:
-            generated = self.synth.load_completed(subject=subject, operation_id=interpret_id,
-                authority=authority, clearance=sensitivity)
+            generated = await context_value(read_context,lambda:self.synth.load_completed(subject=subject,
+                operation_id=interpret_id,authority=authority,clearance=sensitivity))
         else:
             generated = await self.synth.run(subject=subject, operation_id=interpret_id,
                 call=call, requested_model=requested_model, authority=authority, clearance=sensitivity,
                 recipient_meaning=recipient_meaning,timeout_seconds=model_timeout_seconds or 60,
                 inquiry_item_ids=inquiry_item_ids,research_read_receipt_ids=research_read_receipt_ids,
                 recalled_feedback_event_ids=recalled_feedback_event_ids,
-                material_scope=binding.get('feedback_material_scope'))
+                material_scope=binding.get('feedback_material_scope'),read_context=read_context)
         candidates, reviews, repair, repair_disposition = generated.candidates, (), None, None
         if recipient_meaning and generated.rejected_count and not candidates:
             raise PlanningRuntimeError('recipient meaning unavailable; malformed proposals are not qualified silence')
@@ -297,15 +302,15 @@ watcher and not a complete production loop. It creates no channel queues.
                     for cid, verdict, _ in reviews)}
                 try:
                     if self.journal.get('opportunity.synthesis:' + repair_id + ':started') is not None:
-                        repair = self.synth.load_completed(subject=subject, operation_id=repair_id,
-                            authority=authority, clearance=sensitivity)
+                        repair = await context_value(read_context,lambda:self.synth.load_completed(subject=subject,
+                            operation_id=repair_id,authority=authority,clearance=sensitivity))
                     else:
                         repair = await self.synth.run(subject=subject, operation_id=repair_id,
                             call=call, requested_model=requested_model, authority=authority,
                             clearance=sensitivity, revision_event_ids=rejected,
                             recipient_meaning=recipient_meaning,timeout_seconds=model_timeout_seconds or 60,
                             inquiry_item_ids=inquiry_item_ids,research_read_receipt_ids=research_read_receipt_ids,
-                            recalled_feedback_event_ids=recalled_feedback_event_ids)
+                            recalled_feedback_event_ids=recalled_feedback_event_ids,read_context=read_context)
                     # A repair can address rejected intents, not expand the host's work scope.
                     from dataclasses import replace
                     if recipient_meaning and repair.rejected_count and not repair.candidates:

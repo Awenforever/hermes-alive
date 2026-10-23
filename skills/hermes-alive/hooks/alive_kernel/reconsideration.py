@@ -45,7 +45,7 @@ class ReconsiderationStore:
         # Callback identity cannot certify model routing. Host configuration must
         # change when callback semantics or effective inherited routing changes.
         options = {k:v for k,v in parameters.items() if k not in
-                   ('call', 'resolve_domain', 'resolve_grounding_domain', 'operation_id', 'subject', 'policy_context')}
+                   ('call', 'resolve_domain', 'resolve_grounding_domain', 'read_context', 'operation_id', 'subject', 'policy_context')}
         state = dict(method=self.METHOD, subject=subject, configuration=configuration_id,
             window_seconds=window_seconds,
             execute=execute, policy_event=policy.event_id, policy={**asdict(policy.context),

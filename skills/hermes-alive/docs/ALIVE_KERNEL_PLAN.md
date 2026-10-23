@@ -4,6 +4,16 @@ Status: active
 
 Last reviewed: 2026-10-23
 
+ADR0202 moves the measured heavy context reads into Core-owned profile threads,
+under the existing native host's pending/settlement lifecycle. Cancellation is
+not physical completion: the actual worker retains the profile lock, including
+across plugin-generation replacement. A controlled installed-Core cycle now
+observes four actual off-main-thread reads with correct profile scope and unload
+retirement. This does not qualify fresh dependency installation, real inference,
+all IO paths, external memory providers, useful recommendations or production.
+Next qualify the exact source tree and remaining synchronous hotspots, then
+return to the fresh installed useful-sharing vertical slice. Quality rounds: zero.
+
 ADR0201 binds memory relevance to the material actually planned for this cycle,
 not an independently collector-ranked32-source query. Shared pool assembly keeps
 fairness/research precedence, freezes source IDs/cursor/frontier before inference,

@@ -13,6 +13,7 @@ from .feedback_synthesis import FeedbackSynthesisError
 from .model_json import parse_model_json
 from .model_timeouts import MAX_STAGE_SECONDS
 from .native_worker_protocol import identifier,canonical
+from .core_context_read import context_value
 
 MAX_RECALL_PAGES=4
 PAGE_SCAN_LIMIT=32
@@ -90,9 +91,10 @@ class FeedbackRecallSelector:
 
     async def run(self,*,subject,operation_id,query,validate_query,retention_until,call,
                   model=None,clearance=Sensitivity.PRIVATE,max_pages=MAX_RECALL_PAGES,
-                  timeout_seconds=MAX_STAGE_SECONDS,before_sequence=None):
+                  timeout_seconds=MAX_STAGE_SECONDS,before_sequence=None,read_context=None):
         identifier(subject);identifier(operation_id);clearance=Sensitivity(clearance)
         if (not isinstance(query,dict) or not callable(validate_query) or not callable(call)
+                or read_context is not None and not callable(read_context)
                 or type(max_pages) is not int or not 1<=max_pages<=MAX_RECALL_PAGES
                 or type(timeout_seconds) not in (int,float) or not 1<=timeout_seconds<=MAX_STAGE_SECONDS
                 or not isinstance(retention_until,datetime) or retention_until.utcoffset() is None
@@ -134,7 +136,7 @@ class FeedbackRecallSelector:
             actual=[dict(before_sequence=w['before_sequence'],digest=self.vault.digest_json(w['page'])) for w in windows]
             if actual!=pages:raise FeedbackSynthesisError('recall index changed during inference or recovery')
             return windows
-        guard()
+        await context_value(read_context,guard)
         start=self.journal.get(prefix+':started');done=self.journal.get(prefix+':completed')
         if start is not None:
             record_scope(start,'started',None)
@@ -146,7 +148,7 @@ class FeedbackRecallSelector:
             pages=list(done.event.payload['pages'])
             if not 1<=len(pages)<=max_pages:
                 raise FeedbackSynthesisError('invalid retained recall coverage')
-            windows=pages_current(pages)
+            windows=await context_value(read_context,lambda:pages_current(pages))
             if content(start,'feedback.recall-input')!=query:
                 raise FeedbackSynthesisError('recall input differs from original inquiry')
             result=content(done,'feedback.recall-result')
@@ -167,8 +169,8 @@ class FeedbackRecallSelector:
                     or result['next_before_sequence']!=head['next_before_sequence']
                     or result['more_available']!=head['more_available']):
                 raise FeedbackSynthesisError('retained recall choices differ from coverage')
-            self.reader.context(subject=subject,clearance=clearance,recalled_ids=ids)
-            pages_current(pages)
+            await context_value(read_context,lambda:self.reader.context(subject=subject,clearance=clearance,recalled_ids=ids))
+            await context_value(read_context,lambda:pages_current(pages))
             return result
         if done is not None:raise FeedbackSynthesisError('recall completion has no original start')
         anchor=before_sequence or self.journal.last_sequence()+1
@@ -181,7 +183,8 @@ class FeedbackRecallSelector:
         deadline=asyncio.get_running_loop().time()+timeout_seconds
         expiry=retention_until
         try:
-            windows=self.windows(subject=subject,clearance=clearance,before_sequence=anchor,max_pages=max_pages)
+            windows=await context_value(read_context,lambda:self.windows(subject=subject,clearance=clearance,
+                before_sequence=anchor,max_pages=max_pages))
             index=[];allowed=set()
             for window in windows:
                 page=window['page']
@@ -203,19 +206,19 @@ class FeedbackRecallSelector:
                 messages=[dict(role='system',content=PROMPT),dict(role='user',content=json.dumps(snapshot,ensure_ascii=False))]
                 if len(canonical(messages))>120000:
                     raise FeedbackSynthesisError('recall inquiry and complete evidence exceed input budget')
-                pages_current(pages)
+                await context_value(read_context,lambda:pages_current(pages))
                 remaining=deadline-asyncio.get_running_loop().time()
                 if remaining<=0:raise TimeoutError('recall stage budget exhausted')
                 response=await asyncio.wait_for(call(task='alive_feedback_recall',model=model,messages=messages,
                     temperature=.1,max_tokens=1400,timeout=remaining,route_info={}),timeout=remaining)
-                pages_current(pages)
+                await context_value(read_context,lambda:pages_current(pages))
                 text,actual_model=DeliberationSynthesizer._response(response)
                 identifier(actual_model)
                 choice=self._choice(parse_model_json(text),allowed,head['more_available'])
                 ids=tuple(choice['outcome_event_ids'])
-                self.reader.context(subject=subject,clearance=clearance,recalled_ids=ids)
+                await context_value(read_context,lambda:self.reader.context(subject=subject,clearance=clearance,recalled_ids=ids))
                 models.append(actual_model);choices.append(choice)
-            pages_current(pages)
+            await context_value(read_context,lambda:pages_current(pages))
             result=dict(query_digest=query_digest,outcome_event_ids=list(ids),
                 choices=choices,actual_models=models,coverage_complete=False,authority_granted=False,
                 next_before_sequence=head['next_before_sequence'],more_available=head['more_available'])
@@ -224,7 +227,7 @@ class FeedbackRecallSelector:
             self.journal.append(EventEnvelope(event_id=prefix+':completed',event_type='feedback.recall_completed',
                 causation_id=prefix+':started',**common,payload=dict(binding=binding,
                     content=ref.to_event_payload(),pages=pages)))
-            pages_current(pages)
+            await context_value(read_context,lambda:pages_current(pages))
             return result
         except BaseException:
             self.journal.append(EventEnvelope(event_id=prefix+':failed',event_type='feedback.recall_failed',
