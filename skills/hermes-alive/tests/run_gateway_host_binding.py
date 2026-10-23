@@ -71,6 +71,8 @@ async def main(home):
             if error is not None:raise error
             return result
         for result,expected in (({'exit_reason':'stopped'},'stopped'),
+                                ({'exit_reason':'paused'},'stopped'),
+                                ({'exit_reason':'not_authorized'},'needs_attention'),
                                 ({'exit_reason':'cycle_failed'},'failed'),
                                 ({'completed_cycles':1},'finished_unknown')):
             replacement.task=asyncio.create_task(terminal(result))

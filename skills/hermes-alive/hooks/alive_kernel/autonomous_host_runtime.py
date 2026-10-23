@@ -149,16 +149,21 @@ class AutonomousHostRuntime:
                     pass  # A diagnostic write must not replace the original failure/cancellation.
                 raise
 
-    async def run(self,*,build_parameters,stop,max_cycles,interval_seconds=60,cycle_step=None):
-        if (self.running or type(max_cycles) is not int or not 1<=max_cycles<=1000
+    async def run(self,*,build_parameters,stop,max_cycles=None,interval_seconds=60,cycle_step=None,
+                  continuous=False):
+        lifetime_valid=(type(continuous) is bool and
+            (continuous and self.execute and max_cycles is None
+             or not continuous and type(max_cycles) is int and 1<=max_cycles<=1000))
+        if (self.running or not lifetime_valid
                 or type(interval_seconds) not in (int,float) or not 0<=interval_seconds<=86400
+                or continuous and interval_seconds<=0
                 or not callable(build_parameters) or not isinstance(stop,asyncio.Event)
                 or cycle_step is not None and not callable(cycle_step)):
-            raise ValueError('explicit bounded cooperative host lifetime required')
+            raise ValueError('explicit bounded or executing continuous cooperative lifetime required')
         self.running = True
         completed = 0
         try:
-            while completed<max_cycles and not stop.is_set():
+            while (continuous or completed<max_cycles) and not stop.is_set():
                 async def invoke():
                     parameters = build_parameters()
                     if hasattr(parameters,'__await__'): parameters = await parameters
@@ -172,16 +177,22 @@ class AutonomousHostRuntime:
                     await asyncio.wait((active,stopped),return_when=asyncio.FIRST_COMPLETED)
                     if not active.done():
                         return {'completed_cycles':completed,'exit_reason':'stopped','external_delivery_proven':False}
-                    try: active.result()
+                    try: outcome=active.result()
                     except Exception as error:
                         return {'completed_cycles':completed,'exit_reason':'cycle_failed',
                             'failure_class':type(error).__name__,'external_delivery_proven':False}
                     completed += 1
+                    disposition=getattr(outcome,'disposition',None)
+                    if continuous and disposition not in ('submitted','silence','waiting_for_change'):
+                        reason=disposition if disposition in ('paused','not_authorized','attempt_unavailable',
+                            'reconciliation_attention','content_review_attention') else 'unexpected_disposition'
+                        return {'completed_cycles':completed,'exit_reason':reason,
+                                'external_delivery_proven':False}
                 finally:
                     for task in (active,stopped):
                         if not task.done(): task.cancel()
                     await asyncio.gather(active,stopped,return_exceptions=True)
-                if completed<max_cycles and not stop.is_set():
+                if (continuous or completed<max_cycles) and not stop.is_set():
                     try: await asyncio.wait_for(stop.wait(),timeout=interval_seconds)
                     except TimeoutError: pass
             return {'completed_cycles':completed,'exit_reason':'stopped' if stop.is_set() else 'budget',

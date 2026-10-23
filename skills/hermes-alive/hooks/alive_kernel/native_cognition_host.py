@@ -45,19 +45,20 @@ class NativeCognitionHost:
         self.last_call_count=0
         self._background_task=None
 
-    async def run(self,*,build_parameters,stop,max_cycles,interval_seconds=60):
-        """Reuse the durable host's bounded loop, binding native authority each turn."""
+    async def run(self,*,build_parameters,stop,max_cycles=None,interval_seconds=60,continuous=False):
+        """Reuse the durable cooperative loop, binding native authority each turn."""
         if self.host.running:
             raise NativeWorkerError('native host loop already active')
         try:
             return await self.host.run(build_parameters=build_parameters,stop=stop,
-                max_cycles=max_cycles,interval_seconds=interval_seconds,cycle_step=self.step)
+                max_cycles=max_cycles,interval_seconds=interval_seconds,cycle_step=self.step,
+                continuous=continuous)
         finally:
             # The retained worker owns any uncertain child; do not clear its
             # lease or workspace merely because the plugin task was cancelled.
             await self.reap_pending(timeout_seconds=5)
 
-    def start(self,context,*,build_parameters,stop,max_cycles,interval_seconds=60):
+    def start(self,context,*,build_parameters,stop,max_cycles=None,interval_seconds=60,continuous=False):
         """Explicit host entrypoint; Core supervises task cancellation on unload.
 
         Requires a running loop and an already-bound Core profile context. This
@@ -67,7 +68,7 @@ class NativeCognitionHost:
                 or self.host.running or not callable(getattr(context,'spawn_task',None))):
             raise NativeWorkerError('native host task already active or no supervisor')
         coroutine=self.run(build_parameters=build_parameters,stop=stop,max_cycles=max_cycles,
-            interval_seconds=interval_seconds)
+            interval_seconds=interval_seconds,continuous=continuous)
         try:
             task=context.spawn_task(coroutine,name='alive-native-cognition')
         except BaseException:

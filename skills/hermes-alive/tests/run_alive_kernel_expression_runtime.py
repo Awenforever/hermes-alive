@@ -18,11 +18,11 @@ from alive_kernel.semantic_review import SemanticReviewError
 async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.USER_DELEGATED,
                    source_summary='Public workshop, details unverified.', draft_text=None,
                    grounding=False, single_family=False, render_prefix='', model_timeout_seconds=None,
-                   subject='user:test'):
+                   subject='user:test', operation_id='one', source_url='https://example.invalid/workshop'):
     journal = ExperienceJournal(root / 'experience.sqlite3')
     reader = DiscoveryOpportunityIngestor(journal)
     source = reader.ingest(DiscoveryCandidate(source='synthetic public fixture', title='Repair workshop',
-        summary=source_summary, url='https://example.invalid/workshop',
+        summary=source_summary, url=source_url,
         observed_at=datetime.now(timezone.utc)), subject=subject)
     calls = []
     async def call(**kw):
@@ -72,7 +72,7 @@ async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.
     def domain(provider, model):
         if single_family: return 'synthetic-shared-family'
         return 'synthetic-render-family' if model.endswith('/renderer') else 'synthetic-review-family'
-    params = dict(operation_id='one', subject=subject, policy_context=PolicyContext(can_interrupt=True),
+    params = dict(operation_id=operation_id, subject=subject, policy_context=PolicyContext(can_interrupt=True),
         call=call, authority=authority, resolve_domain=domain, language='en', grounding=grounding)
     if model_timeout_seconds is not None: params['model_timeout_seconds']=model_timeout_seconds
     class InterruptedCommitRuntime(ExpressionRuntime):

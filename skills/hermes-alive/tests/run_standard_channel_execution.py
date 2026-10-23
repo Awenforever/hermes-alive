@@ -70,7 +70,7 @@ async def test(root, mode):
         policy_event_id=policies.current(owner).event_id,route_binding_id=binding_id,
         action_kinds=('share',),maximum_sensitivity=Sensitivity.PRIVATE,
         expires_at=datetime.now(timezone.utc)+timedelta(hours=1),operation_id='delegate',
-        allow_natural_expression=True)
+        allow_natural_expression=True,minimum_interval_seconds=0 if mode=='success' else 3600)
     home = root/'profile'; home.mkdir()
     received = []
     logical_offset = [timedelta(0)]
@@ -172,6 +172,41 @@ async def test(root, mode):
         assert replay.disposition=='attempt_unavailable' and len(received)==int(should_send)
     raw = journal.path.read_bytes()
     assert b'PRIVATE_ERROR_SENTINEL' not in raw and b'PRIVATE_OPAQUE_ID_SENTINEL' not in raw
+    if mode=='success':
+        # A consumed, unacknowledged standard send is never replayed, but must
+        # not globally block a distinct authorized intent after process reopen.
+        _, next_parameters, next_expression = await scenario(root/'kernel','share',return_ready=True,
+            operation_id='two',source_url='https://example.invalid/observatory',
+            source_summary='Public observatory open night, details unverified.')
+        second_expression={k:v for k,v in next_parameters.items()
+                           if k not in ('subject','operation_id','policy_context')}
+        second_args={**cycle_args,'operation_id':'two','expression_parameters':second_expression,
+            'authorization_parameters':{**cycle_args['authorization_parameters'],
+                                        'authorization_operation_id':'authorize-two'}}
+        second=await reopened.cycle(**second_args)
+        assert second.disposition=='submitted' and len(received)==2
+        assert received[1][1]==next_expression.text and received[1][1]!=received[0][1]
+        assert len(journal.read(event_type='dispatch.started'))==2
+        cold=AutonomousCycleRuntime(ExperienceJournal(journal.path))
+        for original in (cycle_args,second_args):
+            replay=await cold.cycle(**{**original,'expression_parameters':{
+                **original['expression_parameters'],'call':forbidden}})
+            if replay.disposition=='not_authorized':
+                # Slow filesystems may outlive the original permit before
+                # replay. Expiry must refuse even before the consumed outbox.
+                assert replay.prepared.authorization.reasons==('permit_expired',)
+            else:
+                assert replay.disposition=='attempt_unavailable',repr(replay)
+            assert len(received)==2 and len(journal.read(event_type='dispatch.started'))==2
+        policies.apply(policies.append_update(subject=owner,actor=owner,
+            expected_revision=policies.current(owner).revision,enabled=False,
+            context=PolicyContext(can_interrupt=True),operation_id='pause-after-two'))
+        paused=await cold.cycle(**{**second_args,'operation_id':'three',
+            'expression_parameters':{**second_expression,'call':forbidden}})
+        assert paused.disposition=='paused' and len(received)==2
+        assert not journal.read(event_type='delivery.succeeded')
+        assert not journal.read(event_type='transport.publisher.bound')
+        print('standard_channel_two_intents_reopen_pause:PASS')
     print('standard_channel_case='+mode+':PASS')
 
 

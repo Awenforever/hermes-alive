@@ -4,6 +4,14 @@ Status: active
 
 Last reviewed: 2026-10-24
 
+Continuous-lifetime work (2026-10-24, Codex): ADR0212 reuses the existing native
+host loop for explicit executing-until-stop lifetimes, retaining bounded shadow
+defaults and per-cycle authority. Pause and failures exit rather than restart.
+Two-intent standard-channel/reopen/no-resend qualification is being extended;
+this does not activate ordinary installed sending. Next bind confirmed setup to
+the actual standard execution/continuity assembly and qualify it as installed,
+without replacing missing authority with synthetic fixture grants.
+
 Runtime-observation checkpoint (2026-10-24, Codex): repeated Gateway startup
 inspection now observes its actual owned task instead of reporting already_started
 after termination. Terminal/failure/cancellation and unresolved native work are

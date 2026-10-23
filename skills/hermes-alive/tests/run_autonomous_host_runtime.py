@@ -73,6 +73,41 @@ async def test(root):
     result=await recovered.run(build_parameters=lambda:{},stop=asyncio.Event(),max_cycles=2,
         interval_seconds=0,cycle_step=bound_step)
     assert result['completed_cycles']==2 and stepped==[{},{}]
+    continuous_driver=Driver(journal)
+    continuous_host=AutonomousHostRuntime(continuous_driver,subject='user:continuous',
+                                         configuration_id='config',execute=True)
+    continuous_stop=asyncio.Event()
+    async def continuous_step(parameters):
+        outcome=await continuous_host.step(parameters)
+        if len(continuous_driver.operations)==2:continuous_stop.set()
+        return outcome
+    result=await continuous_host.run(build_parameters=lambda:{},stop=continuous_stop,
+        continuous=True,interval_seconds=.001,cycle_step=continuous_step)
+    assert result['completed_cycles']==2 and result['exit_reason']=='stopped'
+    assert len(set(continuous_driver.operations))==2 and not continuous_host.running
+    async def paused_step(parameters):return SimpleNamespace(disposition='paused')
+    result=await continuous_host.run(build_parameters=lambda:{},stop=asyncio.Event(),
+        continuous=True,interval_seconds=.001,cycle_step=paused_step)
+    assert result['completed_cycles']==1 and result['exit_reason']=='paused'
+    for disposition in ('not_authorized','attempt_unavailable','reconciliation_attention',
+                        'content_review_attention','shadow_selected',None):
+        async def attention_step(parameters):return SimpleNamespace(disposition=disposition)
+        result=await continuous_host.run(build_parameters=lambda:{},stop=asyncio.Event(),
+            continuous=True,interval_seconds=.001,cycle_step=attention_step)
+        expected=disposition if disposition not in ('shadow_selected',None) else 'unexpected_disposition'
+        assert result['completed_cycles']==1 and result['exit_reason']==expected
+    continuous_driver.fail=True
+    result=await continuous_host.run(build_parameters=lambda:{},stop=asyncio.Event(),
+        continuous=True,interval_seconds=.001)
+    assert result['completed_cycles']==0 and result['exit_reason']=='cycle_failed'
+    for options in ({}, {'continuous':True,'interval_seconds':0},
+                    {'continuous':True,'max_cycles':2}, {'continuous':'yes'}):
+        try:await continuous_host.run(build_parameters=lambda:{},stop=asyncio.Event(),**options)
+        except ValueError:pass
+        else:raise AssertionError('implicit/unbounded/busy-loop lifetime accepted')
+    try:await recovered.run(build_parameters=lambda:{},stop=asyncio.Event(),continuous=True)
+    except ValueError:pass
+    else:raise AssertionError('bounded shadow silently became continuous')
     other = AutonomousHostRuntime(Driver(journal),subject='user:other',configuration_id='config')
     assert other.open_cycle().operation_id not in restarted.operations
     # Cooperative shutdown interrupts active work but does not close/fabricate it.

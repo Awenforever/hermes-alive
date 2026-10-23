@@ -129,8 +129,11 @@ class GatewayHostBinding:
                 else:
                     result=self.task.result()
                     reason=result.get('exit_reason') if isinstance(result,dict) else None
-                    if reason in ('budget','stopped','cycle_failed'):
+                    if reason in ('budget','stopped','paused','cycle_failed'):
                         status.update(status='failed' if reason=='cycle_failed' else 'stopped',exit_reason=reason)
+                    elif reason in ('not_authorized','attempt_unavailable','reconciliation_attention',
+                                    'content_review_attention','unexpected_disposition'):
+                        status.update(status='needs_attention',exit_reason=reason)
                     else:
                         status['status']='finished_unknown'
         if self.closed:

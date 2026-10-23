@@ -3,6 +3,19 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## Continuous is an explicit lifetime, not a grant or retry policy
+
+2026-10-24 (Asia/Shanghai), Codex; ADR0212. Reuse the durable/native host loop.
+Continuous execution requires execute=True, continuous=True, no finite budget and
+a positive interval. Bounded shadow semantics remain unchanged. Pause or failure
+ends the loop; each new cycle binds a fresh native caller and current authority.
+Authorization/reconciliation/content attention and unavailable consumed attempts
+also stop; unknown dispositions fail closed rather than silently continue spending.
+Do not restart an uncertain cycle, promote shadow state, infer remote delivery,
+change public cadence defaults to satisfy a test, or add a second physical FIFO.
+Component lifetime and synthetic standard-send fixtures are not ordinary installed
+activation or consumer lifecycle qualification.
+
 ## Started once does not mean running now
 
 2026-10-24 (Asia/Shanghai), Codex. GatewayHostBinding.startup previously

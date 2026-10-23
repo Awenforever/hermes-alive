@@ -28,7 +28,9 @@ async def main(root):
             caller=kwargs['expression_parameters']['call']
             assert caller.operation_id==kwargs['operation_id']
             self.callers.append(caller)
-            return await super().cycle(**kwargs)
+            result=await super().cycle(**kwargs)
+            if getattr(self,'stop_after',None)==len(self.operations):self.stop.set()
+            return result
     class Supervisor:
         def spawn_task(self,coro,*,name):return asyncio.create_task(coro,name=name)
     driver=BoundDriver(ExperienceJournal(root/'journal.sqlite3'))
@@ -70,6 +72,20 @@ async def main(root):
     try:native.start(FailingSupervisor(),**kwargs)
     except RuntimeError:pass
     else:raise AssertionError('host start failure suppressed')
+    live_driver=BoundDriver(ExperienceJournal(root/'continuous.sqlite3'))
+    live_host=AutonomousHostRuntime(live_driver,subject='user:continuous',
+                                   configuration_id='continuous-test',execute=True)
+    live=NativeCognitionHost(live_host,profile_id='profile:synthetic',profile_home=root,
+        read_configuration=lambda:{},read_credential_names=lambda **_:(),interpreter=sys.executable,
+        core=root,private_root=root,environment={},resolve_domain=lambda *labels:'synthetic',
+        profile_scope=profile_scope)
+    live_driver.stop=asyncio.Event();live_driver.stop_after=2
+    result=await live.start(supervisor,build_parameters=lambda:{'expression_parameters':{}},
+        stop=live_driver.stop,continuous=True,interval_seconds=.001)
+    assert result['completed_cycles']==2 and result['exit_reason']=='stopped'
+    assert len(live_driver.callers)==2 and live_driver.callers[0] is not live_driver.callers[1]
+    assert len(set(live_driver.operations))==2 and not live_host.running and not live.pending
+    assert scope=={'active':False,'entered':7,'exited':7}
 
 with tempfile.TemporaryDirectory(prefix='alive-native-supervision-') as folder:
     asyncio.run(main(Path(folder)))
