@@ -470,6 +470,59 @@ class OpportunitySynthesizer:
         return self.vault.digest_json([dict(event=e.observation_event_id,content=_thaw_json(e.content),
             expires_at=e.expires_at.isoformat()) for e in values])
 
+    def source_pool(self,*,subject,clearance,focus=(),revision_event_ids=(),scope=None):
+        """One planned material window for recall and interpretation, not sends.
+
+        Packing can admit only a bounded prefix later. Frozen scope retains the
+        original ordered pool, fairness cursor and verified research group; it
+        never substitutes today's latest sources during recovery.
+        """
+        focus_ids=tuple(e.observation_event_id for e in focus)
+        if scope is not None:
+            if (revision_event_ids or not isinstance(scope,Mapping)
+                    or set(scope)!={'method','cursor','origin_frontier','pool_ids','focus_ids','fair_pool_ids'}
+                    or scope['method']!='bound-material-pool-v1'
+                    or type(scope['cursor']) is not int or type(scope['origin_frontier']) is not int
+                    or not 0<=scope['cursor']<=scope['origin_frontier']
+                    or any(not isinstance(scope[k],(tuple,list)) for k in ('pool_ids','focus_ids','fair_pool_ids'))
+                    or tuple(scope['focus_ids'])!=focus_ids):
+                raise OpportunitySynthesisError('invalid original material scope')
+            ids=tuple(scope['pool_ids']);fair_ids=tuple(scope['fair_pool_ids'])
+            for values,limit in ((ids,32),(fair_ids,32-len(focus_ids))):
+                if (len(values)>limit or any(not isinstance(v,str) for v in values)
+                        or len(set(values))!=len(values)):
+                    raise OpportunitySynthesisError('material scope exceeds original source window')
+            if ids!=tuple(dict.fromkeys((*focus_ids,*fair_ids))):
+                raise OpportunitySynthesisError('material pool differs from its original group and fairness window')
+            records=tuple(self.journal.get(i) for i in ids)
+            if any(r is None or r.event.subject!=subject or r.sequence>scope['origin_frontier']
+                    or list(Sensitivity).index(r.event.sensitivity)>list(Sensitivity).index(Sensitivity(clearance))
+                    for r in records):
+                raise OpportunitySynthesisError('material scope has foreign, future or uncleared references')
+            pool=self.reader.active_evidence(subject=subject,clearance=clearance,limit=32,
+                observation_event_ids=ids) if ids else ()
+            if tuple(e.observation_event_id for e in pool)!=ids:
+                raise OpportunitySynthesisError('original material was withdrawn, expired or erased')
+            by_id={e.observation_event_id:e for e in pool}
+            if any(by_id[e.observation_event_id]!=e for e in focus):
+                raise OpportunitySynthesisError('research group differs from original material')
+            return pool,scope['cursor'],tuple(by_id[i] for i in fair_ids)
+        cursor=self._source_cursor(subject,clearance) if not revision_event_ids else None
+        pool=(self._revision_sources(revision_event_ids,subject,clearance) if revision_event_ids else
+            self.reader.active_evidence(subject=subject,clearance=clearance,limit=32,source_cursor=cursor))
+        fair_pool=pool[:32-len(focus)] if focus and not revision_event_ids else pool
+        if focus:
+            if revision_event_ids and not set(focus_ids)<={e.observation_event_id for e in pool}:
+                raise OpportunitySynthesisError('corrective research cannot enlarge original evidence')
+            pool=tuple(focus)+tuple(e for e in fair_pool if e.observation_event_id not in focus_ids)
+        return pool,cursor,fair_pool
+
+    def material_scope(self,*,subject,clearance,focus=()):
+        pool,cursor,fair=self.source_pool(subject=subject,clearance=clearance,focus=focus)
+        return dict(method='bound-material-pool-v1',cursor=cursor,origin_frontier=self.journal.last_sequence(),
+            pool_ids=[e.observation_event_id for e in pool],focus_ids=[e.observation_event_id for e in focus],
+            fair_pool_ids=[e.observation_event_id for e in fair])
+
     def _validate_source_scan(self,start,receipt):
         scan=receipt.event.payload.get('source_scan')
         if scan is None:
@@ -807,6 +860,7 @@ class OpportunitySynthesizer:
         context = self.context_reader.read(subject=subject, clearance=clearance)
         learning = self.learning_reader.read(subject=subject, clearance=clearance)
         feedback = self.feedback_for_start(start,subject=subject,clearance=clearance)
+        inquiries=();focus=()
         if 'discovery_inquiry_digest' in start.event.payload:
             inquiries = self.inquiries.read(subject=subject, clearance=clearance,
                 item_ids=tuple(start.event.payload.get('discovery_inquiry_item_ids', ())))
@@ -819,6 +873,11 @@ class OpportunitySynthesizer:
                 before_sequence=start.sequence)
             if not {e.observation_event_id for e in focus}<=set(original_ids):
                 raise OpportunitySynthesisError('research evidence group lost part of its original scope')
+        if start.event.payload.get('material_scope') is not None:
+            original_pool,_,_=self.source_pool(subject=subject,clearance=clearance,focus=focus,
+                scope=start.event.payload['material_scope'])
+            if original_ids!=tuple(e.observation_event_id for e in original_pool[:len(original_ids)]):
+                raise OpportunitySynthesisError('interpretation differs from its bound material prefix')
         if self.vault.digest_json([c.to_prompt() for c in context]) != start.event.payload.get(
                 'explicit_context_digest',self.vault.digest_json([])):
             raise OpportunitySynthesisError('explicit context chronology changed since interpretation')
@@ -1022,7 +1081,7 @@ class OpportunitySynthesizer:
                   recipient_meaning: bool = False,
                   protocol_recovery: bool = True,
                   inquiry_item_ids: tuple = (),research_read_receipt_ids: tuple = (),
-                  recalled_feedback_event_ids: tuple = ()) -> OpportunitySynthesisResult:
+                  recalled_feedback_event_ids: tuple = (),material_scope=None) -> OpportunitySynthesisResult:
         if type(recipient_meaning) is not bool or type(protocol_recovery) is not bool:
             raise OpportunitySynthesisError('invalid recipient meaning mode')
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}", operation_id):
@@ -1050,15 +1109,8 @@ class OpportunitySynthesizer:
         feedback = self.feedback_reader.context(subject=subject,clearance=clearance,
             recalled_ids=recalled_feedback_event_ids)
         revisions = self._revision_context(revision_event_ids, subject, clearance)
-        cursor=self._source_cursor(subject,clearance) if not revisions else None
-        pool=(self._revision_sources(revision_event_ids,subject,clearance) if revisions else
-              self.reader.active_evidence(subject=subject,clearance=clearance,limit=32,source_cursor=cursor))
-        fair_pool=pool[:32-len(focus)] if focus and not revisions else pool
-        if focus:
-            focus_ids={e.observation_event_id for e in focus}
-            if revisions and not focus_ids<={e.observation_event_id for e in pool}:
-                raise OpportunitySynthesisError('corrective research cannot enlarge original evidence')
-            pool=tuple(focus)+tuple(e for e in fair_pool if e.observation_event_id not in focus_ids)
+        pool,cursor,fair_pool=self.source_pool(subject=subject,clearance=clearance,focus=focus,
+            revision_event_ids=revision_event_ids,scope=material_scope)
         as_of = datetime.now(timezone.utc)
         budget=RESEARCH_SOURCE_BUDGET if focus else 32000 if revisions else 24000
         prompt_data={"as_of": as_of.isoformat(),
@@ -1104,6 +1156,7 @@ class OpportunitySynthesizer:
             evidence.append(item)
             prompt=packed
         evidence=tuple(evidence)
+        retention_sources=pool if material_scope is not None else evidence
         if (pool and not evidence) or (revisions and len(evidence)!=len(pool)):
             raise OpportunitySynthesisError('source recall/repair window exceeds its current context budget')
         scan=None
@@ -1149,6 +1202,7 @@ class OpportunitySynthesizer:
                 event_type="opportunity.synthesis_started", **base,
                 payload={"observation_event_ids": [e.observation_event_id for e in evidence],
                          "source_scan":scan,
+                         **({'material_scope':material_scope} if material_scope is not None else {}),
                          "interpretation_as_of":as_of.isoformat(),
                          "request_prompt_digest":hashlib.sha256(prompt.encode()).hexdigest(),
                          "commitment_digest":commitment_digest,
@@ -1178,6 +1232,9 @@ class OpportunitySynthesizer:
         if not start.created:
             raise OpportunitySynthesisError("opportunity operation already started")
         def validate_current():
+            if material_scope is not None and self.source_pool(subject=subject,clearance=clearance,
+                    focus=focus,scope=material_scope)!=(pool,cursor,fair_pool):
+                raise OpportunitySynthesisError('bound material changed during model wait')
             if self.inquiries.read(subject=subject, clearance=clearance, item_ids=inquiry_item_ids) != inquiries:
                 raise OpportunitySynthesisError('reading task changed during model wait')
             if focus and resolve_research_reads(self.reader,subject=subject,clearance=clearance,
@@ -1236,7 +1293,7 @@ class OpportunitySynthesizer:
                         invalid_ref=self.vault.put_json(failed_output,
                             subject=subject,purpose='opportunity.protocol-failure',
                             sensitivity=Sensitivity(clearance),content_id='opportunity-protocol:'+operation_id,
-                            retention_until=min([as_of+timedelta(days=7)]+[e.expires_at for e in evidence]+
+                            retention_until=min([as_of+timedelta(days=7)]+[e.expires_at for e in retention_sources]+
                                 [datetime.fromisoformat(f.retention_until) for f in feedback]))
                         correction=self.journal.append(EventEnvelope(
                             event_id=f'opportunity.synthesis:{operation_id}:protocol-recovery',
@@ -1284,7 +1341,7 @@ class OpportunitySynthesizer:
                                  for a in abstentions]}, subject=subject,
                 purpose="opportunity.candidates", sensitivity=Sensitivity(clearance),
                 content_id=f"opportunity-proposals:{operation_id}",
-                retention_until=min([as_of+timedelta(days=7)]+[item.expires_at for item in evidence]+
+                retention_until=min([as_of+timedelta(days=7)]+[item.expires_at for item in retention_sources]+
                                     [datetime.fromisoformat(f.retention_until) for f in feedback]),
             )
             self.journal.append(EventEnvelope(

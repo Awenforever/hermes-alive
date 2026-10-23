@@ -2,7 +2,17 @@
 
 Status: active
 
-Last reviewed: 2026-10-22
+Last reviewed: 2026-10-23
+
+ADR0201 binds memory relevance to the material actually planned for this cycle,
+not an independently collector-ranked32-source query. Shared pool assembly keeps
+fairness/research precedence, freezes source IDs/cursor/frontier before inference,
+and reuses that scope through recall, interpretation and recovery. Packing still
+admits only a bounded prefix; unadmitted recall dependencies retain lifetime and
+erasure constraints. Controlled cases pass; canonical qualification is pending.
+Next qualify the actual scope handoff, then address measured synchronous reads
+without losing Core profile scope or physical cancellation/settlement ownership.
+Do not enable production or replace the full goal with these component gates.
 
 ADR0200 addresses actual loss of visibility of retained feedback, not an interest
 keyword gap. Paged literal evidence and exact current resolution now have a

@@ -54,14 +54,28 @@ watcher and not a complete production loop. It creates no channel queues.
         self.coordinator = CognitionCycleCoordinator(journal,
             content_vault=self.synth.vault, context_vault=context_vault)
 
-    async def _recall_feedback(self,*,subject,operation_id,start,call,model,clearance,inquiry_item_ids,timeout_seconds):
+    async def _recall_feedback(self,*,subject,operation_id,start,call,model,clearance,inquiry_item_ids,
+                               research_read_receipt_ids,timeout_seconds):
         from .feedback_recall import FeedbackRecallSelector
         from .content_vault import ContentReference
+        material=start.event.payload.get('feedback_material_scope')
+        if material is not None and not material['pool_ids']:
+            # There is no material to select memories for. Do not spend on a
+            # model or require private feedback access to establish that fact.
+            return ()
         def capture():
             context=self.synth.context_reader.read(subject=subject,clearance=clearance)
             recent=self.synth.feedback_reader.read(subject=subject,clearance=clearance)
-            sources=self.synth.reader.active_evidence(subject=subject,clearance=clearance,limit=32)
             inquiries=self.synth.inquiries.read(subject=subject,clearance=clearance,item_ids=inquiry_item_ids)
+            material=start.event.payload.get('feedback_material_scope')
+            if material is None:
+                # Historical completed semantic operations retain their old query.
+                sources=self.synth.reader.active_evidence(subject=subject,clearance=clearance,limit=32)
+            else:
+                from .research_evidence import resolve_research_reads
+                focus=(resolve_research_reads(self.synth.reader,subject=subject,clearance=clearance,
+                    receipt_ids=research_read_receipt_ids,inquiries=inquiries) if research_read_receipt_ids else ())
+                sources,_,_=self.synth.source_pool(subject=subject,clearance=clearance,focus=focus,scope=material)
             query=dict(as_of=start.event.occurred_at.isoformat(),
                 current_user_context=[v.to_prompt() for v in context],
                 recent_feedback_context=[v.to_prompt() for v in recent],
@@ -70,6 +84,8 @@ watcher and not a complete production loop. It creates no channel queues.
                     summary_preview=v.content['summary'][:512],preview_only=True,
                     origin_kind=v.content.get('origin_kind','discovery')) for v in sources],
                 authority_granted=False,complete_inventory=False)
+            if material is not None:
+                query['material_scope']=dict(method=material['method'],planned_pool_not_final_draft=True)
             expiry=min((start.event.occurred_at+timedelta(hours=1),
                 *(v.expires_at for v in sources),*(datetime.fromisoformat(v.retention_until) for v in recent),
                 *(datetime.fromisoformat(v['expires_at']) for v in inquiries)))
@@ -198,9 +214,10 @@ watcher and not a complete production loop. It creates no channel queues.
                 'outcome_event_ids':list(recalled_feedback_event_ids)}
         if inquiry_item_ids:
             binding['discovery_inquiry_item_ids'] = list(inquiry_item_ids)
+        research_focus=()
         if research_read_receipt_ids:
             from .research_evidence import resolve_research_reads
-            resolve_research_reads(self.synth.reader,subject=subject,clearance=sensitivity,
+            research_focus=resolve_research_reads(self.synth.reader,subject=subject,clearance=sensitivity,
                 receipt_ids=research_read_receipt_ids,inquiries=self.synth.inquiries.read(
                     subject=subject,clearance=sensitivity,item_ids=inquiry_item_ids))
             binding['research_read_receipt_ids']=list(research_read_receipt_ids)
@@ -209,6 +226,17 @@ watcher and not a complete production loop. It creates no channel queues.
         digest = self.synth.vault.digest_json({'operation': operation_id, 'subject': subject})[:40]
         start_id = 'planning.runtime:' + digest + ':started'
         prior = self.journal.get(start_id)
+        if semantic_feedback_recall and (prior is None or 'feedback_material_scope' in prior.event.payload):
+            if prior is not None:
+                if (prior.event.source!='alive.planning-runtime' or prior.event.actor!='system:alive-runtime'
+                        or prior.event.event_type!='planning.runtime_started' or prior.event.subject!=subject
+                        or prior.event.sensitivity is not sensitivity):
+                    raise PlanningRuntimeError('material scope has foreign planning provenance')
+                material=_thaw_json(prior.event.payload['feedback_material_scope'])
+                self.synth.source_pool(subject=subject,clearance=sensitivity,focus=research_focus,scope=material)
+            else:
+                material=self.synth.material_scope(subject=subject,clearance=sensitivity,focus=research_focus)
+            binding['feedback_material_scope']=material
         if prior is None:
             event = EventEnvelope(event_id=start_id, event_type='planning.runtime_started',
                 source='alive.planning-runtime', actor='system:alive-runtime',
@@ -232,6 +260,7 @@ watcher and not a complete production loop. It creates no channel queues.
             recalled_feedback_event_ids=await self._recall_feedback(subject=subject,
                 operation_id='runtime-feedback:'+digest,start=prior,call=call,model=requested_model,
                 clearance=sensitivity,inquiry_item_ids=inquiry_item_ids,
+                research_read_receipt_ids=research_read_receipt_ids,
                 timeout_seconds=model_timeout_seconds or 600)
         if self.journal.get('opportunity.synthesis:' + interpret_id + ':started') is not None:
             generated = self.synth.load_completed(subject=subject, operation_id=interpret_id,
@@ -241,7 +270,8 @@ watcher and not a complete production loop. It creates no channel queues.
                 call=call, requested_model=requested_model, authority=authority, clearance=sensitivity,
                 recipient_meaning=recipient_meaning,timeout_seconds=model_timeout_seconds or 60,
                 inquiry_item_ids=inquiry_item_ids,research_read_receipt_ids=research_read_receipt_ids,
-                recalled_feedback_event_ids=recalled_feedback_event_ids)
+                recalled_feedback_event_ids=recalled_feedback_event_ids,
+                material_scope=binding.get('feedback_material_scope'))
         candidates, reviews, repair, repair_disposition = generated.candidates, (), None, None
         if recipient_meaning and generated.rejected_count and not candidates:
             raise PlanningRuntimeError('recipient meaning unavailable; malformed proposals are not qualified silence')
