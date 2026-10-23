@@ -4,6 +4,15 @@ Status: active
 
 Last reviewed: 2026-10-24
 
+Runtime-observation checkpoint (2026-10-24, Codex): repeated Gateway startup
+inspection now observes its actual owned task instead of reporting already_started
+after termination. Terminal/failure/cancellation and unresolved native work are
+distinct; inspection never restarts a host or claims remote delivery. This is a
+bounded supervision correction, not continuous live activation. Next complete
+ordinary execution assembly and two-new-intent/recovery/stop qualification;
+the share-to-main-conversation gate, migration, fleet and ten-round gates remain
+open. See DEVELOPMENT_MEMORANDUM.md for the non-regression contract.
+
 Guided-setup checkpoint (2026-10-24): the Core CLI now stages explicit model,
 delivery and separately confirmed outbound-retention choices. A short-lived
 one-use confirmation in the actual authorized Core conversation binds the exact

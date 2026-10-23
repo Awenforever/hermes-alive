@@ -104,11 +104,48 @@ class GatewayHostBinding:
         self.arguments=dict(build_parameters=build_parameters,stop=asyncio.Event(),
             max_cycles=max_cycles,interval_seconds=interval_seconds)
 
+    def runtime_status(self):
+        """Observe the owned task, never infer liveness from startup metadata.
+
+        No restart, model call, transport observation or exception text belongs
+        in this read. A finished loop can still own unresolved native children.
+        """
+        self._require_home()
+        status={'status':'not_configured','legacy_allowed':False,
+                'external_delivery_proven':False,'runtime_active':False}
+        if self.native is not None:
+            status['mode']='execution' if self.native.host.execute else 'shadow'
+            status['pending_work_count']=len(getattr(self.native,'pending',()))
+            status['status']='ready'
+        if self.task is not None:
+            if not self.task.done():
+                status.update(status='stopping' if self.closed else 'running',runtime_active=True)
+            elif self.task.cancelled():
+                status['status']='cancelled'
+            else:
+                error=self.task.exception()
+                if error is not None:
+                    status.update(status='failed',failure_class=type(error).__name__)
+                else:
+                    result=self.task.result()
+                    reason=result.get('exit_reason') if isinstance(result,dict) else None
+                    if reason in ('budget','stopped','cycle_failed'):
+                        status.update(status='failed' if reason=='cycle_failed' else 'stopped',exit_reason=reason)
+                    else:
+                        status['status']='finished_unknown'
+        if self.closed:
+            status['binding_unloaded']=True
+            if not status['runtime_active']:status['status']='unloaded'
+        return status
+
     async def startup(self):
         self._require_home()
         if self.closed:return {'status':'unloaded','legacy_allowed':False}
         if self.native is None:return {'status':'not_configured','legacy_allowed':False}
-        if self.started:return {'status':'already_started','legacy_allowed':False}
+        if self.started:
+            observed=self.runtime_status()
+            if observed['status']=='running':observed['status']='already_started'
+            return observed
         legacy=self.home/'hooks/hermes-alive/handler.py'
         adapter=Path(__file__).resolve().parent/'skills/hermes-alive/hooks/kernel_gateway_handler.py'
         if legacy.exists() and legacy.read_text(encoding='utf-8-sig')!=adapter.read_text(encoding='utf-8-sig'):

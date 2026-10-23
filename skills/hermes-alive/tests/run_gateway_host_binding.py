@@ -24,9 +24,12 @@ async def main(home):
         acquisition={'profile_home':home}
         profile_scope=object()
         calls=0
+        def __init__(self):self.finish=asyncio.Event()
         def start(self,context,**arguments):
             self.calls+=1
-            async def run():return {'completed_cycles':1}
+            async def run():
+                await self.finish.wait()
+                return {'completed_cycles':1,'exit_reason':'budget'}
             return asyncio.create_task(run())
     with patch.dict(sys.modules,{'hermes_constants':constants}):
         context=Context();binding=module.GatewayHostBinding(context);native=Native()
@@ -52,14 +55,46 @@ async def main(home):
             foreign.cancel();await asyncio.gather(foreign,return_exceptions=True)
         if not binding.started:assert (await binding.startup())['status']=='started'
         assert (await binding.startup())['status']=='already_started' and native.calls==1
+        assert binding.runtime_status()['runtime_active']
+        native.finish.set()
         await binding.task
-        assert (await binding.startup())['status']=='already_started' and native.calls==1
+        assert (await binding.startup())['status']=='stopped' and native.calls==1
+        assert binding.runtime_status()['exit_reason']=='budget'
+        assert not binding.runtime_status()['runtime_active']
         context.cleanup[0]()
         assert (await binding.startup())['status']=='unloaded'
         replacement=module.GatewayHostBinding(Context())
         replacement.attach(Native(),build_parameters=lambda:{},max_cycles=1)
         context.cleanup[0]()
         assert not replacement.closed
+        async def terminal(result=None,error=None):
+            if error is not None:raise error
+            return result
+        for result,expected in (({'exit_reason':'stopped'},'stopped'),
+                                ({'exit_reason':'cycle_failed'},'failed'),
+                                ({'completed_cycles':1},'finished_unknown')):
+            replacement.task=asyncio.create_task(terminal(result))
+            replacement.started=True
+            await replacement.task
+            assert (await replacement.startup())['status']==expected
+        replacement.task=asyncio.create_task(terminal(error=RuntimeError('private marker')))
+        await asyncio.gather(replacement.task,return_exceptions=True)
+        observed=await replacement.startup()
+        assert observed['status']=='failed' and observed['failure_class']=='RuntimeError'
+        assert 'private marker' not in str(observed)
+        replacement.task=asyncio.create_task(asyncio.Event().wait())
+        replacement.native.pending=(object(),)
+        replacement.task.cancel()
+        await asyncio.gather(replacement.task,return_exceptions=True)
+        observed=await replacement.startup()
+        assert observed['status']=='cancelled' and observed['pending_work_count']==1
+        assert replacement.native.calls==0  # reads never relaunch a terminal host
+        replacement.task=asyncio.create_task(asyncio.Event().wait())
+        replacement.close()
+        assert replacement.runtime_status()['status']=='stopping'
+        replacement.task.cancel()
+        await asyncio.gather(replacement.task,return_exceptions=True)
+        assert replacement.runtime_status()['status']=='unloaded'
         current.set(home/'foreign')
         try:await replacement.startup()
         except ValueError:pass

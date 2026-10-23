@@ -3,6 +3,19 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## Started once does not mean running now
+
+2026-10-24 (Asia/Shanghai), Codex. GatewayHostBinding.startup previously
+returned already_started after its bounded host task had terminated. Observe the
+owned task on repeated startup inspection instead: distinguish running, stopping,
+budget/stopped, cycle failure, exception, cancellation and unknown completion.
+Do not restart a completed or failed generation implicitly. Keep unresolved
+native work visible independently of loop liveness, and do not expose exception
+messages, private task results or infer external delivery. Unload is not proof
+that native work or Core-owned transport has drained. Regression tests must hold
+the live task open explicitly rather than depend on scheduler timing.
+This component observation is not ordinary activation or daemon qualification.
+
 ## Guided configuration is not activation, migration or implied retention
 
 2026-10-24 (Asia/Shanghai), Codex; ADR0211. Operator setup and the selected
