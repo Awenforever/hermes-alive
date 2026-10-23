@@ -49,6 +49,8 @@ pairing/admission; matching JSON alone never proves it.
   out of order. Ordinary repeat confirmation cannot renew retention or permission.
 - Initialization of an empty store is an explicit operator action. Status and
   startup cannot seed missing identity/content keys; partial migration refuses.
+  A nonempty unrecognized directory is not an empty installation. A surviving
+  Core setup hint also prevents reseeding a completely missing store.
   An existing truncated identity key is invalid, never accepted or padded.
 - Preserve the existing installation key, old raw-user subjects, encrypted
   content, grants and runtime state. Do not rename/merge/delete these as migration.

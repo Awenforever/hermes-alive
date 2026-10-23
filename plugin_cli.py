@@ -215,7 +215,15 @@ def alive_command(args: argparse.Namespace) -> int:
             print(json.dumps({'ok':False,'existing_runtime_must_be_paused':True,'delivery_enabled':False}))
             return 2
         from .tool_receipt_bridge import _kernel_module
-        setup=_kernel_module('kernel_setup').KernelSetupStore(_shared_target()/'kernel',initialize=True)
+        module=_kernel_module('kernel_setup')
+        from hermes_cli.config import load_config_readonly
+        profile_settings=(((load_config_readonly().get('plugins') or {}).get('entries') or {}).get('hermes-alive') or {}).get('settings',{})
+        try:
+            setup=module.KernelSetupStore(_shared_target()/'kernel',initialize=not bool(profile_settings.get('kernel_setup')))
+        except (module.KernelSetupError,RuntimeError):
+            print(json.dumps({'ok':False,'configuration_recovery_required':True,
+                'delivery_enabled':False,'identity_replaced':False}))
+            return 2
         intent,code=setup.stage({'model_calls':True,'delivery':True,
             'outbound_retention_days':args.retention_days,'outbound_retention_confirmed':True,'model':args.model,
             'public_queries':args.public_query,'cited_reads':args.confirm_cited_reads},replace=args.replace)

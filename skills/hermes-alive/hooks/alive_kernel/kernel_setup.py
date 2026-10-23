@@ -61,7 +61,8 @@ class KernelSetupStore:
         expected = (self.root/'identity.key',self.root/'experience.sqlite3',
                     self.root/'content-vault/content.key',self.root/'content-vault/content.sqlite3')
         present = tuple(path.is_file() for path in expected)
-        if type(initialize) is not bool or not all(present) and (any(path.exists() for path in expected) or not initialize):
+        empty = not self.root.exists() or self.root.is_dir() and not any(self.root.iterdir())
+        if type(initialize) is not bool or not all(present) and (not initialize or not empty):
             raise KernelSetupError('setup storage/key inventory incomplete; restore it, never replace its identity')
         self.protector = LocalIdentityProtector(self.root/'identity.key')
         self.journal = ExperienceJournal(self.root/'experience.sqlite3')

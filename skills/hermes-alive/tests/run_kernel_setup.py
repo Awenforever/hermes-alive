@@ -128,6 +128,13 @@ def later_choice(root):
 def lost_key(root):
     refuse(lambda:KernelSetupStore(root))
     assert not root.exists()
+    root.mkdir(parents=True)
+    legacy=root/'preserved-backup-marker'
+    legacy.write_text('synthetic preserved backup',encoding='utf-8')
+    refuse(lambda:KernelSetupStore(root,initialize=True))
+    assert legacy.read_text(encoding='utf-8')=='synthetic preserved backup'
+    assert not (root/'identity.key').exists()
+    legacy.unlink()  # Only the synthetic marker in this owned TemporaryDirectory.
     store=KernelSetupStore(root,initialize=True)
     intent,token=store.stage(OPTIONS)
     key=store.protector.key_path

@@ -132,6 +132,16 @@ async def test(home):
         rc,status=cli(home,'status')
         assert rc==0 and status['setup_phase']=='recovery_required' and not key.exists()
         key.write_bytes(saved)
+        # A surviving Core setup hint also fences a completely missing store.
+        # Preserve/restore this synthetic directory; never seed another identity.
+        backup=home/'synthetic-kernel-backup'
+        store.root.rename(backup)
+        rc,refused_setup=cli(home,'setup','--confirm-model-calls','--confirm-delivery',
+            '--confirm-outbound-retention','--replace')
+        assert rc==2 and refused_setup['configuration_recovery_required'] is True
+        assert refused_setup['identity_replaced'] is False and not store.root.exists()
+        backup.rename(store.root)
+        assert store.configuration().event_id==configured.event_id
         print('HERMES_ALIVE_CORE_GUIDED_SETUP_OK')
     finally:
         if manager is not None:manager.unload()
