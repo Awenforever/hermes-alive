@@ -13,12 +13,26 @@ or length preference or approval of subsequent text. Source review correctly
 found one attribution error; full regeneration fixed it but unnecessarily changed
 unrelated expression into a formulaic contrast and heavier qualification. Preserve
 both findings: factual correction is necessary, and repair must not destroy useful
-unaffected wording. ADR0206 proposes bounded review-anchored edits using the existing
-review/repair stages; a private two-call localization/edit experiment is running.
-Do not add another production judge or activate a proposed protocol before proof.
+unaffected wording. ADR0206's initial two-call experiment is terminal: its new
+reviewer missed the known attribution error, so no edit ran. A second isolated
+diagnostic used the EXISTING retained negative review and replaced only the
+corrective author. One actual configured-primary call proposed a narrow attribution
+edit; all other text remained exact. This is useful prototype evidence, not a clean
+complete quality round. No owner rating or expected edit was supplied to the model.
+
+New development code freezes review-anchored-edits-v1 on new correction starts,
+reconstructs exact edits, retains an encrypted proof in the existing vault and
+revalidates it during recovery and final support. Original findings remain advisory;
+there is no new reviewer or factual approval shortcut. Actual stage fidelity and
+final source review remain mandatory. Ambiguous/missing/foreign/overlapping edits,
+lost protected literals, broad whole-message rewriting, abstention and unavailable
+evidence cannot silently become free re-authoring or provider retries. Old starts
+keep their recorded contracts; historical failures are not reinterpreted. Focused
+and installed/complete-CI qualification of this delta is IN PROGRESS, not PASS.
 The original is not a zero-error round, the revision has no inherited owner rating,
 and the complete quality streak remains zero. Runtime proof is dev28fea970/tree
-9772003089ec232bc6dbe9a2a00f19a74e010ca5; this later plan update is not a new full-CI run.
+9772003089ec232bc6dbe9a2a00f19a74e010ca5; the new local-repair delta has separate
+pending qualification and is not deployed or released.
 
 ADR0205 addresses a second actual early-chain failure: a model omitted a PDF's
 sentence period from a cited project URL, so the old copying/lexical contract

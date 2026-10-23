@@ -75,3 +75,49 @@ without new inference and actual installed integration before activation.
 Current broader objective remains unchanged: useful sustained agenda and learning,
 layered/external memory, new representative complete quality rounds, real platform
 lifecycle/migration/rollback and final production acceptance remain open.
+
+## 2026-10-23 — Prototype result and superseding corrective-author design
+
+This section supersedes the initial two-stage protocol proposal above; it does
+not rewrite historical results. The proposed five-field factual reviewer returned
+supported with no correction spans on the known attribution defect. It took one
+logical call and never invoked the second author. More review calls did not prove
+better detection; preserve this failure rather than relaxing the gold assessment.
+
+A second bounded diagnostic instead reused the original valid negative review and
+its exact original candidate/source evidence. Only the existing corrective author
+was replaced. One real configured-primary call returned a small exact-span change
+that attributed the secondary-source result correctly. Opening, lists, explanation,
+scope judgment and source link were copied unchanged. No owner rating or expected
+span/replacement was supplied. This is one successful diagnostic, not proof of
+general factual judgment, fresh installed integration or a complete quality round.
+
+The development successor therefore leaves the four-field source-review contract
+alone. A new corrective-author start freezes `review-anchored-edits-v1`, receives
+the retained negative findings plus original grounding and meaning, and returns
+exact unique substrings, issue indexes and replacements (or explicit abstention).
+Issue indexes refer to unsupported claims followed by uncertainties; each issue
+must be localized. The host computes non-overlapping spans and copies all other
+characters exactly. It rejects whole-text rewrites, ambiguous/foreign/missing edits,
+unchanged negative output and lost protected literals. It cannot prove a proposed
+span is semantically minimal or that a replacement is true; the existing full
+fidelity and final source/value review must still assess the resulting message.
+
+No extra provider step is added. Scope failure or broad feedback can produce
+unavailable correction rather than forced local edits. This is not a transport
+fallback. Actual provider routing/fallback stays Core-owned. The new expression
+records its actual corrective model, original ancestor and separately reviewed text.
+
+Reconstruction evidence uses the existing encrypted content vault and append-only
+journal, with candidate/source/review/context digests, subject/sensitivity, expiry
+and actual model provenance. Final-support and recovery resolve the original
+negative review and edit evidence afresh and reproduce the exact result. Erased,
+withdrawn, expired or stale evidence invalidates descendants; proof bytes are not
+delivery authority. Existing historical correction starts without the new method
+remain on their original authoring contract; failed/incomplete starts cannot gain
+a new inference or retrospective local-edit evidence. New method is not a user
+switch for changing the contract of an already started operation.
+
+Status of this successor: implemented in the development tree, focused controlled
+qualification in progress. Not installed in production, not released, no actual
+sending; full real lifecycle and quality gates in RELEASE_ACCEPTANCE remain open.

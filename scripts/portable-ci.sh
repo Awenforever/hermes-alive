@@ -87,6 +87,7 @@ run_and_require run_feedback_material_scope.py '^HERMES_ALIVE_FEEDBACK_MATERIAL_
 run_and_require run_core_context_read.py '^HERMES_ALIVE_CORE_CONTEXT_READ_OK$'
 run_and_require run_reading_assessment.py '^HERMES_ALIVE_READING_ASSESSMENT_OK$'
 run_and_require run_citation_selection.py '^HERMES_ALIVE_CITATION_SELECTION_OK$'
+run_and_require run_localized_correction.py '^HERMES_ALIVE_LOCALIZED_CORRECTION_OK$'
 run_and_require run_send_preflight.py '^HERMES_ALIVE_SEND_PREFLIGHT_OK$'
 run_and_require run_source_review_recovery.py '^HERMES_ALIVE_SOURCE_REVIEW_RECOVERY_OK$'
 run_and_require run_source_scope_live_probe.py '^HERMES_ALIVE_SOURCE_SCOPE_LIVE_PROBE_OK$'

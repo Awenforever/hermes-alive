@@ -7,6 +7,7 @@ from .events import EventEnvelope, _thaw_json
 from .opportunity_expression import OpportunityExpressionStore
 from .planning_runtime import PlanningRuntime, PlanningRuntimeResult, validate_model_timeout
 from .semantic_comparator import SemanticComparator
+from .localized_correction import METHOD as LOCAL_CORRECTION_METHOD
 
 
 class ExpressionRuntimeError(ValueError):
@@ -95,6 +96,7 @@ class ExpressionRuntime:
         if planning_parameters.get('grounding', False) or discovery:
             binding['require_independence'] = independent
         correction = None
+        correction_method = None
         if correction_review_event_id is not None:
             if not planning_parameters.get('grounding', False):
                 raise ExpressionRuntimeError('final correction requires grounded planning')
@@ -122,6 +124,15 @@ class ExpressionRuntime:
             binding = {**binding, 'correction_review_event_id':correction_review_event_id,
                 'correction_digest':self.store.content_vault.digest_json(correction),
                 'previous_expression_event_id':correction['previous_expression_event_id']}
+            retained_start=self.journal.get(start_id)
+            # Freeze new starts before inference. Historical starts keep their
+            # recorded method, even if failed or incomplete.
+            correction_method=(retained_start.event.payload.get('correction_method')
+                if retained_start is not None else LOCAL_CORRECTION_METHOD)
+            if correction_method is not None:
+                if correction_method != LOCAL_CORRECTION_METHOD:
+                    raise ExpressionRuntimeError('unknown retained correction method')
+                binding['correction_method']=correction_method
         self._bound_record(start_id, 'expression.runtime_started', subject,
             meaning.event.sensitivity, planned.selection_event_id, binding)
         completed = self.journal.get(done_id)
@@ -149,6 +160,7 @@ class ExpressionRuntime:
                     renderer_model=renderer_model, reviewer_model=reviewer_model,
                     language=language, operation_id=operation, require_independence=independent,
                     correction_review_event_id=correction_review_event_id,
+                    correction_method=correction_method,
                     timeout_seconds=model_timeout_seconds or 60)
                 candidate_id, review_id = comparison.candidate.event_id, comparison.review.event_id
             completed = self._bound_record(done_id, 'expression.runtime_completed', subject,
@@ -172,5 +184,10 @@ class ExpressionRuntime:
             meaning.event.sensitivity, start_id,
             {'expression_event_id': candidate.event_id, 'review_event_id': review.event_id,
              'delivery_authorized': False})
+        if correction_method is not None:
+            from .expression_support import ExpressionSourceSupportReviewer
+            ExpressionSourceSupportReviewer(self.journal,content_vault=self.store.content_vault,
+                context_vault=self.planning.synth.context_vault).current_correction_binding(candidate,
+                    subject=subject,selection_event_id=planned.selection_event_id)
         return ExpressionRuntimeResult(planned, candidate.event_id, review.event_id,
             candidate.text, review.assessment.disposition.value)

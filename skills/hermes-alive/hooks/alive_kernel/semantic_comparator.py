@@ -16,6 +16,7 @@ from .events import EventEnvelope
 from .content_vault import ContentReference
 from .presentation import PresentationProjection
 from .model_json import parse_model_json
+from .localized_correction import METHOD as LOCAL_CORRECTION_METHOD, CORRECTION_PROMPT, apply_correction, text_digest
 from .semantic_rendering import deterministic_text, serialize_meaning
 from .semantic_review import (
     AtomReview, IndependentSemanticReview, ReviewerKind, SemanticReviewError,
@@ -317,12 +318,16 @@ class SemanticComparator:
         language: str | None = None, presentation_scope: str = "proactive_social",
         require_independence: bool = True,
         correction_review_event_id: str | None = None,
+        correction_method: str | None = None,
         protocol_recovery: bool = True,
     ) -> SemanticComparison:
         if type(require_independence) is not bool:
             raise SemanticReviewError('invalid independence mode')
         if type(protocol_recovery) is not bool:
             raise SemanticReviewError('invalid protocol recovery mode')
+        if correction_method is not None and (correction_method != LOCAL_CORRECTION_METHOD
+                or correction_review_event_id is None):
+            raise SemanticReviewError('unknown or unbound local correction method')
         operation = str(operation_id or uuid4())
         if not _ID.fullmatch(operation):
             raise SemanticReviewError("invalid comparison operation ID")
@@ -355,7 +360,10 @@ class SemanticComparator:
         prompt = json.dumps({"meaning": meaning, "presentation": style,
                              "language": language,
                              **({'expression_context':expression_context} if expression_context else {}),
-                             **({'correction':correction} if correction else {})},
+                             **({'correction':correction} if correction else {}),
+                             **({'issues':correction['findings']['unsupported_claims']+
+                                  correction['findings']['uncertainties']}
+                                if correction_method is not None else {})},
                             ensure_ascii=False, separators=(",", ":"))
         from .research_evidence import RESEARCH_MESSAGE_BUDGET
         budget=(RESEARCH_MESSAGE_BUDGET if expression_context and expression_context.get('method')
@@ -371,11 +379,14 @@ class SemanticComparator:
             self._revalidate(selection_event_id, meaning_event_id, subject,
                              meaning, presentation_scope, style, correction)
             render_route: dict[str, str] = {}
+            render_system=(_DISCOVERY_RENDER_PROMPT_V1+
+                (_READING_ASSESSMENT_GUIDANCE if expression_context.get('reading_assessment') else '')
+                if discovery else _RENDER_PROMPT)
+            if correction_method is not None:
+                render_system=CORRECTION_PROMPT
             response = await asyncio.wait_for(call(
                 task="alive_semantic_render", model=renderer_model,
-                messages=[{"role": "system", "content": (_DISCOVERY_RENDER_PROMPT_V1+
-                    (_READING_ASSESSMENT_GUIDANCE if expression_context.get('reading_assessment') else ''))
-                    if discovery else _RENDER_PROMPT},
+                messages=[{"role": "system", "content": render_system},
                           {"role": "user", "content": prompt}],
                 temperature=0.3, max_tokens=4000, timeout=timeout_seconds,
                 route_info=render_route,
@@ -383,6 +394,15 @@ class SemanticComparator:
             self._revalidate(selection_event_id, meaning_event_id, subject,
                              meaning, presentation_scope, style, correction)
             text, actual_model, provider = self._response(response, render_route)
+            proposal=None
+            if correction_method is not None:
+                proposal=parse_model_json(text,max_chars=256000)
+                previous=self.store.resolve_model_candidate(correction['previous_expression_event_id'])
+                if previous is None or previous.text != correction['grounding_context']['candidate']['text']:
+                    raise SemanticReviewError('local correction original is no longer available')
+                text=apply_correction(previous.text,expected_digest=previous.digest,
+                    findings=correction['findings'],response=proposal,
+                    protected_literals=tuple(literal for atom in document.atoms for literal in atom.protected_literals))
             domain = resolve_domain(provider, actual_model)
             if domain is None:
                 raise SemanticReviewError("renderer independence domain is unknown")
@@ -392,6 +412,23 @@ class SemanticComparator:
                 renderer_execution_id=f"execution:{operation}:render",
                 renderer_model=actual_model, renderer_independence_domain=domain,
             )
+            if proposal is not None:
+                # Retain reconstruction evidence in the existing encrypted vault
+                # and journal, not a new backend, reviewer or delivery mechanism.
+                ref=self.store.content_vault.put_json(proposal,subject=subject,
+                    purpose='semantic.local-correction',sensitivity=source.event.sensitivity,
+                    retention_until=candidate.expires_at,content_id='semantic-local-correction:'+operation)
+                self.store.journal.append(EventEnvelope(
+                    event_id='message.local_correction:'+operation,
+                    event_type='expression.local_correction_completed',source='alive.semantic-comparator',
+                    actor='system:alive-shadow-comparator',subject=subject,
+                    sensitivity=source.event.sensitivity,causation_id=candidate.event_id,
+                    expires_at=candidate.expires_at,payload=dict(method=correction_method,
+                        previous_expression_event_id=previous.event_id,review_event_id=correction['review_event_id'],
+                        correction_digest=self.store.content_vault.digest_json(correction),
+                        previous_text_digest=text_digest(previous.text),result_text_digest=candidate.digest,
+                        actual_model=actual_model,provider=provider,content=ref.to_event_payload(),
+                        delivery_authority_granted=False)))
             self._receipt(operation, "rendered", subject, selection_event_id,
                           source.event.sensitivity, status="recorded", model=actual_model)
             stage = "review"

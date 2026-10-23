@@ -3,6 +3,30 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## Narrow correction must not restyle unrelated useful expression
+
+2026-10-23 (Asia/Shanghai), Codex; see ADR0206 and the living plan for qualification.
+A legitimate factual review can coexist with owner-liked explanation. Re-authoring
+the whole message to fix one attribution regressed the unaffected introduction and
+format. Re-running a fresh reviewer with a localization schema then missed the
+same valid finding. Do not turn repeated judging into a search for a green verdict.
+
+New corrective authoring consumes the existing authenticated negative review and
+original source/candidate binding. The model proposes exact unique affected spans
+and replacements or abstains; the host computes offsets, preserves everything else
+and retains encrypted reconstruction evidence. This proves edit boundaries, NOT
+semantic minimality, source truth, reader satisfaction or permission. The resulting
+whole message still needs the same fidelity and final source review. Unknown/broad
+or unsafe corrections fail visibly, never a deterministic digest or full rewrite.
+No topic keyword patch, banned phrase, length quota, new memory/queue or extra judge.
+
+New method frozen before provider calls; old starts and failures keep old semantics.
+Recovery must resolve the original review, owner/source context, original candidate
+and edit proof with current retention/erasure checks. Missing proof cannot inherit
+the ancestor's approval or silently repeat inference. A previously confirmed body
+cannot be auto-edited under its old confirmation. An unsent positive sample rating
+belongs only to that exact sample, not all facts, revisions or permanent interests.
+
 ## Optional acquisition must not destroy initial understanding
 
 ADR0205 follows an actual whole-cycle abort caused by a PDF textual URL's final

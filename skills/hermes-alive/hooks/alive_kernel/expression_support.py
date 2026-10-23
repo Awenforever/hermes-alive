@@ -4,7 +4,7 @@ import json
 import re
 
 from .events import Sensitivity
-from .content_vault import ContentReference
+from .content_vault import ContentReference, ContentVaultError
 from .opportunity_expression import OpportunityExpressionStore
 from .source_support import SourceSupportError, SourceSupportReviewer
 
@@ -118,8 +118,51 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
                 or context['previous_expression_event_id'] != start.event.payload.get('previous_expression_event_id')
                 or done.event.payload.get('expression_event_id') != expression.event_id):
             raise SourceSupportError('correction runtime evidence changed')
+        method=start.event.payload.get('correction_method')
+        if method is not None:
+            self._verify_local_correction(expression,context,method,subject,selection_event_id,start)
         return {'runtime_start_event_id':start_id, 'review_event_id':context['review_event_id'],
                 'context_digest':self.vault.digest_json(context)}
+
+    def _verify_local_correction(self,expression,context,method,subject,selection_event_id,start):
+        from .localized_correction import METHOD, apply_correction, text_digest
+        if method != METHOD:
+            raise SourceSupportError('unknown retained local correction method')
+        operation=expression.renderer_execution_id.removeprefix('execution:').removesuffix(':render')
+        proof=self.journal.get('message.local_correction:'+operation)
+        if proof is None:
+            raise SourceSupportError('local correction proof unavailable')
+        event=proof.event;data=event.payload
+        try:
+            previous=self.expressions.resolve_model_candidate(context['previous_expression_event_id'])
+            ref=ContentReference.from_event_payload(data['content'])
+            if (previous is None or previous.text!=context['grounding_context']['candidate']['text']
+                    or event.event_type!='expression.local_correction_completed'
+                    or event.source!='alive.semantic-comparator' or event.actor!='system:alive-shadow-comparator'
+                    or event.subject!=subject or event.sensitivity is not start.event.sensitivity
+                    or event.causation_id!=expression.event_id or event.expires_at!=expression.expires_at
+                    or not start.event.observed_at<=event.observed_at
+                    or data.get('method')!=METHOD or data.get('delivery_authority_granted') is not False
+                    or data.get('previous_expression_event_id')!=previous.event_id
+                    or data.get('review_event_id')!=context['review_event_id']
+                    or data.get('correction_digest')!=self.vault.digest_json(context)
+                    or data.get('previous_text_digest')!=text_digest(previous.text)
+                    or data.get('result_text_digest')!=expression.digest
+                    or data.get('actual_model')!=expression.renderer_model
+                    or not isinstance(data.get('provider'),str)
+                    or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}',data['provider'])
+                    or data['provider'] in ('auto','default') or ref.retention_until!=expression.expires_at):
+                raise SourceSupportError('local correction proof differs from current expression')
+            proposal=self.vault.resolve_json(ref.content_id,expected_subject=subject,
+                expected_purpose='semantic.local-correction',expected_sensitivity=event.sensitivity)
+            _,document,_,_=self.expressions._selection_context(selection_event_id=selection_event_id,
+                meaning_event_id=expression.meaning_event_id,subject=subject,observed_at=event.observed_at)
+            if (self.vault.digest_json(proposal)!=ref.digest or apply_correction(previous.text,
+                    expected_digest=previous.digest,findings=context['findings'],response=proposal,
+                    protected_literals=tuple(literal for atom in document.atoms for literal in atom.protected_literals))!=expression.text):
+                raise SourceSupportError('local correction reconstruction changed')
+        except (KeyError,TypeError,ValueError,ContentVaultError) as exc:
+            raise SourceSupportError('local correction evidence unavailable or invalid') from exc
 
     def require_current_witness(self, witness, *, subject, expression_event_id,
                                 selection_event_id):
