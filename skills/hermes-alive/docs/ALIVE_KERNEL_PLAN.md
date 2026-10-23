@@ -4,6 +4,17 @@ Status: active
 
 Last reviewed: 2026-10-23
 
+ADR0204 adds a bounded advisory reading assessment to the existing candidate call
+for newly opted-in research cycles. It distinguishes partial/unresolved/claimed
+answered findings with exact admitted passages; quotes do not prove interpretation.
+Missing/invalid notes remain unassessed and do not reject a valid communication
+candidate. The existing encrypted completion retains them and authorship can see
+them as revisable notes, not an owner assignment, source truth or required outline.
+No additional model stage, memory backend, agenda completion or sending authority.
+Initial controlled installed composition passes; final negative/recovery/upgrade
+tests and exact-tree qualification remain pending. Cross-cycle inquiry continuation,
+useful learning and actual new sharing quality are NOT established by this step.
+
 ADR0203 changes the immediate quality investigation after an owner rejected an
 actual complete historical sample that model review had endorsed. Repeating the
 existing review again endorsed it; an isolated contribution/burden rubric noticed

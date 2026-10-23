@@ -161,6 +161,8 @@ async def exercise(root,mode):
             self.calls+=1;models.append(kw['task'])
             task=kw['task'];raw=kw['messages'][1]['content']
             data=json.loads(raw) if task!='alive_deliberation' else None
+            if task=='alive_opportunity_candidates' and isinstance(data,dict) and 'original_evidence' in data:
+                data=data['original_evidence']
             if task=='alive_discovery_reading':
                 refs=[s['source_ref'] for s in data['sources']]
                 if mode=='invalid-choice':refs=['https://private.invalid/not-a-supplied-reference']
@@ -208,11 +210,33 @@ async def exercise(root,mode):
                         communication_plan=dict(version=3,recipient_goal='INTERNAL_GOAL',speech_act='share',contents=[],behavior_constraints=[]),
                         dimensions={n:dict(value=.1 if n in ('risk','urgency','interruption_cost') else .9,reason='Synthetic judgment')
                             for n in ('user_value','urgency','novelty','confidence','risk','interruption_cost')})])
+                    if mode.startswith('reading-assessment'):
+                        assert 'reading_assessments' in kw['messages'][0]['content']
+                        value['reading_assessments']=[dict(item_id=data['tentative_discovery_tasks'][0]['item_id'],
+                            status='partial',findings=[dict(observation_event_id=e['observation_event_id'],
+                                quote='DEEP_READ_EVIDENCE',interpretation='The extract describes observations, not independent validation.')],
+                            open_questions=['What independent evidence tests the claimed improvement?'])]
+                        if mode=='reading-assessment-invalid':
+                            value['reading_assessments'][0]['findings'][0]['quote']='NOT_PRESENT_IN_THE_ORIGINAL_READ'
+                        if mode=='reading-assessment-missing':value.pop('reading_assessments')
+                        if mode=='reading-assessment-recovery' and models.count('alive_opportunity_candidates')==1:
+                            value['candidates']=[{}]
             elif task=='alive_deliberation':
                 choices=json.loads(raw.split('\n',1)[1])
                 value=dict(candidate_id=next(c['candidate_id'] for c in choices if c['candidate_id'].startswith('opportunity-candidate:')),rationale='Synthetic contribution')
             elif task=='alive_semantic_render':
-                assert 'INTERNAL_GOAL' not in raw and 'INTERNAL_RESEARCH_QUESTION' not in raw
+                assert 'INTERNAL_GOAL' not in raw
+                if mode.startswith('reading-assessment'):
+                    assessment=data['expression_context']['reading_assessment']
+                    if mode in ('reading-assessment-invalid','reading-assessment-missing'):
+                        assert not assessment['entries'] and len(assessment['unassessed_questions'])==1
+                        assert assessment['rejected_count']==int(mode=='reading-assessment-invalid')
+                    else:
+                        assert assessment['entries'][0]['status']=='partial'
+                        assert 'INTERNAL_RESEARCH_QUESTION' in assessment['entries'][0]['question']
+                    assert not assessment['agenda_completion_proven'] and not assessment['source_truth_proven']
+                    assert 'unanswered question does not oblige' in kw['messages'][0]['content']
+                else:assert 'INTERNAL_RESEARCH_QUESTION' not in raw
                 if pressure or mode in ('primary-read','replay','private-followup','erase-group-after-final'):
                     assert 'PRIMARY_READ_EVIDENCE' in raw and 'DEEP_READ_EVIDENCE' in raw
                 value='The museum describes observing without intervention: [conservation method]('+url+').'
@@ -237,6 +261,7 @@ async def exercise(root,mode):
         caller_factory=lambda *,cycle,read_binding:Caller(cycle,read_binding),preparation=prep or preparation())
     parameters=dict(expression_parameters=dict(recipient_meaning=True,grounding=True,
         require_independent_grounding=False,model_timeout_seconds=30),resolve_binding=lambda _:None)
+    if mode.startswith('reading-assessment'):parameters['expression_parameters']['record_reading_assessment']=True
     async def allow(self,target):return target in (url,primary,*backgrounds)
     original_tools=CoreDiscoveryTools
     def bounded_tools(*args,**kw):return original_tools(*args,**kw,timeout_seconds=.03 if mode=='uncertain-read' else 2)
@@ -275,9 +300,13 @@ async def exercise(root,mode):
                 try:await runner.step(parameters)
                 except RuntimeError:pass
                 else:raise AssertionError('synthetic interruption did not occur')
-                before=(len(tools),len(models));runner=native()
+                before=(len(tools),len(models));upgraded=preparation()
+                upgraded.record_reading_assessment=True
+                runner=native(upgraded)
             result=await runner.step(parameters)
-            if mode in ('replay','legacy-replay','historical-followup-replay'):assert (len(tools),len(models))==before
+            if mode in ('replay','legacy-replay','historical-followup-replay'):
+                assert (len(tools),len(models))==before
+                assert not journal.read(event_type='discovery.reading_assessment_opened')
             assert result.disposition==('paused' if mode=='paused' else 'silence' if mode=='abstain' else 'shadow_selected')
             assert len(journal.read(event_type='autonomous.host.closed'))==1
             if mode=='paused':assert not tools and not models
@@ -287,6 +316,29 @@ async def exercise(root,mode):
                 assert models.count('alive_discovery_reading')==1
                 assert models.count('alive_discovery_followup')==(0 if mode in ('page-failed','legacy-replay','unconsented-followup') else 1)
                 assert models.count('alive_source_support')==1
+                if mode.startswith('reading-assessment'):
+                    synth=runtime.preparation.expression.planning.synth
+                    done=journal.read(event_type='opportunity.synthesis_completed')[-1]
+                    before=len(models)
+                    retained=synth.reading_assessment_context(subject='user:test',
+                        receipt_event_id=done.event.event_id,clearance=Sensitivity.PRIVATE)
+                    assert len(models)==before
+                    if mode in ('reading-assessment-invalid','reading-assessment-missing'):
+                        assert not retained['entries'] and len(retained['unassessed_item_ids'])==1
+                    else:assert retained['entries'][0]['status']=='partial'
+                    assert not journal.read(event_type='memory.proposed')
+                    try:synth.reading_assessment_context(subject='user:foreign',
+                        receipt_event_id=done.event.event_id,clearance=Sensitivity.PRIVATE)
+                    except ValueError:pass
+                    else:raise AssertionError('foreign reading findings disclosed')
+                    original=next(r for r in journal.read(event_type='discovery.opportunity_observed')
+                        if 'DEEP_READ_EVIDENCE' in str(ingestor.active_evidence(subject='user:test',clearance=Sensitivity.PRIVATE,
+                            observation_event_ids=(r.event.event_id,),limit=1)[0].content.get('summary','')))
+                    vault.erase_item(original.event.payload['content']['content_id'])
+                    try:synth.reading_assessment_context(subject='user:test',
+                        receipt_event_id=done.event.event_id,clearance=Sensitivity.PRIVATE)
+                    except ValueError:pass
+                    else:raise AssertionError('erased source survived in reading findings')
                 if mode=='fair-budget-pressure':
                     admitted=journal.read(event_type='opportunity.synthesis_started')[-1].event.payload
                     scan=admitted['source_scan']
@@ -342,7 +394,7 @@ async def exercise(root,mode):
 
 with tempfile.TemporaryDirectory(prefix='alive-configured-discovery-') as folder:
     modes=('budget-pressure',) if os.getenv('ALIVE_REPRODUCE_OLD_RECALL')=='1' else (
-                 'share','primary-read','private-followup','budget-pressure','fair-budget-pressure','erase-group-after-final','followup-failed','replay','legacy-replay','historical-followup-replay','unconsented-followup','page-failed','abstain','paused',
+                 'share','reading-assessment','reading-assessment-invalid','reading-assessment-missing','reading-assessment-recovery','primary-read','private-followup','budget-pressure','fair-budget-pressure','erase-group-after-final','followup-failed','replay','legacy-replay','historical-followup-replay','unconsented-followup','page-failed','abstain','paused',
                  'invalid-choice','revoked-choice','forgotten-choice','erased-choice','uncertain-read',
                  'invented-followup','foreign-followup','revoked-followup','forgotten-followup','erased-followup','interrupted-followup')
     for mode in modes:

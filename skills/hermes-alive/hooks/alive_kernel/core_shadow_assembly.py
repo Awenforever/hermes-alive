@@ -120,6 +120,7 @@ def assemble(context):
             DiscoveryOpportunityIngestor(journal,content_vault=vault),subject=subject,
             approved_queries=tuple(settings['public_discovery']['queries']),
             follow_citations=settings['public_discovery'].get('follow_citations',False),
+            record_reading_assessment=True,
             validate_consent=validate_consent)
     native=NativeCognitionHost(host,profile_id='profile:'+identity,profile_home=home,
         read_configuration=load_config_readonly,read_credential_names=lambda **_:(),

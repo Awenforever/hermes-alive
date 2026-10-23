@@ -52,7 +52,8 @@ Only one follow-up step is available; do not assume its result will verify a cla
 
 
 class ConfiguredDiscoveryCycle:
-    def __init__(self,context,ingestor,*,subject,approved_queries,validate_consent,follow_citations=False):
+    def __init__(self,context,ingestor,*,subject,approved_queries,validate_consent,follow_citations=False,
+                 record_reading_assessment=False):
         from .core_shadow_assembly import public_discovery_settings
         from .native_worker_protocol import identifier
         identifier(subject)
@@ -60,9 +61,11 @@ class ConfiguredDiscoveryCycle:
         public_discovery_settings(dict(consent='approved_public_queries_no_delivery',queries=list(approved_queries)))
         if not callable(validate_consent):raise HostDiscoveryError('current disclosure consent validator required')
         if type(follow_citations) is not bool:raise HostDiscoveryError('explicit cited-read consent required')
+        if type(record_reading_assessment) is not bool:raise HostDiscoveryError('explicit reading assessment mode required')
         self.context,self.ingestor,self.subject=context,ingestor,subject
         self.queries,self.validate_consent=approved_queries,validate_consent
         self.follow_citations=follow_citations
+        self.record_reading_assessment=record_reading_assessment
         self.inquiries=DiscoveryInquiryContext(ingestor)
         self.tools=None
 
@@ -247,6 +250,9 @@ class ConfiguredDiscoveryCycle:
         current()
         research_enabled=self.follow_citations and self._research_enabled(cycle)
         group_enabled=research_enabled and self._bundle_enabled(cycle)
+        assessment_enabled=self.record_reading_assessment and group_enabled and self._cycle_mode(cycle,
+            prefix='discovery.reading-assessment:',kind='discovery.reading_assessment_opened',
+            payload=dict(method='inquiry-reading-assessment-v1',authority_granted=False))
         if self.tools is not None:self.tools.close()
         self.tools=CoreDiscoveryTools(self.context,read_binding=current,approved_queries=self.queries)
         reader=HostDiscoveryReader(self.ingestor,subject=self.subject,search=self.tools.search,
@@ -285,4 +291,5 @@ class ConfiguredDiscoveryCycle:
                 if group_enabled:read_receipts.append(followed.receipt_id)
                 current()
         return {**parameters,'expression_parameters':{**parameters['expression_parameters'],'inquiry_item_ids':(item_id,),
+            **({'record_reading_assessment':True} if assessment_enabled and read_receipts else {}),
             **({'research_read_receipt_ids':tuple(read_receipts)} if read_receipts else {})}}

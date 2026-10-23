@@ -161,12 +161,14 @@ watcher and not a complete production loop. It creates no channel queues.
                   require_independent_grounding=False, recipient_meaning=False,
                   inquiry_item_ids=(),research_read_receipt_ids=(),recalled_feedback_event_ids=(),
                   semantic_feedback_recall=False,
-                  model_timeout_seconds=None,read_context=None):
+                  model_timeout_seconds=None,read_context=None,record_reading_assessment=False):
         validate_model_timeout(model_timeout_seconds)
         if read_context is not None and not callable(read_context):
             raise PlanningRuntimeError('explicit host context read capability required')
         if type(recipient_meaning) is not bool:
             raise PlanningRuntimeError('invalid recipient meaning mode')
+        if type(record_reading_assessment) is not bool:
+            raise PlanningRuntimeError('explicit reading assessment mode required')
         if type(semantic_feedback_recall) is not bool or semantic_feedback_recall and recalled_feedback_event_ids:
             raise PlanningRuntimeError('choose semantic or explicit feedback recall, not both')
         if type(grounding) is not bool or type(require_independent_grounding) is not bool:
@@ -204,6 +206,9 @@ watcher and not a complete production loop. It creates no channel queues.
                 'require_independence':require_independent_grounding, 'method':'source-support-v1'}
         if recipient_meaning:
             binding['recipient_meaning'] = 'recipient-meaning-v1'
+        if record_reading_assessment:
+            from .reading_assessment import METHOD
+            binding['reading_assessment']=METHOD
         if semantic_feedback_recall:
             from .feedback_recall import FeedbackRecallSelector
             binding['semantic_feedback_recall']=FeedbackRecallSelector.METHOD
@@ -276,7 +281,8 @@ watcher and not a complete production loop. It creates no channel queues.
                 recipient_meaning=recipient_meaning,timeout_seconds=model_timeout_seconds or 60,
                 inquiry_item_ids=inquiry_item_ids,research_read_receipt_ids=research_read_receipt_ids,
                 recalled_feedback_event_ids=recalled_feedback_event_ids,
-                material_scope=binding.get('feedback_material_scope'),read_context=read_context)
+                material_scope=binding.get('feedback_material_scope'),read_context=read_context,
+                record_reading_assessment=record_reading_assessment)
         candidates, reviews, repair, repair_disposition = generated.candidates, (), None, None
         if recipient_meaning and generated.rejected_count and not candidates:
             raise PlanningRuntimeError('recipient meaning unavailable; malformed proposals are not qualified silence')

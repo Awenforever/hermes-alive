@@ -30,6 +30,7 @@ from .action_history import ActionHistoryReader
 from .host_discovery import read_scope_metadata, source_prompt_excerpt, SOURCE_EXCERPT_POLICY
 from .model_timeouts import MAX_STAGE_SECONDS
 from .core_context_read import context_value
+from . import reading_assessment
 
 
 _DISCOVERY_AUTHORING = 'source-led-v2'
@@ -916,6 +917,13 @@ class OpportunitySynthesizer:
             if self.vault.digest_json(bundle) != ref.digest:
                 raise OpportunitySynthesisError("opportunity bundle digest mismatch")
             self._validate_recipient_execution(start, bundle)
+            if start.event.payload.get('interpreter_method',{}).get('reading_assessment'):
+                reading_assessment.validate(bundle['reading_assessment'],inquiries=inquiries,
+                    excerpts={e.observation_event_id:source_prompt_excerpt(e.content,policy=SOURCE_EXCERPT_POLICY)
+                              for e in focus})
+                if (receipt.event.payload.get('reading_unassessed_count')!=len(bundle['reading_assessment']['unassessed_item_ids'])
+                        or receipt.event.payload.get('reading_rejected_count')!=bundle['reading_assessment']['rejected_count']):
+                    raise OpportunitySynthesisError('reading assessment completion counts changed')
             count, rejected = receipt.event.payload["candidate_count"], receipt.event.payload["rejected_count"]
             if type(count) is not int or not 0 <= count <= 4 or type(rejected) is not int or not 0 <= rejected <= 4-count:
                 raise OpportunitySynthesisError("invalid completed counts")
@@ -968,6 +976,30 @@ class OpportunitySynthesizer:
         except Exception:
             raise OpportunitySynthesisError("retained opportunity completion is not recoverable") from None
 
+    def reading_assessment_context(self,*,subject,receipt_event_id,clearance):
+        receipt=self.journal.get(receipt_event_id)
+        if receipt is None or receipt.event.subject!=subject:
+            raise OpportunitySynthesisError('reading assessment has foreign completion scope')
+        operation=receipt_event_id.removeprefix('opportunity.synthesis:').removesuffix(':completed')
+        self.load_completed(subject=subject,operation_id=operation,clearance=clearance)
+        start=self.journal.get(receipt.event.causation_id)
+        if start.event.payload.get('interpreter_method',{}).get('reading_assessment') is None:return None
+        ref=ContentReference.from_event_payload(receipt.event.payload['content'])
+        bundle=self.vault.resolve_json(ref.content_id,expected_subject=subject,
+            expected_purpose='opportunity.candidates',expected_sensitivity=clearance)
+        if self.vault.digest_json(bundle)!=ref.digest:
+            raise OpportunitySynthesisError('reading assessment bundle changed')
+        questions={i['item_id']:i['question'] for i in self.inquiries.read(subject=subject,clearance=clearance,
+            item_ids=tuple(start.event.payload['discovery_inquiry_item_ids']))}
+        assessment=bundle['reading_assessment']
+        return dict(method=reading_assessment.METHOD,completion_event_id=receipt_event_id,
+            actual_model=receipt.event.payload['actual_model'],
+            entries=[{**row,'question':questions[row['item_id']]} for row in assessment['entries']],
+            unassessed_questions=[dict(item_id=i,question=questions[i]) for i in assessment['unassessed_item_ids']],
+            unassessed_item_ids=assessment['unassessed_item_ids'],rejected_count=assessment['rejected_count'],
+            advisory_only=True,source_truth_proven=False,agenda_completion_proven=False,
+            recipient_outline_required=False,action_authority=False)
+
     @staticmethod
     def _validate_recipient_execution(start, bundle):
         method = start.event.payload.get('interpreter_method', {})
@@ -976,6 +1008,12 @@ class OpportunitySynthesizer:
         editorial = method.get('editorial_context')
         authoring = method.get('discovery_authoring')
         source_review=method.get('discovery_source_review')
+        assessment=method.get('reading_assessment')
+        if (assessment not in (None,reading_assessment.METHOD)
+                or assessment is not None and (authoring!='source-led-v3'
+                    or bundle.get('reading_assessment_method')!=assessment)
+                or assessment is None and ('reading_assessment' in bundle or 'reading_assessment_method' in bundle)):
+            raise OpportunitySynthesisError('reading assessment contract mismatch')
         if (mode != bundle.get('recipient_execution')
                 or mode not in (None, 'expression-required-v1')
                 or output != bundle.get('recipient_output')
@@ -1055,6 +1093,8 @@ class OpportunitySynthesizer:
             raise OpportunitySynthesisError('structural recovery output contract mismatch')
         evidence=self.reader.active_evidence(subject=subject,clearance=clearance,limit=32,
             observation_event_ids=tuple(start.event.payload['observation_event_ids']))
+        if method.get('reading_assessment')==reading_assessment.METHOD and isinstance(document,dict):
+            document={k:v for k,v in document.items() if k!='reading_assessments'}
         findings=self._structure_findings_v1(document,evidence,'recovery-proof',receipt.event.event_id,
             ActionAuthority(start.event.payload['host_authority']),
             recipient_meaning=start.event.payload.get('recipient_meaning') is True,
@@ -1082,9 +1122,12 @@ class OpportunitySynthesizer:
                   recipient_meaning: bool = False,
                   protocol_recovery: bool = True,
                   inquiry_item_ids: tuple = (),research_read_receipt_ids: tuple = (),
-                  recalled_feedback_event_ids: tuple = (),material_scope=None,read_context=None) -> OpportunitySynthesisResult:
+                  recalled_feedback_event_ids: tuple = (),material_scope=None,read_context=None,
+                  record_reading_assessment=False) -> OpportunitySynthesisResult:
         if type(recipient_meaning) is not bool or type(protocol_recovery) is not bool:
             raise OpportunitySynthesisError('invalid recipient meaning mode')
+        if type(record_reading_assessment) is not bool:
+            raise OpportunitySynthesisError('explicit reading assessment mode required')
         if read_context is not None and not callable(read_context):
             raise OpportunitySynthesisError('explicit host context read capability required')
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}", operation_id):
@@ -1117,6 +1160,7 @@ class OpportunitySynthesizer:
             return inquiries,focus,commitment_digest,context,learning,history,actions,feedback,revisions,pool,cursor,fair_pool
         (inquiries,focus,commitment_digest,context,learning,history,actions,feedback,revisions,pool,cursor,
             fair_pool)=await context_value(read_context,capture_inputs)
+        assess_reading=bool(record_reading_assessment and focus and inquiries)
         as_of = datetime.now(timezone.utc)
         budget=RESEARCH_SOURCE_BUDGET if focus else 32000 if revisions else 24000
         prompt_data={"as_of": as_of.isoformat(),
@@ -1185,12 +1229,14 @@ class OpportunitySynthesizer:
                 'against the supplied evidence: pursue, revise or abandon the angle as warranted. '
                 'They grant no search, disclosure, commitment or sending authority and impose no '
                 'must-mention inventory on a recipient message.')
+        if assess_reading:system_prompt+='\n'+reading_assessment.GUIDANCE
         method = dict(protocol='recipient-plan-v3' if recipient_meaning else 'legacy-draft-v1',
             recipient_execution='expression-required-v1' if recipient_meaning else None,
             recipient_output='intent-only-v1' if recipient_meaning else None,
             editorial_context='origin-purpose-v1' if recipient_meaning else None,
             discovery_authoring=('source-led-v3' if focus else _DISCOVERY_AUTHORING) if recipient_meaning else None,
             **({'discovery_source_review':_GROUP_SOURCE_REVIEW} if focus else {}),
+            **({'reading_assessment':reading_assessment.METHOD} if assess_reading else {}),
             kind='model_prompt' if evidence else 'system_no_material',
             system_prompt_sha256=hashlib.sha256(system_prompt.encode()).hexdigest() if evidence else None,
             requested_model=requested_model if evidence else None,
@@ -1283,6 +1329,10 @@ class OpportunitySynthesizer:
                         raise OpportunitySynthesisError('opportunity response exceeds boundary')
                     try:
                         document=parse_model_json(content)
+                        assessment_raw=None
+                        if assess_reading and isinstance(document,dict):
+                            document=dict(document)
+                            assessment_raw=document.pop('reading_assessments',None)
                         if protocol_recovery and recipient_meaning:
                             findings=self._structure_findings_v1(document,evidence,operation_id,receipt_id,authority,
                                 recipient_meaning=recipient_meaning,source_presentation=self._SOURCE_PRESENTATION,
@@ -1321,6 +1371,10 @@ class OpportunitySynthesizer:
                 await context_value(read_context,validate_current)
                 model='system/alive-no-current-material'
                 document={'candidates':[],'abstentions':[],'reconsiderations':[]}
+            assessment=(reading_assessment.normalize(assessment_raw,inquiries=inquiries,
+                excerpts={e.observation_event_id:source_prompt_excerpt(e.content,policy=SOURCE_EXCERPT_POLICY)
+                          for e in evidence if e.observation_event_id in {f.observation_event_id for f in focus}})
+                if assess_reading else None)
             candidates, drafts, rejected, indices = self._candidates(
                 document, evidence, operation_id, receipt_id, authority, context, learning=learning,
                 source_presentation=self._SOURCE_PRESENTATION,
@@ -1340,6 +1394,8 @@ class OpportunitySynthesizer:
                  "editorial_context":method['editorial_context'],
                  "discovery_authoring":method['discovery_authoring'],
                  **({'discovery_source_review':method['discovery_source_review']} if focus else {}),
+                 **({'reading_assessment_method':reading_assessment.METHOD,
+                     'reading_assessment':assessment} if assess_reading else {}),
                  "source_presentation": self._SOURCE_PRESENTATION,
                  "reconsiderations":[{'agenda_item_id':r.agenda_item_id,'after_seconds':r.after_seconds,
                                       'reason':r.reason} for r in reconsiderations],
@@ -1354,6 +1410,8 @@ class OpportunitySynthesizer:
                 event_id=receipt_id, event_type="opportunity.synthesis_completed", **base,
                 causation_id=start.event.event_id,
                 payload={"actual_model": model, "candidate_count": len(candidates),
+                         **({'reading_unassessed_count':len(assessment['unassessed_item_ids']),
+                             'reading_rejected_count':assessment['rejected_count']} if assess_reading else {}),
                          "source_scan":scan,
                          "protocol_recovered":recovered,
                          "system_no_material":not bool(evidence),

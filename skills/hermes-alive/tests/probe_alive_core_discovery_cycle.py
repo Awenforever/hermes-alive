@@ -90,6 +90,11 @@ async def main():
                 communication_plan=dict(version=3,recipient_goal='INTERNAL_GOAL',speech_act='share',contents=[],behavior_constraints=[]),
                 dimensions={n:dict(value=.1 if n in ('risk','urgency','interruption_cost') else .9,reason='Synthetic judgment')
                     for n in ('user_value','urgency','novelty','confidence','risk','interruption_cost')})])
+            assert 'reading_assessments' in body['messages'][0]['content']
+            value['reading_assessments']=[dict(item_id=data['tentative_discovery_tasks'][0]['item_id'],status='partial',
+                findings=[dict(observation_event_id=e['observation_event_id'],quote='DEEP_READ_EVIDENCE',
+                    interpretation='The notice reports observation, not independent validation.')],
+                open_questions=['What independently verifies this method?'])]
         elif 'expression_binding' in data:
             stage='final';assert data['expression_binding']['assessment_mode']=='discovery-source-and-value-v3'
             assert 'communication_plan' not in data['candidate']
@@ -103,7 +108,10 @@ async def main():
         elif 'meaning' in data:
             stage='author';assert data['expression_context']['method']=='discovery-source-authoring-v3'
             assert 'PRIMARY_READ_EVIDENCE' in raw and 'DEEP_READ_EVIDENCE' in raw
-            assert 'INTERNAL_GOAL' not in raw and 'INTERNAL_RESEARCH' not in raw
+            assert 'INTERNAL_GOAL' not in raw
+            assessment=data['expression_context']['reading_assessment']
+            assert assessment['entries'][0]['status']=='partial' and 'INTERNAL_RESEARCH' in assessment['entries'][0]['question']
+            assert not assessment['source_truth_proven'] and not assessment['agenda_completion_proven']
             value='The museum describes observing before intervention: [conservation method]('+url+').'
         else:raise AssertionError('Unexpected model stage '+str(list(data)))
         requests.append(dict(stage=stage,model=body['model']))

@@ -160,6 +160,9 @@ class OpportunityExpressionStore(SemanticReviewStore):
                 context.pop(field, None)
         if start.event.payload.get('interpreter_method',{}).get('discovery_source_review')=='bounded-group-source-v1':
             context['semantic_source_contract']='bounded-group-source-v1'
+        if start.event.payload.get('interpreter_method',{}).get('reading_assessment'):
+            context['reading_assessment']=interpreter.reading_assessment_context(
+                subject=subject,receipt_event_id=completion,clearance=source.event.sensitivity)
         if start.event.payload.get('feedback_recall') is not None:
             context['literal_feedback_context']=[v.to_prompt() for v in interpreter.feedback_for_start(
                 start,subject=subject,clearance=source.event.sensitivity)]
