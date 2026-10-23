@@ -3,6 +3,34 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## Verify the real main turn; keep bookkeeping out of conversation
+
+2026-10-24 (Asia/Shanghai), Codex. A direct Core context collector pass does not
+show that an actual AIAgent turn preserves its scope/context through request
+assembly. The opt-in probe must use actual run_conversation and observe actual
+request messages, with no supplied share/history/system overlay and no enabled
+tools. Compare decoded sidecar content: raw JSON substring tests mis-handle the
+exact share's escaped newlines. Save original responses for semantic review, not
+just a green wrapper. Scope/grounding and conversational utility are separate.
+
+Keep machine IDs/status/schema separate from what the user should hear. An
+unknown collector reading scope is explicitly unknown, not an empty reading
+range or proof of full-page/video consumption. Relevant limits should be
+explained in ordinary language; do not show the source-record inventory as the
+answer. This is a general boundary of the context contract, not replacement
+rules for a particular answer, topic or word.
+
+Model fallback belongs to Core. A completed turn through the official fallback
+does not qualify the configured primary. A pre_api_request event is not proof
+that a physical HTTP attempt occurred (cooldowns/pools can intervene). Record
+fallback activation and current route without altering production configuration.
+Core get_version_info returns VersionInfo; use its display_version/commit/source,
+not guessed package metadata or a dictionary API. The failed first setup remains
+failed, not a model call or passing probe. Model-only credentials and full traces
+stay in private isolated storage, never Work or the repository; teardown checks
+the real container state before removing the projection. Reports must refuse
+credential disclosure, and the operator audits private artifacts before cleanup.
+
 ## Exact prepared content is not a delivered conversation turn
 
 2026-10-24 (Asia/Shanghai), Codex. The continuity store must capture before IO,

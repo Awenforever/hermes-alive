@@ -136,3 +136,32 @@ and component evidence, not an actual main-model answer, daemon restart,
 compaction, exact older-quote recall, migration, consumer installation, natural
 quality round, ordinary enabled operation or production deployment. Those gates
 remain required; no quality pass or release qualification is granted here.
+
+## 2026-10-24 actual main-agent diagnostic, still not the installed product gate
+
+The opt-in probe uses an actual AIAgent.run_conversation, with Core-owned model
+and fallback resolution, no tools/private chat/context files, empty supplied
+history and no system/share prompt overlay. Actual pre_api_request observations
+must show the exact protected share in the native current-user sidecar and not
+in the system/assistant messages; a foreign thread must not receive it. Keep
+complete original responses for semantic examination, not only the observer's
+structural assertions. Projection/report paths are operator-supplied private
+storage, and this diagnostic cannot silently run in ordinary CI/installation.
+
+Initial operation r5 failed before a main model call because the probe assumed
+a mapping rather than Core's actual VersionInfo object. The original trace is
+preserved. Operation r6 uses the real version object and completes three main
+turns: a clear unquoted question is answered from the exact share, excerpt-only
+reading is acknowledged, and another thread asks for missing context. All three
+activate the configured official fallback; Core labels the main route rate-
+limited. Six main-request hook events do not prove six physical HTTP attempts
+or successful use of the primary. No production/model configuration is changed.
+
+Review also exposes an unwanted internal-field inventory in the reading-limit
+answer. The context contract now marks bookkeeping as non-user-facing and
+represents absent collector scope as unknown. It does not rewrite the model's
+answer, add topic/word-specific rules or misrepresent original reading depth.
+The changed candidate needs its own qualification. This remains an isolated
+synthetic Core fixture, not ordinary live activation, an external send, consumer
+installation, restart/compaction/older-quote qualification or a clean quality
+round. The original full product and ten-round gates remain open.

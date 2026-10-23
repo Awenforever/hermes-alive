@@ -4,6 +4,21 @@ Status: active
 
 Last reviewed: 2026-10-24
 
+Actual main-turn checkpoint (2026-10-24): an explicit isolated probe now calls
+the real Core AIAgent.run_conversation with empty supplied history and observes
+the actual Core API messages. It uses the retained share/native reader, not a
+test-only prompt overlay. Three initial turns answer the synthetic unquoted
+follow-up, admit excerpt-only reading and request context in a foreign thread.
+All three use Core's configured official fallback after the main route is
+classified unavailable/rate-limited; this is not a successful primary-route
+proof. Six pre_api_request events are NOT a physical HTTP-attempt count. Review
+the complete original responses rather than treating structural success as a
+semantic or quality pass. The reading-limit response exposed internal schema
+language: the context contract now distinguishes bookkeeping from conversation
+and explicitly represents unknown collector scope. Its new candidate still needs
+qualification. These are synthetic component-host turns, not ordinary installed
+activation, consumer qualification, a real send or one of the ten quality rounds.
+
 2026-10-24 share/reader implementation: conversation_continuity now captures an
 exact authorized share before standard-adapter IO, under explicit outbound
 retention, with encrypted Core scope, original source references and erasure
@@ -17,7 +32,7 @@ expiry removes grounding availability, not separately consented outward history;
 explicit forgetting, reset, clearance and profile/receiver/thread scope stop
 disclosure. Retention OFF stops new capture without deleting consented history.
 This attachment is NOT ordinary live assembly/onboarding: the new kernel is still
-shadow and legacy production has not been fixed. Natural main-agent responses,
+shadow and legacy production has not been fixed. Full natural main-agent qualification,
 relevance/exact older-quote recall, daemon restart/compaction, installed activation,
 migration, full fleet and ten useful full-chain rounds remain pending. The first
 fresh-PM/Core component focus passes; expanded expiry/erasure tests have a separate
@@ -45,8 +60,8 @@ An Alive share must be naturally discussable in the owning Hermes conversation.
 Encrypted Alive history, inbound observation and transport submission do not
 establish this. The standard adapter now supports explicit protected share and
 grounding capture plus a scoped Core main-turn reader, not ordinary activation.
-Ordinary unquoted follow-up, cited follow-up, durable recovery and
-cross-session isolation therefore remain UNQUALIFIED, not implemented by inference.
+The installed ordinary follow-up/citation/recovery/isolation product gate remains
+UNQUALIFIED; the bounded actual main-turn evidence above is not its substitute.
 This is a release requirement alongside ordinary activation, not a replacement
 for the existing quality, migration and fleet gates. No production change.
 An actual current-Core hook-dispatch/turn-composition experiment now confirms

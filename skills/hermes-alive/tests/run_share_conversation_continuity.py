@@ -24,7 +24,7 @@ from alive_kernel.privacy import LocalIdentityProtector
 from alive_kernel.retention import RetentionDirection
 
 
-async def test(home, mode):
+async def test(home, mode, *, exercise=None):
     home.mkdir()
     (home/'config.yaml').write_text(json.dumps({'plugins': {'entries': {'hermes-alive':
         {'settings': {'kernel_shadow': {'enabled': True}}}}}}), encoding='utf-8')
@@ -125,6 +125,7 @@ async def test(home, mode):
         assert shares[0]['sources'][0]['url'] == 'https://example.invalid/workshop'
         assert 'bicycles, not cars' in shares[0]['sources'][0]['excerpt']
         assert shares[0]['sources'][0]['reading_status'] == 'retained_excerpt'
+        assert shares[0]['sources'][0]['reading_scope'] == {'collector_scope_reported': False}
         original_reads = journal.read(event_type='opportunity.synthesis_started')
         assert len(original_reads) == 1
         assert shares[0]['sources'][0]['excerpt_policy'] == original_reads[0].event.payload.get(
@@ -156,6 +157,10 @@ async def test(home, mode):
             runner.session_store = core.SessionStore(home/'sessions',runner.config)
             bridge.store = reopened
             assert collect() == text
+            if exercise is not None:
+                await exercise(home=home, context=context, runner=runner, router=router,
+                    bridge=bridge, scope=scope, source=source, entry=entry,
+                    exact_share=expressed.text)
             agent._parent_session_id = 'child'
             assert collect() == ''
         finally:
@@ -209,11 +214,12 @@ async def test(home, mode):
         core.reset_hermes_home_override(token)
 
 
-with tempfile.TemporaryDirectory(prefix='alive-share-continuity-') as directory:
-    try:
-        for mode in ('success','false','exception','no-consent','wrong-direction','late-off'):
-            asyncio.run(test(Path(directory)/mode, mode))
-    finally:
-        from hermes_state_registry import close_all_under
-        close_all_under(directory)
-print('HERMES_ALIVE_SHARE_CONVERSATION_CONTINUITY_OK')
+if __name__ == '__main__':
+    with tempfile.TemporaryDirectory(prefix='alive-share-continuity-') as directory:
+        try:
+            for mode in ('success','false','exception','no-consent','wrong-direction','late-off'):
+                asyncio.run(test(Path(directory)/mode, mode))
+        finally:
+            from hermes_state_registry import close_all_under
+            close_all_under(directory)
+    print('HERMES_ALIVE_SHARE_CONVERSATION_CONTINUITY_OK')
