@@ -4,6 +4,33 @@ Status: active
 
 Last reviewed: 2026-10-23
 
+ADR0203 changes the immediate quality investigation after an owner rejected an
+actual complete historical sample that model review had endorsed. Repeating the
+existing review again endorsed it; an isolated contribution/burden rubric noticed
+avoidable inventory and staged source commentary but still endorsed the whole.
+Do not ship that rubric as a demonstrated repair or add stronger judges indefinitely.
+Preserve complete sample/feedback attribution without inventing delivery or a
+permanent topic dislike. Next test audience-calibrated learning and concrete
+selection/authorship on fresh material, with positive controls for detailed
+explanation, useful notices and warranted criticism. Full original samples must
+be shown for owner feedback. This is a quality failure, not another clean round.
+The first synthetic authorship transfer pilot also gives no convincing repair:
+paired example feedback preserves useful cases but can add repetitive paraphrase.
+Evaluative case IDs leak hints, so it is exploratory, not a blinded success.
+Before adding a preview-memory subsystem, inspect the expression host: installed
+Core auxiliary calls inherit routing/auth, not native AIAgent/SOUL assembly. Reuse
+the existing native caller for a scoped synthetic-identity comparison if useful;
+do not import private persona/history, replace production or assume persona alone
+solves substantive interest. Preserve the native caller's different lifetime bound.
+The existing native comparison now completed: auxiliary plain, auxiliary identity
+and actual native synthetic-SOUL authoring made the same broad choices and did not
+demonstrate a compelling expression improvement. Native used the configured fallback
+route, so provider/host effects are confounded. Do not switch implementation on
+that evidence. Next inspect continuity between the reading question, the actual
+knowledge gained and unresolved agenda; an unanswered inquiry is not an obligation
+to publish a thematic article. Preserve possible alternate worthwhile discoveries,
+without making task completion a rigid topic gate or forcing research-log prose.
+
 ADR0202 moves the measured heavy context reads into Core-owned profile threads,
 under the existing native host's pending/settlement lifecycle. Cancellation is
 not physical completion: the actual worker retains the profile lock, including
