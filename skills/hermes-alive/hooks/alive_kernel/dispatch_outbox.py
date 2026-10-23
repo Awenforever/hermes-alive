@@ -1473,7 +1473,7 @@ class DispatchOutbox:
     def _channel_observation_owner(self, execution, current):
         return self._channel_observation_context(execution,current)[0]
 
-    def _channel_observation_context(self, execution, current):
+    def _channel_observation_context(self, execution, current, *, allow_uncertain=False):
         """Shared ownership gate for reports; never infer external effects."""
         lease = execution.lease
         if lease.capability != "hermes.channel.send":
@@ -1485,10 +1485,12 @@ class DispatchOutbox:
                 "SELECT * FROM dispatch_outbox_v3 WHERE dispatch_id=?",
                 (lease.dispatch_id,),
             ).fetchone()
-        if (row is None or row["state"] != "started"
+        if (row is None or row["state"] not in (
+                {"started", "uncertain"} if allow_uncertain else {"started"})
                 or row["started_event_id"] != execution.start_event_id
                 or row["lease_generation"] != lease.generation
-                or row["lease_token_digest"] != self.protector.pseudonym("dispatch_lease", lease.token)
+                or (row["state"] == "started" and
+                    row["lease_token_digest"] != self.protector.pseudonym("dispatch_lease", lease.token))
                 or not self._valid_start_evidence(
                     start, self._authenticated_start_payload(start), attempt,
                     dispatch_id=lease.dispatch_id, attempt_id=lease.attempt_id,
@@ -1498,6 +1500,58 @@ class DispatchOutbox:
                 or current < start.event.observed_at):
             raise DispatchOutboxError("CLI observation does not own an authenticated start")
         return lease,start
+
+    def record_adapter_observation(self, execution, *, result, now=None):
+        """Observe a normal standard-adapter return, never remote delivery.
+
+        No raw error, response body, opaque ID or model guess is persisted.
+        A long send may have crossed lease expiry/recovery: its existing start
+        stays consumed and a same-generation observation can still be recorded.
+        This does not acknowledge that start or authorize any further IO.
+        """
+        current = self._utc(now)
+        lease, start = self._channel_observation_context(execution, current, allow_uncertain=True)
+        start_payload = self._authenticated_start_payload(start)
+        binding = self.host.get_binding(str(start_payload.get('route_binding_id') or ''))
+        if (binding is None or binding.event_id != start_payload.get('route_binding_event_id')
+                or binding.subject != lease.subject or binding.capability != lease.capability
+                or not self.protector.verify_json('host.route.locator.v1',dict(execution.route),
+                                                  binding.route_fingerprint)):
+            raise DispatchOutboxError('adapter observation differs from the authenticated launch route')
+        success = getattr(result, 'success', None)
+        kind = ('success_reported' if success is True else 'error_reported' if success is False
+                else 'unknown') if type(success) is bool else 'unknown'
+        identifier = getattr(result, 'message_id', None)
+        reference = None
+        if (isinstance(identifier, str) and 1 <= len(identifier) <= 512
+                and identifier == identifier.strip()
+                and not any(ord(c) < 32 or ord(c) == 127 or 0xD800 <= ord(c) <= 0xDFFF for c in identifier)):
+            reference = self.protector.authenticate_json('adapter_report.message_ref.v1',
+                {'route': dict(execution.route), 'message_id': identifier})
+        payload = {'dispatch_id': lease.dispatch_id, 'attempt_id': lease.attempt_id,
+            'start_event_id': execution.start_event_id, 'lease_generation': lease.generation,
+            'report_kind': kind, 'normal_return_observed': True,
+            'reported_message_reference': reference,
+            'message_reference_scope': 'adapter_report_not_complete_bubble_inventory',
+            'external_delivery_proven': False, 'complete_inventory_proven': False,
+            'canonical_quote_target_proven': False, 'delivery_authority_granted': False}
+        payload['integrity_authenticator'] = self.protector.authenticate_json('transport.adapter.observation.v1', payload)
+        event_id = execution.start_event_id + ':adapter-observation'
+        existing = self.journal.get(event_id)
+        if existing is not None:
+            if (_thaw_json(existing.event.payload) != payload
+                    or existing.event.event_type != 'transport.adapter.observed'
+                    or existing.event.source != 'alive.dispatch.adapter.observation'
+                    or existing.event.actor != 'system:alive-dispatch'
+                    or existing.event.subject != lease.subject or existing.event.sensitivity != lease.sensitivity
+                    or existing.event.causation_id != execution.start_event_id
+                    or existing.event.observed_at < start.event.observed_at):
+                raise EventConflictError('adapter observation already has different evidence')
+            return existing
+        return self.journal.append(EventEnvelope(event_id=event_id,event_type='transport.adapter.observed',
+            source='alive.dispatch.adapter.observation',actor='system:alive-dispatch',subject=lease.subject,
+            sensitivity=lease.sensitivity,causation_id=execution.start_event_id,
+            observed_at=current,occurred_at=current,payload=payload))
 
     def record_chunk_observation(self, execution, observer, *, now=None):
         """Persist a closed local trace, NOT a delivery result or permission.

@@ -244,3 +244,11 @@ manufactures them from model output or reviews, nor falls back to another body.
         self._validate_prepared_lease(prepared, lease)
         return await execute_published_text_once(DispatchOutbox(self.journal,
             content_vault=self.vault,context_vault=self.context_vault),lease,**host_parameters)
+
+    async def execute_prepared_with_channel(self, prepared, lease, **host_parameters):
+        """Submit once via the host's standard adapter; no delivery inference."""
+        from .standard_channel_execution import execute_standard_text_once
+        from .dispatch_outbox import DispatchOutbox
+        self._validate_prepared_lease(prepared, lease)
+        return await execute_standard_text_once(DispatchOutbox(self.journal,
+            content_vault=self.vault,context_vault=self.context_vault),lease,**host_parameters)

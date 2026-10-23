@@ -3,6 +3,27 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## Sending permission must not require invented delivery proof
+
+2026-10-23 (Asia/Shanghai), Codex; ADR0208 supersedes the execution eligibility
+restriction of ADR0028 only for newly and explicitly authorized v2 channel routes.
+Do not turn an unavailable remote-delivery receipt into an inability to use normal
+Hermes channels, nor label request acceptance as delivery to bypass that restriction.
+The host reports its truthful capability. A new owner grant chooses the required
+evidence level and exact host snapshot; legacy grants retain their strict meaning.
+Old failures, grants, starts and outcomes must never be silently reinterpreted.
+
+The standard execution branch must consume the same single-start outbox and exact
+reviewed body. Resolve the actual receiving bot/profile/thread/workspace through
+the host, never choose a default adapter or reconstruct a second routing policy.
+Keep routing metadata, interim-stream protection and actual renderer provenance;
+never tag the body from a configured current model or host-supplied model hint.
+Normal adapter returns are bounded sanitized observations, not CLI reports,
+complete bubble inventories, remote delivery, human attention or training labels.
+Long sends can return after a local lease expires: preserve the same-generation
+observation without reviving the start. Cancellation/errors/observation failures
+must not resend. No new FIFO, chunk interception, deterministic body or judge.
+
 ## Narrow correction must not restyle unrelated useful expression
 
 2026-10-23 (Asia/Shanghai), Codex; see ADR0206 and the living plan for qualification.

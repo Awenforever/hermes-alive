@@ -4,6 +4,21 @@ Status: active
 
 Last reviewed: 2026-10-23
 
+New closure implementation: [ADR0208](adr/0208-submission-authority-and-standard-channel.md)
+separates permission to submit from proof of delivery. New explicitly authorized
+v2 route bindings can require request acceptance; existing v1 grants still require
+external-delivery evidence. The host's truthful receipt level is never upgraded.
+A standard-channel execution branch now reuses preparation, canonical expression
+provenance, current authority and the existing single-start outbox. It accepts only
+a synchronous host-owned canonical channel resolver, preserves its routing metadata
+and records a sanitized normal-return observation, not a delivered/read outcome.
+It does not import or inspect an installed Enhance plugin, split/retry messages or
+acknowledge a local return as delivery. The preceding focus snapshot passes seven
+managed-Python suites plus twelve actual-current-Core fake-transport cases. The
+final additional immutable-route/report-binding checks still need exact-tree
+qualification and full regression. Ordinary installed assembly, onboarding grants,
+real routing and feedback/migration remain pending; this is not live readiness.
+
 Current closure checkpoint: [ADR0207](adr/0207-current-core-channel-lifecycle.md).
 The owner has now reviewed the exact original unsent video-resource sample:
 honesty alone did not establish enough recommendation credibility or a reason

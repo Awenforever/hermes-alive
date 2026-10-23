@@ -89,6 +89,9 @@ class RouteBinding:
     binding_authenticator: str
     active: bool
     observed_at: datetime
+    # Old bindings keep the original strict contract. Submission-only routes
+    # require a new signed v2 binding and matching explicit user authority.
+    receipt_requirement: ReceiptLevel = ReceiptLevel.EXTERNAL_DELIVERED
 
 
 class HostCapabilityProjection:
@@ -96,6 +99,7 @@ class HostCapabilityProjection:
 
     SNAPSHOT_NAMESPACE = "host.capability.snapshot.v1"
     ROUTE_NAMESPACE = "host.route.binding.v1"
+    ROUTE_V2_NAMESPACE = "host.route.binding.v2"
     REVOKE_NAMESPACE = "host.route.revocation.v1"
 
     def __init__(
@@ -281,12 +285,17 @@ class HostCapabilityProjection:
         route: Mapping[str, object],
         authority_event_id: str,
         observed_at: datetime | None = None,
+        receipt_requirement: ReceiptLevel | None = None,
     ) -> RouteBinding:
         binding_id = self._identity(binding_id, "route binding identity")
         subject = self._identity(subject, "route subject")
         capability = str(capability).strip()
         if capability not in _CAPABILITIES:
             raise HostCapabilityError("unknown route capability")
+        if receipt_requirement is not None and (
+            capability != "hermes.channel.send" or not isinstance(receipt_requirement, ReceiptLevel)
+        ):
+            raise HostCapabilityError("explicit channel receipt requirement is invalid")
         current = self._utc(observed_at)
         snapshot = self._parse_snapshot(self.journal.get(str(snapshot_event_id)))
         latest_snapshot = self.latest_snapshot(as_of=current)
@@ -308,6 +317,11 @@ class HostCapabilityProjection:
             or authority.event.payload.get("authorizes_route_binding_id") != binding_id
         ):
             raise HostCapabilityError("explicit user route authority is unavailable")
+        if receipt_requirement is not None and (
+            authority.event.payload.get("authorizes_receipt_requirement") != receipt_requirement.value
+            or authority.event.payload.get("authorizes_host_snapshot_event_id") != snapshot.event_id
+        ):
+            raise HostCapabilityError("explicit user receipt requirement authority is unavailable")
         route_document = self._route_document(route)
         route_fingerprint = self.protector.authenticate_json(
             "host.route.locator.v1", route_document
@@ -329,8 +343,11 @@ class HostCapabilityProjection:
             "route_reference": reference.to_event_payload(),
             "route_fingerprint": route_fingerprint,
         }
+        if receipt_requirement is not None:
+            binding_document.update(schema_version=2, receipt_requirement=receipt_requirement.value)
         binding_authenticator = self.protector.authenticate_json(
-            self.ROUTE_NAMESPACE, binding_document
+            self.ROUTE_V2_NAMESPACE if receipt_requirement is not None else self.ROUTE_NAMESPACE,
+            binding_document,
         )
         payload = {**binding_document, "binding_authenticator": binding_authenticator}
         event = EventEnvelope(
@@ -356,14 +373,36 @@ class HostCapabilityProjection:
             raise HostCapabilityError("route binding is unavailable")
         payload = _thaw_json(record.event.payload)
         authenticator = str(payload.pop("binding_authenticator", ""))
+        version = payload.get("schema_version")
         if (
-            payload.get("schema_version") != 1
-            or not self.protector.verify_json(self.ROUTE_NAMESPACE, payload, authenticator)
+            type(version) is not int or version not in (1, 2)
+            or (version == 1 and "receipt_requirement" in payload)
+            or not self.protector.verify_json(
+                self.ROUTE_NAMESPACE if version == 1 else self.ROUTE_V2_NAMESPACE, payload, authenticator)
         ):
             raise HostCapabilityError("route binding is unauthenticated")
         binding_id = self._identity(payload.get("binding_id"), "route binding identity")
         subject = self._identity(payload.get("subject"), "route subject")
         capability = str(payload.get("capability") or "")
+        try:
+            requirement = (ReceiptLevel.EXTERNAL_DELIVERED if version == 1
+                           else ReceiptLevel(payload.get("receipt_requirement")))
+        except (ValueError, TypeError) as exc:
+            raise HostCapabilityError("route receipt requirement is invalid") from exc
+        if version == 2:
+            authority = self.journal.get(str(payload.get("authority_event_id") or ""))
+            if (capability != "hermes.channel.send" or authority is None
+                or authority.sequence >= record.sequence
+                or authority.event.event_type != "conversation.inbound"
+                or authority.event.actor != subject or authority.event.subject != subject
+                or authority.event.observed_at > record.event.observed_at
+                or (authority.event.expires_at is not None
+                    and authority.event.expires_at <= record.event.observed_at)
+                or authority.event.payload.get("authorizes_route_binding_id") != binding_id
+                or authority.event.payload.get("authorizes_receipt_requirement") != requirement.value
+                or authority.event.payload.get("authorizes_host_snapshot_event_id") != payload.get("snapshot_event_id")
+                or record.event.causation_id != authority.event.event_id):
+                raise HostCapabilityError("route receipt requirement lacks exact user authority")
         reference = ContentReference.from_event_payload(payload.get("route_reference"))
         fingerprint = str(payload.get("route_fingerprint") or "")
         if (
@@ -386,6 +425,7 @@ class HostCapabilityProjection:
             authenticator,
             active,
             record.event.observed_at,
+            requirement,
         )
 
     def _valid_revocation(
@@ -458,7 +498,12 @@ class HostCapabilityProjection:
         capability: str,
         as_of: datetime | None = None,
     ) -> tuple[RouteBinding | None, tuple[str, ...]]:
-        """Return a binding only when the current public host API proves delivery."""
+        """Require the exact user-selected evidence contract, never invent delivery.
+
+        Legacy bindings still require external delivery evidence. An explicitly
+        authorized v2 submission-only route permits a send attempt, not a claim
+        that the remote party received it or a retry of an uncertain action.
+        """
 
         reasons: list[str] = []
         binding = self.get_binding(binding_id)
@@ -481,8 +526,13 @@ class HostCapabilityProjection:
                 reasons.append("host_capability_unavailable")
             elif not claim.public_api:
                 reasons.append("host_capability_private_api")
-            elif claim.receipt_level is not ReceiptLevel.EXTERNAL_DELIVERED:
-                reasons.append("host_terminal_receipt_unavailable")
+            else:
+                levels = (ReceiptLevel.REQUEST_ACCEPTED, ReceiptLevel.TURN_COMPLETED,
+                          ReceiptLevel.EXTERNAL_DELIVERED)
+                if levels.index(claim.receipt_level) < levels.index(binding.receipt_requirement):
+                    reasons.append("host_terminal_receipt_unavailable" if
+                        binding.receipt_requirement is ReceiptLevel.EXTERNAL_DELIVERED else
+                        "host_receipt_requirement_unsatisfied")
         try:
             route = self.vault.resolve_json(
                 binding.route_reference.content_id,

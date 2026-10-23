@@ -39,8 +39,9 @@ class AutonomousCycleRuntime:
             execute=False,authorization_parameters=None,send_parameters=None,worker_id=None,
             reconciliation_cursor=0,binding_limit=16,receipt_limit=128,
             reconsider_after_seconds=None,cognition_configuration_id=None,
-            interpret_feedback=False,feedback_model=None):
+            interpret_feedback=False,feedback_model=None,channel_execution='publisher'):
         if (type(execute) is not bool or type(interpret_feedback) is not bool
+                or channel_execution not in ('publisher','standard')
                 or (feedback_model is not None and (not interpret_feedback or not isinstance(feedback_model,str)
                     or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}',feedback_model)))
                 or not isinstance(expression_parameters,dict)
@@ -124,5 +125,7 @@ class AutonomousCycleRuntime:
             attempt_id=prepared.attempt_event_id.removeprefix('action.attempt:'))
         if lease is None:
             return AutonomousCycleResult('attempt_unavailable',reconciliation,prepared=prepared)
-        submission = await self.preparation.execute_prepared_with_publisher(prepared,lease,**send_parameters)
+        submit = (self.preparation.execute_prepared_with_channel if channel_execution == 'standard'
+                  else self.preparation.execute_prepared_with_publisher)
+        submission = await submit(prepared,lease,**send_parameters)
         return AutonomousCycleResult('submitted',reconciliation,prepared=prepared,submission=submission)
