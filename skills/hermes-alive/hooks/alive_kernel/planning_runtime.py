@@ -208,6 +208,8 @@ watcher and not a complete production loop. It creates no channel queues.
             binding['recipient_meaning'] = 'recipient-meaning-v1'
         if record_reading_assessment:
             from .reading_assessment import METHOD
+            # Stable capability activation, not the synthesis output format.
+            # The latter is frozen independently in the original synthesis start.
             binding['reading_assessment']=METHOD
         if semantic_feedback_recall:
             from .feedback_recall import FeedbackRecallSelector

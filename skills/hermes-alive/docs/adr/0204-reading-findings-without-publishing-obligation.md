@@ -1,6 +1,6 @@
 # ADR0204 — Reading findings without a publishing obligation
 
-Status: controlled-qualified; real literal-anchor defect remains open
+Status: reference successor implemented; final qualification pending
 
 ## Gap
 
@@ -86,6 +86,36 @@ whitespace or synonym repair rules, fuzzy quote substitution, or another model
 judge. Preserve the literal v1 contract for historical records rather than silently
 rescuing an originally rejected note or spending inference again. Qualification of
 that successor and a new real representative are still required.
+
+## Host-owned references (v2)
+
+New synthesis starts record inquiry-reading-assessment-v2. Research excerpts in
+that new prompt use summary_passages instead of duplicating a plain excerpt:
+stable source-scoped p1/p2/... IDs and exact text windows, each at most560
+characters with80-character overlap. These are excerpt windows, not PDF page
+numbers or independent confirmations. The method freezes these sizes/ordering;
+later changes require another concrete method, not reinterpretation of v2.
+
+The model returns observation_event_id, passage_id and interpretation, not a
+copied quotation. The host resolves the selected current admitted passage and
+stores its unchanged original text in the existing quote field. Validation
+reconstructs it from the bound source and rejects altered text, unknown refs or
+foreign observations. No dehyphenation, whitespace equivalence, fuzzy substitution
+or extra model judge. An unsupported note remains unassessed as before, not a
+communication-wide failure.
+
+Literal v1 normalizer/validation remains unchanged. The original synthesis start
+and bundle must agree on concrete method. Outer planning/cycle activation retains
+its existing capability contract; that activation is not the result text format.
+Already-started historical cycles are not retroactively opted in or re-inferred.
+An actual old real-test profile reopens the v1 rejected result identically under
+the successor, with zero new inference/events. Broader exact-tree proof is pending.
+
+Understanding the authorized initial pages is now independent of permission for
+extra cited reads. The automatic host may retain those initial read receipts and
+notes even when follow_citations is off; it does not enable a follow-up call or
+widen the owner-approved search/URL scope. Existing old-cycle mode fences remain.
+Tests must cover that distinction as well as normal follow-up, recovery and erasure.
 
 This is a persistent interpretation result under the existing completion, not yet
 cross-cycle inquiry retrieval or automatic pursuit of unresolved questions. It does

@@ -64,6 +64,7 @@ async def main():
         registry.register(name=name,toolset='web',schema=dict(name=name,description='Synthetic controlled source',parameters=dict(type='object')),
             handler=source_handler(name),override=True,scope=str(home))
     def http_response(request):
+        def excerpt(e):return e.get('summary_excerpt') or ''.join(p['text'] for p in e.get('summary_passages',[]))
         if not request.url.path.endswith('/chat/completions'):
             return httpx.Response(503,request=request,json={'error':{'message':'synthetic metadata unavailable'}})
         assert request.url.host=='provider.invalid'
@@ -84,15 +85,15 @@ async def main():
                 value_hypothesis='A possible interesting conservation discovery, not an owner request.')
         elif 'opportunities' in data:
             stage='generate';assert data['tentative_discovery_tasks']
-            assert any('PRIMARY_READ_EVIDENCE' in e['summary_excerpt'] for e in data['opportunities'])
-            e=next(e for e in data['opportunities'] if 'DEEP_READ_EVIDENCE' in e['summary_excerpt'])
+            assert any('PRIMARY_READ_EVIDENCE' in excerpt(e) for e in data['opportunities'])
+            e=next(e for e in data['opportunities'] if 'DEEP_READ_EVIDENCE' in excerpt(e))
             value=dict(candidates=[dict(agenda_item_id=e['agenda_item_id'],kind='share',topic='conservation',
                 communication_plan=dict(version=3,recipient_goal='INTERNAL_GOAL',speech_act='share',contents=[],behavior_constraints=[]),
                 dimensions={n:dict(value=.1 if n in ('risk','urgency','interruption_cost') else .9,reason='Synthetic judgment')
                     for n in ('user_value','urgency','novelty','confidence','risk','interruption_cost')})])
             assert 'reading_assessments' in body['messages'][0]['content']
             value['reading_assessments']=[dict(item_id=data['tentative_discovery_tasks'][0]['item_id'],status='partial',
-                findings=[dict(observation_event_id=e['observation_event_id'],quote='DEEP_READ_EVIDENCE',
+                findings=[dict(observation_event_id=e['observation_event_id'],passage_id=e['summary_passages'][0]['passage_id'],
                     interpretation='The notice reports observation, not independent validation.')],
                 open_questions=['What independently verifies this method?'])]
         elif 'expression_binding' in data:

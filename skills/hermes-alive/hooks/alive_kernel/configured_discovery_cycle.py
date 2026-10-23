@@ -249,7 +249,9 @@ class ConfiguredDiscoveryCycle:
             return expected
         current()
         research_enabled=self.follow_citations and self._research_enabled(cycle)
-        group_enabled=research_enabled and self._bundle_enabled(cycle)
+        # Understanding an already authorized initial read does not grant or
+        # require permission for additional cited-URL network reads.
+        group_enabled=(research_enabled or self.record_reading_assessment) and self._bundle_enabled(cycle)
         assessment_enabled=self.record_reading_assessment and group_enabled and self._cycle_mode(cycle,
             prefix='discovery.reading-assessment:',kind='discovery.reading_assessment_opened',
             payload=dict(method='inquiry-reading-assessment-v1',authority_granted=False))

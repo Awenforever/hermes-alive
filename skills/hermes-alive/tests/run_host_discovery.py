@@ -135,10 +135,25 @@ async def exercise(root):
     else: raise AssertionError('uncertain storage operation reused')
     for event in ('action.attempted','dispatch.externally_started','preference.observed'):
         assert not journal.read(event_type=event)
+    # Identity equivalence is not fetch authority. A tool must still return the
+    # exact requested URL, even when the two spellings canonicalize identically.
+    transport_url='https://EXAMPLE.invalid:443/Original?utm_source=fixture#section'
+    normalized_url='https://example.invalid/Original'
+    async def substituted_extract(urls,*,char_limit):
+        assert urls==[transport_url]
+        return json.dumps(dict(results=[dict(title='Synthetic source',url=normalized_url,
+            content='A substituted response must not be admitted.')]))
+    exact_host=HostDiscoveryReader(ingestor,subject='user:test',search=search,
+        extract=substituted_extract,allow_url=allow_synthetic_url,is_current=lambda:True)
+    substituted=await exact_host.collect(operation_id='substituted-transport',read_urls=(transport_url,))
+    assert substituted.failures==1 and not substituted.observation_ids
     for path in root.glob('experience.sqlite3*'):
         data=path.read_bytes()
         assert b'PRIVATE_QUERY' not in data and b'PRIVATE_PAGE_FACT' not in data
         assert b'PRIVATE_PROVIDER_SECRET' not in data and b'PRIVATE_STORAGE_FAILURE' not in data
+
+async def allow_synthetic_url(url):
+    return True  # Synthetic capability; the test above targets exact response binding.
 
 with tempfile.TemporaryDirectory(prefix='alive-host-discovery-') as folder:
     previous={key:os.environ.get(key) for key in ('HERMES_HOME','HERMES_ALIVE_SHARED_DIR')}

@@ -4,6 +4,30 @@ Status: active
 
 Last reviewed: 2026-10-23
 
+Governance reconciliation (2026-10-23, Asia/Shanghai): follow the operator's
+current shared directory/document/development contracts and real test fleet.
+The product-specific closure is [RELEASE_ACCEPTANCE.md](RELEASE_ACCEPTANCE.md).
+Existing container/pinned-Core proofs are component evidence, not fresh native
+Linux/Windows/WSL2 or public distribution acceptance. Add real lifecycle and
+migration/rollback evidence; WSL2 uses thin environment smoke, not duplicated Linux
+regression. Ubuntu and Windows CI are both mandatory; the current workflow only
+has Ubuntu. Quality streak remains zero. First finish the useful installed slice;
+do not expand an unbounded infrastructure project or publish the shadow kernel.
+Current reference-v2 focused/replay tests have completed, but the fresh real trial
+failed before authorship on canonical-versus-transport URL identity. The pending
+resource-identity change is unqualified. Eighty retained CI logs without a saved
+final exit status do not constitute recovered terminal CI success. Preserve these
+failures and qualify the next exact committed candidate under the new closure.
+
+The ADR0204 reference successor is now implemented: the host exposes numbered,
+bounded exact source windows, and fills the original quotation after the model
+selects a passage. No typography repair or fuzzy matching. The old v1 result stays
+unknown on an actual historical replay with zero model calls/events. Preliminary
+reference integration passes; final qualification, no-followup coverage and a new
+real representative remain pending. Internal understanding is decoupled from
+permission for additional cited network reads. This is not a style-quality fix,
+cross-cycle inquiry continuation or completed production acceptance.
+
 ADR0204 adds a bounded advisory reading assessment to the existing candidate call
 for newly opted-in research cycles. It distinguishes partial/unresolved/claimed
 answered findings with exact admitted passages; quotes do not prove interpretation.

@@ -3,6 +3,20 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## Real distribution closure, not a private repaired installation
+
+Reviewed 2026-10-23 (Asia/Shanghai), Codex. Follow
+[RELEASE_ACCEPTANCE.md](RELEASE_ACCEPTANCE.md) and the deployment's current shared
+multi-platform/governance contracts. Consumer install/upgrade must use a remote
+committed artifact and Hermes' managed dependency flow without hand-editing the
+installed tree. Native Windows needs actual Windows Hermes execution without
+Bash; WSL2 needs real thin environment smoke, not another full Linux regression.
+Keep component, lifecycle, semantic quality, physical delivery and production
+evidence separate. Record terminal status durably before a tool session expires.
+One accepted owner sample or an automatic model review cannot close the ten-round
+quality gate. Shared status is coordination evidence, not a production lock or
+reusable authorization; historical handoffs are superseded, not rewritten.
+
 ## Withdrawal must invalidate derived receipts
 
 A once-valid semantic review cannot survive the owner's withdrawal of its

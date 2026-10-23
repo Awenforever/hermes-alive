@@ -6,6 +6,8 @@ read receipts; original content remains in the existing encrypted source vault.
 from .content_vault import ContentReference
 from .events import Sensitivity
 from .host_discovery import HostDiscoveryError, read_scope_metadata
+from .discovery_opportunities import canonicalize_discovery_url
+from urllib.parse import urlsplit
 
 
 RESEARCH_SOURCE_BUDGET = 64000  # <=4 retained8192-char reads plus bounded context/background.
@@ -65,9 +67,22 @@ def resolve_research_reads(reader, *, subject, clearance, receipt_ids, inquiries
             limit=32,observation_event_ids=ids) if ids else ()
         if tuple(e.observation_event_id for e in evidence)!=ids:
             raise HostDiscoveryError('part of the research evidence was withdrawn or erased')
+        try:
+            requested_identities=set()
+            for original_url in request['read_urls']:
+                identity=canonicalize_discovery_url(original_url)
+                parts=urlsplit(original_url)
+                if parts.username is not None or parts.password is not None:
+                    raise ValueError('credentialed URL is not an original public read')
+                requested_identities.add(identity)
+        except (TypeError,ValueError):
+            raise HostDiscoveryError('research read request has invalid resource identity') from None
         for item in evidence:
             if (read_scope_metadata(item.content).get('reported_read_scope')!='webpage_extract'
-                    or item.content['url'] not in request['read_urls']
+                    # Observations store canonical identities. Transport/citation
+                    # authorization still uses exact original URLs in HostReader;
+                    # never use this identity comparison to permit another fetch.
+                    or item.content['url'] not in requested_identities
                     or journal.get(item.observation_event_id).sequence>=done.sequence):
                 raise HostDiscoveryError('research read has no matching original page evidence')
             if item.observation_event_id not in observations:observations.append(item.observation_event_id)

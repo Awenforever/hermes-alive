@@ -1,5 +1,13 @@
 # Testing and Acceptance
 
+Reviewed 2026-10-23 (Asia/Shanghai), Codex: historical results below retain their
+original date and scope; they do not qualify the current experimental kernel.
+The current ordered release gates and real-platform lifecycle requirements are
+in [RELEASE_ACCEPTANCE.md](RELEASE_ACCEPTANCE.md). A container fixture, simulated
+Windows branch, loaded hook or model-endorsed draft is not native-platform,
+consumer-installation, delivery or human usefulness acceptance. Missing gates
+remain pending, including the ten consecutive fresh complete quality rounds.
+
 ## Regression suites
 
 From the skill root:

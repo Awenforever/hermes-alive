@@ -918,7 +918,9 @@ class OpportunitySynthesizer:
                 raise OpportunitySynthesisError("opportunity bundle digest mismatch")
             self._validate_recipient_execution(start, bundle)
             if start.event.payload.get('interpreter_method',{}).get('reading_assessment'):
-                reading_assessment.validate(bundle['reading_assessment'],inquiries=inquiries,
+                validator=(reading_assessment.validate_references if start.event.payload['interpreter_method']['reading_assessment']
+                    ==reading_assessment.REFERENCE_METHOD else reading_assessment.validate)
+                validator(bundle['reading_assessment'],inquiries=inquiries,
                     excerpts={e.observation_event_id:source_prompt_excerpt(e.content,policy=SOURCE_EXCERPT_POLICY)
                               for e in focus})
                 if (receipt.event.payload.get('reading_unassessed_count')!=len(bundle['reading_assessment']['unassessed_item_ids'])
@@ -992,7 +994,7 @@ class OpportunitySynthesizer:
         questions={i['item_id']:i['question'] for i in self.inquiries.read(subject=subject,clearance=clearance,
             item_ids=tuple(start.event.payload['discovery_inquiry_item_ids']))}
         assessment=bundle['reading_assessment']
-        return dict(method=reading_assessment.METHOD,completion_event_id=receipt_event_id,
+        return dict(method=start.event.payload['interpreter_method']['reading_assessment'],completion_event_id=receipt_event_id,
             actual_model=receipt.event.payload['actual_model'],
             entries=[{**row,'question':questions[row['item_id']]} for row in assessment['entries']],
             unassessed_questions=[dict(item_id=i,question=questions[i]) for i in assessment['unassessed_item_ids']],
@@ -1009,7 +1011,7 @@ class OpportunitySynthesizer:
         authoring = method.get('discovery_authoring')
         source_review=method.get('discovery_source_review')
         assessment=method.get('reading_assessment')
-        if (assessment not in (None,reading_assessment.METHOD)
+        if (assessment not in (None,*reading_assessment.METHODS)
                 or assessment is not None and (authoring!='source-led-v3'
                     or bundle.get('reading_assessment_method')!=assessment)
                 or assessment is None and ('reading_assessment' in bundle or 'reading_assessment_method' in bundle)):
@@ -1093,7 +1095,7 @@ class OpportunitySynthesizer:
             raise OpportunitySynthesisError('structural recovery output contract mismatch')
         evidence=self.reader.active_evidence(subject=subject,clearance=clearance,limit=32,
             observation_event_ids=tuple(start.event.payload['observation_event_ids']))
-        if method.get('reading_assessment')==reading_assessment.METHOD and isinstance(document,dict):
+        if method.get('reading_assessment') in reading_assessment.METHODS and isinstance(document,dict):
             document={k:v for k,v in document.items() if k!='reading_assessments'}
         findings=self._structure_findings_v1(document,evidence,'recovery-proof',receipt.event.event_id,
             ActionAuthority(start.event.payload['host_authority']),
@@ -1184,6 +1186,7 @@ class OpportunitySynthesizer:
             raise OpportunitySynthesisError('current context leaves no source recall budget')
         evidence=[]
         for item in pool:
+            source_excerpt=source_prompt_excerpt(item.content,policy=SOURCE_EXCERPT_POLICY)
             prompt_data['opportunities'].append({
             "agenda_item_id": item.agenda_item_id,
             "observation_event_id": item.observation_event_id,
@@ -1191,8 +1194,10 @@ class OpportunitySynthesizer:
             "origin_kind":item.content.get('origin_kind','discovery'),
             **({'communication_situation':communication_situation(item.content.get('origin_kind','discovery'))}
                if recipient_meaning else {}),
-            "url": item.content["url"], "summary_excerpt": source_prompt_excerpt(
-                item.content, policy=SOURCE_EXCERPT_POLICY),
+            "url": item.content["url"],
+            **({'summary_passages':reading_assessment.passages(source_excerpt)}
+               if assess_reading and item.observation_event_id in {e.observation_event_id for e in focus}
+               else {'summary_excerpt':source_excerpt}),
             "published_at": item.content.get("published_at"),
             "summary_may_be_truncated": len(item.content["summary"]) > len(source_prompt_excerpt(
                 item.content, policy=SOURCE_EXCERPT_POLICY)),
@@ -1229,14 +1234,14 @@ class OpportunitySynthesizer:
                 'against the supplied evidence: pursue, revise or abandon the angle as warranted. '
                 'They grant no search, disclosure, commitment or sending authority and impose no '
                 'must-mention inventory on a recipient message.')
-        if assess_reading:system_prompt+='\n'+reading_assessment.GUIDANCE
+        if assess_reading:system_prompt+='\n'+reading_assessment.REFERENCE_GUIDANCE
         method = dict(protocol='recipient-plan-v3' if recipient_meaning else 'legacy-draft-v1',
             recipient_execution='expression-required-v1' if recipient_meaning else None,
             recipient_output='intent-only-v1' if recipient_meaning else None,
             editorial_context='origin-purpose-v1' if recipient_meaning else None,
             discovery_authoring=('source-led-v3' if focus else _DISCOVERY_AUTHORING) if recipient_meaning else None,
             **({'discovery_source_review':_GROUP_SOURCE_REVIEW} if focus else {}),
-            **({'reading_assessment':reading_assessment.METHOD} if assess_reading else {}),
+            **({'reading_assessment':reading_assessment.REFERENCE_METHOD} if assess_reading else {}),
             kind='model_prompt' if evidence else 'system_no_material',
             system_prompt_sha256=hashlib.sha256(system_prompt.encode()).hexdigest() if evidence else None,
             requested_model=requested_model if evidence else None,
@@ -1371,7 +1376,7 @@ class OpportunitySynthesizer:
                 await context_value(read_context,validate_current)
                 model='system/alive-no-current-material'
                 document={'candidates':[],'abstentions':[],'reconsiderations':[]}
-            assessment=(reading_assessment.normalize(assessment_raw,inquiries=inquiries,
+            assessment=(reading_assessment.normalize_references(assessment_raw,inquiries=inquiries,
                 excerpts={e.observation_event_id:source_prompt_excerpt(e.content,policy=SOURCE_EXCERPT_POLICY)
                           for e in evidence if e.observation_event_id in {f.observation_event_id for f in focus}})
                 if assess_reading else None)
@@ -1394,7 +1399,7 @@ class OpportunitySynthesizer:
                  "editorial_context":method['editorial_context'],
                  "discovery_authoring":method['discovery_authoring'],
                  **({'discovery_source_review':method['discovery_source_review']} if focus else {}),
-                 **({'reading_assessment_method':reading_assessment.METHOD,
+                 **({'reading_assessment_method':reading_assessment.REFERENCE_METHOD,
                      'reading_assessment':assessment} if assess_reading else {}),
                  "source_presentation": self._SOURCE_PRESENTATION,
                  "reconsiderations":[{'agenda_item_id':r.agenda_item_id,'after_seconds':r.after_seconds,

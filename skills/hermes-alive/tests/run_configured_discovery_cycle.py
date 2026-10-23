@@ -1,5 +1,6 @@
 """Bound discovery -> actual kernel expression/recovery; synthetic IO/models only."""
 import asyncio
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 import json
 import os
@@ -75,8 +76,8 @@ for context,expected in ((dict(method='discovery-source-authoring-v3'),'semantic
     assert ('source_context' in original)==(expected=='semantic-source-findings-v1')
 
 
-async def exercise(root,mode):
-    pressure=mode in ('budget-pressure','fair-budget-pressure')
+async def exercise(root,mode,*,primary_url=None):
+    pressure=mode in ('budget-pressure','fair-budget-pressure','reading-assessment-budget-pressure')
     journal=ExperienceJournal(root/'journal.sqlite3')
     vault=ContentVault(root/'vault',backup_root=root/'backups')
     ingestor=DiscoveryOpportunityIngestor(journal,content_vault=vault)
@@ -108,7 +109,7 @@ async def exercise(root,mode):
     state={'consent':True,'interrupt':mode in ('replay','legacy-replay','historical-followup-replay')}
     tools=[];models=[];unload=[];release=threading.Event();entered=threading.Event()
     url='https://example.invalid/conservation'
-    primary='https://example.invalid/original-observations'
+    primary=primary_url or 'https://example.invalid/original-observations'
     backgrounds=(url+'/context-1',url+'/context-2')
     def dispatch(name,args):
         assert journal.read(event_type='autonomous.host.opened'),'read happened before durable cycle binding'
@@ -137,7 +138,9 @@ async def exercise(root,mode):
     def consent():
         if not state['consent']:raise HostDiscoveryError('synthetic disclosure consent withdrawn')
     def preparation():return ConfiguredDiscoveryCycle(ctx,ingestor,subject='user:test',
-        approved_queries=('public museum methods',),validate_consent=consent,follow_citations=mode!='unconsented-followup')
+        approved_queries=('public museum methods',),validate_consent=consent,
+        follow_citations=mode not in ('unconsented-followup','reading-assessment-no-followup'),
+        record_reading_assessment=mode.startswith('reading-assessment'))
     class Runtime(AutonomousCycleRuntime):
         async def cycle(self,**kw):
             if mode=='budget-pressure' and os.getenv('ALIVE_REPRODUCE_OLD_RECALL')=='1':
@@ -194,7 +197,8 @@ async def exercise(root,mode):
                 value=dict(read_targets=[target] if 'followup' in mode or pressure or mode in ('primary-read','replay','erase-group-after-final') else [],
                     reason='Read the cited original protocol, or stop when current scope is adequate.')
             elif task=='alive_opportunity_candidates':
-                sources=data['opportunities']
+                sources=[{**e,'summary_excerpt':e.get('summary_excerpt') or ''.join(p['text'] for p in e.get('summary_passages',[]))}
+                         for e in data['opportunities']]
                 if mode=='abstain':value=dict(candidates=[],abstentions=[dict(agenda_item_id=e['agenda_item_id'],reason='No worthwhile contribution.') for e in sources])
                 else:
                     assert data['tentative_discovery_tasks']
@@ -214,10 +218,11 @@ async def exercise(root,mode):
                         assert 'reading_assessments' in kw['messages'][0]['content']
                         value['reading_assessments']=[dict(item_id=data['tentative_discovery_tasks'][0]['item_id'],
                             status='partial',findings=[dict(observation_event_id=e['observation_event_id'],
-                                quote='DEEP_READ_EVIDENCE',interpretation='The extract describes observations, not independent validation.')],
+                                passage_id=e['summary_passages'][0]['passage_id'],
+                                interpretation='The extract describes observations, not independent validation.')],
                             open_questions=['What independent evidence tests the claimed improvement?'])]
                         if mode=='reading-assessment-invalid':
-                            value['reading_assessments'][0]['findings'][0]['quote']='NOT_PRESENT_IN_THE_ORIGINAL_READ'
+                            value['reading_assessments'][0]['findings'][0]['passage_id']='NOT_AN_ADMITTED_PASSAGE'
                         if mode=='reading-assessment-missing':value.pop('reading_assessments')
                         if mode=='reading-assessment-recovery' and models.count('alive_opportunity_candidates')==1:
                             value['candidates']=[{}]
@@ -261,7 +266,7 @@ async def exercise(root,mode):
         caller_factory=lambda *,cycle,read_binding:Caller(cycle,read_binding),preparation=prep or preparation())
     parameters=dict(expression_parameters=dict(recipient_meaning=True,grounding=True,
         require_independent_grounding=False,model_timeout_seconds=30),resolve_binding=lambda _:None)
-    if mode.startswith('reading-assessment'):parameters['expression_parameters']['record_reading_assessment']=True
+    baseline_memory_proposals=len(journal.read(event_type='memory.proposed'))
     async def allow(self,target):return target in (url,primary,*backgrounds)
     original_tools=CoreDiscoveryTools
     def bounded_tools(*args,**kw):return original_tools(*args,**kw,timeout_seconds=.03 if mode=='uncertain-read' else 2)
@@ -314,7 +319,7 @@ async def exercise(root,mode):
                 assert url in result.expression.text
                 assert len(tools)==(3 if pressure or mode in ('primary-read','replay','followup-failed','private-followup','erase-group-after-final','historical-followup-replay') else 2)
                 assert models.count('alive_discovery_reading')==1
-                assert models.count('alive_discovery_followup')==(0 if mode in ('page-failed','legacy-replay','unconsented-followup') else 1)
+                assert models.count('alive_discovery_followup')==(0 if mode in ('page-failed','legacy-replay','unconsented-followup','reading-assessment-no-followup') else 1)
                 assert models.count('alive_source_support')==1
                 if mode.startswith('reading-assessment'):
                     synth=runtime.preparation.expression.planning.synth
@@ -326,7 +331,7 @@ async def exercise(root,mode):
                     if mode in ('reading-assessment-invalid','reading-assessment-missing'):
                         assert not retained['entries'] and len(retained['unassessed_item_ids'])==1
                     else:assert retained['entries'][0]['status']=='partial'
-                    assert not journal.read(event_type='memory.proposed')
+                    assert len(journal.read(event_type='memory.proposed'))==baseline_memory_proposals
                     try:synth.reading_assessment_context(subject='user:foreign',
                         receipt_event_id=done.event.event_id,clearance=Sensitivity.PRIVATE)
                     except ValueError:pass
@@ -354,6 +359,25 @@ async def exercise(root,mode):
                     assert len(resolve_research_reads(ingestor,subject='user:test',clearance=Sensitivity.PRIVATE,
                         receipt_ids=receipt_ids,inquiries=inquiries))==2
                     original_active=ingestor.active_evidence;resolutions=[0]
+                    if primary_url is not None:
+                        # Fetch/citation retain the exact spelling; stored source
+                        # identity normalizes only the shared URL identity rules.
+                        assert ('web_extract',dict(urls=[primary],char_limit=6000)) in tools
+                        canonical='https://example.invalid/Original-Observations?version=2'
+                        retained=resolve_research_reads(ingestor,subject='user:test',clearance=Sensitivity.PRIVATE,
+                            receipt_ids=receipt_ids,inquiries=inquiries)
+                        assert canonical in {e.content['url'] for e in retained}
+                        for other_url in (canonical.replace('Original','original'),
+                                          canonical.replace('version=2','version=3'),
+                                          canonical.replace('example.invalid','foreign.invalid')):
+                            def changed_resource(**kw):
+                                return tuple(replace(e,content={**e.content,'url':other_url})
+                                    if e.content['url']==canonical else e for e in original_active(**kw))
+                            with patch.object(ingestor,'active_evidence',side_effect=changed_resource):
+                                try:resolve_research_reads(ingestor,subject='user:test',clearance=Sensitivity.PRIVATE,
+                                    receipt_ids=receipt_ids,inquiries=inquiries)
+                                except HostDiscoveryError:pass
+                                else:raise AssertionError('different path/query/host admitted as the read resource')
                     def withdraw_during_resolution(**kw):
                         result=original_active(**kw);resolutions[0]+=1
                         return result[:-1] if resolutions[0]==3 else result
@@ -394,11 +418,16 @@ async def exercise(root,mode):
 
 with tempfile.TemporaryDirectory(prefix='alive-configured-discovery-') as folder:
     modes=('budget-pressure',) if os.getenv('ALIVE_REPRODUCE_OLD_RECALL')=='1' else (
-                 'share','reading-assessment','reading-assessment-invalid','reading-assessment-missing','reading-assessment-recovery','primary-read','private-followup','budget-pressure','fair-budget-pressure','erase-group-after-final','followup-failed','replay','legacy-replay','historical-followup-replay','unconsented-followup','page-failed','abstain','paused',
+                 'share','reading-assessment','reading-assessment-no-followup','reading-assessment-budget-pressure','reading-assessment-invalid','reading-assessment-missing','reading-assessment-recovery','primary-read','private-followup','budget-pressure','fair-budget-pressure','erase-group-after-final','followup-failed','replay','legacy-replay','historical-followup-replay','unconsented-followup','page-failed','abstain','paused',
                  'invalid-choice','revoked-choice','forgotten-choice','erased-choice','uncertain-read',
                  'invented-followup','foreign-followup','revoked-followup','forgotten-followup','erased-followup','interrupted-followup')
     for mode in modes:
         root=Path(folder)/mode;root.mkdir()
         with patch.dict(os.environ,HERMES_HOME=str(root),HERMES_ALIVE_SHARED_DIR=str(root/'runtime')):
             asyncio.run(exercise(root,mode))
+    if os.getenv('ALIVE_REPRODUCE_OLD_RECALL')!='1':
+        root=Path(folder)/'canonical-resource-identity';root.mkdir()
+        with patch.dict(os.environ,HERMES_HOME=str(root),HERMES_ALIVE_SHARED_DIR=str(root/'runtime')):
+            asyncio.run(exercise(root,'primary-read',primary_url=
+                'https://EXAMPLE.invalid:443/Original-Observations?utm_source=fixture&version=2#section'))
 print('HERMES_ALIVE_CONFIGURED_DISCOVERY_CYCLE_OK')
