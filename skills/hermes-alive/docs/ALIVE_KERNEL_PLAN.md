@@ -4,6 +4,19 @@ Status: active
 
 Last reviewed: 2026-10-23
 
+ADR0205 addresses a second actual early-chain failure: a model omitted a PDF's
+sentence period from a cited project URL, so the old copying/lexical contract
+aborted all optional reading and initial understanding. New operations expose
+host-owned exact source citation IDs; the model selects IDs, never rewrites URLs.
+Invalid optional candidates are counted locally; valid siblings and initial reads
+survive. Unusable JSON is an explicit invalid optional decision, not abstention or
+a model fallback. Authority changes, physical uncertainty and provider failures
+still fail. Old pre-search modes/failed decisions are not reinterpreted. This
+implementation remains unqualified until tests and a fresh installed real cycle
+prove actual findings reach expression. No punctuation-repair patch or new queue.
+The prior 4d1323e runtime's full CI has now saved exit0; it does not qualify this
+new delta or substitute for native-platform/quality/production acceptance.
+
 Governance reconciliation (2026-10-23, Asia/Shanghai): follow the operator's
 current shared directory/document/development contracts and real test fleet.
 The product-specific closure is [RELEASE_ACCEPTANCE.md](RELEASE_ACCEPTANCE.md).

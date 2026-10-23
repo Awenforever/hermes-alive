@@ -3,6 +3,18 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## Optional acquisition must not destroy initial understanding
+
+ADR0205 follows an actual whole-cycle abort caused by a PDF textual URL's final
+period. Do not repair model-copied URLs or silently strip punctuation. The host
+owns exact citation spans and IDs; the model chooses references. Reject optional
+choices locally and retain explicit invalid versus abstained outcomes. Existing
+initial evidence remains usable, but failed extra reads remain unknown. Consent,
+owner/source withdrawal, provider failure and physical uncertainty are not
+optional-content errors. Preserve historical v1 starts and results without new
+inference or retroactive acceptance. This improves acquisition, not automatically
+the usefulness or naturalness of the eventual unsolicited message.
+
 ## Real distribution closure, not a private repaired installation
 
 Reviewed 2026-10-23 (Asia/Shanghai), Codex. Follow

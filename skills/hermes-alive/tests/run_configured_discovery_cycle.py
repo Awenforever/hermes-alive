@@ -186,7 +186,10 @@ async def exercise(root,mode,*,primary_url=None):
                 assert 'user_context' not in data and 'owner_context_digest' not in data
                 assert primary in data['sources'][0]['excerpt'], 'follow-up silently truncated deep read'
                 target=dict(source_ref=data['sources'][0]['source_ref'],url=primary)
-                if mode=='invented-followup':target['url']='https://example.invalid/never-cited'
+                if data['method']=='cited-public-followup-v2':
+                    target=dict(source_ref=target['source_ref'],citation_ref=next(c['citation_ref']
+                        for c in data['sources'][0]['citations'] if c['url']==primary))
+                if mode in ('invented-followup','historical-invalid-followup'):target['url']='https://example.invalid/never-cited'
                 if mode=='foreign-followup':target['source_ref']='another-owner-source'
                 if mode=='revoked-followup':state['consent']=False
                 if mode=='forgotten-followup':memory.forget_item(preference.proposal_id,actor='user:test',request_id='forget-followup')
@@ -196,13 +199,17 @@ async def exercise(root,mode,*,primary_url=None):
                 if mode=='interrupted-followup':raise RuntimeError('synthetic follow-up inference interrupted')
                 value=dict(read_targets=[target] if 'followup' in mode or pressure or mode in ('primary-read','replay','erase-group-after-final') else [],
                     reason='Read the cited original protocol, or stop when current scope is adequate.')
+                if mode=='mixed-followup':
+                    value['read_targets'].append(dict(source_ref=target['source_ref'],citation_ref='invented'))
+                if mode=='malformed-followup':value={'unusable':'not a source selection'}
+                if mode=='nonjson-followup':value='not JSON; no authority'
             elif task=='alive_opportunity_candidates':
                 sources=[{**e,'summary_excerpt':e.get('summary_excerpt') or ''.join(p['text'] for p in e.get('summary_passages',[]))}
                          for e in data['opportunities']]
                 if mode=='abstain':value=dict(candidates=[],abstentions=[dict(agenda_item_id=e['agenda_item_id'],reason='No worthwhile contribution.') for e in sources])
                 else:
                     assert data['tentative_discovery_tasks']
-                    if pressure or mode in ('primary-read','replay','private-followup','erase-group-after-final','historical-followup-replay'):
+                    if pressure or mode in ('primary-read','replay','private-followup','erase-group-after-final','historical-followup-replay','mixed-followup'):
                         if os.getenv('ALIVE_REPRODUCE_OLD_RECALL')=='1' and not any('PRIMARY_READ_EVIDENCE' in e['summary_excerpt'] for e in sources):
                             print('REGRESSION_OLD_RECALL_DROPPED_PRIMARY pool='+str(data['recall_window']['pool_size'])+' window='+str(len(sources)),flush=True)
                         assert any('PRIMARY_READ_EVIDENCE' in e['summary_excerpt'] for e in sources)
@@ -277,9 +284,11 @@ async def exercise(root,mode,*,primary_url=None):
             # Emulate an operation begun before the new durable research mode.
             # Reopen with the actual new code, not the patched historical mode.
             runner.preparation._research_enabled=lambda cycle:False
-        if mode=='historical-followup-replay':runner.preparation._bundle_enabled=lambda cycle:False
+        if mode in ('historical-followup-replay','historical-invalid-followup'):
+            runner.preparation._bundle_enabled=lambda cycle:False
+            runner.preparation._citation_references_enabled=lambda cycle:False
         if mode in ('invalid-choice','revoked-choice','forgotten-choice','erased-choice','uncertain-read',
-                    'invented-followup','foreign-followup','revoked-followup','forgotten-followup','erased-followup','interrupted-followup'):
+                    'revoked-followup','forgotten-followup','erased-followup','interrupted-followup','historical-invalid-followup'):
             try:await runner.step(parameters)
             except (HostDiscoveryError,NativeWorkerError,RuntimeError):pass
             else:raise AssertionError('invalid/revoked/uncertain discovery succeeded')
@@ -300,6 +309,8 @@ async def exercise(root,mode,*,primary_url=None):
             except HostDiscoveryError:pass
             else:raise AssertionError('incomplete/failed operation silently repeated')
             assert (len(tools),len(models))==before
+            if mode=='historical-invalid-followup':
+                assert not journal.read(event_type='discovery.citation_selection_opened')
         else:
             if mode in ('replay','legacy-replay','historical-followup-replay'):
                 try:await runner.step(parameters)
@@ -317,10 +328,18 @@ async def exercise(root,mode,*,primary_url=None):
             if mode=='paused':assert not tools and not models
             elif mode!='abstain':
                 assert url in result.expression.text
-                assert len(tools)==(3 if pressure or mode in ('primary-read','replay','followup-failed','private-followup','erase-group-after-final','historical-followup-replay') else 2)
+                assert len(tools)==(3 if pressure or mode in ('primary-read','replay','followup-failed','private-followup','erase-group-after-final','historical-followup-replay','mixed-followup') else 2)
                 assert models.count('alive_discovery_reading')==1
                 assert models.count('alive_discovery_followup')==(0 if mode in ('page-failed','legacy-replay','unconsented-followup','reading-assessment-no-followup') else 1)
                 assert models.count('alive_source_support')==1
+                if mode in ('invented-followup','foreign-followup','malformed-followup','nonjson-followup','mixed-followup'):
+                    rows=journal.read(event_type='discovery.reading_choice_completed')
+                    retained=vault.resolve_json(rows[-1].event.payload['content']['content_id'],
+                        expected_subject='user:test',expected_purpose='discovery.reading-choice',
+                        expected_sensitivity=Sensitivity.PRIVATE)['choice']
+                    assert retained['rejected_count']==1
+                    assert retained['decision_status']==('selected' if mode=='mixed-followup' else 'invalid')
+                    assert len(tools)==(3 if mode=='mixed-followup' else 2)
                 if mode.startswith('reading-assessment'):
                     synth=runtime.preparation.expression.planning.synth
                     done=journal.read(event_type='opportunity.synthesis_completed')[-1]
@@ -420,7 +439,8 @@ with tempfile.TemporaryDirectory(prefix='alive-configured-discovery-') as folder
     modes=('budget-pressure',) if os.getenv('ALIVE_REPRODUCE_OLD_RECALL')=='1' else (
                  'share','reading-assessment','reading-assessment-no-followup','reading-assessment-budget-pressure','reading-assessment-invalid','reading-assessment-missing','reading-assessment-recovery','primary-read','private-followup','budget-pressure','fair-budget-pressure','erase-group-after-final','followup-failed','replay','legacy-replay','historical-followup-replay','unconsented-followup','page-failed','abstain','paused',
                  'invalid-choice','revoked-choice','forgotten-choice','erased-choice','uncertain-read',
-                 'invented-followup','foreign-followup','revoked-followup','forgotten-followup','erased-followup','interrupted-followup')
+                 'invented-followup','foreign-followup','mixed-followup','malformed-followup','nonjson-followup',
+                 'revoked-followup','forgotten-followup','erased-followup','interrupted-followup','historical-invalid-followup')
     for mode in modes:
         root=Path(folder)/mode;root.mkdir()
         with patch.dict(os.environ,HERMES_HOME=str(root),HERMES_ALIVE_SHARED_DIR=str(root/'runtime')):

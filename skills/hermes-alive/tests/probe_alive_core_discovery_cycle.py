@@ -75,10 +75,11 @@ async def main():
         except ValueError:data=json.loads(raw.split('\n',1)[1])
         if isinstance(data,list):
             stage='select';value=dict(candidate_id=next(c['candidate_id'] for c in data if c['candidate_id'].startswith('opportunity-candidate:')),rationale='Synthetic contribution')
-        elif data.get('method')=='cited-public-followup-v1':
+        elif data.get('method')=='cited-public-followup-v2':
             stage='followup';assert 'user_context' not in data
             assert primary in data['sources'][0]['excerpt']
-            value=dict(read_targets=[dict(source_ref=data['sources'][0]['source_ref'],url=primary)],
+            value=dict(read_targets=[dict(source_ref=data['sources'][0]['source_ref'],citation_ref=next(
+                c['citation_ref'] for c in data['sources'][0]['citations'] if c['url']==primary))],
                 reason='Read the actual cited original protocol before interpreting commentary.')
         elif 'sources' in data:
             stage='reading';value=dict(source_refs=[data['sources'][0]['source_ref']],question='INTERNAL_RESEARCH: What changed?',
