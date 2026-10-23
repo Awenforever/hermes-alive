@@ -73,3 +73,14 @@ owner/consent checks remain authoritative before and after selection.
 This addresses optional acquisition robustness only. Persistent inquiry follow-up,
 useful learning, external memory, ten fresh complete quality rounds, four-platform
 distribution and final production acceptance remain open.
+
+## 2026-10-23 qualification update
+
+Development28fea970, exact tree9772003089ec232bc6dbe9a2a00f19a74e010ca5:
+static623/647 with exact modes, focus/actual installed Core and full portable CI81
+pass. A real cycle completed ten logical calls and no-inference reopen, with two
+actual partial reading findings admitted to authorship; cleanup verified. Original
+expression received positive sample-specific owner feedback, but final review
+found an attribution error and whole-message repair regressed unrelated wording.
+Therefore this is evidence of acquisition/reading integration, NOT ten clean quality
+rounds or production acceptance. The correction defect is investigated in ADR0206.

@@ -2,7 +2,7 @@
 cf444ad0788f9ab925b944e4668d974fb8dc36161d3bdc8d9963b6a5021dd53f  ./README.md
 15aa69e768b45e17d71ff22155150fac4d0925ba172748432c5c8c307985e1bb  ./README_CN.md
 4a47b773b3d9d2c763a460c8353d32ffe37b6f904bd756a131b201745a5f4250  ./SKILL.md
-e6f5be8d804201dba3a89bf8b05b6f19cd9dec4de71948f377cc48691e49dbed  ./docs/ALIVE_KERNEL_PLAN.md
+d03fba0b1ec445ef21c46aa95fac64f1718a3020b46a369421247cf5bb206a9e  ./docs/ALIVE_KERNEL_PLAN.md
 97ab9e52cbfbc23d98822e39ecd598be1bb7ccd78395cf59aca7929a3ed98d5d  ./docs/ARCHITECTURE.md
 60a2ffe527b49c1598e8275b205985b63653270b499cdb29a2f7ab672e88fc0e  ./docs/DATA_AND_PRIVACY.md
 f7d37b7aeb659820327d102f749c82ba963ffd5d8c3da5499b6aad08c49b70b1  ./docs/DEVELOPMENT_MEMORANDUM.md
@@ -221,7 +221,8 @@ f7b4da1c1d8f4943f96d98dbb99290d22b564b2ab4c97a0345e2b7b453015c01  ./docs/adr/019
 2c449d23b6ef3836f22de2e41534e5ef12a5b2d5fb12c755a7524853ef74de1d  ./docs/adr/0202-core-owned-context-read-lifecycle.md
 79d05c27a40fcaa68f6bfafa3caf67cc3d603eb4b676a5c1704a0d5329bb9baa  ./docs/adr/0203-owner-calibration-over-self-endorsed-value.md
 f261dfc31f46da3551420d5e9e65195dd7852d01f03bd6d43011dfcec60f467c  ./docs/adr/0204-reading-findings-without-publishing-obligation.md
-c9c28e7dfec1251b2fb6d0ef9421709d8fb184f88231282c945a62bffb0c0c14  ./docs/adr/0205-optional-reading-by-host-citation-identity.md
+64d6c59099fc57f7d39337ea5778509d3379b8d2689714be3ec611ce27b3c66d  ./docs/adr/0205-optional-reading-by-host-citation-identity.md
+c10f3967e90ab5ef79e37f34e5ff5ecf56d94386888413ff358529c57dd09f8e  ./docs/adr/0206-review-anchored-local-correction.md
 4d6108e5f522390a4f9008265a2681771192c500c4c34a02179e24a238b55332  ./docs/evidence/deepseek-seed-20261012.json
 40941e141314d626c51ad4d22ccc19c76dcf4b770a85daa0881d135089fb75ea  ./docs/evidence/qwen-route-20261012.json
 460cffae94c5494e13515ab9c2dc42331e9fd14260bf4182086d5f3bd9e19114  ./hooks/HOOK.yaml

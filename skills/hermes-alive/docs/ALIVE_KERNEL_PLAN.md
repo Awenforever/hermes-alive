@@ -4,6 +4,22 @@ Status: active
 
 Last reviewed: 2026-10-23
 
+The ADR0205 runtime now has exact static/focus/actual-Core composition and full
+portable CI PASS (81 logs), plus a real installed cycle completing ten logical
+calls and no-inference reopen. Actual v2 partial findings reached authorship.
+The owner positively reviewed the ORIGINAL unsent technical sample's explanation
+and plain, source-grounded scope judgment. This does not imply a permanent topic
+or length preference or approval of subsequent text. Source review correctly
+found one attribution error; full regeneration fixed it but unnecessarily changed
+unrelated expression into a formulaic contrast and heavier qualification. Preserve
+both findings: factual correction is necessary, and repair must not destroy useful
+unaffected wording. ADR0206 proposes bounded review-anchored edits using the existing
+review/repair stages; a private two-call localization/edit experiment is running.
+Do not add another production judge or activate a proposed protocol before proof.
+The original is not a zero-error round, the revision has no inherited owner rating,
+and the complete quality streak remains zero. Runtime proof is dev28fea970/tree
+9772003089ec232bc6dbe9a2a00f19a74e010ca5; this later plan update is not a new full-CI run.
+
 ADR0205 addresses a second actual early-chain failure: a model omitted a PDF's
 sentence period from a cited project URL, so the old copying/lexical contract
 aborted all optional reading and initial understanding. New operations expose
