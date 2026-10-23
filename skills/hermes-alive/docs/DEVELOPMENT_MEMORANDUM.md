@@ -27,6 +27,13 @@ the ancestor's approval or silently repeat inference. A previously confirmed bod
 cannot be auto-edited under its old confirmation. An unsent positive sample rating
 belongs only to that exact sample, not all facts, revisions or permanent interests.
 
+Keep launch scripts immutable while their process is active. Updating the runner
+for a later operation can corrupt the earlier shell's remaining input even when
+its inner test process finishes normally. Record inner test evidence and outer
+terminal status separately; a printed PASS cannot override a failed wrapper or a
+missing exit status. Preserve the failed attempt, qualify a separate exact candidate,
+and do not rerun an old inference or overwrite history to manufacture success.
+
 ## Optional acquisition must not destroy initial understanding
 
 ADR0205 follows an actual whole-cycle abort caused by a PDF textual URL's final

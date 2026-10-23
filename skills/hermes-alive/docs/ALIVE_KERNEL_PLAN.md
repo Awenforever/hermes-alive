@@ -28,11 +28,19 @@ final source review remain mandatory. Ambiguous/missing/foreign/overlapping edit
 lost protected literals, broad whole-message rewriting, abstention and unavailable
 evidence cannot silently become free re-authoring or provider retries. Old starts
 keep their recorded contracts; historical failures are not reinterpreted. Focused
-and installed/complete-CI qualification of this delta is IN PROGRESS, not PASS.
+managed-Python and controlled actual-Core installation/seven-stage/reinstall checks
+pass on the preceding tree. Final runtime commit597a9c6/tree707e7207069785cd5b5eb2247f589e7647292b9f
+adds the stricter overlapping-anchor guard and passes complete portable CI with82
+suite logs and saved exit0. This is not fresh dependency or native fleet acceptance.
 The original is not a zero-error round, the revision has no inherited owner rating,
 and the complete quality streak remains zero. Runtime proof is dev28fea970/tree
-9772003089ec232bc6dbe9a2a00f19a74e010ca5; the new local-repair delta has separate
-pending qualification and is not deployed or released.
+9772003089ec232bc6dbe9a2a00f19a74e010ca5; local correction has the separate runtime
+qualification above. Later documentation-only trees are not new runtime CI runs.
+A new installed real public-video/history discovery is in progress on707e720…;
+do not assume useful expression, corrected facts or delivery before actual results.
+Next prioritize ordinary installed activation/delivery/feedback and safe legacy
+migration, not additional reviewer/framework layers. The installed assembler is
+still explicitly non-sending shadow; successful preparation is not live readiness.
 
 ADR0205 addresses a second actual early-chain failure: a model omitted a PDF's
 sentence period from a cited project URL, so the old copying/lexical contract

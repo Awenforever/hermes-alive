@@ -121,3 +121,23 @@ switch for changing the contract of an already started operation.
 Status of this successor: implemented in the development tree, focused controlled
 qualification in progress. Not installed in production, not released, no actual
 sending; full real lifecycle and quality gates in RELEASE_ACCEPTANCE remain open.
+
+### Successor qualification, 2026-10-23 (Asia/Shanghai), Codex
+
+Runtime597a9c6470e552253e00146c7a876b8c4d4cc0a7,
+tree707e7207069785cd5b5eb2247f589e7647292b9f: exact archive permissions and static
+626/650 manifests PASS; full portable CI82 suite logs and saved terminal exit0.
+Fifteen controlled repair modes include exact unaffected wording, malformed or
+unanchored edits, whole-text/protected-literal refusal, abstention, cancellation
+before/after reconstruction proof, original-review/proof erasure, confirmation
+protection and historical failed starts without repeat inference. Pure tests also
+reject overlapping occurrences (non-overlapping substring count is not uniqueness).
+The prior code tree passed actual installed-Core startup/seven controlled model
+stages/reinstall; this does not prove final fresh dependency/native acceptance.
+
+An earlier candidate's inner tests completed but its external runner failed after
+being edited while active. Preserve the wrapper failure separately; only the
+independent final candidate's normal terminal result qualifies this delta. Never
+edit an active runner; use immutable per-operation launch snapshots. These checks
+do not prove semantic minimality, ten clean real rounds, production activation or
+ordinary consumer lifecycle. A fresh different-source actual cycle remains open.
