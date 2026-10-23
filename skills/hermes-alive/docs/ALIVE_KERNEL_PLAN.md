@@ -4,6 +4,26 @@ Status: active
 
 Last reviewed: 2026-10-24
 
+2026-10-24 share/reader implementation: conversation_continuity now captures an
+exact authorized share before standard-adapter IO, under explicit outbound
+retention, with encrypted Core scope, original source references and erasure
+dependencies. The signed journal header contains no raw recipient/body/source.
+CoreShareContinuity explicitly attaches a bounded actual pre_llm_call reader to
+the owning Gateway generation; no user turn, transcript mirror, model call or
+physical queue is created. Adapter returns remain success/error/unknown reports,
+never delivery or proof of user viewing. Capture/crash gaps remain unconfirmed.
+Historical reads do not re-run expired execution/planning authority. Source
+expiry removes grounding availability, not separately consented outward history;
+explicit forgetting, reset, clearance and profile/receiver/thread scope stop
+disclosure. Retention OFF stops new capture without deleting consented history.
+This attachment is NOT ordinary live assembly/onboarding: the new kernel is still
+shadow and legacy production has not been fixed. Natural main-agent responses,
+relevance/exact older-quote recall, daemon restart/compaction, installed activation,
+migration, full fleet and ten useful full-chain rounds remain pending. The first
+fresh-PM/Core component focus passes; expanded expiry/erasure tests have a separate
+immutable operation whose terminal evidence must be checked. No component result
+closes the conversational product gate or changes quality0/10.
+
 2026-10-24 closure slice: the new gateway_session_bridge reuses actual Core
 SessionStore exact-key lookup, restored identity, receiving-adapter selection and
 native thread/workspace metadata. It is accessible from the current owned Gateway
@@ -17,15 +37,15 @@ Actual Core helper/store tests pass for standalone and a routed runtime with TWO
 bots: the receiver, not the runtime's other bot, owns delivery. Cold-store recovery
 and actual task-local turn-envelope checks also pass. This is a routing/identity
 prerequisite, NOT owner consent, memory access, installed continuity or a natural
-main-agent response. Ordinary onboarding, retention, exact share/source/outcome
-linkage and the actual pre_llm_call reader remain the next implementation work.
+main-agent response. Ordinary onboarding and installed qualification remain
+pending; the protected share/reader implementation is described above.
 
 Owner-required closure: [ADR0210](adr/0210-share-to-main-conversation-continuity.md).
 An Alive share must be naturally discussable in the owning Hermes conversation.
 Encrypted Alive history, inbound observation and transport submission do not
-establish this. The current standard adapter branch submits text and records an
-observation but does not bridge the exact share and its grounding into the main
-conversation. Ordinary unquoted follow-up, cited follow-up, durable recovery and
+establish this. The standard adapter now supports explicit protected share and
+grounding capture plus a scoped Core main-turn reader, not ordinary activation.
+Ordinary unquoted follow-up, cited follow-up, durable recovery and
 cross-session isolation therefore remain UNQUALIFIED, not implemented by inference.
 This is a release requirement alongside ordinary activation, not a replacement
 for the existing quality, migration and fleet gates. No production change.
@@ -33,8 +53,9 @@ An actual current-Core hook-dispatch/turn-composition experiment now confirms
 the native pre_llm_call context channel preserves the profile/session scope and
 adds context to the current user's API content without changing existing history
 or the system prefix, or triggering a new turn. This is only seam qualification;
-share persistence, outcome linkage, grounding retrieval and installed follow-up
-are still missing. Do not turn the synthetic supplied context into product proof.
+the subsequently implemented persistence/reader is separately qualified, while
+installed follow-up remains missing. Do not turn supplied-context seam evidence
+or the new component tests into conversational product proof.
 
 Current integration step: [ADR0210](adr/0210-share-to-main-conversation-continuity.md),
 following the channel acquisition/lifetime work in ADR0209.

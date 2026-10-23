@@ -25,6 +25,7 @@ class StandardChannelExecution:
 
 async def execute_standard_text_once(outbox, lease, *, resolve_channel, clearance,
         profile_id, hermes_home, resolve_target, extract_media, observe_profile_home,
+        continuity=None,
         clock=lambda: datetime.now(timezone.utc)):
     """Consume a start, validate the exact body/route, submit once, observe return.
 
@@ -74,6 +75,13 @@ async def execute_standard_text_once(outbox, lease, *, resolve_channel, clearanc
     if Path(observe_profile_home()).resolve() != plan.hermes_home:
         raise ValueError('canonical channel resolution changed the owning profile')
     outbox.validate_execution_for_launch(execution, now=clock())
+    if continuity is not None:
+        # Trusted host capability; capture the exact share before entering IO.
+        # Persistence is not delivery, and must never create a second queue.
+        continuity.prepare(execution, clearance=clearance, now=clock())
+        if Path(observe_profile_home()).resolve() != plan.hermes_home:
+            raise ValueError('conversation capture changed the owning profile')
+        outbox.validate_execution_for_launch(execution, now=clock())
     result = await adapter.send(chat_id=execution.route['chat_id'], content=plan.stdin_text,
                                 metadata=metadata)
     observation = outbox.record_adapter_observation(execution, result=result, now=clock())

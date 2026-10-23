@@ -17,6 +17,7 @@ class GatewayHostBinding:
         self.channel_error_class=None
         self._unsubscribe_channels=None
         self._session_routers={}
+        self._continuity=None
         context.on_unload(self.close)
         read_config=getattr(context,'get_config',None)
         settings=read_config('kernel_shadow',{}) if callable(read_config) else {}
@@ -64,6 +65,25 @@ class GatewayHostBinding:
         self._session_routers[platform]=router
         return router
 
+    def attach_continuity(self,store,router,*,clearance):
+        """Explicit trusted assembly; not an enablement or retention grant."""
+        self._require_home()
+        if self.closed or self._continuity is not None or router not in self._session_routers.values():
+            raise ValueError('current owned Core router and one continuity attachment required')
+        from .gateway_conversation_bridge import CoreShareContinuity
+        self._continuity=CoreShareContinuity(store,router,clearance=clearance)
+        self.context.register_hook('pre_llm_call',self._conversation_context)
+        return self._continuity
+
+    def _conversation_context(self,**values):
+        if self.closed or self._continuity is None:return None
+        try:
+            self._require_home()
+            return self._continuity.context(**values)
+        except Exception as exc:
+            logging.getLogger(__name__).warning('Alive conversation context unavailable: %s',type(exc).__name__)
+            return None
+
     def attach(self,native,*,build_parameters,max_cycles,interval_seconds=60):
         """Trusted host assembly, not a user/model-supplied action or permission."""
         self._require_home()
@@ -101,6 +121,7 @@ class GatewayHostBinding:
 
     def close(self):
         self.closed=True
+        if self._continuity is not None:self._continuity.close()
         for router in self._session_routers.values():router.close()
         self._session_routers.clear()
         if self._unsubscribe_channels is not None:

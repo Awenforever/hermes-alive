@@ -112,6 +112,37 @@ class OpportunityExpressionStore(SemanticReviewStore):
                                    original_url, evidence, (original_url,)),)
         return source, stored, atoms, expiry, plan
 
+    def continuity_sources_for_selection(self, selection_event_id, subject):
+        """Original, currently validated source references for a share snapshot.
+
+        Called before submission, never to re-authorize historical discussion.
+        Retain references, not the recipient's entire private planning context.
+        """
+        source, stored, _atoms, _expiry, plan = self._selected_draft(selection_event_id, subject)
+        candidate = stored.selection.candidate
+        completion = next(e for name in ('user_value', 'urgency', 'novelty',
+            'confidence', 'risk', 'interruption_cost')
+            for e in getattr(candidate.dimensions, name).evidence_event_ids
+            if e.startswith('opportunity.synthesis:') and e.endswith(':completed'))
+        start = self.journal.get(self.journal.get(completion).event.causation_id)
+        original = OpportunitySynthesizer(self.journal, content_vault=self.content_vault,
+            context_vault=self.context_vault).reader.active_evidence(subject=subject,
+                clearance=source.event.sensitivity, limit=32,
+                observation_event_ids=tuple(start.event.payload['observation_event_ids']))
+        selected = {e.observation_event_id for e in original
+                    if e.agenda_item_id == candidate.agenda_item_id}
+        if plan is not None and plan['version'] == 3:
+            context = self.expression_context_for_selection(selection_event_id, subject)
+            selected.update(e['event_id'] for e in context['source_evidence'])
+        references = []
+        for evidence in original:
+            if evidence.observation_event_id in selected:
+                record = self.journal.get(evidence.observation_event_id)
+                references.append({'event_id': record.event.event_id,
+                    'content': _thaw_json(record.event.payload['content']),
+                    'excerpt_policy': start.event.payload.get('interpreter_method',{}).get('source_excerpt_policy')})
+        return references
+
     def expression_context_for_selection(self, selection_event_id, subject):
         *_, plan = self._selected_draft(selection_event_id, subject)
         if plan is None or plan['version'] != 3:

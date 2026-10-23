@@ -258,13 +258,13 @@ async def multiplex(home):
             reset_hermes_home_override(primary_token)
 
 
-with tempfile.TemporaryDirectory(prefix='alive-core-session-') as directory:
-    try:
-        asyncio.run(main(Path(directory)/'profile'))
-        asyncio.run(multiplex(Path(directory)/'multiplex-primary'))
-    finally:
-        # Windows cannot remove open SQLite/WAL files. This is ONLY the owned
-        # fixture directory, never global process/profile storage teardown.
-        from hermes_state_registry import close_all_under
-        close_all_under(directory)
-print('HERMES_ALIVE_CORE_SESSION_ROUTING_OK')
+if __name__ == '__main__':
+    with tempfile.TemporaryDirectory(prefix='alive-core-session-') as directory:
+        try:
+            asyncio.run(main(Path(directory)/'profile'))
+            asyncio.run(multiplex(Path(directory)/'multiplex-primary'))
+        finally:
+            # Windows cannot remove open SQLite/WAL files. Only this fixture.
+            from hermes_state_registry import close_all_under
+            close_all_under(directory)
+    print('HERMES_ALIVE_CORE_SESSION_ROUTING_OK')

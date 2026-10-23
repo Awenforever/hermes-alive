@@ -98,3 +98,41 @@ The experiment uses synthetic peers/transport and partially constructed actual
 Core objects, not a real daemon or consumer install. Retention/onboarding, exact
 share/source/outcome persistence, the actual main-turn reader and full natural
 follow-up qualification remain pending. This does not close the product gate.
+
+## 2026-10-24 protected share and native main-turn reader implementation
+
+The standard channel path now accepts a trusted continuity capability before
+adapter IO and rechecks dispatch/home authority afterward. ShareContinuityStore
+retains exact content, private Core scope, original source references and erasure
+dependencies under explicit outbound consent, in the existing protected vault.
+A signed structural share_prepared event binds the authenticated dispatch start,
+scope and original retention horizon. It is not sent/delivered/viewed evidence.
+Only a separately signed existing adapter observation supplies its truthful
+success/error/unknown report; missing/exception/crash evidence stays unconfirmed.
+No observer creates IO, an acknowledgment, retry, physical queue or user turn.
+
+CoreShareContinuity attaches through the owning GatewayHostBinding and exact
+CoreSessionRouter. The real pre_llm_call reader gets bounded protected content
+and source grounding under the admitted turn's scope, never a latest session or
+another profile/bot/thread. The context distinguishes sourced evidence, Alive
+interpretation, actual reading limits and submission uncertainty. Ordinary
+unrelated turns must not be forced into discussing it. Capture is optional for
+older component executors; final ordinary live assembly must require the complete
+conversational contract instead of silently enabling one-way dispatch.
+
+Historical retrieval does not re-run current planning or expired executable
+selection. Source retention expiry leaves separately consented exact outward
+history with grounding unavailable. Explicit erasure invalidates dependent
+content; an authorized durable subject-forget request stops disclosure even
+before its physical worker finishes. Retention OFF stops new capture, not earlier
+consented history. No raw scope/source/body is copied into the public journal.
+
+The first immutable operation exercises actual current-Core routing/dispatcher/
+turn collector with synthetic planning and adapter returns, reopened protection,
+scope/clearance refusals, absent consent, failure and unknown effects. Standard
+send, routing, startup and public plugin registration focus also pass. Expanded
+expiry and pending-erasure checks use a new immutable operation. This is code
+and component evidence, not an actual main-model answer, daemon restart,
+compaction, exact older-quote recall, migration, consumer installation, natural
+quality round, ordinary enabled operation or production deployment. Those gates
+remain required; no quality pass or release qualification is granted here.

@@ -3,6 +3,30 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## Exact prepared content is not a delivered conversation turn
+
+2026-10-24 (Asia/Shanghai), Codex. The continuity store must capture before IO,
+not after a normal return that could be lost in a crash. Its event is explicitly
+share_prepared, not sent. Only authenticated existing adapter observations add a
+success/error/unknown report; none is remote delivery, user viewing, a canonical
+quote inventory or an instruction to retry. Main-agent context must preserve
+these limits, exact content and reading scope. Never fabricate a transcript/user
+turn or let source text issue instructions. Core admission/scope precedes content
+decryption; retention consent does not grant sending or replace pairing.
+
+Do not use expiring planning/candidate resolvers for historical conversation.
+Separately consented outward history has its own original deadline; replay must
+not renew it. Source expiry (including physical sweeping) is not user forgetting:
+keep the exact outward text with unavailable grounding, but never restore expired
+source excerpts. Explicit source/subject erasure must suppress dependent context;
+a durable authorized forget request blocks reads even before its erase worker
+finishes. Retention OFF stops new capture, not previous consented history. Drain
+the retention projection instead of trusting its first1000 records. Test source
+expiry both before and after sweeping, original-owner isolation before decrypt,
+reset, failed/unknown submission, cold store and actual Core hook composition.
+The current explicit attachment and synthetic adapter are component evidence,
+not ordinary activation, a natural main-agent answer or consumer qualification.
+
 ## Exact Core conversation scope is not a bare user ID or an authority grant
 
 2026-10-24 (Asia/Shanghai), Codex. gateway_session_bridge must use Core's actual
