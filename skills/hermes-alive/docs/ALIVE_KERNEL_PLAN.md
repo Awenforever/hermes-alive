@@ -4,6 +4,22 @@ Status: active
 
 Last reviewed: 2026-10-24
 
+Guided-setup checkpoint (2026-10-24): the Core CLI now stages explicit model,
+delivery and separately confirmed outbound-retention choices. A short-lived
+one-use confirmation in the actual authorized Core conversation binds the exact
+receiver/profile/user/thread, derives scoped principal v2 and attaches the native
+continuity reader. Options/scope stay protected; configuration hints contain no
+raw IDs, tokens or topics. Confirmation does not enable a policy, delegation,
+model call or send. Missing keys/partial migration refuse rather than seeding a
+new identity. Old subjects/content/grants remain untouched; a later retention
+choice wins over replay/recovery. Installed-byte Core CLI/command/lifecycle
+component evidence is being qualified. This is NOT ordinary live activation or
+the complete migration/onboarding contract: production is unchanged, and the
+native supervisor, source customization, authorized delivery, explicit legacy
+migration, consumer/fleet and complete quality/release gates remain pending.
+See ADR0211. Do not stop at a configured-but-inactive product or enable legacy
+as a hidden fallback to make the new setup appear operational.
+
 Actual main-turn checkpoint (2026-10-24): an explicit isolated probe now calls
 the real Core AIAgent.run_conversation with empty supplied history and observes
 the actual Core API messages. It uses the retained share/native reader, not a

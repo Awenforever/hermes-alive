@@ -41,9 +41,13 @@ class LocalIdentityProtector:
 
     def _load_or_create(self) -> bytes:
         try:
-            return self.key_path.read_bytes()
+            existing = self.key_path.read_bytes()
         except FileNotFoundError:
             pass
+        else:
+            if len(existing) < 32:
+                raise RuntimeError('Alive identity key is invalid')
+            return existing
         key = os.urandom(32)
         try:
             descriptor = os.open(

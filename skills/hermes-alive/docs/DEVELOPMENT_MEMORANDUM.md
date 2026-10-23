@@ -3,6 +3,41 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## Guided configuration is not activation, migration or implied retention
+
+2026-10-24 (Asia/Shanghai), Codex; ADR0211. Operator setup and the selected
+authorized conversation are different trust boundaries. The Core CLI issues a
+short-lived confirmation; an actual Core command source and exact existing
+SessionStore scope confirm it. Do not derive the target from model text, the
+latest chat, an invented user/subject ID, environment fallback or a fabricated
+session. If the slash command is the first interaction and Core has no session,
+ask for an ordinary message, do not create a routing entry to make lookup pass.
+No source without Core admission is authorization just because its fields match.
+
+Confirm outbound history separately from model/delivery. Show retention duration,
+model inheritance, public-query scope, disabled inbound/automatic learning and
+configuration retention before presenting the code. Pending choices are sealed,
+expire, and their unowned duplicate is erased after confirmation. Never log the
+code or raw user/session/source data. Do not read credentials to configure Alive;
+model routing/auth/fallback remain Core-owned. Existing state is preserved, not
+silently relabeled as another realm's principal.
+
+Recovery must not manufacture authority. Replay cannot override a later OFF or
+rewrap erased content. Fence a missing retention write at its original confirmed
+sequence under the writer lock; project newer consent ahead of earlier replay.
+Status/startup/confirmation require the existing journal and BOTH keys. Explicit
+initial setup may initialize an empty store, but never replace missing migration
+keys or accept a truncated identity key. Such an inventory fault needs recovery,
+not a new installation identity. Preserve synthetic missing-key tests and legacy
+content/key/grant preservation evidence; neither proves actual legacy migration.
+
+Return configured_not_activated until the real execution assembly exists.
+Do not silently invoke the legacy watcher or claim enabled=True from metadata.
+CLI denial tests must inspect the structured reason, not just exit2 (which could
+also be an unrelated parser/import error). Public discovery, actual CLI/command
+dispatch and runtime reinstall are component evidence, not a remote consumer,
+paired real account, daemon restart or full live lifecycle qualification.
+
 ## Verify the real main turn; keep bookkeeping out of conversation
 
 2026-10-24 (Asia/Shanghai), Codex. A direct Core context collector pass does not

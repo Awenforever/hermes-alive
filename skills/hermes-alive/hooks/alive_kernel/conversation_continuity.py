@@ -42,6 +42,16 @@ def _allowed(sensitivity, clearance):
     return list(Sensitivity).index(Sensitivity(sensitivity)) <= list(Sensitivity).index(Sensitivity(clearance))
 
 
+def core_scope_identity(scope, protector):
+    """Private canonical scope -> stable owner and exact conversation binding."""
+    document = _scope(scope)
+    owner = 'user:core-v2:' + protector.authenticate_json('core.principal.v2',
+        {name: document[name] for name in ('platform', 'transport_profile',
+                                         'scope_id', 'guild_id', 'user_id')})
+    fingerprint = protector.authenticate_json('conversation.core.scope.v1', document)
+    return document, owner, fingerprint
+
+
 class ShareContinuityStore:
     MAX_TEXT = 32768
     MAX_SOURCES = 8
@@ -53,12 +63,7 @@ class ShareContinuityStore:
         self.retention = RetentionProjection(self.journal, content_vault=self.vault)
 
     def _identity(self, scope):
-        document = _scope(scope)
-        owner = 'user:core-v2:' + self.protector.authenticate_json('core.principal.v2',
-            {name: document[name] for name in ('platform', 'transport_profile',
-                                             'scope_id', 'guild_id', 'user_id')})
-        fingerprint = self.protector.authenticate_json('conversation.core.scope.v1', document)
-        return document, owner, fingerprint
+        return core_scope_identity(scope, self.protector)
 
     def _retention_policy(self, owner):
         target = self.journal.last_sequence()

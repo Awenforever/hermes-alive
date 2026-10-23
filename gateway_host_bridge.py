@@ -21,7 +21,9 @@ class GatewayHostBinding:
         context.on_unload(self.close)
         read_config=getattr(context,'get_config',None)
         settings=read_config('kernel_shadow',{}) if callable(read_config) else {}
-        if isinstance(settings,dict) and settings.get('enabled') is True:
+        setup=read_config('kernel_setup',{}) if callable(read_config) else {}
+        if (isinstance(settings,dict) and settings.get('enabled') is True
+                or isinstance(setup,dict) and (setup.get('pending_intent_id') or setup.get('activation_event_id'))):
             self._refresh_channels()
             # Core's process-owned listener returns an unsubscribe handle. The
             # plugin owns that handle and removes it even on targeted unload.
@@ -65,14 +67,18 @@ class GatewayHostBinding:
         self._session_routers[platform]=router
         return router
 
-    def attach_continuity(self,store,router,*,clearance):
+    def attach_continuity(self,store,router,*,clearance,replace=False):
         """Explicit trusted assembly; not an enablement or retention grant."""
         self._require_home()
-        if self.closed or self._continuity is not None or router not in self._session_routers.values():
+        if (type(replace) is not bool or self.closed or self._continuity is not None and not replace
+                or router not in self._session_routers.values()):
             raise ValueError('current owned Core router and one continuity attachment required')
         from .gateway_conversation_bridge import CoreShareContinuity
-        self._continuity=CoreShareContinuity(store,router,clearance=clearance)
-        self.context.register_hook('pre_llm_call',self._conversation_context)
+        fresh=CoreShareContinuity(store,router,clearance=clearance)
+        previous=self._continuity
+        if previous is not None:previous.close()
+        self._continuity=fresh
+        if previous is None:self.context.register_hook('pre_llm_call',self._conversation_context)
         return self._continuity
 
     def _conversation_context(self,**values):

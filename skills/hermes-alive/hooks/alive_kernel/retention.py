@@ -116,8 +116,11 @@ class RetentionProjection:
         sensitivity: Sensitivity,
         actor: str,
         operation_id: str | None = None,
+        not_after_sequence: int | None = None,
     ) -> JournalRecord:
         subject = str(subject).strip()
+        if not_after_sequence is not None and (type(not_after_sequence) is not int or not_after_sequence < 0):
+            raise RetentionValidationError('invalid retention recovery fence')
         actor = str(actor).strip()
         days = int(retention_days)
         resolved_directions = self._directions(directions)
@@ -154,7 +157,14 @@ class RetentionProjection:
                 raise RetentionValidationError("operation_id was reused with different consent")
             return existing
         try:
-            result = self.journal.append(event)
+            def fence(connection):
+                if not_after_sequence is None:
+                    return
+                row = connection.execute('SELECT sequence FROM experience_events WHERE event_type=? AND subject=? ORDER BY sequence DESC LIMIT 1',
+                    ('retention.consent_changed', subject)).fetchone()
+                if row is not None and row['sequence'] > not_after_sequence:
+                    raise RetentionValidationError('a later retention choice supersedes recovery')
+            result = self.journal.append(event, precondition=fence)
             return JournalRecord(result.sequence, result.event)
         except EventConflictError as exc:
             raise RetentionValidationError("conflicting retention consent event") from exc
@@ -222,6 +232,13 @@ class RetentionProjection:
                         connection, event, "rejected", "consent_boundary_invalid"
                     )
                     connection.execute("COMMIT")
+                    return decision
+                current = connection.execute('''SELECT events.sequence FROM retention_policies_v1 AS policies
+                    JOIN experience_events AS events ON events.event_id=policies.consent_event_id
+                    WHERE policies.subject=?''', (event.subject,)).fetchone()
+                if current is not None and current['sequence'] >= record.sequence:
+                    decision = self._decision(connection,event,'ignored','newer_consent_already_projected')
+                    connection.execute('COMMIT')
                     return decision
                 connection.execute(
                     """

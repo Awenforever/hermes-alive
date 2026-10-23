@@ -46,6 +46,16 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
     kernel.add_argument('--public-query',action='append',help='Approved public search text; repeat up to three times')
     kernel.add_argument('--confirm-public-reads',action='store_true',help='Authorize only these public queries and reading their results')
     kernel.add_argument('--confirm-cited-reads',action='store_true',help='Additionally authorize one bounded follow-up of actual public citations')
+    setup=actions.add_parser('setup',help='Prepare explicit kernel choices; confirm the target in its authorized conversation (not activated yet)')
+    setup.add_argument('--confirm-model-calls',action='store_true')
+    setup.add_argument('--confirm-delivery',action='store_true')
+    setup.add_argument('--confirm-outbound-retention',action='store_true',help='Separately approve saving shares for conversation continuation')
+    setup.add_argument('--retention-days',type=int,default=30,help='Explicitly approved outbound discussion history retention')
+    setup.add_argument('--model',default=None,help='Optional Core-configured alias; default inherits Hermes')
+    setup.add_argument('--public-query',action='append',default=[])
+    setup.add_argument('--confirm-public-reads',action='store_true')
+    setup.add_argument('--confirm-cited-reads',action='store_true')
+    setup.add_argument('--replace',action='store_true',help='Explicitly replace a prior pending/configured setup; preserves history')
     actions.add_parser("uninstall-runtime", help="Remove owned runtime code while preserving user state")
     actions.add_parser("enable", help="Enable proactive delivery")
     actions.add_parser("disable", help="Disable proactive delivery")
@@ -195,6 +205,29 @@ def alive_command(args: argparse.Namespace) -> int:
     action = getattr(args, "alive_action", None)
     if action == "install-runtime":
         return _install_runtime(getattr(args,'engine',None))
+    if action == 'setup':
+        if (not args.confirm_model_calls or not args.confirm_delivery or not args.confirm_outbound_retention
+                or bool(args.public_query) != args.confirm_public_reads
+                or args.confirm_cited_reads and not args.public_query):
+            print(json.dumps({'ok':False,'confirmation_required':True,'delivery_enabled':False}))
+            return 2
+        if _effective_enabled():
+            print(json.dumps({'ok':False,'existing_runtime_must_be_paused':True,'delivery_enabled':False}))
+            return 2
+        from .tool_receipt_bridge import _kernel_module
+        setup=_kernel_module('kernel_setup').KernelSetupStore(_shared_target()/'kernel',initialize=True)
+        intent,code=setup.stage({'model_calls':True,'delivery':True,
+            'outbound_retention_days':args.retention_days,'outbound_retention_confirmed':True,'model':args.model,
+            'public_queries':args.public_query,'cited_reads':args.confirm_cited_reads},replace=args.replace)
+        from hermes_cli.plugins_state import save_plugin_setting
+        save_plugin_setting('hermes-alive',('kernel_setup',),{'pending_intent_id':intent.event.event_id})
+        print(json.dumps({'ok':True,'confirmation_command':'/alive confirm '+code,
+            'expires_in_seconds':900,'restart_required':True,'delivery_enabled':False,'model_calls_started':False,
+            'confirmation_summary':{'model':args.model or 'inherit_hermes','outbound_history_days':args.retention_days,
+                'inbound_history':False,'automatic_profile_learning':False,'public_queries':args.public_query,
+                'configuration_kept_until_removed':True},
+            'phase':'awaiting_authorized_conversation_confirmation'}))
+        return 0
     if action == 'kernel-setup':
         if not getattr(args,'confirm_model_calls',False):
             print(json.dumps({'ok':False,'confirmation_required':True,'physical_delivery':False}))
@@ -222,6 +255,12 @@ def alive_command(args: argparse.Namespace) -> int:
     if action == "uninstall-runtime":
         return _uninstall_runtime()
     if action == "enable":
+        from hermes_cli.config import load_config_readonly
+        settings=(((load_config_readonly().get('plugins') or {}).get('entries') or {}).get('hermes-alive') or {}).get('settings',{})
+        if settings.get('kernel_setup'):
+            print(json.dumps({'ok':False,'enabled':False,'kernel_activation_not_qualified':True,
+                'legacy_fallback_allowed':False}))
+            return 2
         _set_enabled(True)
         print(json.dumps({"ok": True, "enabled": True, "restart_required": True}))
         return 0
@@ -230,6 +269,17 @@ def alive_command(args: argparse.Namespace) -> int:
         print(json.dumps({"ok": True, "enabled": False, "restart_required": True}))
         return 0
     if action in {None, "status"}:
+        from hermes_cli.config import load_config_readonly
+        settings=(((load_config_readonly().get('plugins') or {}).get('entries') or {}).get('hermes-alive') or {}).get('settings',{})
+        setup_status={}
+        if settings.get('kernel_setup'):
+            try:
+                from .tool_receipt_bridge import _kernel_module
+                configured=_kernel_module('kernel_setup').KernelSetupStore(_shared_target()/'kernel').configuration()
+                setup_status={'setup_phase':'configured_not_activated' if configured else 'awaiting_confirmation',
+                              'delivery_authority_activated':False,'legacy_identity_migrated':False}
+            except Exception:
+                setup_status={'setup_phase':'recovery_required','delivery_authority_activated':False}
         print(
             json.dumps(
                 {
@@ -239,6 +289,7 @@ def alive_command(args: argparse.Namespace) -> int:
                     "enabled": _effective_enabled(),
                     "state_root": str(_shared_target()),
                     "live_runtime_verified": False,
+                    **setup_status,
                 },
                 indent=2,
             )

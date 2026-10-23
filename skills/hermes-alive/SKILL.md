@@ -14,6 +14,46 @@ before lifecycle installation.
 
 ## Preconditions
 
+### Guided kernel configuration (development branch; NOT delivery activation)
+
+This is a prerequisite for replacing shadow/manual host wiring, not a finished
+production engine. Do not select it as a silent ordinary-install upgrade or claim
+that configuration enables delivery. Preserve existing state and pause an
+existing active runtime only after asking the operator. Migration is not automatic.
+
+Explain and obtain separate approval for model calls, proactive delivery, and
+saving the exact outbound shares for follow-up. Explain the chosen history
+retention (1–365 days), that configuration/recipient metadata stays until removed,
+and that inbound-history retention and automatic profile learning are NOT enabled.
+Ask whether any public search topics/citation reads are approved; do not insert
+the developer's interests or infer externally disclosed searches from private chat.
+Model selection defaults to Hermes; only request an optional existing Core alias,
+never credentials. Translate ordinary choices into flags for the user.
+
+After approval, stage configuration with the confirmed values:
+
+```text
+hermes alive setup --confirm-model-calls --confirm-delivery --confirm-outbound-retention --retention-days <approved-days>
+```
+
+Only when separately approved, add `--public-query "<approved text>"` (up to three)
+with `--confirm-public-reads`, and optionally `--confirm-cited-reads`. For an
+intentional replacement, explain that old data/grants remain separate before
+using `--replace`. Show the returned confirmation_summary in the user's language,
+then give that user the one-time `/alive confirm ...` command. Never persist its
+actual code in shared docs/logs or send it to another user's conversation.
+The target user confirms in the intended authorized Hermes conversation; do not
+ask for internal subject IDs. If Core has no existing session, ask for one ordinary
+message first and retry within the 15-minute window. A changed/expired code needs
+explicit new setup, not guessed routing. Installing the kernel hook and restarting
+still need the operator's normal lifecycle approval.
+
+Status must say `configured_not_activated` after confirmation. Exact share-reader
+attachment is available, but the live execution/supervision and supported legacy
+migration are still pending. `enable` deliberately refuses this partial engine;
+do not manually edit installed code/flags or start the legacy watcher to bypass
+that refusal. Continue the product's full qualification before deployment.
+
 ### Experimental kernel shadow mode (development branch only)
 
 Do not silently select this mode for ordinary installs or turn it into delivery.
