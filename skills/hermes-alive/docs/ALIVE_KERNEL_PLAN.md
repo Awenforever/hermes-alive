@@ -4,6 +4,90 @@ Status: active
 
 Last reviewed: 2026-10-23
 
+Owner-required closure: [ADR0210](adr/0210-share-to-main-conversation-continuity.md).
+An Alive share must be naturally discussable in the owning Hermes conversation.
+Encrypted Alive history, inbound observation and transport submission do not
+establish this. The current standard adapter branch submits text and records an
+observation but does not bridge the exact share and its grounding into the main
+conversation. Ordinary unquoted follow-up, cited follow-up, durable recovery and
+cross-session isolation therefore remain UNQUALIFIED, not implemented by inference.
+This is a release requirement alongside ordinary activation, not a replacement
+for the existing quality, migration and fleet gates. No production change.
+An actual current-Core hook-dispatch/turn-composition experiment now confirms
+the native pre_llm_call context channel preserves the profile/session scope and
+adds context to the current user's API content without changing existing history
+or the system prefix, or triggering a new turn. This is only seam qualification;
+share persistence, outcome linkage, grounding retrieval and installed follow-up
+are still missing. Do not turn the synthetic supplied context into product proof.
+
+Current integration step: [ADR0209](adr/0209-core-channel-capability-lifetime.md).
+The preceding standard-channel portable regression has terminated successfully:
+84 suite logs, saved wrapper exit0 and container removed. Scope is exactly tree
+1fd5be7841260d6c8ec123c4022a99a3fbf74411, not later guards or channel acquisition.
+New channel acquisition is now installed in the opted-in shadow plugin's actual
+registration path, inheriting names from Core's non-materializing platform inventory. Public
+factories provide weak, generation/home/loop-bound adapter handles; disconnected,
+foreign, retired, collected or ambiguous handles cannot become live-ready. Alive
+does not disconnect Core transports or rewrite dedup to simulate hot reload.
+Pure Windows and managed-Linux tests pass, including actual current-Core config,
+PluginContext/manager/factory/unload/reconnect behavior with in-memory adapters.
+This is not recipient routing, an owner grant or ordinary enabled delivery.
+Fresh Core PM dependency admission is separate and has no credential mounts. Its
+first attempt failed because the experiment placed the tool store on Docker's
+noexec temporary filesystem; mount inspection verified that cause. Preserve that
+failure. A distinct fresh build uses a normal isolated profile volume, keeping
+temporary noexec protection intact; its terminal result still needs inspection.
+The second fresh attempt then correctly refused the image's Python3.13 against
+the current Core lock's3.14-only environment. A third uses PM's own pinned Python
+instead of forcing the bootstrap interpreter; do not relax or re-resolve Core's
+lock. Inspection also shows its exact cryptography50.0.1 pin conflicts with the
+plugin's old50.0.0 equality. The plugin declaration now accepts50.x without a
+higher patch floor or a forced host downgrade; actual fresh admission is pending.
+The third attempt reached the project build, which correctly could not write
+editable-install metadata into read-only supply. Preserve it too. A fourth builds
+only the fresh locked dependency environment through PM's `--no-install-project`,
+reusing verified public download cache, not a partial environment. That cannot
+claim a fresh Hermes application installation: real installer identity/stamping,
+supported-version admission and consumer lifecycle still require separate proof.
+The fourth attempt is now terminal exit0: a fresh PM-locked Python3.14.9
+environment with openai2.24.0 and cryptography50.0.1. The container is absent.
+Six focused suites now pass in it, including actual Core acquisition and fourteen
+standard-send cases. The application itself was deliberately not installed.
+Read-only source identity qualification confirms Core's actual version_info and
+manifest gate see0.22.5 from clean Git/tag provenance; the legacy __version__
+placeholder is not that API. No stamp or Core modification is needed to prove
+source identity. The old plugin <0.22 declaration actually rejects this Core.
+The development candidate now targets >=0.22.5,<0.23, in line with the current-Core
+integration and the no-old-compatibility requirement. This removes a known version
+gate mismatch, not the remaining real dependency admission/consumer install gates.
+The first identity probe failed by using undeclared bootstrap PyYAML; a distinct
+probe using Core's own manifest parser supplies the actual identity/gate evidence.
+A distinct actual Core PM Venv generation now also passes with the real plugin
+declaration included: Core plus cryptography50.0.1, PyYAML6.0.3 and tzdata2025.3,
+Python3.14.9. It uses PM's writable build snapshot and resolution, not a source
+patch or raw pip/uv repair. The source version remains actual Git0.22.5 even though
+the installed distribution metadata says0.0.0. This qualifies the union build,
+not remote consumer installation, dependency consent UX or an enabled Alive loop.
+The new direct-loader test additionally exercises the full actual plugin entry
+point, default inactivity and opted-in channel registration against actual Core;
+its terminal outcome belongs to the exact candidate evidence, not a fake manifest.
+That check exposed a real registration defect. A first private-loader probe timed
+out; a distinct PUBLIC discovery probe also timed out. Its thread stacks show
+register_core_channels loading full Gateway config, which materializes a deferred
+platform and waits on the discovery lock held by the thread waiting for register.
+The correction reads Core's enum/registered_names without materialization, then
+refreshes via Core's post-discovery listener (unsubscribed on unload). Only an
+actually connected adapter becomes usable. Keep both negative runs; no timeout
+increase, SDK pre-import, Core patch or fake discovery flag is the correction.
+The test now uses exact installed candidate copies and real public discovery,
+with an explicit synthetic late deferred platform to catch this lifecycle seam.
+The fresh-environment portable run on tree024a20876dc0eaab78eed074a51e2d0c2be4dc4e
+hit its explicit900s wrapper deadline during configured discovery, after earlier
+suites completed. Preserve exit124 and its partial logs; it is not a full CI PASS
+and not by itself an assertion failure. Do not edit its launcher or lower product
+invariants. Complete affected regressions and qualify the final assembled consumer
+candidate under a sufficient bounded budget before release.
+
 New closure implementation: [ADR0208](adr/0208-submission-authority-and-standard-channel.md)
 separates permission to submit from proof of delivery. New explicitly authorized
 v2 route bindings can require request acceptance; existing v1 grants still require
@@ -17,8 +101,9 @@ acknowledge a local return as delivery. Runtime9aecabe/treef003a6fb23948531d33aa
 passes seven exact-tree managed-Python suites and fourteen cases with actual
 current-Core BasePlatformAdapter/SendResult and an in-memory transport, including
 immutable/report-bound routes and wrong platform/profile refusal. Complete portable
-CI is running on the immediately preceding tree1fd5be7841260d6c8ec123c4022a99a3fbf74411;
-it is not yet terminal and will not qualify the final two added guards by assertion.
+CI passed on the immediately preceding tree1fd5be7841260d6c8ec123c4022a99a3fbf74411
+with saved exit0 and84 suite logs. This does not qualify the final two added guards
+or subsequent acquisition delta by assertion.
 Ordinary installed assembly, onboarding grants,
 real routing and feedback/migration remain pending; this is not live readiness.
 

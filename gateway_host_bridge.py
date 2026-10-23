@@ -1,5 +1,6 @@
 """Per-plugin-generation Gateway startup handoff; experimental shadow only."""
 import asyncio
+import logging
 from pathlib import Path
 
 
@@ -12,7 +13,30 @@ class GatewayHostBinding:
         self.task=None
         self.closed=False
         self.started=False
+        self.channels={}
+        self.channel_error_class=None
+        self._unsubscribe_channels=None
         context.on_unload(self.close)
+        read_config=getattr(context,'get_config',None)
+        settings=read_config('kernel_shadow',{}) if callable(read_config) else {}
+        if isinstance(settings,dict) and settings.get('enabled') is True:
+            self._refresh_channels()
+            # Core's process-owned listener returns an unsubscribe handle. The
+            # plugin owns that handle and removes it even on targeted unload.
+            self._unsubscribe_channels=context._manager.on_plugin_loaded(self._refresh_channels)
+
+    def _refresh_channels(self,_summaries=None):
+        if self.closed:return
+        from .gateway_channel_bridge import register_core_channels
+        try:
+            self._require_home()
+            register_core_channels(self.context,existing=self.channels)
+            self.channel_error_class=None
+        except Exception as exc:
+            # Non-sending shadow work may continue. This is not live readiness;
+            # never expose config/credential-bearing exception text.
+            self.channel_error_class=type(exc).__name__
+            logging.getLogger(__name__).warning('Alive channel capability unavailable: %s',self.channel_error_class)
 
     def _require_home(self):
         from hermes_constants import get_hermes_home
@@ -56,6 +80,12 @@ class GatewayHostBinding:
 
     def close(self):
         self.closed=True
+        if self._unsubscribe_channels is not None:
+            self._unsubscribe_channels()
+            self._unsubscribe_channels=None
+        for handle in self.channels.values():
+            handle.close()
+        self.channels.clear()
         if self.arguments is not None:
             stop=self.arguments['stop']
             if self.task is not None and not self.task.done():

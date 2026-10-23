@@ -18,6 +18,8 @@ model-use consent, delivery permission or a production change window.
 2. Close ordinary installed activation and lifecycle: package-manager dependency
    admission, guided customization, inherited Hermes model/channel capabilities,
    memory permissions, bounded discovery, authorized delivery and feedback.
+   Include the share-to-main-conversation continuity gate below: a separately
+   generated initiative is not a complete conversational product.
    Shadow preparation is not ordinary live operation. Missing host capabilities
    remain blockers; never patch Core or introduce a second transport queue.
 3. Freeze an exact committed candidate. Qualify its regressions and Ubuntu plus
@@ -68,6 +70,34 @@ fresh consumer installation. Use an existing stable release as the upgrade
 baseline, a committed remote candidate for pre-release testing, then verify the
 actual published tag before final consumer acceptance. Never manufacture a stable
 tag just to make a pending gate appear passed.
+
+## Share-to-main-conversation continuity — required, PENDING
+
+Follow [ADR0210](adr/0210-share-to-main-conversation-continuity.md). Exercise actual
+installed Hermes main-agent turns after Alive initiatives; no test-only prompt
+overlay may supply context that the installed product would omit.
+
+- A clear ordinary, unquoted follow-up understands the exact preceding share and
+  gives a grounded continuation rather than asking what it shared or inventing
+  facts. Include both technical material and a nontechnical topic.
+- A quotation of an older share selects that share despite intervening messages;
+  ambiguous unquoted references ask for clarification rather than choose blindly.
+- Inspect the actual main-agent context and source access. Exact outward content,
+  supporting material and uncertainty must be available appropriately; do not
+  infer correctness merely because a fluent answer resembles an expected one.
+- Exercise a delayed physical FIFO drain, failed and uncertain submissions, and
+  a crash between submission and continuity persistence. No unsent share becomes
+  a seen-message claim, no automatic resend and no duplicated conversation entry.
+- Repeat a follow-up after Gateway restart and under normal context compaction;
+  respect reset, retention expiry, erasure and revoked authority. Two profiles,
+  receiving accounts, users and threads must not contaminate one another.
+- Exercise Alive alone and the optional Enhance integration without a competing
+  physical queue. No fake user message, unsolicited main-agent turn or unrelated
+  task interruption may be used to make the continuity test pass.
+
+Component fixtures are useful negative tests, not this end-to-end proof. Include
+conversational follow-up in the final quality cohort as well as source and sending
+quality; ten isolated one-way posts cannot establish conversational Alive.
 
 ## State and boundaries
 

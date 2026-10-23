@@ -3,6 +3,56 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## Registration must not materialize deferred platform configuration
+
+2026-10-23 (Asia/Shanghai), Codex; supplement to ADR0209. Manually instantiated
+contexts passed while real public discovery timed out. Actual thread stacks
+showed Alive's register() calling load_gateway_config(), which tried to load a
+deferred platform under the discovery lock held by the waiting parent thread.
+Never read fully materialized Gateway config or import SDKs during registration.
+Use Core's enum plus its non-materializing registered_names inventory, refresh
+after discovery through the Core listener, and unsubscribe on unload. Inventory
+membership is not connection, destination authorization or permission to send.
+Regression must use actual public discovery with configured deferred platforms,
+not only a synthetic already-loaded manifest or a private loader outside its
+lifecycle. Preserve timed-out inputs/stacks; do not raise deadlines or prewarm
+platforms to hide the defect. No Core lock/loader modifications are authorized.
+
+## A share journal is not main-conversation continuity
+
+2026-10-23 (Asia/Shanghai), Codex; ADR0210. The owner reported that legacy Alive's
+separate model output cannot be naturally discussed with Hermes afterward. The
+new kernel's internal share/source history does not by itself fix that defect:
+the standard adapter sender currently has no main-conversation grounding bridge.
+Treat this as an explicit final product gate, not an already solved memory feature.
+Verify actual unquoted and quoted main-agent follow-up, durable recovery, honest
+submission states and session isolation. Never make the test pass with a synthetic
+user turn, a hand-injected test-only prompt, a second transport queue or a claim
+that a stored record means the recipient or main agent has received its context.
+
+## Dependency compatibility is a supported API range, not yesterday's host patch
+
+For current Core, use its version_info/manifest admission API, not the legacy
+hermes_cli.__version__ placeholder. A read-only actual-source experiment proved
+clean0.22.5 Git provenance and the old <0.22 declaration's real rejection without
+any install stamp. The candidate now declares >=0.22.5,<0.23; unsupported older
+hosts should get a clear admission refusal, not a silent legacy execution path.
+Version acceptance alone does not prove dependency resolution or installation.
+
+2026-10-23 (Asia/Shanghai), Codex. The earlier crypto50.0.0 equality avoided forcing
+a newer patch onto the then-supported Core. Current stable supply instead locks
+50.0.1. Keeping the equality now conflicts with the host instead of protecting it.
+Declare the compatible50.x API range, retain50.0.0 as the minimum and the exact CI
+fixture pin, and let Core PM honor its own exact lock. Do not force50.0.2, downgrade
+the host, mutate its environment with raw pip/uv or relock Core to get a green test.
+Fresh PM environment and plugin admission remain separate actual checks.
+
+Preserve diagnostic failures: the first fresh-build layout put PM tools on a
+noexec Docker temporary mount; the second forced the image's3.13 bootstrap Python
+against a3.14-only current lock. Neither justifies a Core patch. Keep /tmp noexec,
+give the isolated profile a normal executable owned volume and let PM choose its
+own pinned toolchain. Do not call a reused or repaired partial build a fresh one.
+
 ## Sending permission must not require invented delivery proof
 
 2026-10-23 (Asia/Shanghai), Codex; ADR0208 supersedes the execution eligibility

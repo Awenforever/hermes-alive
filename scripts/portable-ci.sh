@@ -87,6 +87,7 @@ run_and_require run_feedback_material_scope.py '^HERMES_ALIVE_FEEDBACK_MATERIAL_
 run_and_require run_core_context_read.py '^HERMES_ALIVE_CORE_CONTEXT_READ_OK$'
 run_and_require run_host_submission_contract.py '^HERMES_ALIVE_HOST_SUBMISSION_CONTRACT_OK$'
 run_and_require run_standard_channel_execution.py '^HERMES_ALIVE_STANDARD_CHANNEL_EXECUTION_OK$'
+run_and_require run_gateway_channel_binding.py '^HERMES_ALIVE_GATEWAY_CHANNEL_BINDING_OK$'
 run_and_require run_reading_assessment.py '^HERMES_ALIVE_READING_ASSESSMENT_OK$'
 run_and_require run_citation_selection.py '^HERMES_ALIVE_CITATION_SELECTION_OK$'
 run_and_require run_localized_correction.py '^HERMES_ALIVE_LOCALIZED_CORRECTION_OK$'
