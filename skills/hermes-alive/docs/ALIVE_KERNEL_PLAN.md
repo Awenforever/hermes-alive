@@ -4,6 +4,24 @@ Status: active
 
 Last reviewed: 2026-10-23
 
+Current closure checkpoint: [ADR0207](adr/0207-current-core-channel-lifecycle.md).
+The owner has now reviewed the exact original unsent video-resource sample:
+honesty alone did not establish enough recommendation credibility or a reason
+to open it. This case is not a clean round. Keep the feedback sample-scoped;
+do not invent a lasting dislike of videos/resources or compensate with hype.
+The ordinary activation investigation has actual current-Core evidence, not
+just interface names: profile-scoped public platform factories expose the adapter,
+but run before connectivity and are deduplicated across plugin generations.
+Targeted unload retains an old factory; even a new adapter can skip its successor.
+Full rediscovery also leaves the existing adapter's dedup key. A clean registry
+AND a fresh adapter bind correctly in the isolated in-memory experiment. Do not
+patch Core, bypass dedup or call hot reload live-ready. Public in-conversation
+posting also truncates over-limit text and cannot select a background recipient.
+These are bounded integration findings, not authorization, rendering, FIFO or
+remote-delivery proof. Existing runtime remains shadow; no new sender or reviewer
+has been installed. Continue the ordinary activation/feedback/migration slice,
+then qualify the actual remote artifact on the real fleet. No production change.
+
 The ADR0205 runtime now has exact static/focus/actual-Core composition and full
 portable CI PASS (81 logs), plus a real installed cycle completing ten logical
 calls and no-inference reopen. Actual v2 partial findings reached authorship.
@@ -41,9 +59,10 @@ logical calls, final source review and no-inference reopen, with credentials
 removed and no delivery. Actual admitted reading notes correctly identify that
 only a catalog was read and the substantive question is unresolved. The final
 message offers a resource arrangement and viewing sequence, not a content insight.
-Factual support passes; recipient value remains unqualified. Resource discovery
+Factual support passes; the owner's subsequent sample-scoped assessment does not
+support counting this as a useful recommendation. Resource discovery
 can be useful, but topic/title/duration matches do not themselves prove content
-quality. Do not claim human rejection, ban resource sharing, force transcripts or
+quality. Do not generalize this feedback, ban resource sharing, force transcripts or
 add another judge to manufacture a verdict. Full original shown for optional
 sample-scoped calibration, not permanent preference learning or send consent.
 Next prioritize ordinary installed activation/delivery/feedback and safe legacy
