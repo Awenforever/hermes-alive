@@ -147,6 +147,23 @@ async def exercise(root):
         extract=substituted_extract,allow_url=allow_synthetic_url,is_current=lambda:True)
     substituted=await exact_host.collect(operation_id='substituted-transport',read_urls=(transport_url,))
     assert substituted.failures==1 and not substituted.observation_ids
+    # Representation is capture metadata, not extra editorial prose inserted
+    # into the source. Unknown future fields do not invalidate usable content.
+    async def represented_extract(urls,*,char_limit):
+        return json.dumps({'results':[{'title':'Synthetic summary','url':urls[0],
+            'content':'Only supplied source content.','content_representation':'operator_paraphrase'}]})
+    represented=HostDiscoveryReader(ingestor,subject='user:test',search=search,
+        extract=represented_extract,allow_url=allow_synthetic_url,is_current=lambda:True)
+    captured=await represented.collect(operation_id='represented',read_urls=('https://example.invalid/summary',))
+    material=ingestor.active_evidence(subject='user:test',clearance=Sensitivity.PRIVATE,
+        observation_event_ids=captured.observation_ids,limit=32)[0]
+    assert material.content['summary']=='Only supplied source content.'
+    scope=read_scope_metadata(material.content)
+    assert scope['reported_content_representation']=='operator_paraphrase'
+    assert scope['independent_verification_proven'] is False
+    assert read_scope_metadata({'source':'hermes.web.extract','attributes':{
+        'read_scope':'webpage_extract','content_representation':'future-provider-format'}})[
+            'reported_content_representation']=='unspecified'
     for path in root.glob('experience.sqlite3*'):
         data=path.read_bytes()
         assert b'PRIVATE_QUERY' not in data and b'PRIVATE_PAGE_FACT' not in data

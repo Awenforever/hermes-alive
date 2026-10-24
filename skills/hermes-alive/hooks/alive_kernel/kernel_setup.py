@@ -33,8 +33,10 @@ class KernelConfiguration:
 
 
 def validate_options(options):
-    if (not isinstance(options, dict) or set(options) != {'model_calls', 'delivery',
-            'outbound_retention_days', 'outbound_retention_confirmed', 'model', 'public_queries', 'cited_reads'}
+    required={'model_calls','delivery','outbound_retention_days','outbound_retention_confirmed',
+              'model','public_queries','cited_reads'}
+    if (not isinstance(options, dict) or not required<=set(options)
+            or set(options)-required-{'language','communication_preference'}
             or options['model_calls'] is not True or options['delivery'] is not True
             or options['outbound_retention_confirmed'] is not True
             or type(options['outbound_retention_days']) is not int
@@ -48,6 +50,13 @@ def validate_options(options):
             or any(not isinstance(q,str) or not q.strip() or len(q)>128 for q in queries)
             or len(set(queries)) != len(queries) or options['cited_reads'] and not queries):
         raise KernelSetupError('bounded approved public queries and optional Core model alias required')
+    if ('language' in options and (not isinstance(options['language'],str)
+            or not re.fullmatch(r'[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8}){0,3}',options['language']))
+            or 'communication_preference' in options and (
+                not isinstance(options['communication_preference'],str)
+                or not 1<=len(options['communication_preference'].strip())<=1000
+                or len(json.dumps(options['communication_preference'],ensure_ascii=False))>1500)):
+        raise KernelSetupError('bounded explicit communication choices required')
     return {**options, 'public_queries':list(queries)}
 
 
@@ -246,12 +255,40 @@ class KernelSetupStore:
                 retention.apply(consent)
             except RetentionValidationError:
                 raise KernelSetupError('retention changed after confirmation; newer choice preserved') from None
+        self._retain_communication_preference(configured)
         intent = self.journal.get(intent_id)
         pending = ContentReference.from_event_payload(self._payload(intent,self.INTENT_TYPE)['content'])
         # The confirmed owner now has its protected configuration. Do not leave
         # an unowned duplicate of the operator's topics in the pending namespace.
         self.vault.erase_item(pending.content_id)
         return configured
+
+    def _retain_communication_preference(self,configured):
+        """Confirmed explicit preferences use existing protected memory/context.
+
+        A replay must not recreate forgotten memory or borrow another owner's
+        style. No private chat reading or inferred interests are authorized.
+        """
+        value=configured.options.get('communication_preference')
+        if value is None:return
+        from .memory import MemoryProjection,MemoryProposal,MemoryKind,MemoryAuthority
+        identifier='setup-communication:'+self.vault.digest_json({'configuration':configured.event_id})[:40]
+        if self.journal.get('memory.proposal:'+identifier) is not None:return
+        memory=MemoryProjection(self.journal)
+        previous=None
+        for item in memory.retrieve(subject=configured.subject,clearance=Sensitivity.PRIVATE,
+                                    kinds=(MemoryKind.PREFERENCE,),limit=512):
+            if item.predicate!='profile.communication':continue
+            origin=self.journal.get(item.created_from_event_id)
+            if origin is None:continue
+            sources=[self.journal.get(event_id) for event_id in origin.event.payload['source_event_ids']]
+            if sources and all(s is not None and s.event.event_type==self.CONFIRMED_TYPE
+                    and s.event.actor==configured.subject and s.event.subject==configured.subject for s in sources):
+                previous=item.memory_id;break
+        proposal=MemoryProposal(kind=MemoryKind.PREFERENCE,subject=configured.subject,
+            predicate='profile.communication',value=value,authority=MemoryAuthority.USER_EXPLICIT,
+            source_event_ids=(configured.event_id,),confidence=1,proposal_id=identifier,supersedes_id=previous)
+        memory.apply(memory.append_proposal(proposal,actor=configured.subject))
 
     def confirm(self, intent_id, token, *, scope, now=None):
         """Trusted Core slash caller supplies the canonical current scope.

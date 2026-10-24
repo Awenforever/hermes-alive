@@ -19,10 +19,15 @@ async def test(home):
     home.mkdir()
     shutil.copytree(core.repo,home/'plugins/hermes-alive')
     model={'provider':'auto','default':'owner-configured-model'}
-    (home/'config.yaml').write_text(json.dumps({'plugins':{'enabled':['hermes-alive']},'model':model}),encoding='utf-8')
+    (home/'config.yaml').write_text(json.dumps({'plugins':{'enabled':['hermes-alive']},
+        'model':model,'display':{'language':'fr'}}),encoding='utf-8')
     rc,staged=cli(home,'setup','--confirm-model-calls','--confirm-delivery',
-        '--confirm-outbound-retention','--public-query','public astronomy news','--confirm-public-reads')
+        '--confirm-outbound-retention','--public-query','public astronomy news','--confirm-public-reads',
+        '--language','zh-CN','--communication-preference','Use plain language; depth follows the material.')
     assert rc==0 and not staged['delivery_enabled']
+    assert staged['confirmation_summary']['conversation_language']=='zh-CN'
+    assert staged['confirmation_summary']['communication_preference']=='Use plain language; depth follows the material.'
+    assert staged['confirmation_summary']['explicit_communication_memory_until_updated_or_forgotten'] is True
     command=staged['confirmation_command'].removeprefix('/alive ')
     rc,result=cli(home,'install-runtime','--engine','kernel')
     assert rc==0 and result['engine']=='kernel'
@@ -47,6 +52,8 @@ async def test(home):
         setup=importlib.import_module(loaded.module.__name__+'.kernel_setup_bridge')
         execution=importlib.import_module(loaded.module.__name__+'.kernel_execution_bridge')
         store=setup.setup_store(binding)
+        assert execution.expression_language(SimpleNamespace(options={}))=='fr'
+        assert execution.expression_language(store.configuration())=='zh-CN'
         # Public-plugin namespace imports must work WITHOUT legacy hooks on
         # sys.path. Pure tests formerly masked the missing global safe_io import.
         from tools.registry import registry
@@ -69,6 +76,10 @@ async def test(home):
         assert active and binding.task is not None and not binding.task.done()
         assert binding.native.host.execute and binding.arguments['continuous'] is True
         assert binding.native.context_reads is None  # no implicit private-memory permission
+        assert binding.arguments['build_parameters']()['expression_parameters']['language']=='zh-CN'
+        preferences=execution.kernel('cognition_context').CognitionContextReader(store.journal).read(
+            subject=store.configuration().subject,clearance=execution.kernel('events').Sensitivity.PRIVATE)
+        assert any(p.predicate=='profile.communication' and p.value=='Use plain language; depth follows the material.' for p in preferences)
         assert binding.arguments['build_parameters']()['expression_parameters']['authority']==execution.kernel('deliberation').ActionAuthority.USER_DELEGATED
         assert binding.native._caller is None
         # Hold the lifetime before yielding again: the actual native task is

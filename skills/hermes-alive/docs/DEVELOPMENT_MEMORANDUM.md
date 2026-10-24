@@ -3,6 +3,25 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## Recipient configuration must reach actual cognition, not only installation
+
+2026-10-24, Codex; ADR0215. Existing renderer language and explicit context paths
+were disconnected from ordinary setup. Confirmed optional language now overrides
+the existing render parameter; otherwise use Core locale, not source/query
+language as an invented durable preference. Optional bounded communication text
+uses existing encrypted USER_EXPLICIT memory, bound to the exact owner-confirmed
+setup. Replace only that owner's active earlier setup-derived style; omission is
+not erasure. Duplicate confirmation must not restore forgotten preferences.
+This is not consent to read chats, change Core locale/models or infer interests.
+
+The r30 real comparison speaks Chinese but still recites defensive caveats.
+Inspect the source capture too: operator reading-limit notes embedded in the
+source prose are not a neutral sample of source-led authoring. Keep source facts
+and reported representation apart. Optional content_representation is a bounded
+collector statement, never full-page reading or independent verification. Preserve
+old metadata shape when absent; normalize unknown formats without losing usable
+content. No blacklist of awkward sentences or forced positive share is adopted.
+
 ## Public-plugin dependencies and authorization lifetime
 
 2026-10-24, Codex. Activated r22 entered the actual native host but its public

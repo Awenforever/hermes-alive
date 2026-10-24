@@ -31,8 +31,13 @@ def read_scope_metadata(content):
             or not isinstance(attrs,Mapping)
             or attrs.get('read_scope') not in ('search_listing','webpage_extract')):
         return {}
-    return dict(reported_read_scope=attrs['read_scope'],independent_verification_proven=False,
+    metadata=dict(reported_read_scope=attrs['read_scope'],independent_verification_proven=False,
         video_consumption_proven=False,page_may_contain_navigation=attrs['read_scope']=='webpage_extract')
+    if 'content_representation' in attrs:
+        representation=attrs['content_representation']
+        metadata['reported_content_representation']=(representation if representation in
+            ('source_extract','operator_paraphrase','machine_summary') else 'unspecified')
+    return metadata
 
 
 SOURCE_EXCERPT_POLICY = 'retained-web-extract-v1'
@@ -120,7 +125,11 @@ class HostDiscoveryReader:
                 summary=content,observed_at=observed,published_at=None,
                 attributes=dict(read_scope='search_listing' if kind=='search' else 'webpage_extract',
                     publication_date_unresolved=True,independently_verified=False,
-                    video_watched=False,page_may_contain_navigation=kind=='extract'))
+                    video_watched=False,page_may_contain_navigation=kind=='extract',
+                    **({'content_representation':item['content_representation']
+                        if isinstance(item['content_representation'],str) and item['content_representation'] in
+                        ('source_extract','operator_paraphrase','machine_summary') else 'unspecified'}
+                       if 'content_representation' in item else {})))
         except ValueError:
             raise HostDiscoveryError('invalid source candidate') from None
         ingested=self.ingestor.ingest(candidate,subject=self.subject)

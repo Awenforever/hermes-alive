@@ -30,6 +30,17 @@ the developer's interests or infer externally disclosed searches from private ch
 Model selection defaults to Hermes; only request an optional existing Core alias,
 never credentials. Translate ordinary choices into flags for the user.
 
+Ask whether the recipient wants a particular conversation language or has an
+explicit communication preference; "no customization" is valid. Optional
+`--language <language-tag>` overrides only Alive's output language; otherwise
+Alive follows Hermes' locale, not the source language or an inferred chat profile.
+Optional `--communication-preference "<their own words>"` is retained privately
+after the target owner confirms, as explicit Alive memory available to discovery
+and expression. Explain it remains until updated/forgotten, independently of the
+outbound-history retention period. Never invent a preference, copy the developer's
+profile or silently convert sample feedback into lasting memory. These choices
+grant neither additional actions nor permission to read private chats.
+
 After approval, stage configuration with the confirmed values:
 
 ```text
@@ -42,6 +53,10 @@ intentional replacement, explain that old data/grants remain separate before
 using `--replace`. Show the returned confirmation_summary in the user's language,
 then give that user the one-time `/alive confirm ...` command. Never persist its
 actual code in shared docs/logs or send it to another user's conversation.
+Show the actual staged language, exact communication wording and its memory
+lifecycle BEFORE asking for confirmation. Do not replace it with "configured" or
+hide a developer-supplied preference behind the code. The summary is private to
+this intended owner; do not copy it into shared operational logs.
 The target user confirms in the intended authorized Hermes conversation; do not
 ask for internal subject IDs. If Core has no existing session, ask for one ordinary
 message first and retry within the 15-minute window. A changed/expired code needs

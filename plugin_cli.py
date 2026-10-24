@@ -57,6 +57,8 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
     setup.add_argument('--confirm-outbound-retention',action='store_true',help='Separately approve saving shares for conversation continuation')
     setup.add_argument('--retention-days',type=int,default=30,help='Explicitly approved outbound discussion history retention')
     setup.add_argument('--model',default=None,help='Optional Core-configured alias; default inherits Hermes')
+    setup.add_argument('--language',help='Optional conversation language tag; otherwise follows Hermes locale')
+    setup.add_argument('--communication-preference',help='Explicit communication preference, stored privately after owner confirmation')
     setup.add_argument('--public-query',action='append',default=[])
     setup.add_argument('--confirm-public-reads',action='store_true')
     setup.add_argument('--confirm-cited-reads',action='store_true')
@@ -238,14 +240,20 @@ def alive_command(args: argparse.Namespace) -> int:
             return 2
         intent,code=setup.stage({'model_calls':True,'delivery':True,
             'outbound_retention_days':args.retention_days,'outbound_retention_confirmed':True,'model':args.model,
-            'public_queries':args.public_query,'cited_reads':args.confirm_cited_reads},replace=args.replace)
+            'public_queries':args.public_query,'cited_reads':args.confirm_cited_reads,
+            **({'language':args.language} if getattr(args,'language',None) else {}),
+            **({'communication_preference':args.communication_preference}
+               if getattr(args,'communication_preference',None) else {})},replace=args.replace)
         from hermes_cli.plugins_state import save_plugin_setting
         save_plugin_setting('hermes-alive',('kernel_setup',),{'pending_intent_id':intent.event.event_id})
         print(json.dumps({'ok':True,'confirmation_command':'/alive confirm '+code,
             'expires_in_seconds':900,'restart_required':True,'delivery_enabled':False,'model_calls_started':False,
             'confirmation_summary':{'model':args.model or 'inherit_hermes','outbound_history_days':args.retention_days,
                 'inbound_history':False,'automatic_profile_learning':False,'public_queries':args.public_query,
-                'configuration_kept_until_removed':True},
+                'configuration_kept_until_removed':True,
+                'conversation_language':getattr(args,'language',None) or 'follows_hermes_locale',
+                'communication_preference':getattr(args,'communication_preference',None),
+                'explicit_communication_memory_until_updated_or_forgotten':bool(getattr(args,'communication_preference',None))},
             'phase':'awaiting_authorized_conversation_confirmation'}))
         return 0
     if action == 'kernel-setup':

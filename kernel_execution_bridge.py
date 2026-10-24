@@ -34,6 +34,13 @@ def runtime_engine(binding):
     return json.loads(manifest.read_text(encoding='utf-8')).get('engine')
 
 
+def expression_language(configured):
+    selected=configured.options.get('language')
+    if selected is not None:return selected
+    from agent.i18n import get_language
+    return get_language().replace('_','-')
+
+
 def _retired(binding):
     if binding.task is not None and not binding.task.done():
         raise ValueError('stop the previous host before enabling a new generation')
@@ -195,6 +202,7 @@ def assemble(binding):
                 authorization_parameters={},send_parameters={})
         validate()
         return dict(expression_parameters={'requested_model':configured.options['model'],'grounding':True,
+            'language':expression_language(configured),
             'authority':kernel('deliberation').ActionAuthority.USER_DELEGATED,
             'recipient_meaning':True,'require_independent_grounding':False,
             'model_timeout_seconds':kernel('model_timeouts').DEFAULT_STAGE_SECONDS},

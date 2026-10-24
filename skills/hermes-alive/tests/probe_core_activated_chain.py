@@ -98,7 +98,9 @@ async def exercise(home):
     token=core.set_hermes_home_override(home)
     try:
         rc,staged=cli(home,'setup','--confirm-model-calls','--confirm-delivery',
-            '--confirm-outbound-retention','--public-query',corpus['query'],'--confirm-public-reads')
+            '--confirm-outbound-retention','--public-query',corpus['query'],'--confirm-public-reads',
+            '--language','zh-CN','--communication-preference',
+            '请用中文自然交流，按内容决定深浅；先把值得聊的事讲明白，再给出贴近事实的朴素评价。')
         if rc!=0:raise RuntimeError('actual Core setup failed')
         rc,installed=cli(home,'install-runtime','--engine','kernel')
         if rc!=0 or installed['engine']!='kernel':raise RuntimeError('native runtime installation failed')
@@ -111,13 +113,14 @@ async def exercise(home):
                 if name=='web_search':
                     if arguments!=dict(query=corpus['query'],limit=3):raise RuntimeError('unapproved search')
                     return json.dumps({'success':True,'data':{'web':[dict(url=s['url'],title=s['title'],
-                        description=s['content'][:180]) for s in sources.values()]}})
+                        description=s['content'][:180],content_representation='operator_paraphrase')
+                        for s in sources.values()]}})
                 urls=arguments.get('urls')
                 if not isinstance(urls,list) or len(urls)!=1 or urls[0] not in sources:
                     raise RuntimeError('snapshot read outside approved source corpus')
                 item=sources[urls[0]]
                 return json.dumps({'results':[{'url':item['url'],'title':item['title'],
-                    'content':item['content'],'snapshot_scope':'bounded_public_excerpt','full_page_read':False}]})
+                    'content':item['content'],'content_representation':'operator_paraphrase'}]})
             return handle
         for name in ('web_search','web_extract'):
             registry.register(name=name,toolset='web',schema=dict(name=name,

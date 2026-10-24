@@ -4,6 +4,41 @@ Status: active
 
 Last reviewed: 2026-10-24
 
+Recipient-context actual comparison (2026-10-24, Codex): r30/r31 each16 focused
+suites passed, including real CLI/control, explicit zh-CN over Core fr locale,
+Core-locale default resolution, encrypted setup-derived explicit preferences,
+replacement and forget/replay refusal. r30 actual model chain now speaks Chinese
+and continues two main turns, but repeats defensive commentary: NOT a quality pass.
+Its annotated source corpus mixed operator scope cautions with source facts.
+
+r32 separates source-only public paraphrase from reported representation metadata.
+Actual generation contains unsupported additions (including a public leaderboard
+not supplied by the source). Semantic review rejects it; zero adapter submission
+and zero main turns. This is a retained failure, not silence or a passed round.
+Source review must not be weakened or the corpus expanded to excuse this draft.
+Inspection also confirms continuous host exits on content_review_attention: one
+content-quality rejection can stop the long-term task. Next close bounded,
+durable draft correction/review recovery and distinguish content rejection from
+unknown IO/authorization failures. Reuse existing final-source correction where
+appropriate instead of another unbounded judge/retry loop. Review the overlapping
+semantic/source gates and their actionable evidence; do not patch a named claim.
+The synthetic probe's request for a plain evaluation is a test persona, NOT an
+owner's lasting preference or a requirement to criticize every source. Broader
+recipient/profile cases and real live tools remain required. Quality stays0/10.
+
+Full r32 component regression remains running at this checkpoint; collect its
+actual handle/terminal evidence. Do not promote the earlier r26 full run into this
+changed setup/representation candidate or count focused suites as quality rounds.
+
+Recipient-context integration (2026-10-24; ADR0215): the renderer's existing
+language and explicit owner-context paths were not connected to ordinary setup.
+Optional confirmed language and bounded communication wording now enter those
+existing paths; default language follows Core locale, not a private-chat inference.
+Style uses encrypted explicit memory with owner-confirmation evidence, idempotent
+recovery, same-owner replacement and no forgotten-preference resurrection. No
+private reads or new action permission. Pure setup tests pass; actual installed
+Core/model qualification is in progress, not a naturalness or quality pass.
+
 Activated-chain evidence (2026-10-24, Codex; supersedes the in-progress notes
 below): r27 completed actual CLI/setup/authorized native enable -> scoped public
 digest dispatch -> inherited Core models -> ordinary standard execution through
