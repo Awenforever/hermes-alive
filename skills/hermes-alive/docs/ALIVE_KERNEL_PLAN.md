@@ -4,6 +4,23 @@ Status: active
 
 Last reviewed: 2026-10-24
 
+Observation/cognition boundary (2026-10-24; ADR0217): configured public discovery
+now exposes a no-model listing observation followed by explicit reasoning;
+the old callable composes both. Exact ephemeral owner/cycle/generation ownership
+and retained-material checks prevent stale cognition; unload preserves pending
+physical work. A complete listing-only keyed fingerprint excludes receipt IDs;
+partial/failure has no complete fingerprint. This does NOT yet implement durable
+waiting or suppress calls in the native host. Next connect eligibility before
+selection, with owner/context changes, source fairness and bounded revisits.
+
+Full r36 component regression is now terminal0/PASS with89 suites, replacing the
+earlier running note; it covers the prior initial-repair candidate, not ADR0217.
+Actual native-Core authoring alternatives (public replay, no external sends)
+still added unsupported explanations despite source tools. A dedicated draft
+output separated Core completion metadata, but quality did not pass. Do not
+replace the generation backend or remove reviews on this evidence. Quality0/10;
+real-source, continuity, migration, fleet and production acceptance remain open.
+
 Initial-repair qualification checkpoint (2026-10-24): immutable r35's new pure
 suite passes on Linux (successful repair, repeated rejection, cancelled/incomplete
 work, erased ancestry, conflicting source review and critical semantic rejection).

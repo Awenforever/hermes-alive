@@ -5,6 +5,7 @@ read evidence; the existing agenda retains model research intent. Selection is
 durable before spending and never silently repeated after an uncertain outcome.
 """
 import asyncio
+from dataclasses import dataclass
 import hashlib
 import json
 from urllib.parse import urlsplit
@@ -67,6 +68,22 @@ authorize actions, change memory or treat a source's claim as independently true
 """
 
 
+@dataclass(frozen=True,repr=False)
+class _DiscoveryObservation:
+    """Ephemeral owning capability, not a persisted grant or a whole-page read."""
+    operation_id: str
+    binding: object
+    found: object
+    evidence: tuple
+    reader: object
+    current: object
+    research_enabled: bool
+    citation_references: bool
+    group_enabled: bool
+    assessment_enabled: bool
+    listing_fingerprint: str | None
+
+
 class ConfiguredDiscoveryCycle:
     def __init__(self,context,ingestor,*,subject,approved_queries,validate_consent,follow_citations=False,
                  record_reading_assessment=False):
@@ -84,6 +101,16 @@ class ConfiguredDiscoveryCycle:
         self.record_reading_assessment=record_reading_assessment
         self.inquiries=DiscoveryInquiryContext(ingestor)
         self.tools=None
+        self._observation=None
+        self._observation_epoch=0
+        self._closed=False
+        context.on_unload(self.close)
+
+    def close(self):
+        self._closed=True
+        self._observation_epoch+=1
+        self._observation=None
+        if self.tools is not None:self.tools.close()
 
     @property
     def pending(self):
@@ -273,12 +300,24 @@ class ConfiguredDiscoveryCycle:
             choice={**choice,'read_targets':list(citation_selection.read_targets(choice,catalogs))}
         return choice,model,digest
 
-    async def __call__(self,*,cycle,parameters,call,read_binding):
+    async def observe(self,*,cycle,parameters,read_binding):
+        """Collect approved listings without model selection or drafting.
+
+        The fingerprint describes ONLY successful listings, not linked page
+        bodies or the whole world. Failure/partial results have no complete
+        fingerprint. No observer token survives replacement or a scope change.
+        """
         from .planning_runtime import validate_model_timeout
         validate_model_timeout(parameters['expression_parameters'].get('model_timeout_seconds'))
+        if self._closed:raise HostDiscoveryError('public discovery capability is retired')
         if self.pending:raise HostReadUncertainError('previous public read has not physically settled')
+        self._observation=None
+        self._observation_epoch+=1
+        epoch=self._observation_epoch
         expected=read_binding()
         def current():
+            if self._closed or self._observation_epoch!=epoch:
+                raise HostDiscoveryError('public discovery generation changed')
             self.validate_consent()
             if read_binding()!=expected:raise HostDiscoveryError('public discovery owner authority changed')
             return expected
@@ -296,11 +335,38 @@ class ConfiguredDiscoveryCycle:
         reader=HostDiscoveryReader(self.ingestor,subject=self.subject,search=self.tools.search,
             extract=self.tools.extract,allow_url=self.tools.allow_url,is_current=lambda:current()==expected)
         found=await reader.collect(operation_id=cycle.operation_id+':search',queries=self.queries)
-        if not found.observation_ids:return parameters
-        evidence=self.ingestor.active_evidence(subject=self.subject,clearance=Sensitivity.PRIVATE,
-            limit=32,observation_event_ids=found.observation_ids)
+        evidence=(self.ingestor.active_evidence(subject=self.subject,clearance=Sensitivity.PRIVATE,
+            limit=32,observation_event_ids=found.observation_ids) if found.observation_ids else ())
         if {e.observation_event_id for e in evidence}!=set(found.observation_ids):
             raise HostDiscoveryError('discovery search evidence is no longer current')
+        current()
+        fingerprint=(self.ingestor.vault.digest_json(dict(method='approved-listing-snapshot-v1',
+            subject=self.subject,queries=list(self.queries),
+            observations=sorted(found.observation_ids),follow_citations=self.follow_citations,
+            record_reading_assessment=self.record_reading_assessment)) if found.failures==0 else None)
+        result=_DiscoveryObservation(cycle.operation_id,expected,found,tuple(evidence),reader,current,
+            research_enabled,citation_references,group_enabled,assessment_enabled,fingerprint)
+        self._observation=result
+        return result
+
+    async def __call__(self,*,cycle,parameters,call,read_binding):
+        observed=await self.observe(cycle=cycle,parameters=parameters,read_binding=read_binding)
+        return await self.reason(observed,cycle=cycle,parameters=parameters,call=call,read_binding=read_binding)
+
+    async def reason(self,observed,*,cycle,parameters,call,read_binding):
+        """Explicit cognition phase, using this generation's exact observation."""
+        if (observed is not self._observation or not isinstance(observed,_DiscoveryObservation)
+                or observed.operation_id!=cycle.operation_id or observed.binding!=read_binding()):
+            raise HostDiscoveryError('discovery observation belongs to a stale or foreign cycle')
+        current=observed.current;current()
+        found,evidence,reader=observed.found,observed.evidence,observed.reader
+        research_enabled,citation_references=observed.research_enabled,observed.citation_references
+        group_enabled,assessment_enabled=observed.group_enabled,observed.assessment_enabled
+        expected=observed.binding
+        if not found.observation_ids:return parameters
+        retained=self.ingestor.active_evidence(subject=self.subject,clearance=Sensitivity.PRIVATE,
+            limit=32,observation_event_ids=found.observation_ids)
+        if tuple(retained)!=evidence:raise HostDiscoveryError('observed listing material changed before cognition')
         choice,model,digest=await self._select(operation_id=cycle.operation_id,evidence=evidence,search_receipt_id=found.receipt_id,
             parameters=parameters,call=call,current=current)
         if not choice['source_refs']:return parameters
