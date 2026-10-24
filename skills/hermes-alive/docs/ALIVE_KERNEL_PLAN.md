@@ -4,6 +4,18 @@ Status: active
 
 Last reviewed: 2026-10-24
 
+Ordinary-control implementation (2026-10-24, Codex; ADR0213): native Core enable,
+pause and status now bind the actual admitted configured conversation. Signed,
+finite activation references existing policy/route/delegation; startup only restores
+still-valid grants, and CLI disable targets that same policy. Shared Core model
+slot/fallback logic and mandatory continuity are reused, not another sender or
+permission framework. Control-only installed-byte qualification is in progress;
+ordinary complete discovery/model/send execution and interrupted-work recovery
+are NOT yet qualified. Do not equate a newly created task with product acceptance.
+Native execution uses the explicit lifecycle engine `kernel`; `kernel-shadow`
+remains non-sending even with retained authorization. Pre-cognition cadence reads
+share the final atomic launch accounting and wait without source/model spend.
+
 Core submission assembly (2026-10-24, Codex): CoreSessionRouter now builds the
 standard-send callbacks from Core's actual resolve_send_target and extract_media,
 with mandatory same-router continuity and clearance. It captures no grant and

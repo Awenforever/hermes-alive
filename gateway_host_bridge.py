@@ -1,6 +1,7 @@
 """Per-plugin-generation Gateway startup handoff; experimental shadow only."""
 import asyncio
 import logging
+import json
 from pathlib import Path
 
 
@@ -13,6 +14,7 @@ class GatewayHostBinding:
         self.task=None
         self.closed=False
         self.started=False
+        self.control_lock=asyncio.Lock()
         self.channels={}
         self.channel_error_class=None
         self._unsubscribe_channels=None
@@ -22,8 +24,11 @@ class GatewayHostBinding:
         read_config=getattr(context,'get_config',None)
         settings=read_config('kernel_shadow',{}) if callable(read_config) else {}
         setup=read_config('kernel_setup',{}) if callable(read_config) else {}
+        manifest=self.home/'plugin-data/hermes-alive/runtime/install/manifest.json'
+        native_installed=manifest.is_file() and json.loads(manifest.read_text(encoding='utf-8')).get('engine')=='kernel'
         if (isinstance(settings,dict) and settings.get('enabled') is True
-                or isinstance(setup,dict) and (setup.get('pending_intent_id') or setup.get('activation_event_id'))):
+                or isinstance(setup,dict) and (setup.get('pending_intent_id') or setup.get('activation_event_id'))
+                or native_installed):
             self._refresh_channels()
             # Core's process-owned listener returns an unsubscribe handle. The
             # plugin owns that handle and removes it even on targeted unload.
@@ -90,19 +95,33 @@ class GatewayHostBinding:
             logging.getLogger(__name__).warning('Alive conversation context unavailable: %s',type(exc).__name__)
             return None
 
-    def attach(self,native,*,build_parameters,max_cycles,interval_seconds=60):
+    def attach(self,native,*,build_parameters,max_cycles,interval_seconds=60,continuous=False):
         """Trusted host assembly, not a user/model-supplied action or permission."""
         self._require_home()
-        if (self.closed or self.started or self.native is not None
-                or native.host.execute is not False
+        live=native.host.execute is True
+        if live:
+            from .kernel_setup_bridge import setup_store
+            from .kernel_execution_bridge import runtime_engine
+            if runtime_engine(self)!='kernel':raise ValueError('native execution engine required')
+            store=setup_store(self)
+            configured=store.configuration();active=store.activation()
+            if (active is None or configured is None or self._continuity is None
+                    or native.host.subject!=configured.subject
+                    or native.host.configuration_id!=active['activation_event_id']
+                    or Path(native.host.journal.path).resolve()!=Path(store.journal.path).resolve()):
+                raise ValueError('current signed execution and owning continuity required')
+        lifetime=(type(continuous) is bool and (live and continuous and max_cycles is None
+            or not live and not continuous and type(max_cycles) is int and 1<=max_cycles<=1000))
+        if (self.closed or self.started or self.native is not None or not lifetime
                 or Path(native.acquisition['profile_home']).resolve()!=self.home
                 or native.profile_scope is None or not callable(build_parameters)
-                or type(max_cycles) is not int or not 1<=max_cycles<=1000
-                or type(interval_seconds) not in (int,float) or not 0<=interval_seconds<=86400):
-            raise ValueError('explicit current shadow host and bounded lifetime required')
+                or type(interval_seconds) not in (int,float) or not 0<=interval_seconds<=86400
+                or live and interval_seconds<=0):
+            raise ValueError('current bounded shadow or signed continuous execution required')
         self.native=native
         self.arguments=dict(build_parameters=build_parameters,stop=asyncio.Event(),
             max_cycles=max_cycles,interval_seconds=interval_seconds)
+        if continuous:self.arguments['continuous']=True
 
     def runtime_status(self):
         """Observe the owned task, never infer liveness from startup metadata.
@@ -119,7 +138,8 @@ class GatewayHostBinding:
             status['status']='ready'
         if self.task is not None:
             if not self.task.done():
-                status.update(status='stopping' if self.closed else 'running',runtime_active=True)
+                stopping=self.closed or self.arguments is not None and self.arguments['stop'].is_set()
+                status.update(status='stopping' if stopping else 'running',runtime_active=True)
             elif self.task.cancelled():
                 status['status']='cancelled'
             else:

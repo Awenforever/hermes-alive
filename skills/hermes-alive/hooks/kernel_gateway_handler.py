@@ -1,7 +1,8 @@
 """Dedicated experimental kernel hook. Never starts the legacy watcher.
 
 Not selected by the legacy lifecycle installer. Host assembly must explicitly
-attach the current profile's native shadow host before Gateway startup.
+attach the current profile's bounded shadow host or authenticated native host.
+The installed engine and current signed authority jointly govern execution.
 """
 from pathlib import Path
 

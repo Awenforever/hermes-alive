@@ -20,14 +20,23 @@ def configure_kernel_gateway_host(native,**parameters):
 async def kernel_gateway_startup():
     if _gateway_host_binding is None:
         raise RuntimeError('current plugin instance has not registered')
-    if _gateway_host_binding.context.get_config('kernel_setup',{}):
+    configured=_gateway_host_binding.context.get_config('kernel_setup',{})
+    from . import kernel_execution_bridge as execution
+    native_installed=execution.runtime_engine(_gateway_host_binding)=='kernel'
+    if configured or native_installed:
+        root=_gateway_host_binding.home/'plugin-data/hermes-alive/runtime/kernel'
+        if not configured and not root.exists():return await _gateway_host_binding.startup()
         attach_configured_continuity(_gateway_host_binding)
     if _gateway_host_binding.native is None and not _gateway_host_binding.closed:
-        from .tool_receipt_bridge import _kernel_module
-        assembled=_kernel_module('core_shadow_assembly').assemble(_gateway_host_binding.context)
-        if assembled is not None:
-            native,parameters=assembled
-            _gateway_host_binding.attach(native,**parameters)
+        if configured or native_installed:
+            assembled=execution.assemble(_gateway_host_binding)
+            if assembled is not None:execution.attach(_gateway_host_binding,assembled)
+        else:
+            from .tool_receipt_bridge import _kernel_module
+            assembled=_kernel_module('core_shadow_assembly').assemble(_gateway_host_binding.context)
+            if assembled is not None:
+                native,parameters=assembled
+                _gateway_host_binding.attach(native,**parameters)
     return await _gateway_host_binding.startup()
 
 

@@ -103,10 +103,10 @@ async def test(home):
         before=binding._continuity
         result=await loaded.module.kernel_gateway_startup()
         assert result['status']=='not_configured'
-        assert binding._continuity is not before and before._closed
+        assert binding._continuity is before and not before._closed
         assert binding.native is None and binding.task is None
         rc,enabled=cli(home,'enable')
-        assert rc==2 and enabled['kernel_activation_not_qualified'] is True
+        assert rc==2 and enabled['authorized_conversation_required'] is True
         assert enabled['legacy_fallback_allowed'] is False
         rc,status=cli(home,'status')
         assert rc==0 and status['setup_phase']=='configured_not_activated'
@@ -148,8 +148,9 @@ async def test(home):
         core.reset_hermes_home_override(token)
 
 
-with tempfile.TemporaryDirectory(prefix='alive-core-guided-setup-') as directory:
-    try:asyncio.run(test(Path(directory)/'profile'))
-    finally:
-        from hermes_state_registry import close_all_under
-        close_all_under(directory)
+if __name__=='__main__':
+    with tempfile.TemporaryDirectory(prefix='alive-core-guided-setup-') as directory:
+        try:asyncio.run(test(Path(directory)/'profile'))
+        finally:
+            from hermes_state_registry import close_all_under
+            close_all_under(directory)

@@ -21,7 +21,8 @@ def scenario(root, interval, maximum):
         grant = ActionDelegationStore(journal).grant(subject=owner, actor=owner,
             policy_event_id='policy:1', route_binding_id='route:1', action_kinds=('share',),
             maximum_sensitivity=Sensitivity.PRIVATE, expires_at=now + timedelta(days=3),
-            operation_id=operation, now=now, minimum_interval_seconds=interval, max_starts_per_24h=maximum)
+            operation_id=operation, now=now, minimum_interval_seconds=interval, max_starts_per_24h=maximum,
+            allow_natural_expression=True)
         return JournalRecord(grant.sequence, EventEnvelope(event_type='synthetic.authorization', source='synthetic', actor=owner,
             subject=owner, payload={'delegation_event_id':grant.event.event_id,
             'policy_event_id':'policy:1', 'route_binding_id':'route:1',
@@ -38,8 +39,15 @@ def scenario(root, interval, maximum):
         return journal.append(event, precondition=lambda connection:
             outbox._check_delegated_cadence(connection, receipt, when))
     first = start('first', now)
+    def eligible(receipt=auth,when=now):
+        return outbox.next_delegated_start(receipt.event.payload['delegation_event_id'],
+            subject=receipt.event.subject,policy_event_id='policy:1',route_binding_id='route:1',now=when)
+    expected=now+timedelta(days=1) if maximum==1 else now+timedelta(seconds=interval)
+    assert eligible()==expected
     assert not start('first', now).created
     new_grant = authorization('new-grant')
+    assert eligible(new_grant)==expected  # read-only and final accounting agree across renewal
+    assert eligible(when=expected)==expected
     try:
         start('blocked', now + timedelta(seconds=1), new_grant)
     except DispatchOutboxError:

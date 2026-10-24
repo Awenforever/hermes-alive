@@ -429,7 +429,7 @@ def install(args: argparse.Namespace) -> int:
     previous_manifest=_read_json(paths.manifest_file,{})
     removed=_read_json(paths.install_dir/'uninstalled.json',{})
     engine=getattr(args,'engine',None) or previous_manifest.get('engine') or removed.get('engine','legacy')
-    if engine not in ('legacy','kernel-shadow'):
+    if engine not in ('legacy','kernel-shadow','kernel'):
         raise LifecycleError('Unknown installed engine; explicit recovery required')
     validation = _validate_source_tree(paths.source_root)
     # Normalize lifecycle-created Hermes directory parents even under umask 000.
@@ -472,9 +472,9 @@ def install(args: argparse.Namespace) -> int:
 
         authoritative_source = paths.source_target
         _copy_tree(authoritative_source / "hooks", hook_stage)
-        if engine=='kernel-shadow':
+        if engine in ('kernel-shadow','kernel'):
             shutil.copy2(authoritative_source/'hooks/kernel_gateway_handler.py',hook_stage/'handler.py')
-            (hook_stage/'HOOK.yaml').write_text(_kernel_hook_yaml(),encoding='utf-8',newline='\n')
+            (hook_stage/'HOOK.yaml').write_text(_kernel_hook_yaml(engine),encoding='utf-8',newline='\n')
         _compile_tree(hook_stage)
         hook_previous = _swap_directory(
             hook_stage,
@@ -1116,8 +1116,9 @@ def _verify_no_secret_values(payload: Any, path: str = "") -> list[str]:
     return failures
 
 
-def _kernel_hook_yaml() -> str:
-    return 'name: hermes-alive-kernel\ndescription: Non-sending experimental kernel startup\nevents: [gateway:startup]\n'
+def _kernel_hook_yaml(engine='kernel-shadow') -> str:
+    description='Consent-bound native kernel startup' if engine=='kernel' else 'Non-sending experimental kernel startup'
+    return f'name: hermes-alive-kernel\ndescription: {description}\nevents: [gateway:startup]\n'
 
 
 def verify(args: argparse.Namespace) -> int:
@@ -1154,10 +1155,10 @@ def verify(args: argparse.Namespace) -> int:
     )
     manifest = _read_json(paths.manifest_file, {})
     engine=manifest.get('engine','legacy') if isinstance(manifest,dict) else 'legacy'
-    if engine=='kernel-shadow' and paths.source_target.is_dir():
+    if engine in ('kernel-shadow','kernel') and paths.source_target.is_dir():
         source_hooks['handler.py']=hashlib.sha256((paths.source_target/'hooks/kernel_gateway_handler.py').read_bytes()).hexdigest()
-        source_hooks['HOOK.yaml']=hashlib.sha256(_kernel_hook_yaml().encode()).hexdigest()
-    if engine not in ('legacy','kernel-shadow'):
+        source_hooks['HOOK.yaml']=hashlib.sha256(_kernel_hook_yaml(engine).encode()).hexdigest()
+    if engine not in ('legacy','kernel-shadow','kernel'):
         failures.append('unknown_runtime_engine')
     if source_hooks != active_hooks:
         failures.append("source_active_hook_hash_mismatch")
@@ -1180,7 +1181,7 @@ def verify(args: argparse.Namespace) -> int:
             "manifest_present": paths.manifest_file.is_file(),
             "managed_config_present": paths.config_file.is_file(),
             "provider": ({'backend':'core_plugin_llm','ready':None,'live_test_required':True}
-                         if engine=='kernel-shadow' else _provider_status(paths)),
+                         if engine in ('kernel-shadow','kernel') else _provider_status(paths)),
         }
     )
 
@@ -1316,7 +1317,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     install_parser = subparsers.add_parser("install")
     _add_common_paths(install_parser)
-    install_parser.add_argument('--engine',choices=('legacy','kernel-shadow'),default=None)
+    install_parser.add_argument('--engine',choices=('legacy','kernel-shadow','kernel'),default=None)
     install_parser.set_defaults(func=install)
 
     configure_parser = subparsers.add_parser("configure")

@@ -172,6 +172,18 @@ async def test(root, mode):
         assert replay.disposition=='attempt_unavailable' and len(received)==int(should_send)
     raw = journal.path.read_bytes()
     assert b'PRIVATE_ERROR_SENTINEL' not in raw and b'PRIVATE_OPAQUE_ID_SENTINEL' not in raw
+    if mode in ('false','unknown','long','cancel','exception','write-failure'):
+        # An uncertain/error send still consumes cadence. Do not spend on a new
+        # source/model cycle merely to discover the launch is too early.
+        now=clock()
+        ready=runtime.outbox.next_delegated_start(delegation.event.event_id,subject=owner,
+            policy_event_id=policies.current(owner).event_id,route_binding_id=binding_id,now=now)
+        assert ready>now
+        async def no_cooldown_spend(**_):raise AssertionError('cooldown invoked a model')
+        waiting=await runtime.cycle(**{**cycle_args,'operation_id':'cooldown',
+            'defer_until_eligible':True,'expression_parameters':{**expression,'call':no_cooldown_spend}})
+        assert waiting.disposition=='waiting_for_change' and len(received)==1
+        assert len(journal.read(event_type='dispatch.started'))==1
     if mode=='success':
         # A consumed, unacknowledged standard send is never replayed, but must
         # not globally block a distinct authorized intent after process reopen.

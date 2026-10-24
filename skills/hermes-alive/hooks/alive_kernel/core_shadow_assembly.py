@@ -67,23 +67,15 @@ def normalize_settings(settings):
     return normalized
 
 
-def assemble(context):
-    settings=context.get_config('kernel_shadow',{})
-    if not isinstance(settings,dict) or settings.get('enabled') is not True:
-        return None
-    subject,max_cycles,interval,model=validate_settings(settings)
-    settings=normalize_settings(settings)
+def native_for_host(context,host,*,home,preparation,validate_consent,context_reads=None):
+    """Shared Core-owned model slot/caller; no policy, route or enablement."""
     from hermes_constants import get_hermes_home
     from hermes_cli.config import load_config_readonly
     import hermes_cli
-    home=Path(get_hermes_home()).resolve()
-    if home!=Path(context._manager.scope_key).resolve():
-        raise ValueError('shadow setup belongs to another Core profile')
+    home=Path(home).resolve()
+    if home!=Path(get_hermes_home()).resolve() or home!=Path(context._manager.scope_key).resolve():
+        raise ValueError('native host belongs to another Core profile')
     task_state={}
-    consent_snapshot=canonical(settings)
-    def validate_consent():
-        if canonical(normalize_settings(context.get_config('kernel_shadow',{})))!=consent_snapshot:
-            raise ValueError('configured shadow consent changed; new host assembly required')
     def refresh_task():
         validate_consent()
         from hermes_cli.fallback_config import get_fallback_chain
@@ -100,6 +92,31 @@ def assemble(context):
             task_state['revision']=revision
     refresh_task()
     root=home/'plugin-data/hermes-alive/runtime/kernel'
+    identity=hashlib.sha256(str(home).encode()).hexdigest()[:24]
+    return NativeCognitionHost(host,profile_id='profile:'+identity,profile_home=home,
+        read_configuration=load_config_readonly,read_credential_names=lambda **_:(),
+        interpreter=sys.executable,core=Path(hermes_cli.__file__).resolve().parent.parent,
+        private_root=root,environment={},resolve_domain=lambda *labels:'unverified-family',
+        profile_scope=lambda:core_profile_cycle_scope(home),preparation=preparation,
+        context_reads=context_reads,
+        caller_factory=lambda *,cycle,read_binding:CorePluginModelCaller(context,read_binding=read_binding,refresh_task=refresh_task))
+
+
+def assemble(context):
+    settings=context.get_config('kernel_shadow',{})
+    if not isinstance(settings,dict) or settings.get('enabled') is not True:
+        return None
+    subject,max_cycles,interval,model=validate_settings(settings)
+    settings=normalize_settings(settings)
+    from hermes_constants import get_hermes_home
+    home=Path(get_hermes_home()).resolve()
+    if home!=Path(context._manager.scope_key).resolve():
+        raise ValueError('shadow setup belongs to another Core profile')
+    consent_snapshot=canonical(settings)
+    def validate_consent():
+        if canonical(normalize_settings(context.get_config('kernel_shadow',{})))!=consent_snapshot:
+            raise ValueError('configured shadow consent changed; new host assembly required')
+    root=home/'plugin-data/hermes-alive/runtime/kernel'
     journal=ExperienceJournal(root/'experience.sqlite3')
     vault=ContentVault(root/'content-vault',backup_root=root/'content-backups')
     policies=AutonomyPolicyProjection(journal)
@@ -108,7 +125,6 @@ def assemble(context):
             enabled=True,context=PolicyContext(can_interrupt=True),
             operation_id='configured-shadow-consent:'+hashlib.sha256(subject.encode()).hexdigest()[:24]))
     # Never re-enable a journal policy paused by the owner on a later restart.
-    identity=hashlib.sha256(str(home).encode()).hexdigest()[:24]
     configuration='core-shadow:'+hashlib.sha256(canonical(settings)).hexdigest()[:24]
     host=AutonomousHostRuntime(AutonomousCycleRuntime(journal,content_vault=vault),
         subject=subject,configuration_id=configuration,execute=False)
@@ -122,14 +138,8 @@ def assemble(context):
             follow_citations=settings['public_discovery'].get('follow_citations',False),
             record_reading_assessment=True,
             validate_consent=validate_consent)
-    native=NativeCognitionHost(host,profile_id='profile:'+identity,profile_home=home,
-        read_configuration=load_config_readonly,read_credential_names=lambda **_:(),
-        interpreter=sys.executable,core=Path(hermes_cli.__file__).resolve().parent.parent,
-        private_root=root,environment={},resolve_domain=lambda *labels:'unverified-family',
-        profile_scope=lambda:core_profile_cycle_scope(home),
-        preparation=preparation,
-        context_reads=CoreContextRead(context),
-        caller_factory=lambda *,cycle,read_binding:CorePluginModelCaller(context,read_binding=read_binding,refresh_task=refresh_task))
+    native=native_for_host(context,host,home=home,preparation=preparation,
+                           validate_consent=validate_consent,context_reads=CoreContextRead(context))
     parameters=dict(expression_parameters={'requested_model':model,'grounding':True,
         'recipient_meaning':True,'require_independent_grounding':False,
         'model_timeout_seconds':DEFAULT_STAGE_SECONDS},resolve_binding=lambda _:None,

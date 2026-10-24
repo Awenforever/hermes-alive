@@ -154,6 +154,75 @@ class KernelSetupStore:
         record = self.journal.get(intent.event.event_id + ':confirmed')
         return self._configuration(record) if record else None
 
+    def activation(self, *, now=None):
+        """Authenticated durable authority only, never Gateway task liveness."""
+        configured=self.configuration()
+        if configured is None:return None
+        record=next(self.journal.iter_reverse(event_types=('alive.setup.activated',),
+                                             max_records=1),None)
+        if record is None:return None
+        payload=self._payload(record,'alive.setup.activated')
+        current=self._now(now)
+        if (record.event.actor!=configured.subject or record.event.subject!=configured.subject
+                or record.event.causation_id!=configured.event_id
+                or payload.get('configuration_event_id')!=configured.event_id):return None
+        if (record.event.expires_at is None
+                or not record.event.observed_at<=current<record.event.expires_at):return None
+        from .autonomy_policy import AutonomyPolicyProjection
+        from .action_delegation import ActionDelegationStore
+        from .host_capabilities import HostCapabilityProjection
+        policy=AutonomyPolicyProjection(self.journal).current(configured.subject)
+        latest=next(self.journal.iter_reverse(event_types=('autonomy.policy_changed',),
+            subject=configured.subject,max_records=1),None)
+        if (policy is None or not policy.enabled or policy.event_id!=payload.get('policy_event_id')
+                or latest is None or latest.event.event_id!=policy.event_id):return None
+        if not ActionDelegationStore(self.journal).permits(payload.get('delegation_event_id'),
+                subject=configured.subject,policy_event_id=policy.event_id,
+                route_binding_id=payload.get('route_binding_id'),capability='hermes.channel.send',
+                action_kind='share',sensitivity=Sensitivity.PRIVATE,now=current,natural_expression=True):return None
+        host=HostCapabilityProjection(self.journal,content_vault=self.vault)
+        binding,reasons=host.execution_binding(
+            payload.get('route_binding_id'),subject=configured.subject,capability='hermes.channel.send',as_of=current)
+        route={'profile':configured.scope['runtime_profile'],'platform':configured.scope['platform'],
+               'chat_id':configured.scope['chat_id'],'thread_id':configured.scope['thread_id'] or None}
+        if reasons or binding is None or host.resolve_route(binding)!=route:return None
+        return {**payload,'activation_event_id':record.event.event_id}
+
+    def record_activation(self, configured, *, policy_event_id, route_binding_id,
+                          delegation_event_id, expires_at, supersedes_cycle_event_id=None, now=None):
+        """Trusted admitted enable command has already minted exact host grants."""
+        current=self._now(now)
+        if self.configuration()!=configured or not current<expires_at<=current+timedelta(days=30):
+            raise KernelSetupError('current confirmed setup and finite activation required')
+        references=dict(configuration_event_id=configured.event_id,policy_event_id=policy_event_id,
+                        route_binding_id=route_binding_id,delegation_event_id=delegation_event_id)
+        if any(not isinstance(value,str) or not value or len(value)>254 for value in references.values()):
+            raise KernelSetupError('exact activation references required')
+        if supersedes_cycle_event_id is not None:
+            if not isinstance(supersedes_cycle_event_id,str) or not re.fullmatch(r'host-cycle:[a-f0-9]{64}',supersedes_cycle_event_id):
+                raise KernelSetupError('exact interrupted cycle reference required')
+            references['supersedes_cycle_event_id']=supersedes_cycle_event_id
+        event=self._seal(EventEnvelope(event_id='alive.activation:'+uuid4().hex,
+            event_type='alive.setup.activated',source='hermes.command.alive.setup',
+            actor=configured.subject,subject=configured.subject,sensitivity=Sensitivity.PRIVATE,
+            causation_id=configured.event_id,occurred_at=current,observed_at=current,
+            expires_at=expires_at,payload=references))
+        confirmed=self.journal.get(configured.event_id)
+        def factory(connection):
+            latest=connection.execute('SELECT event_id FROM experience_events WHERE event_type=? ORDER BY sequence DESC LIMIT 1',
+                                      (self.INTENT_TYPE,)).fetchone()
+            policy=connection.execute('SELECT event_id FROM experience_events WHERE event_type=? AND subject=? ORDER BY sequence DESC LIMIT 1',
+                ('autonomy.policy_changed',configured.subject)).fetchone()
+            if (latest is None or confirmed is None or latest['event_id']!=confirmed.event.causation_id
+                    or policy is None or policy['event_id']!=policy_event_id):
+                raise KernelSetupError('setup or policy changed during activation')
+            return event
+        self.journal.append(factory)
+        active=self.activation(now=current)
+        if active is None or active['activation_event_id']!=event.event_id:
+            raise KernelSetupError('activation is not current')
+        return active
+
     def _retain_configuration(self, record, configured):
         """Recover a missing first write, never re-enable a later OFF choice."""
         retention = RetentionProjection(self.journal, content_vault=self.vault)

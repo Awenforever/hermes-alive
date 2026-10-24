@@ -150,6 +150,31 @@ class DispatchOutbox:
             raise DispatchOutboxError("delegation unavailable at cadence boundary")
         grant = self.journal._record(connection.execute(
             "SELECT * FROM experience_events WHERE event_id=?", (delegation_id,)).fetchone())
+        ready,reason=self._delegated_cadence_boundary(connection,grant,authorization.event.subject,current)
+        if ready>current:raise DispatchOutboxError(reason)
+
+    def next_delegated_start(self,delegation_event_id,*,subject,policy_event_id,
+                             route_binding_id,now=None):
+        """Advisory pre-cognition eligibility, not a reservation or IO grant.
+
+        The actual launch still checks/reserves atomically. All consumed starts,
+        including uncertain ones and prior grants, use the SAME owner history.
+        """
+        from .action_delegation import ActionDelegationStore
+        current=self._utc(now)
+        with closing(self._connect()) as connection:
+            connection.execute('BEGIN')
+            if not ActionDelegationStore(self.journal).permits(delegation_event_id,
+                    subject=subject,policy_event_id=policy_event_id,route_binding_id=route_binding_id,
+                    capability='hermes.channel.send',action_kind='share',sensitivity=Sensitivity.PRIVATE,
+                    now=current,connection=connection,natural_expression=True):
+                raise DispatchOutboxError('delegation unavailable before cognition')
+            grant=self.journal._record(connection.execute(
+                'SELECT * FROM experience_events WHERE event_id=?',(delegation_event_id,)).fetchone())
+            return self._delegated_cadence_boundary(connection,grant,subject,current)[0]
+
+    def _delegated_cadence_boundary(self,connection,grant,subject,current):
+        """One authenticated cadence calculation for advisory and final checks."""
         interval = grant.event.payload.get("minimum_interval_seconds")
         maximum = grant.event.payload.get("max_starts_per_24h")
         if (type(interval) is not int or not 0 <= interval <= 86400
@@ -158,7 +183,7 @@ class DispatchOutbox:
         history = []
         for row in connection.execute(
                 "SELECT * FROM experience_events WHERE subject=? AND event_type='dispatch.started' AND observed_at>?",
-                (authorization.event.subject, (current - timedelta(days=1)).isoformat())):
+                (subject, (current - timedelta(days=1)).isoformat())):
             record = self.journal._record(row)
             payload = self._authenticated_start_payload(record)
             if payload is None or not payload.get("delegation_event_id"):
@@ -169,12 +194,16 @@ class DispatchOutbox:
                         str(payload.get("dispatch_id")), int(payload.get("lease_generation", -1)))):
                 raise DispatchOutboxError("delegated cadence history is invalid")
             history.append(record.event.observed_at)
-        if len(history) >= maximum:
-            raise DispatchOutboxError("delegated rolling-day start budget exhausted")
         if any(stamp > current for stamp in history):
             raise DispatchOutboxError("delegated cadence clock regressed")
-        if history and current - max(history) < timedelta(seconds=interval):
-            raise DispatchOutboxError("delegated minimum start interval not reached")
+        ready,reason=current,None
+        if len(history)>=maximum:
+            ready=sorted(history)[-maximum]+timedelta(days=1)
+            reason='delegated rolling-day start budget exhausted'
+        interval_end=max(history)+timedelta(seconds=interval) if history else current
+        if interval_end>ready:
+            ready,reason=interval_end,'delegated minimum start interval not reached'
+        return ready,reason
 
     def _authorization_route(
         self,

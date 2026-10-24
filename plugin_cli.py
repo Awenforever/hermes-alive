@@ -30,11 +30,16 @@ def _shared_target() -> Path:
     return _home() / "plugin-data" / "hermes-alive" / "runtime"
 
 
+def _installed_engine():
+    manifest=_shared_target()/'install/manifest.json'
+    return json.loads(manifest.read_text(encoding='utf-8')).get('engine') if manifest.is_file() else None
+
+
 def register_cli(parser: argparse.ArgumentParser) -> None:
     actions = parser.add_subparsers(dest="alive_action")
     actions.add_parser("status", help="Show installation and enablement state")
     install=actions.add_parser("install-runtime", help="Install or refresh the profile-scoped gateway hook")
-    install.add_argument('--engine',choices=('legacy','kernel-shadow'),default=None)
+    install.add_argument('--engine',choices=('legacy','kernel-shadow','kernel'),default=None)
     kernel=actions.add_parser('kernel-setup',help='Configure non-sending experimental kernel; model consent required')
     owner=kernel.add_mutually_exclusive_group(required=True)
     owner.add_argument('--subject',help='Existing private kernel owner identity')
@@ -185,6 +190,10 @@ def _effective_enabled() -> bool:
     manifest_path=_shared_target()/'install/manifest.json'
     if manifest_path.is_file():
         manifest=json.loads(manifest_path.read_text(encoding='utf-8'))
+        if manifest.get('engine')=='kernel':
+            from .tool_receipt_bridge import _kernel_module
+            try:return bool(_kernel_module('kernel_setup').KernelSetupStore(_shared_target()/'kernel').activation())
+            except (ValueError,RuntimeError,OSError):return False
         if manifest.get('engine')=='kernel-shadow':
             from hermes_cli.config import load_config_readonly
             shadow=(((load_config_readonly().get('plugins') or {}).get('entries') or {}).get('hermes-alive') or {}).get('settings',{}).get('kernel_shadow',{})
@@ -220,9 +229,12 @@ def alive_command(args: argparse.Namespace) -> int:
         profile_settings=(((load_config_readonly().get('plugins') or {}).get('entries') or {}).get('hermes-alive') or {}).get('settings',{})
         try:
             setup=module.KernelSetupStore(_shared_target()/'kernel',initialize=not bool(profile_settings.get('kernel_setup')))
-        except (module.KernelSetupError,RuntimeError):
+        except (module.KernelSetupError,RuntimeError,OSError):
             print(json.dumps({'ok':False,'configuration_recovery_required':True,
                 'delivery_enabled':False,'identity_replaced':False}))
+            return 2
+        if setup.activation():
+            print(json.dumps({'ok':False,'existing_runtime_must_be_paused':True,'delivery_enabled':False}))
             return 2
         intent,code=setup.stage({'model_calls':True,'delivery':True,
             'outbound_retention_days':args.retention_days,'outbound_retention_confirmed':True,'model':args.model,
@@ -265,14 +277,37 @@ def alive_command(args: argparse.Namespace) -> int:
     if action == "enable":
         from hermes_cli.config import load_config_readonly
         settings=(((load_config_readonly().get('plugins') or {}).get('entries') or {}).get('hermes-alive') or {}).get('settings',{})
-        if settings.get('kernel_setup'):
-            print(json.dumps({'ok':False,'enabled':False,'kernel_activation_not_qualified':True,
+        if settings.get('kernel_setup') or _installed_engine()=='kernel':
+            print(json.dumps({'ok':False,'enabled':False,'authorized_conversation_required':True,
+                'next_command':'/alive enable',
                 'legacy_fallback_allowed':False}))
             return 2
         _set_enabled(True)
         print(json.dumps({"ok": True, "enabled": True, "restart_required": True}))
         return 0
     if action == "disable":
+        from hermes_cli.config import load_config_readonly
+        settings=(((load_config_readonly().get('plugins') or {}).get('entries') or {}).get('hermes-alive') or {}).get('settings',{})
+        if settings.get('kernel_setup') or _installed_engine()=='kernel':
+            from .tool_receipt_bridge import _kernel_module
+            from uuid import uuid4
+            if not settings.get('kernel_setup') and not (_shared_target()/'kernel').exists():
+                print(json.dumps({'ok':True,'enabled':False,'new_work_authority_revoked':True,
+                                  'live_runtime_verified':False,'transport_queue_drained':False}))
+                return 0
+            store=_kernel_module('kernel_setup').KernelSetupStore(_shared_target()/'kernel')
+            configured=store.configuration()
+            if configured:
+                from importlib import import_module
+                policies=import_module(store.__class__.__module__.rsplit('.',1)[0]+'.autonomy_policy').AutonomyPolicyProjection(store.journal)
+                current=policies.current(configured.subject)
+                if current and current.enabled:
+                    policies.apply(policies.append_update(subject=configured.subject,actor=configured.subject,
+                        expected_revision=current.revision,enabled=False,context=current.context,
+                        operation_id='operator-pause:'+uuid4().hex))
+            print(json.dumps({'ok':True,'enabled':False,'new_work_authority_revoked':True,
+                              'live_runtime_verified':False,'transport_queue_drained':False}))
+            return 0
         _set_enabled(False)
         print(json.dumps({"ok": True, "enabled": False, "restart_required": True}))
         return 0
@@ -280,21 +315,25 @@ def alive_command(args: argparse.Namespace) -> int:
         from hermes_cli.config import load_config_readonly
         settings=(((load_config_readonly().get('plugins') or {}).get('entries') or {}).get('hermes-alive') or {}).get('settings',{})
         setup_status={}
-        if settings.get('kernel_setup'):
+        if settings.get('kernel_setup') or _installed_engine()=='kernel':
             try:
                 from .tool_receipt_bridge import _kernel_module
-                configured=_kernel_module('kernel_setup').KernelSetupStore(_shared_target()/'kernel').configuration()
-                setup_status={'setup_phase':'configured_not_activated' if configured else 'awaiting_confirmation',
-                              'delivery_authority_activated':False,'legacy_identity_migrated':False}
+                root=_shared_target()/'kernel'
+                store=_kernel_module('kernel_setup').KernelSetupStore(root) if settings.get('kernel_setup') or root.exists() else None
+                configured=store.configuration() if store else None
+                active=store.activation() if store else None
+                setup_status={'setup_phase':('authorized_runtime_unverified' if active else 'configured_not_activated')
+                                  if configured else ('awaiting_confirmation' if store else 'awaiting_setup'),
+                              'enabled':bool(active),'delivery_authority_activated':bool(active),'legacy_identity_migrated':False}
             except Exception:
-                setup_status={'setup_phase':'recovery_required','delivery_authority_activated':False}
+                setup_status={'setup_phase':'recovery_required','delivery_authority_activated':False,'enabled':False}
         print(
             json.dumps(
                 {
                     "ok": True,
                     "hermes_home": str(_home()),
                     "hook_installed": (_hook_target() / "HOOK.yaml").is_file(),
-                    "enabled": _effective_enabled(),
+                    "enabled": False if settings.get('kernel_setup') or _installed_engine()=='kernel' else _effective_enabled(),
                     "state_root": str(_shared_target()),
                     "live_runtime_verified": False,
                     **setup_status,

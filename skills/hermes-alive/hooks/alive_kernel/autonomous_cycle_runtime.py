@@ -4,6 +4,7 @@ Current models/context and authority come from the host/user, never this module.
 Shadow is non-executing; opt-in execution consumes only the exact prepared attempt.
 """
 from dataclasses import dataclass,field
+from datetime import datetime,timezone
 import re
 
 from .dispatch_outbox import DispatchOutbox
@@ -39,8 +40,9 @@ class AutonomousCycleRuntime:
             execute=False,authorization_parameters=None,send_parameters=None,worker_id=None,
             reconciliation_cursor=0,binding_limit=16,receipt_limit=128,
             reconsider_after_seconds=None,cognition_configuration_id=None,
-            interpret_feedback=False,feedback_model=None,channel_execution='publisher'):
-        if (type(execute) is not bool or type(interpret_feedback) is not bool
+            interpret_feedback=False,feedback_model=None,channel_execution='publisher',defer_until_eligible=False):
+        if (type(execute) is not bool or type(interpret_feedback) is not bool or type(defer_until_eligible) is not bool
+                or defer_until_eligible and (not execute or channel_execution!='standard')
                 or channel_execution not in ('publisher','standard')
                 or (feedback_model is not None and (not interpret_feedback or not isinstance(feedback_model,str)
                     or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}',feedback_model)))
@@ -58,6 +60,12 @@ class AutonomousCycleRuntime:
             return AutonomousCycleResult('paused',reconciliation)
         if reconciliation['failed_bindings']:
             return AutonomousCycleResult('reconciliation_attention',reconciliation)
+        if defer_until_eligible:
+            now=datetime.now(timezone.utc)
+            ready=self.outbox.next_delegated_start(authorization_parameters.get('delegation_event_id'),
+                subject=subject,policy_event_id=policy.event_id,
+                route_binding_id=authorization_parameters.get('route_binding_id'),now=now)
+            if ready>now:return AutonomousCycleResult('waiting_for_change',reconciliation)
         if interpret_feedback:
             await self.feedback.tick(subject=subject,call=expression_parameters.get('call'),model=feedback_model,
                 clearance=expression_parameters.get('sensitivity','private'))

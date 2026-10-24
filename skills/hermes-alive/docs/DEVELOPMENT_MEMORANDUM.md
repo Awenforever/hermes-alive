@@ -3,6 +3,34 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## Control wiring is not complete execution qualification
+
+2026-10-24 (Asia/Shanghai), Codex; ADR0213. Only actual admitted Core commands in
+the confirmed owner conversation may enable/pause/query. Store full-envelope
+signed activation tied to finite existing grants. Config hints cannot mint or
+renew authority. Startup must not revive legacy/shadow when new setup is paused.
+Model/fallback management stays in the shared Core slot; public-query consent
+does not imply private profile/chat access or automatic learning. Keep pending
+and reap capabilities on any discovery preparation wrapper. Reuse current
+continuity on repeated confirmation/startup instead of closing an active bridge.
+CLI disable must revoke the real policy, not legacy files only. Report durable
+authority separately from live task state and channel delivery. A no-model
+start/stop fixture is control evidence only; interrupted active-cycle recovery,
+actual ordinary cycles, migration and consumer/fleet/quality gates remain open.
+
+Pre-cognition cooldown and final cadence reservation must share the same verified
+owner history, including uncertain starts and grants from before renewal. The
+advisory read is not a reservation; final writer-transaction checks still win.
+Skip source/model work during a cooldown and recheck in the standard cycle, not
+only after expensive cognition. Cross-process policy OFF must reach paused without
+unnecessary route/tool/model work. Use the exact embedded package for dependencies;
+the observer loader's module allowlist is not a general import/activation API.
+Keep `kernel-shadow` non-sending even with retained grants. Native activation
+requires the explicit `kernel` lifecycle engine, not just execute=True or a
+renamed UI label. Native-engine discovery/startup consults signed state even when
+the disposable Core setup hint is missing; an absent fresh store is unconfigured,
+while a damaged existing inventory requires recovery, never key replacement.
+
 ## Standard submission must use Core parsing and owning continuity
 
 2026-10-24 (Asia/Shanghai), Codex. Prior standard executor fixtures supplied
