@@ -45,7 +45,7 @@ def register(ctx) -> None:
     _gateway_host_binding=GatewayHostBinding(ctx)
     register_setup_command(ctx,_gateway_host_binding)
     register_tool_receipt_hook(ctx)
-    register_admitted_inbound_hook(ctx)
+    register_admitted_inbound_hook(ctx,_gateway_host_binding)
     ctx.register_cli_command(
         name="alive",
         help="Install, inspect, and control Hermes Alive",

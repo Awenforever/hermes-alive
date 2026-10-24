@@ -157,6 +157,8 @@ run_and_require run_discovery_observation_phase.py '^HERMES_ALIVE_DISCOVERY_OBSE
 run_and_require run_native_discovery_wait.py '^HERMES_ALIVE_NATIVE_DISCOVERY_WAIT_OK$'
 run_and_require run_native_content_recovery.py '^HERMES_ALIVE_NATIVE_CONTENT_RECOVERY_OK$'
 run_and_require run_reconsideration_expired_agenda.py '^HERMES_ALIVE_RECONSIDERATION_EXPIRED_AGENDA_OK$'
+run_and_require run_alive_kernel_tool_receipts.py '^HERMES_ALIVE_KERNEL_TOOL_RECEIPTS_OK$'
+run_and_require run_alive_kernel_admitted_inbound.py '^HERMES_ALIVE_ADMITTED_INBOUND_OK$'
 run_and_require run_rich_content_model_attribution_v1.py '^HERMES_ALIVE_RICH_CONTENT_MODEL_ATTRIBUTION_RESULT=PASS([[:space:]]|$)'
 run_and_require run_runtime_disable_contract.py '^HERMES_ALIVE_RUNTIME_DISABLE_CONTRACT_RESULT=PASS$'
 run_and_require run_plugin_cli_portable.py '^HERMES_ALIVE_PLUGIN_CLI_PORTABLE_RESULT=PASS$'

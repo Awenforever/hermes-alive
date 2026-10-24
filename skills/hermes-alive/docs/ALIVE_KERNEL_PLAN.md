@@ -4,6 +4,21 @@ Status: active
 
 Last reviewed: 2026-10-24
 
+Ordinary-input wiring (2026-10-24; ADR0223): the configured native engine now
+observes current Core-admitted target input independently of the legacy shadow
+environment switch. It resolves the actual profile/receiver/conversation and
+records only keyed revision metadata under the canonical native principal.
+It never consumes input, stores a chat body, classifies a person as human or
+confers memory/learning authority. The first actual Core integration passes
+ordinary/replayed/edited input, foreign scope, pause and independent consumer
+cases; final qualification with direct wait-invalidation assertions is pending.
+This exposes the remaining product gap explicitly: default daily-chat retention,
+noise-aware memory extraction and attributed feedback are NOT wired by this
+observer. Next integrate those through explicit onboarding choices and existing
+consent/memory machinery, using synthetic actual-Core turns before private data.
+ADR0222 is now terminal PASS95 portable plus nine recovery suites and its Windows
+temporal regression; these do not qualify the new ingress path by substitution.
+
 Recovery qualification update (2026-10-24): ADR0221 runtime r53 is terminal PASS
 in 94 portable suites, 16 actual supported-Core checks and eight recovery suites.
 The actual inherited-model public-digest diagnostic generated one isolated local

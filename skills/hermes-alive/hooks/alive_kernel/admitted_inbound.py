@@ -19,6 +19,47 @@ class AdmittedInboundError(ValueError):
     pass
 
 
+def record_configured_input(store,configured,scope,values):
+    """Wake the configured native owner without retaining or learning a body.
+
+    Caller is the non-consuming Core admission hook with a live canonical router.
+    This metadata is not human attribution, quoted-feedback evidence or memory
+    authority. Future consented body/learning intake is a separate contract.
+    """
+    from .conversation_continuity import core_scope_identity
+    from .autonomy_policy import AutonomyPolicyProjection
+    _document,owner,_fingerprint=core_scope_identity(scope,store.protector)
+    current=store.configuration()
+    policy=AutonomyPolicyProjection(store.journal).current(owner)
+    if (current is None or current.event_id!=configured.event_id or owner!=configured.subject
+            or policy is None or not policy.enabled):return None
+    message=values.get('message_id');text=values.get('text')
+    if not _identifier(message) or not isinstance(text,str) or len(text)>1_000_000:
+        raise AdmittedInboundError('bounded current native input required')
+    text_fingerprint=store.protector.authenticate_json('configured.input.text.v1',text)
+    identity=dict(owner=owner,platform=scope['platform'],transport=scope['transport_profile'],
+        configuration=configured.event_id,session=values['session_key'],message=message,
+        normalized_text_revision=text_fingerprint)
+    event_id='conversation.configured:'+store.protector.authenticate_json('configured.input.v1',identity)
+    payload=dict(method='configured-input-wake-v1',configuration_event_id=configured.event_id,
+        text_fingerprint=text_fingerprint,
+        text_characters=len(text),raw_content_stored=False,erasable_content_stored=False,
+        content_retention_status='not_authorized',principal_kind='not_exposed_by_host',
+        learning_authority_granted=False,execution_authority_granted=False,
+        role='native_input_observation_not_agent_turn')
+    existing=store.journal.get(event_id)
+    if existing is not None:
+        if (existing.event.event_type!='conversation.inbound'
+                or existing.event.source!='hermes.plugin.post_gateway_admission'
+                or existing.event.actor!='system:alive-configured-input'
+                or existing.event.subject!=owner or dict(existing.event.payload)!=payload):
+            raise AdmittedInboundError('configured native input identity conflicts')
+        return existing
+    return store.journal.append(EventEnvelope(event_id=event_id,event_type='conversation.inbound',
+        source='hermes.plugin.post_gateway_admission',actor='system:alive-configured-input',
+        subject=owner,sensitivity=Sensitivity.PRIVATE,payload=payload))
+
+
 def _identifier(value):
     return isinstance(value, str) and bool(value.strip()) and len(value) <= 4096
 

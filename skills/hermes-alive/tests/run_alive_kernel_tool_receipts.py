@@ -23,6 +23,7 @@ class FakePluginContext:
     def __init__(self) -> None:
         self.hooks: dict[str, object] = {}
         self.cli: dict[str, object] = {}
+        self.commands: dict[str, object] = {}
         self._manager=SimpleNamespace(scope_key=str(Path.cwd()))
         self.unload=[]
 
@@ -34,6 +35,10 @@ class FakePluginContext:
 
     def register_cli_command(self, **values):
         self.cli[str(values["name"])] = values
+
+    def register_command(self,name,handler,*,description,args_hint,argument_mode):
+        assert argument_mode=='text' and callable(handler)
+        self.commands[name]=handler
 
 
 def _load_plugin():
@@ -79,6 +84,7 @@ def main() -> int:
             plugin.register(context)
             assert set(context.hooks) == {"post_tool_call", "post_gateway_admission"}
             assert set(context.cli) == {"alive"}
+            assert set(context.commands)=={'alive'}
             callback = context.hooks["post_tool_call"]
             values = {
                 "tool_name": "terminal",

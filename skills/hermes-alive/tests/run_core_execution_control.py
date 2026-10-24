@@ -85,6 +85,54 @@ async def test(home):
         # Hold the lifetime before yielding again: the actual native task is
         # tested without permitting source/model calls in this control fixture.
         binding.arguments['stop'].set()
+        # Ordinary native ingress uses the configured Core principal without
+        # the legacy shadow environment flag. Observe, never claim the turn.
+        from gateway.run_inbound_consumer import run_post_admission_hook
+        def inputs():return store.journal.read(event_type='conversation.inbound')
+        host=binding.native.host
+        def input_snapshot():
+            return host.runtime.reconsideration.capture(subject=host.subject,
+                configuration_id=host.configuration_id,execute=True,
+                policy=host.runtime.reconciliation._owner_policy(host.subject),
+                parameters=binding.arguments['build_parameters']()['expression_parameters'],window_seconds=600)
+        original_input=input_snapshot()
+        before_inputs=len(inputs())
+        event=SimpleNamespace(message_id='synthetic-ordinary-input',text='PRIVATE_CURRENT_BODY_SENTINEL')
+        assert await run_post_admission_hook(runner,event,source,entry.session_key)==(False,None)
+        assert len(inputs())==before_inputs+1
+        observed=inputs()[-1].event
+        assert observed.subject==store.configuration().subject
+        assert observed.actor=='system:alive-configured-input'
+        assert observed.payload['method']=='configured-input-wake-v1'
+        assert observed.payload['raw_content_stored'] is False
+        assert observed.payload['erasable_content_stored'] is False
+        assert observed.payload['learning_authority_granted'] is False
+        current_input=input_snapshot()
+        assert current_input.owner_frontier>original_input.owner_frontier
+        assert current_input.semantic_digest!=original_input.semantic_digest
+        assert b'PRIVATE_CURRENT_BODY_SENTINEL' not in store.journal.path.read_bytes()
+        assert await run_post_admission_hook(runner,event,source,entry.session_key)==(False,None)
+        assert len(inputs())==before_inputs+1,'ordinary replay became another wake'
+        edited=SimpleNamespace(message_id=event.message_id,text='PRIVATE_EDITED_BODY_SENTINEL')
+        assert await run_post_admission_hook(runner,edited,source,entry.session_key)==(False,None)
+        assert len(inputs())==before_inputs+2,'changed normalized text did not wake'
+        assert await run_post_admission_hook(runner,event,source,entry.session_key)==(False,None)
+        assert len(inputs())==before_inputs+2,'old content replay superseded its newer revision'
+        foreign=core.SessionSource(platform=core.Platform.TELEGRAM,chat_id=source.chat_id,
+            user_id='synthetic-other',thread_id='7')
+        assert await run_post_admission_hook(runner,event,foreign,entry.session_key)==(False,None)
+        assert len(inputs())==before_inputs+2
+        other_thread=core.SessionSource(platform=core.Platform.TELEGRAM,chat_id=source.chat_id,
+            user_id=source.user_id,thread_id='8')
+        assert await run_post_admission_hook(runner,event,other_thread,entry.session_key)==(False,None)
+        assert len(inputs())==before_inputs+2
+        # A separate consumer can own @actions. Alive neither requires that
+        # plugin nor stores its body or turns it into a user-authorized memory.
+        binding.context.register_hook('post_gateway_admission',lambda **v:
+            {'action':'handled','reply':'synthetic consumer'} if v.get('text')=='@synthetic-action' else None)
+        event=SimpleNamespace(message_id='synthetic-consumed-input',text='@synthetic-action')
+        assert await run_post_admission_hook(runner,event,source,entry.session_key)==(True,'synthetic consumer')
+        assert len(inputs())==before_inputs+3
         assert '有效' in await invoke('status')
         assert '仍在运行' in await invoke('enable')
         assert len(store.journal.read(event_type='alive.setup.activated'))==1
@@ -126,6 +174,10 @@ async def test(home):
         assert store.activation(now=datetime.now(timezone.utc)+timedelta(days=366))==active
         assert store.journal.get(active['delegation_event_id']).event.expires_at is None
         assert '已暂停' in await invoke('pause')
+        paused_inputs=len(inputs())
+        assert await run_post_admission_hook(runner,SimpleNamespace(
+            message_id='synthetic-paused-input',text='PRIVATE_PAUSED_BODY'),source,entry.session_key)==(False,None)
+        assert len(inputs())==paused_inputs
         await binding.task
         assert store.activation(now=datetime.now(timezone.utc)+timedelta(days=366)) is None
         assert store.activation() is None and not binding.native.pending
