@@ -4,6 +4,32 @@ Status: active
 
 Last reviewed: 2026-10-24
 
+Initial-repair qualification checkpoint (2026-10-24): immutable r35's new pure
+suite passes on Linux (successful repair, repeated rejection, cancelled/incomplete
+work, erased ancestry, conflicting source review and critical semantic rejection).
+Windows first failed its overly strict recovered-object equality after the real
+30-second send permit expired: no model was repeated, and no new attempt was
+created. The fixture now requires exact same body/proof and exact old permit
+identity/expiry with permit_expired refusal; no production time limit was changed.
+The corrected Windows existing-venv check is terminal0 with
+WINDOWS_INITIAL_REPAIR_RECOVERY_OK; this is not a Windows Desktop consumer test.
+Actual r35 model chain submitted one isolated draft and completed two main turns,
+but it did not exercise the initial-rejection repair branch. It still overexplains
+missing evidence and gives unsolicited practical advice: NOT a quality pass.
+Long-lived attention waiting and broader semantic review/purpose boundaries are
+still open; do not mistake this narrow repair bridge for long-term completion.
+
+Review-recovery implementation (2026-10-24; ADR0216): a narrowly verified
+unsupported-addition-only initial rejection may now obtain actual source findings
+and use the existing once-per-intent correction path. A second review cannot
+overrule an unchanged rejected original; critical/invalid/missing semantic proof
+still stops, and the corrected body must independently satisfy all final gates.
+New cancellation, disagreement, repeated rejection, ancestry and no-spend replay
+fixtures are under qualification. Long-lived attention waiting is still open;
+do not enlarge a continue tuple into unbounded regeneration. Actual r32 full
+component regression has since ended terminal0/PASS/88 suites, but predates this
+new correction bridge and is NOT its full qualification.
+
 Recipient-context actual comparison (2026-10-24, Codex): r30/r31 each16 focused
 suites passed, including real CLI/control, explicit zh-CN over Core fr locale,
 Core-locale default resolution, encrypted setup-derived explicit preferences,

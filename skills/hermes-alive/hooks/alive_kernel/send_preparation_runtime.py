@@ -107,9 +107,16 @@ manufactures them from model output or reviews, nor falls back to another body.
                 selection_event_id=expressed.planning.selection_event_id,
                 subject=expression_parameters['subject']))
         if expression_parameters.get('grounding',False) or required:
-            if expressed.review_disposition=='rejected':
+            semantic_rejected=expressed.review_disposition=='rejected'
+            if semantic_rejected and not (allow_repair and expression_parameters.get('grounding',False)
+                    and self._addition_repair_candidate(expressed,expression_parameters)):
                 return ExpressionQualityResult(expressed,expressed.review_event_id,'final_semantic_rejected')
             final_event,quality=await self._review_final(expressed,expression_parameters)
+            if semantic_rejected and quality=='supported':
+                # A second reviewer cannot overrule an unresolved semantic
+                # rejection. Only a NEW corrected and re-reviewed body may pass.
+                return ExpressionQualityResult(expressed,expressed.review_event_id,
+                    'final_semantic_rejected',final_event,'semantic_rejection_unresolved')
             if quality!='supported':
                 initial_final=final_event
                 if not allow_repair:
@@ -129,6 +136,24 @@ manufactures them from model output or reviews, nor falls back to another body.
                 if quality!='supported':
                     return ExpressionQualityResult(expressed,final_event,'final_'+quality,initial_final,repair)
         return ExpressionQualityResult(expressed,final_event,quality,initial_final,repair)
+
+    def _addition_repair_candidate(self,expressed,parameters):
+        """A valid narrow rejection may obtain findings, never authorization.
+
+        Reuse the existing once-per-intent final-source correction slot. Meaning
+        loss, speech-act/literal changes, missing/foreign/invalid proof and an
+        already corrected body are not candidates for this bridge.
+        """
+        if parameters.get('correction_review_event_id') is not None:return False
+        record=self.journal.get(expressed.review_event_id)
+        required=parameters.get('require_independent_grounding',False)
+        verified=self.expression.store.verify_review(record,allow_correlated=not required) if record else None
+        if (verified is None or verified.candidate_event_id!=expressed.expression_event_id
+                or {risk.value for risk in verified.assessment.risks}!={'unsupported_addition'}):return False
+        payload=record.event.payload
+        return bool(payload.get('speech_act_preserved') is True
+            and payload.get('protected_literals_preserved') is True
+            and all(atom['preserved'] is True and not atom['risks'] for atom in payload['atom_reviews']))
 
     async def prepare(self, *, authorization_operation_id, route_binding_id,
                       confirmation_event_id=None, delegation_event_id=None,

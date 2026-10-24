@@ -3,6 +3,24 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## Initial semantic additions must not bypass review or miss bounded repair
+
+2026-10-24, Codex; ADR0216. The first semantic discovery review could reject an
+unsupported addition before the established final-source correction path could
+obtain actionable findings. Only a current authenticated additions-only rejection
+with all atoms/literals/speech preserved may enter that path. A supportive second
+review does not approve the unchanged rejected original. Reuse the same one-slot
+correction, require new semantic and final-source approval, and keep existing
+authority/cadence/unknown-work checks. No exception for a particular source claim.
+
+The expanded Windows fixture exposed a TEST expectation, not a replay permission
+bug: slow actual filesystem verification crosses the existing30s permit. Recovery
+keeps identical body/quality/ancestry and performs zero provider calls, but correctly
+returns permit_expired and no new attempt. Accept only that narrowly verified
+decline in the fixture; never extend production TTL, mint a replacement permit,
+fake a clock or omit expiry merely to keep dataclass equality. Preserve critical
+rejection, conflicting reviews, cancellation, erased-proof and no-spend tests.
+
 ## Recipient configuration must reach actual cognition, not only installation
 
 2026-10-24, Codex; ADR0215. Existing renderer language and explicit context paths

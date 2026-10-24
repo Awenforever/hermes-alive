@@ -3,6 +3,7 @@
 import asyncio
 import argparse
 from datetime import datetime, timedelta, timezone
+from dataclasses import replace
 import json
 from pathlib import Path
 import sys
@@ -23,9 +24,10 @@ from alive_kernel_testkit import install_terminal_route
 from run_alive_kernel_expression_runtime import scenario
 
 
-async def test(root, mode):
+async def test(root, mode, *, initial_semantic_rejected=False):
     journal, params, original = await scenario(root, 'share', return_ready=True,
-        grounding=True, single_family=True, render_prefix='I told you yesterday. ')
+        grounding=True, single_family=True, render_prefix='I told you yesterday. ',
+        semantic_additions=initial_semantic_rejected)
     policy = AutonomyPolicyProjection(journal)
     policy.apply(policy.append_update(subject='user:test', actor='user:test', expected_revision=0,
         enabled=True, context=PolicyContext(can_interrupt=True), operation_id='policy'))
@@ -156,7 +158,16 @@ async def test(root, mode):
     else:
         if mode in ('cancel','review-cancel'):
             assert reopened.attempt_event_id is None and reopened.repair_disposition == 'unavailable'
-        else: assert reopened == prepared
+        elif reopened!=prepared and prepared.authorization is not None:
+            # Slow real-filesystem verification may cross the existing30s
+            # permit. Replay must NOT renew it merely to preserve object equality.
+            previous,current=prepared.authorization,reopened.authorization
+            assert previous.authorized and current is not None and not current.authorized
+            assert current.reasons==(*previous.reasons,'permit_expired')
+            assert current.event_id==previous.event_id and current.valid_until==previous.valid_until
+            assert current.valid_until<=datetime.now(timezone.utc)
+            assert reopened==replace(prepared,authorization=current,attempt_event_id=None)
+        else: assert reopened==prepared
     if mode=='review-cancel':
         assert len(journal.read(event_type='expression.local_correction_completed'))==1
         repair_starts=[r for r in journal.read(event_type='expression.runtime_started')

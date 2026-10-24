@@ -18,7 +18,8 @@ from alive_kernel.semantic_review import SemanticReviewError
 async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.USER_DELEGATED,
                    source_summary='Public workshop, details unverified.', draft_text=None,
                    grounding=False, single_family=False, render_prefix='', model_timeout_seconds=None,
-                   subject='user:test', operation_id='one', source_url='https://example.invalid/workshop'):
+                   subject='user:test', operation_id='one', source_url='https://example.invalid/workshop',
+                   semantic_additions=False,semantic_speech_shift=False):
     journal = ExperienceJournal(root / 'experience.sqlite3')
     reader = DiscoveryOpportunityIngestor(journal)
     source = reader.ingest(DiscoveryCandidate(source='synthetic public fixture', title='Repair workshop',
@@ -61,8 +62,8 @@ async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.
         elif task == 'alive_semantic_review':
             data = json.loads(kw['messages'][1]['content'])
             value = {'atom_reviews': [{'atom_id': atom['atom_id'], 'preserved': True, 'risks': []}
-                for atom in data['meaning']['atoms']], 'added_claims_detected': False,
-                'speech_act_preserved': True, 'protected_literals_preserved': True}
+                for atom in data['meaning']['atoms']], 'added_claims_detected': semantic_additions,
+                'speech_act_preserved': not semantic_speech_shift, 'protected_literals_preserved': True}
             model = 'synthetic/renderer' if single_family else 'synthetic/reviewer'
             kw['route_info']['provider'] = 'synthetic-review-provider'
         else:
@@ -114,7 +115,7 @@ async def scenario(root, mode, *, return_ready=False, authority=ActionAuthority.
     assert len(calls)==count_before_invalid
     assert not result.delivery_authorized
     if single_family:
-        assert result.review_disposition == 'correlated_review'
+        assert result.review_disposition == ('rejected' if semantic_additions or semantic_speech_shift else 'correlated_review')
         record = journal.get(result.review_event_id)
         assert not record.event.payload['independent_review']
         assert runtime.store.verify_review(record) is None

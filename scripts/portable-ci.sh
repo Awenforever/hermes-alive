@@ -120,6 +120,7 @@ run_and_require run_core_plugin_model_call.py '^HERMES_ALIVE_CORE_PLUGIN_MODEL_C
 run_and_require run_expression_history.py '^HERMES_ALIVE_EXPRESSION_HISTORY_OK$'
 run_and_require run_final_wording_preparation.py '^HERMES_ALIVE_FINAL_WORDING_PREPARATION_OK$'
 run_and_require run_final_wording_repair.py '^HERMES_ALIVE_FINAL_WORDING_REPAIR_OK$'
+run_and_require run_initial_semantic_repair.py '^HERMES_ALIVE_INITIAL_SEMANTIC_REPAIR_OK$'
 run_and_require run_shadow_final_quality.py '^HERMES_ALIVE_SHADOW_FINAL_QUALITY_OK$'
 run_and_require run_alive_kernel_expression_runtime.py '^HERMES_ALIVE_KERNEL_EXPRESSION_RUNTIME_OK$'
 run_and_require run_alive_kernel_opportunity_synthesis.py '^HERMES_ALIVE_KERNEL_OPPORTUNITY_SYNTHESIS_OK$'
