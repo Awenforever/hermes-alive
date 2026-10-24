@@ -1,5 +1,6 @@
 """Current expression to send-time authorization; no channel IO or FIFO."""
 from dataclasses import dataclass
+from datetime import datetime,timezone
 import re
 
 from .action_authorization import SendTimeAuthorizer, ActionAuthorizationDecision
@@ -29,6 +30,26 @@ class SendPreparationResult:
     repair_disposition: str | None = None
 
 
+@dataclass(frozen=True,slots=True)
+class QualifiedContentRejection:
+    """Current completed negative advice, NOT a deferral or action grant."""
+    subject: str
+    operation_id: str
+    selection_event_id: str
+    expression_event_id: str
+    review_event_id: str
+    disposition: str
+    source_event_ids: tuple[str,...]
+    valid_until: datetime
+
+    def to_event_payload(self):
+        return dict(method='qualified-content-rejection-v1',subject=self.subject,operation_id=self.operation_id,
+            selection_event_id=self.selection_event_id,
+            expression_event_id=self.expression_event_id,review_event_id=self.review_event_id,
+            disposition=self.disposition,source_event_ids=list(self.source_event_ids),
+            valid_until=self.valid_until.isoformat(),authority_granted=False)
+
+
 class SendPreparationRuntime:
     """Compose planning/expression with existing exact send-time checks.
 
@@ -45,6 +66,73 @@ manufactures them from model output or reviews, nor falls back to another body.
         self.authorizer = SendTimeAuthorizer(journal, content_vault=self.vault,
                                             context_vault=context_vault)
         self.outcomes = OutcomeProjection(journal, content_vault=self.vault)
+
+    def rejection_witness(self,assessed,parameters):
+        """Distinguish completed content rejection from unknown/failed work.
+
+        Read-only. A later eligibility decision must revalidate this witness;
+        this method neither snoozes sources nor makes attention safe to ignore.
+        """
+        from .content_vault import ContentReference,ContentVaultError
+        from .expression_support import ExpressionSourceSupportReviewer
+        if (assessed.quality_disposition not in (
+                'final_semantic_rejected','final_unsupported','final_uncertain')
+                or getattr(parameters.get('call'),'pending',())):
+            return None
+        expressed=assessed.expression
+        if (expressed.planning.action_kind!='share' or expressed.expression_event_id is None
+                or expressed.planning.operation_id!=parameters['operation_id']
+                or assessed.final_review_event_id is None):return None
+        required=parameters.get('require_independent_grounding',False)
+        try:
+            candidate=self.expression.store.resolve_model_candidate(expressed.expression_event_id)
+            if (candidate is None or candidate.text!=expressed.text
+                    or candidate.selection_event_id!=expressed.planning.selection_event_id):return None
+            subject,origin,clearance=self._expression_origin(expressed)
+            if subject!=parameters['subject']:return None
+            review=self.journal.get(assessed.final_review_event_id)
+            if review is None or review.event.subject!=subject:return None
+            if assessed.quality_disposition=='final_semantic_rejected':
+                verified=self.expression.store.verify_review(review,allow_correlated=not required)
+                if (expressed.review_disposition!='rejected'
+                        or expressed.review_event_id!=review.event.event_id or verified is None
+                        or verified.candidate_event_id!=expressed.expression_event_id
+                        or verified.assessment.disposition.value!='rejected'):
+                    return None
+                review_expiry=review.event.expires_at
+            else:
+                reviewer=ExpressionSourceSupportReviewer(self.journal,content_vault=self.vault,
+                    context_vault=self.context_vault)
+                findings=reviewer.verify_current(review.event.event_id,subject=subject,
+                    interpretation_id=origin,candidate_id=expressed.expression_event_id,
+                    clearance=clearance,allow_correlated=not required)
+                if findings is None or 'final_'+findings['verdict']!=assessed.quality_disposition:return None
+                resolver=parameters.get('resolve_grounding_domain') or (lambda model:'unqualified-family')
+                if (resolver(review.event.payload['generator_model'])!=review.event.payload['generator_domain']
+                        or resolver(review.event.payload['reviewer_model'])!=review.event.payload['reviewer_domain']):
+                    return None
+                # Source-review events retain history without an envelope TTL;
+                # their encrypted review content inherits the actual expression
+                # lifetime. Do not mistake absent event TTL for absent proof.
+                review_expiry=ContentReference.from_event_payload(review.event.payload['content']).retention_until
+                if review_expiry!=candidate.expires_at:return None
+            references=self.expression.store.continuity_sources_for_selection(
+                expressed.planning.selection_event_id,subject)
+            sources=tuple(self.journal.get(ref['event_id']) for ref in references)
+            # Never silently defer a user-admitted commitment as if it were an
+            # optional public discovery. Source state and truth stay unchanged.
+            if (not sources or any(source is None or source.event.subject!=subject
+                    or source.event.event_type!='discovery.opportunity_observed'
+                    or source.event.expires_at is None for source in sources)
+                    or review_expiry is None):return None
+            expiry=min(candidate.expires_at,review_expiry,*(s.event.expires_at for s in sources))
+            if review.event.expires_at is not None:expiry=min(expiry,review.event.expires_at)
+            if expiry<=datetime.now(timezone.utc):return None
+            return QualifiedContentRejection(subject,expressed.planning.operation_id,expressed.planning.selection_event_id,
+                expressed.expression_event_id,review.event.event_id,assessed.quality_disposition,
+                tuple(s.event.event_id for s in sources),expiry)
+        except (ContentVaultError,ValueError):
+            return None  # Unavailable/foreign proof is attention, not qualified rejection.
 
     def _expression_origin(self, expressed):
         candidate = self.expression.store.resolve_model_candidate(expressed.expression_event_id)

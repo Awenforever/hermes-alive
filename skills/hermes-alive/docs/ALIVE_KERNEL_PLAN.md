@@ -4,6 +4,17 @@ Status: active
 
 Last reviewed: 2026-10-24
 
+Quality-rejection boundary (2026-10-24; ADR0219): current completed negative
+wording advice now has an optional reference-only witness in authenticated host
+completion. Unknown/pending work, unavailable repair, missing/erased or foreign
+proof and user commitments do not qualify. Source validity is not cognitive
+eligibility: no source is hidden, snoozed or relabeled. The continuous host still
+stops on attention; source-specific bounded eligibility and exhaustion recovery
+remain open. Next consume the qualified history rather than enlarge the continue
+tuple or build a second queue. The predecessor r46 full component run is now
+terminal0/PASS91 and actual Core focus terminal0/PASS16; neither qualifies this
+new boundary or counts as a natural-quality round. Qualification is in progress.
+
 Pre-cognition wait integration (2026-10-24; ADR0218): native configured discovery
 now defers model selection/page reading until after reconciliation and existing
 wait validation. Encrypted derived-argument receipts restore only prior inquiry

@@ -88,6 +88,12 @@ class AutonomousHostRuntime:
             raise ValueError('cycle completion exceeds qualified contract')
         payload = {'subject':self.subject,'lane':self.lane,'operation_id':cycle.operation_id,'disposition':result.disposition,
             'next_reconciliation_cursor':cursor,'external_delivery_proven':False,'authority_granted':False}
+        rejection=getattr(result,'content_rejection',None)
+        if rejection is not None:
+            if (result.disposition!='content_review_attention' or rejection.subject!=self.subject
+                    or rejection.operation_id!=cycle.operation_id):
+                raise ValueError('content rejection cannot relabel another cycle outcome')
+            payload['content_rejection']=rejection.to_event_payload()
         payload['integrity_authenticator'] = self.protector.authenticate_json('autonomous.host.closed.v1',payload)
         def factory(connection):
             row = connection.execute('SELECT sequence,canonical_json,integrity_hash FROM experience_events WHERE event_id=?',(cycle.event_id,)).fetchone()
