@@ -81,6 +81,7 @@ class OpportunitySynthesisResult:
     unassessed_agenda_item_ids: tuple[str, ...] = ()
     reconsiderations: tuple[OpportunityReconsideration, ...] = field(default=(), repr=False)
     rejected_reconsideration_count: int = 0
+    candidate_deferred: bool = False
 
 
 _DIMENSIONS = ("user_value", "urgency", "novelty", "confidence", "interruption_cost", "risk")
@@ -472,7 +473,7 @@ class OpportunitySynthesizer:
         return self.vault.digest_json([dict(event=e.observation_event_id,content=_thaw_json(e.content),
             expires_at=e.expires_at.isoformat()) for e in values])
 
-    def source_pool(self,*,subject,clearance,focus=(),revision_event_ids=(),scope=None):
+    def source_pool(self,*,subject,clearance,focus=(),revision_event_ids=(),scope=None,excluded_urls=()):
         """One planned material window for recall and interpretation, not sends.
 
         Packing can admit only a bounded prefix later. Frozen scope retains the
@@ -481,15 +482,31 @@ class OpportunitySynthesizer:
         """
         focus_ids=tuple(e.observation_event_id for e in focus)
         if scope is not None:
+            v2=isinstance(scope,Mapping) and scope.get('method')=='bound-material-pool-v2'
+            keys={'method','cursor','origin_frontier','pool_ids','focus_ids','fair_pool_ids'}
+            if v2:keys|={'eligible_primary_ids','deferred_source_ids'}
             if (revision_event_ids or not isinstance(scope,Mapping)
-                    or set(scope)!={'method','cursor','origin_frontier','pool_ids','focus_ids','fair_pool_ids'}
-                    or scope['method']!='bound-material-pool-v1'
+                    or set(scope)!=keys
+                    or scope['method'] not in ('bound-material-pool-v1','bound-material-pool-v2')
                     or type(scope['cursor']) is not int or type(scope['origin_frontier']) is not int
                     or not 0<=scope['cursor']<=scope['origin_frontier']
                     or any(not isinstance(scope[k],(tuple,list)) for k in ('pool_ids','focus_ids','fair_pool_ids'))
                     or tuple(scope['focus_ids'])!=focus_ids):
                 raise OpportunitySynthesisError('invalid original material scope')
             ids=tuple(scope['pool_ids']);fair_ids=tuple(scope['fair_pool_ids'])
+            if v2:
+                eligible=scope['eligible_primary_ids'];deferred=scope['deferred_source_ids']
+                if (not isinstance(eligible,(tuple,list)) or not isinstance(deferred,(tuple,list))
+                        or any(not isinstance(i,str) for i in (*eligible,*deferred))
+                        or len(set(eligible))!=len(eligible) or not set(eligible)<=set(ids)
+                        or not 1<=len(deferred)<=64 or len(set(deferred))!=len(deferred)):
+                    raise OpportunitySynthesisError('invalid candidate eligibility references')
+                # Deferred material is an audit of the original choice, not an
+                # ongoing fact dependency of a separately valid chosen message.
+                for identity in deferred:
+                    item=self.journal.get(identity)
+                    if item is None or item.event.subject!=subject or item.sequence>scope['origin_frontier']:
+                        raise OpportunitySynthesisError('candidate deferral has foreign/future provenance')
             for values,limit in ((ids,32),(fair_ids,32-len(focus_ids))):
                 if (len(values)>limit or any(not isinstance(v,str) for v in values)
                         or len(set(values))!=len(values)):
@@ -511,6 +528,8 @@ class OpportunitySynthesizer:
             return pool,scope['cursor'],tuple(by_id[i] for i in fair_ids)
         cursor=self._source_cursor(subject,clearance) if not revision_event_ids else None
         pool=(self._revision_sources(revision_event_ids,subject,clearance) if revision_event_ids else
+            self.reader.candidate_evidence(subject=subject,clearance=clearance,limit=32,
+                source_cursor=cursor,excluded_urls=excluded_urls) if excluded_urls else
             self.reader.active_evidence(subject=subject,clearance=clearance,limit=32,source_cursor=cursor))
         fair_pool=pool[:32-len(focus)] if focus and not revision_event_ids else pool
         if focus:
@@ -519,11 +538,25 @@ class OpportunitySynthesizer:
             pool=tuple(focus)+tuple(e for e in fair_pool if e.observation_event_id not in focus_ids)
         return pool,cursor,fair_pool
 
-    def material_scope(self,*,subject,clearance,focus=()):
-        pool,cursor,fair=self.source_pool(subject=subject,clearance=clearance,focus=focus)
-        return dict(method='bound-material-pool-v1',cursor=cursor,origin_frontier=self.journal.last_sequence(),
+    def material_scope(self,*,subject,clearance,focus=(),excluded_urls=(),deferred_source_ids=()):
+        pool,cursor,fair=self.source_pool(subject=subject,clearance=clearance,focus=focus,excluded_urls=excluded_urls)
+        scope=dict(method='bound-material-pool-v1',cursor=cursor,origin_frontier=self.journal.last_sequence(),
             pool_ids=[e.observation_event_id for e in pool],focus_ids=[e.observation_event_id for e in focus],
             fair_pool_ids=[e.observation_event_id for e in fair])
+        if deferred_source_ids:
+            from .discovery_opportunities import canonicalize_discovery_url
+            excluded={canonicalize_discovery_url(url) for url in excluded_urls}
+            scope.update(method='bound-material-pool-v2',deferred_source_ids=list(dict.fromkeys(deferred_source_ids)),
+                eligible_primary_ids=[e.observation_event_id for e in pool if not e.content.get('url') or
+                    canonicalize_discovery_url(e.content['url']) not in excluded])
+        self.source_pool(subject=subject,clearance=clearance,focus=focus,scope=scope)
+        return scope
+
+    @staticmethod
+    def candidate_window(evidence,scope):
+        if scope is not None and scope.get('method')=='bound-material-pool-v2':
+            return tuple(e for e in evidence if e.observation_event_id in scope['eligible_primary_ids'])
+        return evidence
 
     def _validate_source_scan(self,start,receipt):
         scan=receipt.event.payload.get('source_scan')
@@ -850,7 +883,9 @@ class OpportunitySynthesizer:
             raise OpportunitySynthesisError("recovery cannot upgrade original host authority")
         original_ids = tuple(start.event.payload.get("observation_event_ids", ()))
         self._validate_source_scan(start,receipt)
-        if not original_ids and self.reader.active_evidence(subject=subject,clearance=clearance,limit=32):
+        eligible_scope=start.event.payload.get('material_scope')
+        scoped_eligibility=eligible_scope is not None and eligible_scope.get('method')=='bound-material-pool-v2'
+        if not original_ids and not scoped_eligibility and self.reader.active_evidence(subject=subject,clearance=clearance,limit=32):
             raise OpportunitySynthesisError('new material invalidates an empty interpretation')
         try:
             evidence = self.reader.active_evidence(subject=subject, clearance=clearance, limit=32,
@@ -936,8 +971,9 @@ class OpportunitySynthesizer:
                 if rejected:
                     raise OpportunitySynthesisError("legacy partial bundle lacks stable proposal identities")
                 indices = tuple(range(count))
+            candidate_evidence=self.candidate_window(evidence,eligible_scope)
             candidates, _, invalid, _ = self._candidates({"candidates": bundle["proposals"]},
-                evidence, operation_id, receipt.event.event_id, authority, context, tuple(indices), learning,
+                candidate_evidence, operation_id, receipt.event.event_id, authority, context, tuple(indices), learning,
                 source_presentation=bundle.get("source_presentation", "model_text_v1"),feedback=feedback,
                 recipient_meaning=start.event.payload.get('recipient_meaning',False),
                 intent_only=bundle.get('recipient_output') == 'intent-only-v1',
@@ -966,15 +1002,21 @@ class OpportunitySynthesizer:
                 raise OpportunitySynthesisError("completed model attribution unavailable")
             self._validate_protocol_recovery(start,receipt,subject,clearance)
             no_material=receipt.event.payload.get('system_no_material',False)
-            if type(no_material) is not bool or (not original_ids and not no_material):
+            deferred=receipt.event.payload.get('candidate_deferred',False)
+            expected_deferred=bool(scoped_eligibility and not candidate_evidence)
+            if type(deferred) is not bool or deferred!=expected_deferred:
+                raise OpportunitySynthesisError('candidate deferral lost its original eligibility scope')
+            if type(no_material) is not bool or (not original_ids and not no_material and not deferred):
                 raise OpportunitySynthesisError('invalid no-material provenance')
             if no_material:
                 if (original_ids or candidates or abstentions or reconsiderations
                         or model!='system/alive-no-current-material'):
                     raise OpportunitySynthesisError('invalid no-material system completion')
+            if deferred and (candidates or abstentions or reconsiderations or model!='system/alive-candidate-deferred'):
+                raise OpportunitySynthesisError('invalid deferred-material system completion')
             return OpportunitySynthesisResult(model, candidates, receipt.event.event_id, rejected,
                 abstentions, rejected_abstentions, self._unassessed(evidence, candidates, abstentions),
-                reconsiderations, rejected_hints)
+                reconsiderations, rejected_hints,deferred)
         except Exception:
             raise OpportunitySynthesisError("retained opportunity completion is not recoverable") from None
 
@@ -1095,6 +1137,7 @@ class OpportunitySynthesizer:
             raise OpportunitySynthesisError('structural recovery output contract mismatch')
         evidence=self.reader.active_evidence(subject=subject,clearance=clearance,limit=32,
             observation_event_ids=tuple(start.event.payload['observation_event_ids']))
+        evidence=self.candidate_window(evidence,start.event.payload.get('material_scope'))
         if method.get('reading_assessment') in reading_assessment.METHODS and isinstance(document,dict):
             document={k:v for k,v in document.items() if k!='reading_assessments'}
         findings=self._structure_findings_v1(document,evidence,'recovery-proof',receipt.event.event_id,
@@ -1211,6 +1254,9 @@ class OpportunitySynthesizer:
             evidence.append(item)
             prompt=packed
         evidence=tuple(evidence)
+        candidate_evidence=self.candidate_window(evidence,material_scope)
+        deferred=bool(material_scope is not None and material_scope.get('method')=='bound-material-pool-v2'
+            and not candidate_evidence)
         retention_sources=pool if material_scope is not None else evidence
         if (pool and not evidence) or (revisions and len(evidence)!=len(pool)):
             raise OpportunitySynthesisError('source recall/repair window exceeds its current context budget')
@@ -1235,6 +1281,11 @@ class OpportunitySynthesizer:
                 'They grant no search, disclosure, commitment or sending authority and impose no '
                 'must-mention inventory on a recipient message.')
         if assess_reading:system_prompt+='\n'+reading_assessment.REFERENCE_GUIDANCE
+        if material_scope is not None and material_scope.get('method')=='bound-material-pool-v2':
+            prompt_data['stage_contract']['eligible_primary_agenda_ids']=[e.agenda_item_id for e in candidate_evidence]
+            prompt=json.dumps(prompt_data,ensure_ascii=False,separators=(',',':'))
+            if len(prompt)>budget:raise OpportunitySynthesisError('candidate eligibility exceeds source budget')
+            system_prompt+='\nOnly eligible_primary_agenda_ids may anchor a new communication candidate. Other supplied sources remain factual context, not rejected facts or user dislikes.'
         method = dict(protocol='recipient-plan-v3' if recipient_meaning else 'legacy-draft-v1',
             recipient_execution='expression-required-v1' if recipient_meaning else None,
             recipient_output='intent-only-v1' if recipient_meaning else None,
@@ -1242,9 +1293,9 @@ class OpportunitySynthesizer:
             discovery_authoring=('source-led-v3' if focus else _DISCOVERY_AUTHORING) if recipient_meaning else None,
             **({'discovery_source_review':_GROUP_SOURCE_REVIEW} if focus else {}),
             **({'reading_assessment':reading_assessment.REFERENCE_METHOD} if assess_reading else {}),
-            kind='model_prompt' if evidence else 'system_no_material',
-            system_prompt_sha256=hashlib.sha256(system_prompt.encode()).hexdigest() if evidence else None,
-            requested_model=requested_model if evidence else None,
+            kind='model_prompt' if candidate_evidence else 'system_candidate_deferred' if deferred else 'system_no_material',
+            system_prompt_sha256=hashlib.sha256(system_prompt.encode()).hexdigest() if candidate_evidence else None,
+            requested_model=requested_model if candidate_evidence else None,
             protocol_recovery=protocol_recovery,
             structure_recovery='proposal-shape-v3' if protocol_recovery and recipient_meaning else None,
             source_presentation=self._SOURCE_PRESENTATION,
@@ -1297,8 +1348,9 @@ class OpportunitySynthesizer:
             if focus and resolve_research_reads(self.reader,subject=subject,clearance=clearance,
                     receipt_ids=research_read_receipt_ids,inquiries=inquiries)!=focus:
                 raise OpportunitySynthesisError('research evidence group changed during model wait')
-            if self.reader.active_evidence(subject=subject, clearance=clearance, limit=32,
-                    observation_event_ids=tuple(e.observation_event_id for e in evidence) if evidence else None) != evidence:
+            if (self.reader.active_evidence(subject=subject,clearance=clearance,limit=32,
+                    observation_event_ids=tuple(e.observation_event_id for e in evidence)) if evidence else
+                    () if deferred else self.reader.active_evidence(subject=subject,clearance=clearance,limit=32)) != evidence:
                 raise OpportunitySynthesisError("opportunity evidence changed during model wait")
             if self._commitment_digest(subject,clearance)!=commitment_digest:
                 raise OpportunitySynthesisError('current commitments changed during model wait')
@@ -1317,8 +1369,9 @@ class OpportunitySynthesizer:
         deadline=asyncio.get_running_loop().time()+timeout_seconds
         recovered=False
         structural_failure=False
+        assessment_raw=None
         try:
-            if evidence:
+            if candidate_evidence:
                 messages=[{'role':'system','content':system_prompt},{'role':'user','content':prompt}]
                 for attempt in range(2 if protocol_recovery else 1):
                     await context_value(read_context,validate_current)
@@ -1339,7 +1392,7 @@ class OpportunitySynthesizer:
                             document=dict(document)
                             assessment_raw=document.pop('reading_assessments',None)
                         if protocol_recovery and recipient_meaning:
-                            findings=self._structure_findings_v1(document,evidence,operation_id,receipt_id,authority,
+                            findings=self._structure_findings_v1(document,candidate_evidence,operation_id,receipt_id,authority,
                                 recipient_meaning=recipient_meaning,source_presentation=self._SOURCE_PRESENTATION,
                                 as_of=as_of,require_assessment=structural_failure,intent_only=True,
                                 allow_editorial_brief=True)
@@ -1374,14 +1427,14 @@ class OpportunitySynthesizer:
                     break
             else:
                 await context_value(read_context,validate_current)
-                model='system/alive-no-current-material'
+                model='system/alive-candidate-deferred' if deferred else 'system/alive-no-current-material'
                 document={'candidates':[],'abstentions':[],'reconsiderations':[]}
             assessment=(reading_assessment.normalize_references(assessment_raw,inquiries=inquiries,
                 excerpts={e.observation_event_id:source_prompt_excerpt(e.content,policy=SOURCE_EXCERPT_POLICY)
                           for e in evidence if e.observation_event_id in {f.observation_event_id for f in focus}})
                 if assess_reading else None)
             candidates, drafts, rejected, indices = self._candidates(
-                document, evidence, operation_id, receipt_id, authority, context, learning=learning,
+                document, candidate_evidence, operation_id, receipt_id, authority, context, learning=learning,
                 source_presentation=self._SOURCE_PRESENTATION,
                 feedback=feedback,
                 recipient_meaning=recipient_meaning,
@@ -1419,7 +1472,8 @@ class OpportunitySynthesizer:
                              'reading_rejected_count':assessment['rejected_count']} if assess_reading else {}),
                          "source_scan":scan,
                          "protocol_recovered":recovered,
-                         "system_no_material":not bool(evidence),
+                         "system_no_material":not bool(evidence) and not deferred,
+                         **({'candidate_deferred':True} if deferred else {}),
                          "abstention_count": len(abstentions),
                          "rejected_abstention_count": rejected_abstentions,
                          "reconsideration_count":len(reconsiderations),
@@ -1429,7 +1483,7 @@ class OpportunitySynthesizer:
             ))
             return OpportunitySynthesisResult(model, candidates, receipt_id, rejected, abstentions,
                 rejected_abstentions, self._unassessed(evidence, candidates, abstentions),
-                reconsiderations, rejected_hints)
+                reconsiderations, rejected_hints,deferred)
         except BaseException as exc:
             # Cancellation also leaves a structural terminal fact, never a retry.
             self.journal.append(EventEnvelope(

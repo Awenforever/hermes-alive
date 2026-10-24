@@ -125,6 +125,8 @@ class AutonomousCycleRuntime:
         if not execute:
             assessed=await self.preparation.assess(**parameters)
             expression=assessed.expression
+            if expression.planning.candidate_deferred:
+                return AutonomousCycleResult('content_deferred',reconciliation,expression=expression)
             if assessed.quality_disposition.startswith('final_'):
                 rejection=await context_value(expression_parameters.get('read_context'),
                     lambda:self.preparation.rejection_witness(assessed,parameters))
@@ -140,6 +142,8 @@ class AutonomousCycleRuntime:
         if any(key in authorization_parameters for key in parameters):
             raise ValueError('authorization cannot override cycle planning')
         prepared = await self.preparation.prepare(**parameters,**authorization_parameters)
+        if prepared.expression.planning.candidate_deferred:
+            return AutonomousCycleResult('content_deferred',reconciliation,prepared=prepared)
         if prepared.expression.planning.action_kind=='silence':
             if capture is not None:
                 self.reconsideration.remember(subject=subject,configuration_id=cognition_configuration_id,

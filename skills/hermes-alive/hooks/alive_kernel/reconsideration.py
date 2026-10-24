@@ -43,12 +43,20 @@ class ReconsiderationStore:
         now = self.now()
         evidence = self.synth.reader.active_evidence(subject=subject, clearance=clearance, limit=32,
             source_cursor=self.synth._source_cursor(subject,clearance))
+        # A completed scan may rotate the same fair window. Its order is not
+        # new evidence; different window membership/content still wakes us.
+        evidence=tuple(sorted(evidence,key=lambda item:item.observation_event_id))
         readers = (self.synth.context_reader, self.synth.learning_reader, self.synth.history_reader,
                    self.synth.action_reader, self.synth.feedback_reader)
         # Callback identity cannot certify model routing. Host configuration must
         # change when callback semantics or effective inherited routing changes.
         options = {k:v for k,v in parameters.items() if k not in
                    ('call', 'resolve_domain', 'resolve_grounding_domain', 'read_context', 'operation_id', 'subject', 'policy_context')}
+        scope=options.get('candidate_material_scope')
+        if scope is not None and scope.get('method')=='bound-material-pool-v2':
+            # IDs/order/eligibility remain semantic; the original cursor and
+            # sequence ceiling are still verified on retained plan replay.
+            options['candidate_material_scope']={k:v for k,v in scope.items() if k not in ('origin_frontier','cursor')}
         state = dict(method=self.METHOD, subject=subject, configuration=configuration_id,
             window_seconds=window_seconds,
             execute=execute, policy_event=policy.event_id, policy={**asdict(policy.context),

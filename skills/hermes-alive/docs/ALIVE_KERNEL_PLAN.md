@@ -4,6 +4,15 @@ Status: active
 
 Last reviewed: 2026-10-24
 
+Ordinary content recovery (2026-10-24; ADR0221): the native configured discovery
+path now consumes bounded rejection eligibility before reading and fresh planning.
+Frozen candidate anchors remain distinct from the full retained facts. All-held
+material produces content_deferred, never semantic silence or a new model call.
+Only an explicitly capable native preparation opts into continuing a qualified,
+unexpired negative review; uncertain work and other attention still stop.
+Current qualification is in progress. No production deployment or natural-quality
+round is claimed; previous view-only and component results do not prove this path.
+
 Bounded retry eligibility view (2026-10-24; ADR0220): authenticated v2 rejection
 history is revalidated without inference, with original fixed review-time
 deadline, owner/input/policy/configuration and retained-proof scope. Candidate

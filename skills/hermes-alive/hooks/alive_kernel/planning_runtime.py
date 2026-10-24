@@ -38,6 +38,7 @@ class PlanningRuntimeResult:
     grounding_reviews: tuple = ()
     repair_interpretation_event_id: str | None = None
     repair_disposition: str | None = None
+    candidate_deferred: bool = False
 
 
 class PlanningRuntime:
@@ -161,7 +162,8 @@ watcher and not a complete production loop. It creates no channel queues.
                   require_independent_grounding=False, recipient_meaning=False,
                   inquiry_item_ids=(),research_read_receipt_ids=(),recalled_feedback_event_ids=(),
                   semantic_feedback_recall=False,
-                  model_timeout_seconds=None,read_context=None,record_reading_assessment=False):
+                  model_timeout_seconds=None,read_context=None,record_reading_assessment=False,
+                  candidate_material_scope=None):
         validate_model_timeout(model_timeout_seconds)
         if read_context is not None and not callable(read_context):
             raise PlanningRuntimeError('explicit host context read capability required')
@@ -231,6 +233,10 @@ watcher and not a complete production loop. It creates no channel queues.
                 receipt_ids=research_read_receipt_ids,inquiries=self.synth.inquiries.read(
                     subject=subject,clearance=sensitivity,item_ids=inquiry_item_ids))
             binding['research_read_receipt_ids']=list(research_read_receipt_ids)
+        if candidate_material_scope is not None:
+            await context_value(read_context,lambda:self.synth.source_pool(subject=subject,clearance=sensitivity,
+                focus=research_focus,scope=candidate_material_scope))
+            binding['candidate_material_scope']=candidate_material_scope
         if model_timeout_seconds is not None:
             binding['model_timeout_seconds']=model_timeout_seconds
         digest = self.synth.vault.digest_json({'operation': operation_id, 'subject': subject})[:40]
@@ -245,6 +251,8 @@ watcher and not a complete production loop. It creates no channel queues.
                 material=_thaw_json(prior.event.payload['feedback_material_scope'])
                 await context_value(read_context,lambda:self.synth.source_pool(
                     subject=subject,clearance=sensitivity,focus=research_focus,scope=material))
+            elif candidate_material_scope is not None:
+                material=candidate_material_scope
             else:
                 material=await context_value(read_context,lambda:self.synth.material_scope(
                     subject=subject,clearance=sensitivity,focus=research_focus))
@@ -283,7 +291,7 @@ watcher and not a complete production loop. It creates no channel queues.
                 recipient_meaning=recipient_meaning,timeout_seconds=model_timeout_seconds or 60,
                 inquiry_item_ids=inquiry_item_ids,research_read_receipt_ids=research_read_receipt_ids,
                 recalled_feedback_event_ids=recalled_feedback_event_ids,
-                material_scope=binding.get('feedback_material_scope'),read_context=read_context,
+                material_scope=binding.get('candidate_material_scope') or binding.get('feedback_material_scope'),read_context=read_context,
                 record_reading_assessment=record_reading_assessment)
         candidates, reviews, repair, repair_disposition = generated.candidates, (), None, None
         if recipient_meaning and generated.rejected_count and not candidates:
@@ -396,4 +404,4 @@ watcher and not a complete production loop. It creates no channel queues.
         return PlanningRuntimeResult(operation_id, generated.receipt_event_id,
             prepared.frame_event_id, expected, stored.selection.candidate.action_kind.value,
             stored.selection.selected_by, reviews, repair.receipt_event_id if repair is not None else None,
-            repair_disposition)
+            repair_disposition,generated.candidate_deferred)

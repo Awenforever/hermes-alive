@@ -10,6 +10,7 @@ from .native_core_acquisition import CoreScopedModelAcquirer
 from .native_host_caller import HostModelBinding,HostNativeCaller
 from .native_worker_protocol import NativeWorkerError,canonical,identifier
 from .content_vault import ContentVaultError
+from .events import _thaw_json
 
 
 class NativeCognitionHost:
@@ -53,7 +54,7 @@ class NativeCognitionHost:
         try:
             return await self.host.run(build_parameters=build_parameters,stop=stop,
                 max_cycles=max_cycles,interval_seconds=interval_seconds,cycle_step=self.step,
-                continuous=continuous)
+                continuous=continuous,continue_content_review=getattr(self.preparation,'supports_bounded_retry',False))
         finally:
             # The retained worker owns any uncertain child; do not clear its
             # lease or workspace merely because the plugin task was cancelled.
@@ -154,7 +155,22 @@ class NativeCognitionHost:
                         return validated(await self.preparation(cycle=cycle,parameters=bound,
                             call=self._caller,read_binding=read_binding))
                     observed=await self.preparation.observe(cycle=cycle,parameters=bound,read_binding=read_binding)
+                    from .core_context_read import context_value
+                    from .rejection_eligibility import RejectionEligibility
+                    eligibility=RejectionEligibility(self.host)
+                    async def current_eligibility():
+                        value=await context_value(bound['expression_parameters'].get('read_context'),
+                            lambda:eligibility.read(bound['expression_parameters']))
+                        if read_binding()!=expected:raise NativeWorkerError('eligibility owner authority changed')
+                        return value
+                    view=await current_eligibility()
+                    fingerprint=observed.listing_fingerprint
+                    if fingerprint is not None and view.held:
+                        fingerprint=self.host.runtime.preparation.vault.digest_json(dict(listings=fingerprint,
+                            held=[dict(url=h.source_url,source=h.observation_event_id,review=h.review_event_id,
+                                until=h.until.isoformat()) for h in view.held],complete=view.history_complete))
                     restored=None
+                    restored_scope=None
                     if bound.get('reconsider_after_seconds') is not None and observed.listing_fingerprint is not None:
                         previous=next(self.host.journal.iter_reverse(event_types=(self.host.runtime.reconsideration.EVENT,),
                             subject=self.host.subject,max_records=1),None)
@@ -163,13 +179,45 @@ class NativeCognitionHost:
                                 restored=self.preparation.restore_parameters(
                                     operation_id=previous.event.payload['operation_id'],
                                     listing_fingerprint=observed.listing_fingerprint)
+                                key=self.host.runtime.preparation.vault.digest_json(dict(
+                                    operation=previous.event.payload['operation_id'],subject=self.host.subject))[:40]
+                                prior=self.host.journal.get('planning.runtime:'+key+':started')
+                                if prior is not None:restored_scope=_thaw_json(prior.event.payload.get('candidate_material_scope'))
                             except ContentVaultError:
                                 restored=None  # Missing retained material cannot justify a wait.
                     async def reason():
-                        return validated(await self.preparation.reason(observed,cycle=cycle,parameters=bound,
-                            call=self._caller,read_binding=read_binding))['expression_parameters']
-                    return validated({**bound,'expression_parameters':{**bound['expression_parameters'],**(restored or {})},
-                        'prepare_expression':reason,'listing_fingerprint':observed.listing_fingerprint,
+                        nonlocal view
+                        prepared=validated(await self.preparation.reason(observed,cycle=cycle,parameters=bound,
+                            call=self._caller,read_binding=read_binding,excluded_urls=view.excluded_urls))['expression_parameters']
+                        view=await current_eligibility()
+                        def scope():
+                            runtime=self.host.runtime.preparation
+                            synth=runtime.expression.planning.synth
+                            key=runtime.vault.digest_json(dict(operation=cycle.operation_id,subject=self.host.subject))[:40]
+                            prior=self.host.journal.get('planning.runtime:'+key+':started')
+                            if prior is not None:
+                                # Recover the original choice, never apply today's
+                                # expiry/hold to an already-started generation.
+                                old=_thaw_json(prior.event.payload.get('candidate_material_scope'))
+                                return {**prepared,**({'candidate_material_scope':old} if old is not None else {})}
+                            if not view.held:return prepared
+                            focus=()
+                            receipts=prepared.get('research_read_receipt_ids',())
+                            if receipts:
+                                from .research_evidence import resolve_research_reads
+                                clearance=prepared.get('sensitivity','private')
+                                focus=resolve_research_reads(synth.reader,subject=self.host.subject,clearance=clearance,
+                                    receipt_ids=receipts,inquiries=synth.inquiries.read(subject=self.host.subject,
+                                        clearance=clearance,item_ids=prepared.get('inquiry_item_ids',())))
+                            material=synth.material_scope(subject=self.host.subject,clearance=prepared.get('sensitivity','private'),
+                                focus=focus,excluded_urls=view.excluded_urls,
+                                deferred_source_ids=tuple(dict.fromkeys(h.observation_event_id for h in view.held)))
+                            return {**prepared,'candidate_material_scope':material}
+                        return await context_value(prepared.get('read_context'),scope)
+                    initial={**bound['expression_parameters'],**(restored or {})}
+                    if restored_scope is not None:initial['candidate_material_scope']=restored_scope
+                    return validated({**bound,'expression_parameters':initial,
+                        'prepare_expression':reason,'listing_fingerprint':fingerprint,
                         'reuse_reconsideration':restored is not None})
                 return prepare()
             try:

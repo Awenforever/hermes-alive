@@ -5,7 +5,7 @@ delegated to the composed runtime; failed active work never becomes a new cycle.
 """
 import asyncio
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime,timedelta,timezone
 import re
 
 from .events import EventEnvelope,Sensitivity,_thaw_json
@@ -88,7 +88,7 @@ class AutonomousHostRuntime:
         cursor = result.reconciliation['next_after_sequence']
         if (type(cursor) is not int or cursor<0 or result.external_delivery_proven is not False
                 or result.disposition not in ('paused','reconciliation_attention','silence','shadow_selected',
-                    'not_authorized','attempt_unavailable','submitted','content_review_attention','waiting_for_change')):
+                    'not_authorized','attempt_unavailable','submitted','content_review_attention','waiting_for_change','content_deferred')):
             raise ValueError('cycle completion exceeds qualified contract')
         payload = {'subject':self.subject,'lane':self.lane,'operation_id':cycle.operation_id,'disposition':result.disposition,
             'next_reconciliation_cursor':cursor,'external_delivery_proven':False,'authority_granted':False}
@@ -168,11 +168,11 @@ class AutonomousHostRuntime:
                 raise
 
     async def run(self,*,build_parameters,stop,max_cycles=None,interval_seconds=60,cycle_step=None,
-                  continuous=False):
+                  continuous=False,continue_content_review=False):
         lifetime_valid=(type(continuous) is bool and
             (continuous and self.execute and max_cycles is None
              or not continuous and type(max_cycles) is int and 1<=max_cycles<=1000))
-        if (self.running or not lifetime_valid
+        if (self.running or not lifetime_valid or type(continue_content_review) is not bool
                 or type(interval_seconds) not in (int,float) or not 0<=interval_seconds<=86400
                 or continuous and interval_seconds<=0
                 or not callable(build_parameters) or not isinstance(stop,asyncio.Event)
@@ -201,7 +201,15 @@ class AutonomousHostRuntime:
                             'failure_class':type(error).__name__,'external_delivery_proven':False}
                     completed += 1
                     disposition=getattr(outcome,'disposition',None)
-                    if continuous and disposition not in ('submitted','silence','waiting_for_change'):
+                    qualified_retry=False
+                    witness=getattr(outcome,'content_rejection',None)
+                    window=getattr(outcome,'content_rejection_window_seconds',None)
+                    if (continue_content_review and disposition=='content_review_attention'
+                            and witness is not None and type(window) is int and 1<=window<=3600):
+                        review=self.journal.get(witness.review_event_id)
+                        qualified_retry=review is not None and min(witness.valid_until,
+                            review.event.observed_at+timedelta(seconds=window))>datetime.now(timezone.utc)
+                    if continuous and disposition not in ('submitted','silence','waiting_for_change','content_deferred') and not qualified_retry:
                         reason=disposition if disposition in ('paused','not_authorized','attempt_unavailable',
                             'reconciliation_attention','content_review_attention') else 'unexpected_disposition'
                         return {'completed_cycles':completed,'exit_reason':reason,

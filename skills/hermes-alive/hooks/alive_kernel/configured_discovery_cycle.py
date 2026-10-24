@@ -86,6 +86,7 @@ class _DiscoveryObservation:
 
 
 class ConfiguredDiscoveryCycle:
+    supports_bounded_retry=True
     def __init__(self,context,ingestor,*,subject,approved_queries,validate_consent,follow_citations=False,
                  record_reading_assessment=False):
         from .core_shadow_assembly import public_discovery_settings
@@ -413,7 +414,48 @@ class ConfiguredDiscoveryCycle:
             payload=dict(content=ref.to_event_payload(),authority_granted=False)))
         return parameters
 
-    async def reason(self,observed,*,cycle,parameters,call,read_binding):
+    def _read_scope(self,observed,excluded_urls):
+        """Freeze primary read eligibility before inference, including a skip.
+
+        A recovered operation uses its own original references, not today's
+        changed cooldown. Legacy started choices retain their original input.
+        """
+        from .discovery_opportunities import canonicalize_discovery_url
+        journal,vault=self.ingestor.journal,self.ingestor.vault
+        identity='discovery.read-scope:'+vault.digest_json(dict(subject=self.subject,
+            operation=observed.operation_id))[:40]
+        record=journal.get(identity)
+        all_ids=tuple(e.observation_event_id for e in observed.evidence)
+        if record is None:
+            old_choice='discovery.reading-choice:'+vault.digest_json(dict(subject=self.subject,
+                operation=observed.operation_id))[:40]+':started'
+            if journal.get(old_choice) is not None:return observed.evidence
+            excluded={canonicalize_discovery_url(url) for url in excluded_urls}
+            ids=tuple(e.observation_event_id for e in observed.evidence
+                if canonicalize_discovery_url(e.content['url']) not in excluded)
+            payload=dict(method='read-eligibility-v1',search_receipt=observed.found.receipt_id,
+                original_ids=list(all_ids),eligible_ids=list(ids),authority_granted=False)
+            signature=vault.digest_json(payload)
+            journal.append(EventEnvelope(event_id=identity,event_type='discovery.read_scope_retained',
+                source='alive.configured-discovery',actor='system:alive-configured-reader',subject=self.subject,
+                sensitivity=Sensitivity.PRIVATE,causation_id=observed.found.receipt_id,
+                payload={**payload,'authenticator':signature}))
+            record=journal.get(identity)
+        from .events import _thaw_json
+        data=_thaw_json(record.event.payload);signature=data.pop('authenticator',None)
+        if (record.event.event_type!='discovery.read_scope_retained' or record.event.subject!=self.subject
+                or record.event.source!='alive.configured-discovery' or record.event.actor!='system:alive-configured-reader'
+                or record.event.causation_id!=observed.found.receipt_id or vault.digest_json(data)!=signature
+                or data.get('method')!='read-eligibility-v1' or data.get('authority_granted') is not False
+                or data.get('search_receipt')!=observed.found.receipt_id or data.get('original_ids')!=list(all_ids)
+                or not isinstance(data.get('eligible_ids'),list)
+                or any(not isinstance(item,str) for item in data['eligible_ids'])
+                or len(set(data['eligible_ids']))!=len(data['eligible_ids'])
+                or not set(data['eligible_ids'])<=set(all_ids)):
+            raise HostDiscoveryError('read eligibility lacks original current provenance')
+        return tuple(e for e in observed.evidence if e.observation_event_id in data['eligible_ids'])
+
+    async def reason(self,observed,*,cycle,parameters,call,read_binding,excluded_urls=()):
         """Explicit cognition phase, using this generation's exact observation."""
         if (observed is not self._observation or not isinstance(observed,_DiscoveryObservation)
                 or observed.operation_id!=cycle.operation_id or observed.binding!=read_binding()):
@@ -427,6 +469,8 @@ class ConfiguredDiscoveryCycle:
         retained=self.ingestor.active_evidence(subject=self.subject,clearance=Sensitivity.PRIVATE,
             limit=32,observation_event_ids=found.observation_ids)
         if tuple(retained)!=evidence:raise HostDiscoveryError('observed listing material changed before cognition')
+        evidence=self._read_scope(observed,excluded_urls)
+        if not evidence:return self._retain_parameters(observed,parameters)
         choice,model,digest=await self._select(operation_id=cycle.operation_id,evidence=evidence,search_receipt_id=found.receipt_id,
             parameters=parameters,call=call,current=current)
         if not choice['source_refs']:return self._retain_parameters(observed,parameters)

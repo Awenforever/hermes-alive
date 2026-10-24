@@ -2,13 +2,14 @@
 """Host lifetime/identity tests; fake cycle driver is not model-quality proof."""
 import asyncio
 from dataclasses import replace
+from datetime import datetime,timedelta,timezone
 from pathlib import Path
 import sys
 import tempfile
 from types import SimpleNamespace
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'hooks'))
-from alive_kernel import DispatchOutbox,ExperienceJournal
+from alive_kernel import DispatchOutbox,ExperienceJournal,EventEnvelope
 from alive_kernel.autonomous_host_runtime import AutonomousHostRuntime
 
 
@@ -96,6 +97,28 @@ async def test(root):
             continuous=True,interval_seconds=.001,cycle_step=attention_step)
         expected=disposition if disposition not in ('shadow_selected',None) else 'unexpected_disposition'
         assert result['completed_cycles']==1 and result['exit_reason']==expected
+    # Lifetime control only: these synthetic outcomes confer no send authority.
+    review=journal.append(EventEnvelope(event_id='test:bounded-review',event_type='test.review',
+        source='test',actor='system:test',subject='user:continuous')).event
+    witness=SimpleNamespace(review_event_id=review.event_id,
+        valid_until=review.observed_at+timedelta(hours=1))
+    for capable,proof,window,expected_cycles in (
+            (False,witness,300,1),(True,witness,300,2),
+            (True,None,300,1),(True,witness,None,1),
+            (True,SimpleNamespace(review_event_id=review.event_id,
+                valid_until=datetime.now(timezone.utc)-timedelta(seconds=1)),300,1)):
+        calls=[];bounded_stop=asyncio.Event()
+        async def bounded_step(parameters):
+            calls.append(parameters)
+            if len(calls)==2:
+                bounded_stop.set()
+                return SimpleNamespace(disposition='content_deferred')
+            return SimpleNamespace(disposition='content_review_attention',content_rejection=proof,
+                content_rejection_window_seconds=window)
+        result=await continuous_host.run(build_parameters=lambda:{},stop=bounded_stop,
+            continuous=True,continue_content_review=capable,interval_seconds=.001,cycle_step=bounded_step)
+        assert result['completed_cycles']==expected_cycles
+        assert result['exit_reason']==('stopped' if expected_cycles==2 else 'content_review_attention')
     continuous_driver.fail=True
     result=await continuous_host.run(build_parameters=lambda:{},stop=asyncio.Event(),
         continuous=True,interval_seconds=.001)
