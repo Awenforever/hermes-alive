@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from safe_io import file_lock
+from .file_locks import file_lock
 
 from .agenda import AgendaProjection
 from .availability import AvailabilityProjection

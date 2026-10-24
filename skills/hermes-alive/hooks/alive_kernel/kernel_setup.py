@@ -166,8 +166,11 @@ class KernelSetupStore:
         if (record.event.actor!=configured.subject or record.event.subject!=configured.subject
                 or record.event.causation_id!=configured.event_id
                 or payload.get('configuration_event_id')!=configured.event_id):return None
-        if (record.event.expires_at is None
-                or not record.event.observed_at<=current<record.event.expires_at):return None
+        if not record.event.observed_at<=current:return None
+        if payload.get('lifetime')=='until_revoked':
+            if record.event.expires_at is not None:return None
+        elif (payload.get('lifetime') is not None or record.event.expires_at is None
+                or current>=record.event.expires_at):return None
         from .autonomy_policy import AutonomyPolicyProjection
         from .action_delegation import ActionDelegationStore
         from .host_capabilities import HostCapabilityProjection
@@ -189,15 +192,20 @@ class KernelSetupStore:
         return {**payload,'activation_event_id':record.event.event_id}
 
     def record_activation(self, configured, *, policy_event_id, route_binding_id,
-                          delegation_event_id, expires_at, supersedes_cycle_event_id=None, now=None):
+                          delegation_event_id, expires_at, supersedes_cycle_event_id=None, now=None,
+                          until_revoked=False):
         """Trusted admitted enable command has already minted exact host grants."""
         current=self._now(now)
-        if self.configuration()!=configured or not current<expires_at<=current+timedelta(days=30):
-            raise KernelSetupError('current confirmed setup and finite activation required')
+        if (type(until_revoked) is not bool
+                or until_revoked and expires_at is not None
+                or not until_revoked and (expires_at is None or not current<expires_at<=current+timedelta(days=30))
+                or self.configuration()!=configured):
+            raise KernelSetupError('current confirmed setup and explicit activation lifetime required')
         references=dict(configuration_event_id=configured.event_id,policy_event_id=policy_event_id,
                         route_binding_id=route_binding_id,delegation_event_id=delegation_event_id)
         if any(not isinstance(value,str) or not value or len(value)>254 for value in references.values()):
             raise KernelSetupError('exact activation references required')
+        if until_revoked:references['lifetime']='until_revoked'
         if supersedes_cycle_event_id is not None:
             if not isinstance(supersedes_cycle_event_id,str) or not re.fullmatch(r'host-cycle:[a-f0-9]{64}',supersedes_cycle_event_id):
                 raise KernelSetupError('exact interrupted cycle reference required')

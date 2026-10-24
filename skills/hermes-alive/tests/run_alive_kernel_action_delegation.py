@@ -50,6 +50,26 @@ def main(root):
         raise AssertionError('foreign actor created delegation')
     store.revoke(delegation_event_id=record.event.event_id, subject='user:test', actor='user:test')
     assert not store.permits(record.event.event_id, **expected)
+    # Persistent means explicitly signed, not a missing historical expiry.
+    arguments=dict(subject='user:test',actor='user:test',policy_event_id='policy:1',
+        route_binding_id='route:1',action_kinds=('share',),maximum_sensitivity=Sensitivity.PRIVATE,
+        expires_at=None,operation_id='persistent',now=now)
+    try:store.grant(**arguments)
+    except ActionDelegationError:pass
+    else:raise AssertionError('missing expiry silently became persistent')
+    persistent=store.grant(**arguments,until_revoked=True)
+    future={**expected,'now':now+timedelta(days=366)}
+    assert store.permits(persistent.event.event_id,**future)
+    assert not store.permits(persistent.event.event_id,**{**future,'subject':'user:other'})
+    altered=_thaw_json(record.event.payload)
+    altered.update(operation_id='forged-persistent',expires_at=None,lifetime='until_revoked')
+    forged=journal.append(EventEnvelope(event_id='action.delegation:forged-persistent',
+        event_type='action.delegation_granted',source='hermes.command.alive',actor='user:test',
+        subject='user:test',sensitivity=Sensitivity.PRIVATE,observed_at=now,occurred_at=now,
+        expires_at=None,payload=altered))
+    assert not store.permits(forged.event.event_id,**future)
+    store.revoke(delegation_event_id=persistent.event.event_id,subject='user:test',actor='user:test')
+    assert not store.permits(persistent.event.event_id,**future)
     retained = journal.get(record.event.event_id)
     assert retained.sequence == record.sequence
     assert retained.event.canonical_json() == record.event.canonical_json()

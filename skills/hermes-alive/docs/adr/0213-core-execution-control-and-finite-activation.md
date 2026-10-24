@@ -76,3 +76,12 @@ configuration preservation. Keep the full natural conversation, source utility,
 longitudinal learning, interrupted-work recovery, legacy migration, fleet,
 consumer installation, ten-round quality and separately authorized production
 acceptance gates open. A callable new command does not close them.
+
+## 2026-10-24 product lifetime decision supersession
+
+ADR0214 supersedes this ADR's monthly expiry for ordinary proactive enablement:
+the owner chose lasting authorization until pause or revocation. Both grant and
+activation now require an explicitly signed persistent lifetime, not mere expiry
+omission. Historical finite records keep their original meaning; no upgrade or
+startup expands them. Scope, policy, route, cadence, cancellation and independent
+retention controls above remain. This is not production/send authorization.

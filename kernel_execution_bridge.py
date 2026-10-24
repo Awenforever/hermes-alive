@@ -3,7 +3,7 @@
 No legacy fallback, recipient discovery, provider router or physical queue.
 Only the admitted command path may create grants; startup only restores them.
 """
-from datetime import datetime,timedelta,timezone
+from datetime import datetime,timezone
 from uuid import uuid4
 from importlib import import_module
 import json
@@ -93,7 +93,7 @@ def enable(binding,scope):
     from hermes_cli.version_info import get_version_info
     version=get_version_info()
     operation=uuid4().hex
-    now=datetime.now(timezone.utc);expiry=now+timedelta(days=30)
+    now=datetime.now(timezone.utc)
     snapshot=host.observe_snapshot(snapshot_id='core:'+operation,hermes_version=version.display_version,
         plugin_api_version=1,capabilities={'hermes.channel.send':{'interface':'core.adapter.send',
             'available':True,'public_api':True,'receipt_level':'request_accepted'}},observed_at=now)
@@ -118,9 +118,9 @@ def enable(binding,scope):
     delegation=kernel('action_delegation').ActionDelegationStore(store.journal).grant(
         subject=configured.subject,actor=configured.subject,policy_event_id=policy.event_id,
         route_binding_id=route_id,action_kinds=('share','ask'),maximum_sensitivity=Sensitivity.PRIVATE,
-        expires_at=expiry,operation_id='core-enable:'+operation,allow_natural_expression=True)
+        expires_at=None,until_revoked=True,operation_id='core-enable:'+operation,allow_natural_expression=True)
     store.record_activation(configured,policy_event_id=policy.event_id,route_binding_id=route_id,
-        delegation_event_id=delegation.event.event_id,expires_at=expiry,
+        delegation_event_id=delegation.event.event_id,expires_at=None,until_revoked=True,
         supersedes_cycle_event_id=interrupted.event.event_id if interrupted else None)
     # Do not overwrite setup/intent hints: journal remains authoritative.
     return assemble(binding)

@@ -3,6 +3,35 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## Public-plugin dependencies and authorization lifetime
+
+2026-10-24, Codex. Activated r22 entered the actual native host but its public
+read failed before registry dispatch; zero actual model calls and safe silence
+were NOT success. Core public plugin loading intentionally does not put legacy
+hooks on global sys.path. Kernel public reads, context reads, recovery and erasure
+must use package-local locking rather than `from safe_io ...`. Do not fix consumer
+installation by injecting a legacy path or borrowing another installed version.
+The Core public-entry regression dispatches a synthetic scoped tool through the
+real registry without importing the legacy hooks path. Preserve the same OS lock
+protocol; there is no new transport queue or import-time runtime directory.
+
+ADR0214 records the owner's explicit until-paused/revoked choice. Both delegation
+and activation require a signed persistent marker; expiry omission is not a grant.
+Older finite records keep finite semantics. No automatic upgrade renewal, model
+permission inference, private-chat access or production window is added. Outbound
+content retention still has its own independent expiry/erasure rules.
+
+## A complete diagnostic is not a manufactured positive round
+
+2026-10-24 (Asia/Shanghai), Codex. The activated-chain probe must invoke the actual
+setup/authorized Core commands and native model facade, not manually assemble
+golden expression parameters or force a model to choose a share. A public digest
+replay is explicitly distinct from fresh search/raw full-page extraction. Preserve
+silence/failures, exact submitted text and original main responses privately; keep
+model credentials and owner data out of Git/Work. Offline kernel copies require
+settled owned work and closed connections. A source/model stage response is not
+proof of remote delivery, semantic correctness or consumer/fleet acceptance.
+
 ## Control wiring is not complete execution qualification
 
 2026-10-24 (Asia/Shanghai), Codex; ADR0213. Only actual admitted Core commands in

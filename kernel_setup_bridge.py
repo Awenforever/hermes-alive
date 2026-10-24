@@ -96,7 +96,7 @@ def register_setup_command(context,binding):
                     if result['status']!='started':
                         execution.pause(binding,scope)
                         raise ValueError('Gateway did not start the authorized host')
-                    return ('Alive 已启用：授权有效期30天，最多每日3次、间隔至少1小时。'
+                    return ('Alive 已启用：授权持续有效，直到你暂停或撤销；最多每日3次、间隔至少1小时。'
                             '模型及备用模型由 Hermes 管理；可用 /alive pause 暂停，/alive status 查询。'
                             '消息提交不代表对方已收到。')
             settings = context.get_config('kernel_setup',{})
@@ -114,7 +114,8 @@ def register_setup_command(context,binding):
             attach_configured_continuity(binding,configured)
             return ('目标会话和所选权限已确认，分享接续读取已接入。'
                     '当前仍未启用模型调用和主动发送。配置公开检索主题后，可发送 /alive enable，'
-                    '授权30天、最多每日3次且间隔至少1小时；/alive pause 可暂停。旧身份不会自动迁移。')
+                    '授权持续有效直到暂停或撤销，最多每日3次且间隔至少1小时；'
+                    '/alive pause 可暂停。资料保留期限单独管理。旧身份不会自动迁移。')
         except Exception as exc:
             if enable_attempted and scope is not None:
                 try:

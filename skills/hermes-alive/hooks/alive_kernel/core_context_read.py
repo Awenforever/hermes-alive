@@ -64,7 +64,7 @@ class CoreContextRead:
     def ensure_available(self):
         """Fence a replacement host before public/model preparation can start."""
         from hermes_constants import get_hermes_home
-        from safe_io import file_lock
+        from .file_locks import file_lock
         if self._closed or Path(get_hermes_home()).resolve()!=self.home:
             raise NativeWorkerError('context read capability closed or wrong profile')
         if self.pending:raise ContextReadUncertainError('context work still physically pending')
@@ -88,7 +88,7 @@ class CoreContextRead:
         def worker():
             value=None;error=None
             try:
-                from safe_io import file_lock
+                from .file_locks import file_lock
                 with file_lock(self.home/'plugin-data/hermes-alive/runtime/kernel/context-read.lock',timeout=0):
                     self._current(read_binding,binding)
                     value=operation()

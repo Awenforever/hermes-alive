@@ -32,11 +32,16 @@ class ActionDelegationStore:
     def grant(self, *, subject, actor, policy_event_id, route_binding_id,
               action_kinds, maximum_sensitivity, expires_at, operation_id, now=None,
               minimum_interval_seconds=3600, max_starts_per_24h=3,
-              allow_natural_expression=False):
-        current, expiry = self._utc(now), self._utc(expires_at)
+              allow_natural_expression=False, until_revoked=False):
+        if type(until_revoked) is not bool or until_revoked and expires_at is not None:
+            raise ActionDelegationError('explicit consistent delegation lifetime required')
+        if expires_at is None and not until_revoked:
+            raise ActionDelegationError('missing expiry is not persistent authorization')
+        current = self._utc(now)
+        expiry = None if until_revoked else self._utc(expires_at)
         if (actor != subject or not subject or not policy_event_id or not route_binding_id
                 or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}', operation_id)
-                or not current < expiry <= current + timedelta(days=30)):
+                or not until_revoked and not current < expiry <= current + timedelta(days=30)):
             raise ActionDelegationError('invalid self-authorized delegation scope')
         kinds = sorted({ActionKind(kind).value for kind in action_kinds})
         if not kinds or not set(kinds) <= {'share', 'ask'}:
@@ -52,7 +57,8 @@ class ActionDelegationStore:
             'action_kinds': kinds, 'maximum_sensitivity': sensitivity.value,
             'minimum_interval_seconds': minimum_interval_seconds,
             'max_starts_per_24h': max_starts_per_24h,
-            'expires_at': expiry.isoformat(), 'quality_qualified': False}
+            'expires_at': expiry.isoformat() if expiry is not None else None, 'quality_qualified': False}
+        if until_revoked:payload['lifetime']='until_revoked'
         # Absence in historical grants means NO permission expansion on upgrade.
         if allow_natural_expression:
             payload['allow_natural_expression'] = True
@@ -94,12 +100,17 @@ class ActionDelegationStore:
         if type(natural_expression) is not bool:
             return False
         try:
+            if payload.get('lifetime')=='until_revoked':
+                valid_lifetime=event.expires_at is None and payload['expires_at'] is None
+            else:
+                valid_lifetime=(payload.get('lifetime') is None and event.expires_at is not None
+                    and current<event.expires_at
+                    and event.expires_at==datetime.fromisoformat(payload['expires_at']))
             return bool(event.event_type == 'action.delegation_granted'
                 and event.source == 'hermes.command.alive' and event.actor == subject
                 and event.subject == subject and event.sensitivity is Sensitivity.PRIVATE
                 and event.event_id == 'action.delegation:' + payload['operation_id']
-                and event.observed_at <= current < event.expires_at
-                and event.expires_at == datetime.fromisoformat(payload['expires_at'])
+                and event.observed_at <= current and valid_lifetime
                 and self.protector.verify_json('action.delegation.v1', payload, authenticator)
                 and (not natural_expression or payload.get('allow_natural_expression') is True)
                 and read(event.event_id + ':revoked') is None

@@ -319,7 +319,7 @@ def resume_retention_maintenance(shared_dir: str | Path) -> dict[str, int]:
     kernel_dir = Path(shared_dir).expanduser().resolve() / "kernel"
     if not (kernel_dir / "experience.sqlite3").is_file():
         return {"erasures_resumed": 0, "expired_erased": 0}
-    from safe_io import try_file_lock
+    from .file_locks import try_file_lock
     # Use recovery's existing cross-process lock. A cancelled watcher may leave
     # its worker running while a replacement watcher or startup recovery begins.
     with try_file_lock(kernel_dir / 'recovery.lock') as acquired:

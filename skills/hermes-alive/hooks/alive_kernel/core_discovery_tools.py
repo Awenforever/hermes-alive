@@ -65,7 +65,7 @@ class CoreDiscoveryTools:
         if self.pending: raise HostDiscoveryError('Core public read still physically pending')
         binding=self._current()
         def worker():
-            from safe_io import file_lock
+            from .file_locks import file_lock
             # Same lock across instances/module generations/processes. It is held
             # by the worker, not the waiting task: cancellation cannot release it.
             with file_lock(self.home/'plugin-data/hermes-alive/runtime/kernel/public-read.lock',timeout=0):

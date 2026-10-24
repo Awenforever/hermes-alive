@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 import shutil
 import tempfile
-from datetime import datetime,timezone
+from datetime import datetime,timezone,timedelta
 from types import SimpleNamespace
 
 import run_core_session_routing as core
@@ -47,6 +47,22 @@ async def test(home):
         setup=importlib.import_module(loaded.module.__name__+'.kernel_setup_bridge')
         execution=importlib.import_module(loaded.module.__name__+'.kernel_execution_bridge')
         store=setup.setup_store(binding)
+        # Public-plugin namespace imports must work WITHOUT legacy hooks on
+        # sys.path. Pure tests formerly masked the missing global safe_io import.
+        from tools.registry import registry
+        reads=[]
+        def public_read(arguments,**_):
+            reads.append(arguments)
+            return json.dumps({'success':True,'data':{'web':[]}})
+        registry.register(name='web_search',toolset='web',schema={'name':'web_search',
+            'description':'Synthetic public-read import regression','parameters':{'type':'object'}},
+            handler=public_read,override=True,scope=str(home))
+        tools=execution.kernel('core_discovery_tools').CoreDiscoveryTools(binding.context,
+            read_binding=lambda:'synthetic-current-binding',approved_queries=('public astronomy news',))
+        assert json.loads(await tools.search('public astronomy news',limit=3))['success']
+        assert reads==[{'query':'public astronomy news','limit':3}]
+        assert not tools.pending
+        tools.close()
         assert store.activation() is None
         assert '已启用' in await invoke('enable')
         active=store.activation()
@@ -95,9 +111,12 @@ async def test(home):
         assert len(store.journal.read(event_type='alive.setup.activated'))==1
         assert store.activation()==active  # startup did not renew expiry/grants
         record=store.journal.get(active['activation_event_id'])
-        assert store.activation(now=record.event.expires_at) is None
+        assert record.event.expires_at is None and record.event.payload['lifetime']=='until_revoked'
+        assert store.activation(now=datetime.now(timezone.utc)+timedelta(days=366))==active
+        assert store.journal.get(active['delegation_event_id']).event.expires_at is None
         assert '已暂停' in await invoke('pause')
         await binding.task
+        assert store.activation(now=datetime.now(timezone.utc)+timedelta(days=366)) is None
         assert store.activation() is None and not binding.native.pending
         assert (await loaded.module.kernel_gateway_startup())['status']=='stopped'
         assert execution.assemble(binding) is None

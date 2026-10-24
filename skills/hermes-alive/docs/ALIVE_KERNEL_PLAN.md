@@ -4,6 +4,59 @@ Status: active
 
 Last reviewed: 2026-10-24
 
+Activated-chain evidence (2026-10-24, Codex; supersedes the in-progress notes
+below): r27 completed actual CLI/setup/authorized native enable -> scoped public
+digest dispatch -> inherited Core models -> ordinary standard execution through
+an isolated adapter -> two actual main-agent turns with empty supplied history.
+Exact-share context was observed from the installed plugin reader, not a test
+prompt overlay. Six native logical stages used the configured official fallback
+after main-route RateLimitError observations; hook counts are not HTTP counts.
+No external delivery, live search, consumer installation or quality pass follows.
+
+Original-response review is NOT a quality pass: the share stays in English despite
+a Chinese discovery input, and its conversational continuation overemphasizes
+epistemic disclaimers. Do not fix this by forcing one case to be shared or adding
+a blacklist of phrases. Next close explicit recipient communication preferences
+and source-led, proportionate explanation through ordinary setup/context; do not
+silently read private chats or treat a search query as permanent language consent.
+Real live tools/daemon restart/compaction, legacy state migration, ordinary memory
+and feedback integration, fleet and final ten-round gates remain open (0/10).
+
+r22 had no model call after a source failure; r23 reached one actual grounded
+main reply but a probe cleanup error stopped its second turn. r24's new synthetic
+registry regression returned a dict where Core requires a JSON string. r25 fixed
+both probe contracts, then exposed that routed-profile credentials cannot be
+borrowed from the launch process environment. The diagnostic now puts only its
+authorized model projection in its own private Core dotenv profile, never in Work
+or production. r26 demonstrated actual official fallback and justified silence
+for historical material, not a positive-message test. All failures remain retained;
+no retries are reclassified as previous successful operations. Final r25 control
+focus passed16; full r26 component regression is still pending terminal here.
+
+Owner lifetime decision (2026-10-24; ADR0214): ordinary proactive authorization
+lasts until explicit pause/revocation, not mandatory monthly renewal. An explicit
+signed persistent lifetime is required; historical finite grants do not expand.
+Data retention and production-send permissions remain separate. This supersedes
+the thirty-day ordinary-activation choice in earlier dated checkpoints below.
+
+Activated-chain r22 exposed a real namespace-boundary dependency: a public plugin
+could not import legacy global safe_io, so its first public read failed and the
+no-material policy correctly stayed silent without invoking a model. Prior pure
+fixtures put legacy hooks on sys.path and concealed that distribution defect.
+Kernel lock dependencies are now package-local, with no import-time directory
+creation or sys.path repair. A public-entry Core tool regression was added; r23
+has reached actual source dispatch and real model responses, but is not yet a
+terminal/semantic/quality pass. Preserve the original failed operation.
+
+Activated-chain diagnostic (2026-10-24, Codex): an explicit opt-in probe now drives
+actual CLI/setup/confirmation/enable through the native host and Core model facade,
+public digest replay through Core's tool registry, standard in-memory adapter and
+actual main-agent follow-up. Model-only projection and complete originals stay
+private; abstention/failure is retained, not forced into a submission. Public digest
+replay is NOT real search/full-page extraction, real delivery or a quality round.
+Run and inspect original behavior before claiming this path works; ordinary
+provider/source/physical worker/fleet and full quality gates remain open.
+
 Ordinary-control implementation (2026-10-24, Codex; ADR0213): native Core enable,
 pause and status now bind the actual admitted configured conversation. Signed,
 finite activation references existing policy/route/delegation; startup only restores
