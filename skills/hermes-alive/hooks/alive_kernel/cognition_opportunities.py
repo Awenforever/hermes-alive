@@ -117,6 +117,16 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
         if observation_event_ids is not None:
             by_id={e.observation_event_id:e for e in (*discoveries,*commitments)}
             return tuple(by_id[e] for e in observation_event_ids if e in by_id)
+        return self._merge_candidate_evidence(discoveries,commitments,limit,source_cursor)
+
+    def candidate_evidence(self,*,subject,clearance,limit=8,excluded_urls=(),source_cursor=None):
+        discoveries=super().candidate_evidence(subject=subject,clearance=clearance,limit=limit,
+            excluded_urls=excluded_urls,source_cursor=source_cursor)
+        commitments=self.commitments(subject=subject,clearance=clearance,limit=limit)
+        return self._merge_candidate_evidence(discoveries,commitments,limit,source_cursor)
+
+    @staticmethod
+    def _merge_candidate_evidence(discoveries,commitments,limit,source_cursor):
         if not discoveries:
             return commitments[:limit]
         reserved=min(len(commitments),max(1,limit//2))

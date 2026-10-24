@@ -83,6 +83,8 @@ async def test(root, *, recipient_meaning=False, purpose_repair=False, plan_vers
     else: raise AssertionError('new commitment did not invalidate empty material')
     evidence=synth.reader.active_evidence(subject='user:test',clearance=Sensitivity.PRIVATE)
     assert len(evidence)==1 and evidence[0].content['origin_kind']=='commitment' and evidence[0].content['url']==''
+    assert synth.reader.candidate_evidence(subject='user:test',clearance=Sensitivity.PRIVATE,
+        excluded_urls=('https://example.invalid/workshop',))==evidence,'public-source holds hid a user commitment'
     calls=[]
     purpose_attempts=[]
     async def model(**kwargs):

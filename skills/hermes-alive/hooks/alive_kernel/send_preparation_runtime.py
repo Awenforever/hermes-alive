@@ -39,14 +39,16 @@ class QualifiedContentRejection:
     expression_event_id: str
     review_event_id: str
     disposition: str
+    interpretation_event_ids: tuple[str,...]
     source_event_ids: tuple[str,...]
     valid_until: datetime
 
     def to_event_payload(self):
-        return dict(method='qualified-content-rejection-v1',subject=self.subject,operation_id=self.operation_id,
+        return dict(method='qualified-content-rejection-v2',subject=self.subject,operation_id=self.operation_id,
             selection_event_id=self.selection_event_id,
             expression_event_id=self.expression_event_id,review_event_id=self.review_event_id,
-            disposition=self.disposition,source_event_ids=list(self.source_event_ids),
+            disposition=self.disposition,interpretation_event_ids=list(self.interpretation_event_ids),
+            source_event_ids=list(self.source_event_ids),
             valid_until=self.valid_until.isoformat(),authority_granted=False)
 
 
@@ -73,8 +75,6 @@ manufactures them from model output or reviews, nor falls back to another body.
         Read-only. A later eligibility decision must revalidate this witness;
         this method neither snoozes sources nor makes attention safe to ignore.
         """
-        from .content_vault import ContentReference,ContentVaultError
-        from .expression_support import ExpressionSourceSupportReviewer
         if (assessed.quality_disposition not in (
                 'final_semantic_rejected','final_unsupported','final_uncertain')
                 or getattr(parameters.get('call'),'pending',())):
@@ -83,20 +83,60 @@ manufactures them from model output or reviews, nor falls back to another body.
         if (expressed.planning.action_kind!='share' or expressed.expression_event_id is None
                 or expressed.planning.operation_id!=parameters['operation_id']
                 or assessed.final_review_event_id is None):return None
+        if assessed.quality_disposition=='final_semantic_rejected' and (
+                expressed.review_disposition!='rejected' or expressed.review_event_id!=assessed.final_review_event_id):
+            return None
+        receipts=tuple(i for i in (expressed.planning.interpretation_event_id,
+            expressed.planning.repair_interpretation_event_id) if i is not None)
+        return self._qualify_rejection(parameters=parameters,selection_id=expressed.planning.selection_event_id,
+            expression_id=expressed.expression_event_id,review_id=assessed.final_review_event_id,
+            disposition=assessed.quality_disposition,receipts=receipts,expected_text=expressed.text)
+
+    def restore_rejection(self,payload,parameters):
+        """Revalidate reference-only history; the caller authenticates its host envelope.
+
+        No model replay, fresh operation, suppression or authority. Old v1
+        records remain historical and cannot imply the new restoration scope.
+        """
+        from collections.abc import Mapping
+        from .events import _thaw_json
+        if (not isinstance(payload,Mapping) or payload.get('method')!='qualified-content-rejection-v2'
+                or payload.get('authority_granted') is not False or payload.get('subject')!=parameters['subject']
+                or payload.get('operation_id')!=parameters['operation_id']):return None
+        receipts=payload.get('interpretation_event_ids')
+        if (not isinstance(receipts,(tuple,list)) or not 1<=len(receipts)<=2
+                or any(not isinstance(i,str) or not i.startswith('opportunity.synthesis:')
+                    or not i.endswith(':completed') for i in receipts) or len(set(receipts))!=len(receipts)):
+            return None
+        restored=self._qualify_rejection(parameters=parameters,selection_id=payload.get('selection_event_id'),
+            expression_id=payload.get('expression_event_id'),review_id=payload.get('review_event_id'),
+            disposition=payload.get('disposition'),receipts=tuple(receipts))
+        return restored if restored is not None and restored.to_event_payload()==_thaw_json(payload) else None
+
+    def _qualify_rejection(self,*,parameters,selection_id,expression_id,review_id,disposition,receipts,
+                           expected_text=None):
+        from .content_vault import ContentReference,ContentVaultError
+        from .expression_support import ExpressionSourceSupportReviewer
+        from .events import Sensitivity
+        if (disposition not in ('final_semantic_rejected','final_unsupported','final_uncertain')
+                or getattr(parameters.get('call'),'pending',())
+                or any(not isinstance(i,str) or not i for i in (selection_id,expression_id,review_id))):return None
         required=parameters.get('require_independent_grounding',False)
         try:
-            candidate=self.expression.store.resolve_model_candidate(expressed.expression_event_id)
-            if (candidate is None or candidate.text!=expressed.text
-                    or candidate.selection_event_id!=expressed.planning.selection_event_id):return None
-            subject,origin,clearance=self._expression_origin(expressed)
+            original=self.journal.get(expression_id)
+            if (original is None or original.event.subject!=parameters['subject']
+                    or list(Sensitivity).index(original.event.sensitivity)>list(Sensitivity).index(
+                        Sensitivity(parameters.get('sensitivity',Sensitivity.PRIVATE)))):return None
+            candidate=self.expression.store.resolve_model_candidate(expression_id)
+            if (candidate is None or expected_text is not None and candidate.text!=expected_text
+                    or candidate.selection_event_id!=selection_id):return None
+            subject,origin,clearance=self._origin_from_receipts(expression_id,receipts)
             if subject!=parameters['subject']:return None
-            review=self.journal.get(assessed.final_review_event_id)
+            review=self.journal.get(review_id)
             if review is None or review.event.subject!=subject:return None
-            if assessed.quality_disposition=='final_semantic_rejected':
+            if disposition=='final_semantic_rejected':
                 verified=self.expression.store.verify_review(review,allow_correlated=not required)
-                if (expressed.review_disposition!='rejected'
-                        or expressed.review_event_id!=review.event.event_id or verified is None
-                        or verified.candidate_event_id!=expressed.expression_event_id
+                if (verified is None or verified.candidate_event_id!=expression_id
                         or verified.assessment.disposition.value!='rejected'):
                     return None
                 review_expiry=review.event.expires_at
@@ -104,9 +144,9 @@ manufactures them from model output or reviews, nor falls back to another body.
                 reviewer=ExpressionSourceSupportReviewer(self.journal,content_vault=self.vault,
                     context_vault=self.context_vault)
                 findings=reviewer.verify_current(review.event.event_id,subject=subject,
-                    interpretation_id=origin,candidate_id=expressed.expression_event_id,
+                    interpretation_id=origin,candidate_id=expression_id,
                     clearance=clearance,allow_correlated=not required)
-                if findings is None or 'final_'+findings['verdict']!=assessed.quality_disposition:return None
+                if findings is None or 'final_'+findings['verdict']!=disposition:return None
                 resolver=parameters.get('resolve_grounding_domain') or (lambda model:'unqualified-family')
                 if (resolver(review.event.payload['generator_model'])!=review.event.payload['generator_domain']
                         or resolver(review.event.payload['reviewer_model'])!=review.event.payload['reviewer_domain']):
@@ -117,7 +157,7 @@ manufactures them from model output or reviews, nor falls back to another body.
                 review_expiry=ContentReference.from_event_payload(review.event.payload['content']).retention_until
                 if review_expiry!=candidate.expires_at:return None
             references=self.expression.store.continuity_sources_for_selection(
-                expressed.planning.selection_event_id,subject)
+                selection_id,subject)
             sources=tuple(self.journal.get(ref['event_id']) for ref in references)
             # Never silently defer a user-admitted commitment as if it were an
             # optional public discovery. Source state and truth stay unchanged.
@@ -128,19 +168,21 @@ manufactures them from model output or reviews, nor falls back to another body.
             expiry=min(candidate.expires_at,review_expiry,*(s.event.expires_at for s in sources))
             if review.event.expires_at is not None:expiry=min(expiry,review.event.expires_at)
             if expiry<=datetime.now(timezone.utc):return None
-            return QualifiedContentRejection(subject,expressed.planning.operation_id,expressed.planning.selection_event_id,
-                expressed.expression_event_id,review.event.event_id,assessed.quality_disposition,
-                tuple(s.event.event_id for s in sources),expiry)
+            return QualifiedContentRejection(subject,parameters['operation_id'],selection_id,
+                expression_id,review.event.event_id,disposition,receipts,tuple(s.event.event_id for s in sources),expiry)
         except (ContentVaultError,ValueError):
             return None  # Unavailable/foreign proof is attention, not qualified rejection.
 
     def _expression_origin(self, expressed):
-        candidate = self.expression.store.resolve_model_candidate(expressed.expression_event_id)
+        return self._origin_from_receipts(expressed.expression_event_id,
+            (expressed.planning.interpretation_event_id,expressed.planning.repair_interpretation_event_id))
+
+    def _origin_from_receipts(self,expression_id,receipts):
+        candidate = self.expression.store.resolve_model_candidate(expression_id)
         if candidate is None:
             raise ValueError('final expression provenance is unavailable')
         subject = self.journal.get(candidate.event_id).event.subject
-        for receipt in (expressed.planning.interpretation_event_id,
-                        expressed.planning.repair_interpretation_event_id):
+        for receipt in receipts:
             if receipt is None:
                 continue
             operation = receipt.removeprefix('opportunity.synthesis:').removesuffix(':completed')

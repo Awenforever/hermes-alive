@@ -531,6 +531,27 @@ class DiscoveryOpportunityIngestor:
                         limit: int = 8,
                         observation_event_ids: tuple[str, ...] | None = None,
                         source_cursor: int | None = None) -> tuple[OpportunityEvidence, ...]:
+        """Current authenticated facts; candidate exclusions never affect this API."""
+        return self._read_evidence(subject=subject,clearance=clearance,limit=limit,
+            observation_event_ids=observation_event_ids,source_cursor=source_cursor)
+
+    def candidate_evidence(self, *, subject: str, clearance: Sensitivity, limit: int = 8,
+                           excluded_urls: tuple[str,...] = (), source_cursor: int | None = None):
+        """Attempt-eligible discovery window, never retained-proof resolution.
+
+        Exclusion is scoped to this read, before the result limit; it changes
+        neither source truth, agenda state nor active_evidence's pinned API.
+        """
+        if (type(limit) is not int or not 1<=limit<=32
+                or not isinstance(excluded_urls,tuple) or len(excluded_urls)>64
+                or any(not isinstance(url,str) for url in excluded_urls)):
+            raise DiscoveryOpportunityError('bounded explicit candidate exclusions required')
+        excluded=frozenset(canonicalize_discovery_url(url) for url in excluded_urls)
+        return self._read_evidence(subject=subject,clearance=clearance,limit=limit,
+            source_cursor=source_cursor,excluded_urls=excluded)
+
+    def _read_evidence(self, *, subject, clearance,limit=8,observation_event_ids=None,
+                       source_cursor=None,excluded_urls=()):
         """Read authenticated current discovery content, scoped before LIMIT.
 
         The caller supplies a Hermes-authorized principal, never a model-proposed
@@ -596,6 +617,8 @@ class DiscoveryOpportunityIngestor:
                     expected_purpose="discovery.observation", expected_sensitivity=item.sensitivity,
                 )
             except (ContentUnavailableError, ContentIntegrityError):
+                continue
+            if excluded_urls and canonicalize_discovery_url(content['url']) in excluded_urls:
                 continue
             values.append(OpportunityEvidence(
                 item.item_id, observation_id, record.event.expires_at,

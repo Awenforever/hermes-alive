@@ -5,6 +5,7 @@ delegated to the composed runtime; failed active work never becomes a new cycle.
 """
 import asyncio
 from dataclasses import dataclass
+from datetime import timedelta
 import re
 
 from .events import EventEnvelope,Sensitivity,_thaw_json
@@ -68,7 +69,10 @@ class AutonomousHostRuntime:
                     raise ValueError('completion references a missing/different open cycle')
             if type(cursor) is not int or cursor<0:
                 raise ValueError('invalid host scan cursor')
+            owner_frontier=connection.execute('SELECT COALESCE(MAX(sequence),0) FROM experience_events WHERE subject=?',
+                (self.subject,)).fetchone()[0]
             payload = {'subject':self.subject,'lane':self.lane,'configuration_id':self.configuration_id,'execute':self.execute,
+                'owner_event_frontier':int(owner_frontier),
                 'previous_closed_event_id':previous,'reconciliation_cursor':cursor,'authority_granted':False}
             identity = self.protector.authenticate_json('autonomous.host.identity.v1',payload)
             payload['operation_id'] = 'host-cycle:'+identity[:40]
@@ -94,6 +98,14 @@ class AutonomousHostRuntime:
                     or rejection.operation_id!=cycle.operation_id):
                 raise ValueError('content rejection cannot relabel another cycle outcome')
             payload['content_rejection']=rejection.to_event_payload()
+            window=getattr(result,'content_rejection_window_seconds',None)
+            if window is not None:
+                if type(window) is not int or not 1<=window<=3600:
+                    raise ValueError('bounded content retry window required')
+                review=self.journal.get(rejection.review_event_id)
+                if review is None:raise ValueError('completed rejection review unavailable')
+                payload['content_rejection_retry_until']=min(rejection.valid_until,
+                    review.event.observed_at+timedelta(seconds=window)).isoformat()
         payload['integrity_authenticator'] = self.protector.authenticate_json('autonomous.host.closed.v1',payload)
         def factory(connection):
             row = connection.execute('SELECT sequence,canonical_json,integrity_hash FROM experience_events WHERE event_id=?',(cycle.event_id,)).fetchone()

@@ -27,6 +27,7 @@ class AutonomousCycleResult:
     reconsideration_event_id: str | None = None
     quality_assessment: object = field(default=None,repr=False)
     content_rejection: object = field(default=None,repr=False)
+    content_rejection_window_seconds: int | None = None
 
 
 class AutonomousCycleRuntime:
@@ -128,7 +129,8 @@ class AutonomousCycleRuntime:
                 rejection=await context_value(expression_parameters.get('read_context'),
                     lambda:self.preparation.rejection_witness(assessed,parameters))
                 return AutonomousCycleResult('content_review_attention',reconciliation,
-                    expression=expression,quality_assessment=assessed,content_rejection=rejection)
+                    expression=expression,quality_assessment=assessed,content_rejection=rejection,
+                    content_rejection_window_seconds=reconsider_after_seconds if rejection is not None else None)
             if capture is not None and expression.planning.action_kind=='silence':
                 self.reconsideration.remember(subject=subject,configuration_id=cognition_configuration_id,
                     before=before,after=await capture(),planning=expression.planning)
@@ -147,7 +149,8 @@ class AutonomousCycleRuntime:
             rejection=await context_value(expression_parameters.get('read_context'),
                 lambda:self.preparation.rejection_witness(prepared,parameters))
             return AutonomousCycleResult('content_review_attention',reconciliation,prepared=prepared,
-                content_rejection=rejection)
+                content_rejection=rejection,
+                content_rejection_window_seconds=reconsider_after_seconds if rejection is not None else None)
         if prepared.authorization is None or not prepared.authorization.authorized:
             return AutonomousCycleResult('not_authorized',reconciliation,prepared=prepared)
         lease = self.outbox.acquire(worker_id=worker_id,subject=subject,

@@ -4,6 +4,15 @@ Status: active
 
 Last reviewed: 2026-10-24
 
+Bounded retry eligibility view (2026-10-24; ADR0220): authenticated v2 rejection
+history is revalidated without inference, with original fixed review-time
+deadline, owner/input/policy/configuration and retained-proof scope. Candidate
+selection has a distinct exclusion-before-limit API; raw/pinned facts and user
+commitments remain readable. Ordinary waiting ticks do not displace usable
+negative history. Qualification is in progress; this view is NOT wired into the
+ordinary continuous loop yet. Next close source-choice/planning/exhaustion
+continuation rather than relabel rejection as silence or hide original facts.
+
 Quality-rejection boundary (2026-10-24; ADR0219): current completed negative
 wording advice now has an optional reference-only witness in authenticated host
 completion. Unknown/pending work, unavailable repair, missing/erased or foreign

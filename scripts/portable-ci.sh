@@ -122,6 +122,7 @@ run_and_require run_final_wording_preparation.py '^HERMES_ALIVE_FINAL_WORDING_PR
 run_and_require run_final_wording_repair.py '^HERMES_ALIVE_FINAL_WORDING_REPAIR_OK$'
 run_and_require run_initial_semantic_repair.py '^HERMES_ALIVE_INITIAL_SEMANTIC_REPAIR_OK$'
 run_and_require run_qualified_content_rejection.py '^HERMES_ALIVE_QUALIFIED_CONTENT_REJECTION_OK$'
+run_and_require run_rejection_eligibility.py '^HERMES_ALIVE_REJECTION_ELIGIBILITY_OK$'
 run_and_require run_shadow_final_quality.py '^HERMES_ALIVE_SHADOW_FINAL_QUALITY_OK$'
 run_and_require run_alive_kernel_expression_runtime.py '^HERMES_ALIVE_KERNEL_EXPRESSION_RUNTIME_OK$'
 run_and_require run_alive_kernel_opportunity_synthesis.py '^HERMES_ALIVE_KERNEL_OPPORTUNITY_SYNTHESIS_OK$'

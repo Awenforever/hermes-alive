@@ -16,7 +16,7 @@ from alive_kernel.content_vault import ContentReference
 from run_alive_kernel_expression_runtime import scenario
 
 
-async def exercise(root,mode):
+async def make_rejection(root,mode,*,retry_window=None):
     journal=ExperienceJournal(root/'experience.sqlite3')
     runtime=AutonomousCycleRuntime(journal)
     policy=AutonomyPolicyProjection(journal)
@@ -37,7 +37,13 @@ async def exercise(root,mode):
         return NS(model='synthetic/renderer',choices=[NS(message=NS(content=json.dumps(value)))])
     expression={k:v for k,v in params.items() if k not in ('subject','operation_id','policy_context')}
     expression.update(call=source,allow_repair=False)
-    result=await host.step(dict(expression_parameters=expression,resolve_binding=lambda _:None))
+    result=await host.step(dict(expression_parameters=expression,resolve_binding=lambda _:None,
+        **({'reconsider_after_seconds':retry_window} if retry_window is not None else {})))
+    return journal,runtime,host,cycle,params,expression,result,calls
+
+
+async def exercise(root,mode):
+    journal,runtime,host,cycle,params,expression,result,calls=await make_rejection(root,mode)
     if mode=='supported':
         assert result.disposition=='shadow_selected' and result.content_rejection is None
         return
@@ -56,6 +62,9 @@ async def exercise(root,mode):
     before=(journal.last_sequence(),len(calls))
     verify=lambda value=assessed,options=parameters:runtime.preparation.rejection_witness(value,options)
     assert verify()==witness
+    assert runtime.preparation.restore_rejection(witness.to_event_payload(),parameters)==witness
+    assert runtime.preparation.restore_rejection({**witness.to_event_payload(),
+        'review_event_id':'missing-review'},parameters) is None
     assert verify(options={**parameters,'subject':'user:other'}) is None
     assert verify(options={**parameters,'operation_id':'foreign-cycle'}) is None
     assert verify(replace(assessed,expression=replace(assessed.expression,text='Foreign unreviewed wording.'))) is None
@@ -63,9 +72,9 @@ async def exercise(root,mode):
         planning=replace(assessed.expression.planning,selection_event_id='foreign-selection')))) is None
     assert verify(replace(assessed,quality_disposition='final_repair_unavailable')) is None
     assert verify(replace(assessed,final_review_event_id='missing-review')) is None
-    source.pending=({'phase':'synthetic_unknown_child'},)
+    expression['call'].pending=({'phase':'synthetic_unknown_child'},)
     assert verify() is None,'a pending physical model operation became safe content rejection'
-    source.pending=()
+    expression['call'].pending=()
     assert verify()==witness
     assert (journal.last_sequence(),len(calls))==before,'proof inspection created work or journal events'
     for foreign in (replace(witness,subject='user:other'),replace(witness,operation_id='foreign-cycle')):
@@ -85,8 +94,9 @@ async def exercise(root,mode):
     assert not journal.read(event_type='dispatch.externally_delivered')
 
 
-with tempfile.TemporaryDirectory(prefix='alive-qualified-rejection-') as temporary:
-    for mode in ('semantic','unsupported','uncertain','supported'):
-        print('QUALIFIED_REJECTION_CASE='+mode,flush=True)
-        asyncio.run(exercise(Path(temporary)/mode,mode))
-print('HERMES_ALIVE_QUALIFIED_CONTENT_REJECTION_OK')
+if __name__=='__main__':
+    with tempfile.TemporaryDirectory(prefix='alive-qualified-rejection-') as temporary:
+        for mode in ('semantic','unsupported','uncertain','supported'):
+            print('QUALIFIED_REJECTION_CASE='+mode,flush=True)
+            asyncio.run(exercise(Path(temporary)/mode,mode))
+    print('HERMES_ALIVE_QUALIFIED_CONTENT_REJECTION_OK')
