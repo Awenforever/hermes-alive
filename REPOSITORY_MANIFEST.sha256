@@ -18,7 +18,7 @@ afc9a9d7368a8a62c1a6ed7cc614bbc05a891511cbfad050abdb185e73dc2ae0  ./gateway_host
 53dfb7811d82d4622018d4b462753412b139fc6f5deef7a5129c2d92930f3035  ./gateway_session_bridge.py
 e2febdce9066c7ca805be10ec2971e03f10634ae82ab936e0ac2b52bbc35301f  ./kernel_execution_bridge.py
 4b686255f3dd1973cee42335e193a1c76cddcfcbf071d4e4a2d51f858cb49614  ./kernel_setup_bridge.py
-55cd0f449be4056d3bad5541fc13955159e91de300e418cc1b8610783b509ab1  ./metadata/hermes-alive-source.sha256
+b6fe830ba3e28665cde6be3d565c1850ce4b20715c2f593b414d683319457bae  ./metadata/hermes-alive-source.sha256
 5cba4486635fe54faef4cbb05cfb645c315d9ad4dd3316817f12bc81c44b220e  ./metadata/hermes-alive.json
 8a8d72e18f017d562eb34248fad6ec9da130dd663972d6a161845ee16e89f023  ./plugin.yaml
 db75497592264ca16f34838d2dafe06bf1ae0bd39da3893af43158dedef0c1b1  ./plugin_cli.py
@@ -30,7 +30,7 @@ acc205902d64993d163b7a7e2a89a0eb97e7561a2ac4f515313de2190181ee0e  ./scripts/upda
 cf444ad0788f9ab925b944e4668d974fb8dc36161d3bdc8d9963b6a5021dd53f  ./skills/hermes-alive/README.md
 15aa69e768b45e17d71ff22155150fac4d0925ba172748432c5c8c307985e1bb  ./skills/hermes-alive/README_CN.md
 d94ca97e3f68fec794e043cf20c101ff454e0bd9d37e11b0490f2b12aeb8ec29  ./skills/hermes-alive/SKILL.md
-00b17e2e6e2bcdf2c4f6c88c4d669227859475a6ad182a037d859d7be8d10216  ./skills/hermes-alive/docs/ALIVE_KERNEL_PLAN.md
+811902e0b0a7be61334f184635f5491b31beb1b400e83cb4eaa49c4ab19ff5f0  ./skills/hermes-alive/docs/ALIVE_KERNEL_PLAN.md
 97ab9e52cbfbc23d98822e39ecd598be1bb7ccd78395cf59aca7929a3ed98d5d  ./skills/hermes-alive/docs/ARCHITECTURE.md
 60a2ffe527b49c1598e8275b205985b63653270b499cdb29a2f7ab672e88fc0e  ./skills/hermes-alive/docs/DATA_AND_PRIVACY.md
 52695227de605d74f3c9c2b683f8ee979a353fa05dfc4c8975828af5e2be5386  ./skills/hermes-alive/docs/DEVELOPMENT_MEMORANDUM.md

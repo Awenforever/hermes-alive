@@ -31,7 +31,11 @@ authorized model projection in its own private Core dotenv profile, never in Wor
 or production. r26 demonstrated actual official fallback and justified silence
 for historical material, not a positive-message test. All failures remain retained;
 no retries are reclassified as previous successful operations. Final r25 control
-focus passed16; full r26 component regression is still pending terminal here.
+focus passed16; full r26 component regression is now terminal0, marker PASS,
+88 suite logs. This is a reused managed environment/component regression, not
+GitHub dual-OS CI, fresh remote consumers, real transport or a quality round.
+The later r28 tree differs only in reviewed documentation and matching manifests;
+runtime/test bytes match the qualified r26/r27 candidate.
 
 Owner lifetime decision (2026-10-24; ADR0214): ordinary proactive authorization
 lasts until explicit pause/revocation, not mandatory monthly renewal. An explicit
