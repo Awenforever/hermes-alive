@@ -15,7 +15,7 @@ class ReconsiderationContext:
 
 
 class ReconsiderationStore:
-    METHOD = 'alive-reconsideration-v2'
+    METHOD = 'alive-reconsideration-v3'
     EVENT = 'cognition.wait_recorded'
 
     def __init__(self, preparation, protector, *, clock=None):
@@ -31,10 +31,13 @@ class ReconsiderationStore:
             raise ValueError('reconsideration clock must be timezone aware')
         return now.astimezone(timezone.utc)
 
-    def capture(self, *, subject, configuration_id, execute, policy, parameters, window_seconds):
+    def capture(self, *, subject, configuration_id, execute, policy, parameters, window_seconds,
+                listing_fingerprint=None):
         if (not isinstance(configuration_id, str) or not re.fullmatch(
                 r'[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}', configuration_id)
-                or type(window_seconds) is not int or not 1 <= window_seconds <= 3600):
+                or type(window_seconds) is not int or not 1 <= window_seconds <= 3600
+                or listing_fingerprint is not None and (not isinstance(listing_fingerprint,str)
+                    or not re.fullmatch(r'[0-9a-f]{64}',listing_fingerprint))):
             raise ValueError('bounded reconsideration needs explicit host configuration')
         clearance = Sensitivity(parameters.get('sensitivity', Sensitivity.PRIVATE))
         now = self.now()
@@ -54,13 +57,22 @@ class ReconsiderationStore:
                 content=_thaw_json(e.content), expires_at=e.expires_at.isoformat()) for e in evidence],
             context=[[c.to_prompt() for c in reader.read(subject=subject, clearance=clearance)]
                      for reader in readers])
+        if listing_fingerprint is not None:state['listing_fingerprint']=listing_fingerprint
         with closing(self.journal._connect()) as connection:
             # Observe new inbound even before memory/feedback projection. Do not
             # read private message bodies merely to decide whether to wake up.
             inbound = connection.execute('SELECT MAX(sequence) FROM experience_events WHERE subject=? AND event_type=?',
                 (subject, 'conversation.inbound')).fetchone()[0]
-            frontier = connection.execute('SELECT MAX(sequence) FROM experience_events WHERE subject=? AND event_type NOT IN (?,?,?)',
-                (subject, self.EVENT, 'autonomous.host.opened', 'autonomous.host.closed')).fetchone()[0]
+            ignored=(self.EVENT,'autonomous.host.opened','autonomous.host.closed')
+            if listing_fingerprint is not None:
+                # Only the already-observed listing protocol's control records
+                # are non-semantic. New source versions, failures, inbound,
+                # memory, feedback and unknown events still wake the owner.
+                ignored+=('discovery.host_read_started','discovery.host_read_completed',
+                    'discovery.research_cycle_opened','discovery.citation_selection_opened',
+                    'discovery.research_group_opened','discovery.reading_assessment_opened')
+            frontier = connection.execute('SELECT MAX(sequence) FROM experience_events WHERE subject=? AND event_type NOT IN ('+
+                ','.join('?' for _ in ignored)+')',(subject,*ignored)).fetchone()[0]
             allowed = tuple(s.value for s in Sensitivity)[:tuple(Sensitivity).index(clearance)+1]
             placeholders = ','.join('?' for _ in allowed)
             deadlines = connection.execute('SELECT item_id,state,available_at,due_at,expires_at FROM agenda_items_v1 '
@@ -108,7 +120,7 @@ class ReconsiderationStore:
         payload = _thaw_json(event.payload)
         signature = payload.pop('integrity_authenticator', None)
         method = payload.get('method')
-        if method not in ('alive-reconsideration-v1',self.METHOD):
+        if method not in ('alive-reconsideration-v1','alive-reconsideration-v2',self.METHOD):
             raise ValueError('unknown reconsideration history method')
         identity = self.protector.authenticate_json(method+'.identity',
             dict(subject=subject,configuration_id=payload.get('configuration_id'),

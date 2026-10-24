@@ -9,6 +9,7 @@ import hashlib
 from .native_core_acquisition import CoreScopedModelAcquirer
 from .native_host_caller import HostModelBinding,HostNativeCaller
 from .native_worker_protocol import NativeWorkerError,canonical,identifier
+from .content_vault import ContentVaultError
 
 
 class NativeCognitionHost:
@@ -140,14 +141,36 @@ class NativeCognitionHost:
                         or not self.host.runtime.reconciliation._owner_policy(self.host.subject).enabled):return bound
                 async def prepare():
                     expected=read_binding()
-                    prepared=await self.preparation(cycle=cycle,parameters=bound,
-                        call=self._caller,read_binding=read_binding)
-                    if (read_binding()!=expected or not isinstance(prepared,dict)
-                            or prepared.get('expression_parameters',{}).get('call') is not self._caller
-                            or prepared['expression_parameters'].get('resolve_domain') is not self.resolve_domain
-                            or self.context_reads is not None and prepared['expression_parameters'].get('read_context') is not read_context):
-                        raise NativeWorkerError('cycle preparation changed current native authority')
-                    return prepared
+                    def validated(prepared):
+                        if (read_binding()!=expected or not isinstance(prepared,dict)
+                                or prepared.get('expression_parameters',{}).get('call') is not self._caller
+                                or prepared['expression_parameters'].get('resolve_domain') is not self.resolve_domain
+                                or self.context_reads is not None and prepared['expression_parameters'].get('read_context') is not read_context):
+                            raise NativeWorkerError('cycle preparation changed current native authority')
+                        return prepared
+                    phased=all(callable(getattr(self.preparation,name,None)) for name in
+                        ('observe','reason','restore_parameters'))
+                    if not phased:
+                        return validated(await self.preparation(cycle=cycle,parameters=bound,
+                            call=self._caller,read_binding=read_binding))
+                    observed=await self.preparation.observe(cycle=cycle,parameters=bound,read_binding=read_binding)
+                    restored=None
+                    if bound.get('reconsider_after_seconds') is not None and observed.listing_fingerprint is not None:
+                        previous=next(self.host.journal.iter_reverse(event_types=(self.host.runtime.reconsideration.EVENT,),
+                            subject=self.host.subject,max_records=1),None)
+                        if previous is not None and previous.event.payload.get('configuration_id')==self.host.configuration_id:
+                            try:
+                                restored=self.preparation.restore_parameters(
+                                    operation_id=previous.event.payload['operation_id'],
+                                    listing_fingerprint=observed.listing_fingerprint)
+                            except ContentVaultError:
+                                restored=None  # Missing retained material cannot justify a wait.
+                    async def reason():
+                        return validated(await self.preparation.reason(observed,cycle=cycle,parameters=bound,
+                            call=self._caller,read_binding=read_binding))['expression_parameters']
+                    return validated({**bound,'expression_parameters':{**bound['expression_parameters'],**(restored or {})},
+                        'prepare_expression':reason,'listing_fingerprint':observed.listing_fingerprint,
+                        'reuse_reconsideration':restored is not None})
                 return prepare()
             try:
                 return await self.host.step_bound(build)

@@ -4,6 +4,18 @@ Status: active
 
 Last reviewed: 2026-10-24
 
+Pre-cognition wait integration (2026-10-24; ADR0218): native configured discovery
+now defers model selection/page reading until after reconciliation and existing
+wait validation. Encrypted derived-argument receipts restore only prior inquiry
+references for exact retained-silence replay, never old callbacks or authority.
+Reconsideration v3 distinguishes complete listing identity from observation-only
+control logs. Missing/erased proof, source/context/policy/agenda changes, unknown
+owner events and expiry require fresh cognition. Qualification is in progress;
+do not claim a passing native chain before its test has actually terminated.
+This supersedes ADR0217's "native still composed" status, not its observation
+boundary. Content-rejection deferral/fairness and continuous recovery remain open;
+verified silence reuse must not silently stand in for these different outcomes.
+
 Observation/cognition boundary (2026-10-24; ADR0217): configured public discovery
 now exposes a no-model listing observation followed by explicit reasoning;
 the old callable composes both. Exact ephemeral owner/cycle/generation ownership

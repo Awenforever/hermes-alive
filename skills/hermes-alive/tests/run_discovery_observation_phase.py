@@ -82,6 +82,11 @@ async def exercise(root):
         assert await prep.reason(second,cycle=second_cycle,parameters=parameters,call=model,
             read_binding=binding)==parameters
         assert models==['alive_discovery_reading']
+        before=journal.read(event_type='discovery.parameters_retained')[-1].event
+        assert await prep.reason(second,cycle=second_cycle,parameters=parameters,call=model,
+            read_binding=binding)==parameters
+        assert models==['alive_discovery_reading']
+        assert journal.read(event_type='discovery.parameters_retained')[-1].event==before
         state['title']='Changed synthetic title'
         third_cycle,third=await observe()
         assert third.listing_fingerprint!=second.listing_fingerprint
@@ -94,6 +99,10 @@ async def exercise(root):
         assert empty.listing_fingerprint is not None and not empty.found.observation_ids
         assert await prep.reason(empty,cycle=empty_cycle,parameters=parameters,call=model,
             read_binding=binding)==parameters
+        before=journal.read(event_type='discovery.parameters_retained')[-1].event
+        assert await prep.reason(empty,cycle=empty_cycle,parameters=parameters,call=model,
+            read_binding=binding)==parameters
+        assert journal.read(event_type='discovery.parameters_retained')[-1].event==before
         _,empty_again=await observe()
         assert empty_again.listing_fingerprint==empty.listing_fingerprint
         state['mode']='failed'

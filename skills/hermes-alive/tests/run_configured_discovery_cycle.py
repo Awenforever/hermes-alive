@@ -1,5 +1,6 @@
 """Bound discovery -> actual kernel expression/recovery; synthetic IO/models only."""
 import asyncio
+import argparse
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 import json
@@ -291,10 +292,13 @@ async def exercise(root,mode,*,primary_url=None):
                     'revoked-followup','forgotten-followup','erased-followup','interrupted-followup','historical-invalid-followup'):
             try:await runner.step(parameters)
             except (HostDiscoveryError,NativeWorkerError,RuntimeError):pass
-            else:raise AssertionError('invalid/revoked/uncertain discovery succeeded')
+            else:raise AssertionError('invalid/revoked/uncertain discovery succeeded: '+mode+
+                ' model_stages='+repr(models)+' tools='+repr([name for name,_ in tools]))
             assert not journal.read(event_type='autonomous.host.closed')
             failure=journal.read(event_type='autonomous.host.failed')[-1].event
-            assert failure.payload['phase']=='preparation'
+            # Public observation is still preparation; selection/page reasoning
+            # is now deferred inside cognition after reconciliation/wait checks.
+            assert failure.payload['phase']=='cognition'
             assert failure.payload['failure_class'] in ('HostDiscoveryError','HostReadUncertainError','RuntimeError')
             assert 'message' not in failure.payload and failure.payload['authority_granted'] is False
             if mode=='uncertain-read':
@@ -435,19 +439,26 @@ async def exercise(root,mode,*,primary_url=None):
     release.set()
 
 
+parser=argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--case',action='append',default=[],help='Run only named synthetic cases (not the full-suite marker).')
+selected_cases=parser.parse_args().case
 with tempfile.TemporaryDirectory(prefix='alive-configured-discovery-') as folder:
     modes=('budget-pressure',) if os.getenv('ALIVE_REPRODUCE_OLD_RECALL')=='1' else (
                  'share','reading-assessment','reading-assessment-no-followup','reading-assessment-budget-pressure','reading-assessment-invalid','reading-assessment-missing','reading-assessment-recovery','primary-read','private-followup','budget-pressure','fair-budget-pressure','erase-group-after-final','followup-failed','replay','legacy-replay','historical-followup-replay','unconsented-followup','page-failed','abstain','paused',
                  'invalid-choice','revoked-choice','forgotten-choice','erased-choice','uncertain-read',
                  'invented-followup','foreign-followup','mixed-followup','malformed-followup','nonjson-followup',
                  'revoked-followup','forgotten-followup','erased-followup','interrupted-followup','historical-invalid-followup')
+    if selected_cases:
+        if set(selected_cases)-set(modes):raise ValueError('unknown configured-discovery test case')
+        modes=tuple(selected_cases)
     for mode in modes:
+        print('CONFIGURED_DISCOVERY_CASE='+mode,flush=True)
         root=Path(folder)/mode;root.mkdir()
         with patch.dict(os.environ,HERMES_HOME=str(root),HERMES_ALIVE_SHARED_DIR=str(root/'runtime')):
             asyncio.run(exercise(root,mode))
-    if os.getenv('ALIVE_REPRODUCE_OLD_RECALL')!='1':
+    if not selected_cases and os.getenv('ALIVE_REPRODUCE_OLD_RECALL')!='1':
         root=Path(folder)/'canonical-resource-identity';root.mkdir()
         with patch.dict(os.environ,HERMES_HOME=str(root),HERMES_ALIVE_SHARED_DIR=str(root/'runtime')):
             asyncio.run(exercise(root,'primary-read',primary_url=
                 'https://EXAMPLE.invalid:443/Original-Observations?utm_source=fixture&version=2#section'))
-print('HERMES_ALIVE_CONFIGURED_DISCOVERY_CYCLE_OK')
+print('HERMES_ALIVE_CONFIGURED_DISCOVERY_CASE_OK' if selected_cases else 'HERMES_ALIVE_CONFIGURED_DISCOVERY_CYCLE_OK')

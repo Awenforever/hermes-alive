@@ -6,6 +6,7 @@ durable before spending and never silently repeated after an uncertain outcome.
 """
 import asyncio
 from dataclasses import dataclass
+from datetime import timedelta
 import hashlib
 import json
 from urllib.parse import urlsplit
@@ -342,8 +343,9 @@ class ConfiguredDiscoveryCycle:
         current()
         fingerprint=(self.ingestor.vault.digest_json(dict(method='approved-listing-snapshot-v1',
             subject=self.subject,queries=list(self.queries),
-            observations=sorted(found.observation_ids),follow_citations=self.follow_citations,
-            record_reading_assessment=self.record_reading_assessment)) if found.failures==0 else None)
+            observations=sorted(found.observation_ids),research_enabled=research_enabled,
+            citation_references=citation_references,group_enabled=group_enabled,
+            assessment_enabled=assessment_enabled)) if found.failures==0 else None)
         result=_DiscoveryObservation(cycle.operation_id,expected,found,tuple(evidence),reader,current,
             research_enabled,citation_references,group_enabled,assessment_enabled,fingerprint)
         self._observation=result
@@ -352,6 +354,64 @@ class ConfiguredDiscoveryCycle:
     async def __call__(self,*,cycle,parameters,call,read_binding):
         observed=await self.observe(cycle=cycle,parameters=parameters,read_binding=read_binding)
         return await self.reason(observed,cycle=cycle,parameters=parameters,call=call,read_binding=read_binding)
+
+    def _prepared_identity(self,operation_id):
+        return 'discovery.prepared:'+self.ingestor.vault.digest_json(dict(
+            subject=self.subject,operation_id=operation_id))[:40]
+
+    def restore_parameters(self,*,operation_id,listing_fingerprint):
+        """Restore only prior derived arguments, never callbacks or authority.
+
+        This is a potential wait input, NOT permission to skip cognition. The
+        runtime must still validate the retained silence and its full context.
+        """
+        if listing_fingerprint is None:return None
+        record=self.ingestor.journal.get(self._prepared_identity(operation_id))
+        if record is None:return None
+        event=record.event
+        expected_search='discovery.host-read:'+self.ingestor.vault.digest_json(dict(
+            subject=self.subject,operation_id=operation_id+':search'))[:40]+':completed'
+        if (event.event_type!='discovery.parameters_retained' or event.source!='alive.configured-discovery'
+                or event.actor!='system:alive-configured-reader' or event.subject!=self.subject
+                or event.causation_id!=expected_search or event.sensitivity is not Sensitivity.PRIVATE
+                or event.payload.get('authority_granted') is not False):
+            raise HostDiscoveryError('discovery parameter receipt has foreign provenance')
+        ref=ContentReference.from_event_payload(event.payload['content'])
+        value=self.ingestor.vault.resolve_json(ref.content_id,expected_subject=self.subject,
+            expected_purpose='discovery.prepared-parameters',expected_sensitivity=Sensitivity.PRIVATE)
+        if (self.ingestor.vault.digest_json(value)!=ref.digest
+                or value.get('operation_id')!=operation_id or value.get('method')!='discovery-derived-parameters-v1'):
+            raise HostDiscoveryError('discovery parameter receipt changed')
+        if value['listing_fingerprint']!=listing_fingerprint:return None
+        delta=value['parameters']
+        if (not isinstance(delta,dict) or set(delta)-{
+                'inquiry_item_ids','research_read_receipt_ids','record_reading_assessment'}):
+            raise HostDiscoveryError('discovery receipt exceeds derived argument scope')
+        return {k:tuple(v) if k in ('inquiry_item_ids','research_read_receipt_ids') else v
+            for k,v in delta.items()}
+
+    def _retain_parameters(self,observed,parameters):
+        if observed.listing_fingerprint is None:return parameters
+        delta={k:v for k,v in parameters['expression_parameters'].items() if k in (
+            'inquiry_item_ids','research_read_receipt_ids','record_reading_assessment')}
+        value=dict(method='discovery-derived-parameters-v1',operation_id=observed.operation_id,
+            listing_fingerprint=observed.listing_fingerprint,parameters=delta)
+        identity=self._prepared_identity(observed.operation_id)
+        if self.ingestor.journal.get(identity) is not None:
+            previous=self.restore_parameters(operation_id=observed.operation_id,
+                listing_fingerprint=observed.listing_fingerprint)
+            if previous is None or previous!=delta:
+                raise HostDiscoveryError('completed discovery parameters changed during replay')
+            return parameters  # Preserve the original event time and expiry.
+        search=self.ingestor.journal.get(observed.found.receipt_id)
+        expiry=min([e.expires_at for e in observed.evidence]+[search.event.observed_at+timedelta(days=7)])
+        ref=self.ingestor.vault.put_json(value,subject=self.subject,purpose='discovery.prepared-parameters',
+            content_id=identity+':content',retention_until=expiry)
+        self.ingestor.journal.append(EventEnvelope(event_id=identity,event_type='discovery.parameters_retained',
+            source='alive.configured-discovery',actor='system:alive-configured-reader',subject=self.subject,
+            sensitivity=Sensitivity.PRIVATE,causation_id=observed.found.receipt_id,expires_at=expiry,
+            payload=dict(content=ref.to_event_payload(),authority_granted=False)))
+        return parameters
 
     async def reason(self,observed,*,cycle,parameters,call,read_binding):
         """Explicit cognition phase, using this generation's exact observation."""
@@ -363,13 +423,13 @@ class ConfiguredDiscoveryCycle:
         research_enabled,citation_references=observed.research_enabled,observed.citation_references
         group_enabled,assessment_enabled=observed.group_enabled,observed.assessment_enabled
         expected=observed.binding
-        if not found.observation_ids:return parameters
+        if not found.observation_ids:return self._retain_parameters(observed,parameters)
         retained=self.ingestor.active_evidence(subject=self.subject,clearance=Sensitivity.PRIVATE,
             limit=32,observation_event_ids=found.observation_ids)
         if tuple(retained)!=evidence:raise HostDiscoveryError('observed listing material changed before cognition')
         choice,model,digest=await self._select(operation_id=cycle.operation_id,evidence=evidence,search_receipt_id=found.receipt_id,
             parameters=parameters,call=call,current=current)
-        if not choice['source_refs']:return parameters
+        if not choice['source_refs']:return self._retain_parameters(observed,parameters)
         by_id={e.observation_event_id:e for e in evidence}
         selected=[by_id[r] for r in choice['source_refs']]
         item_id='inquiry:'+self.ingestor.vault.digest_json(dict(cycle=cycle.operation_id,subject=self.subject))[:40]
@@ -394,6 +454,6 @@ class ConfiguredDiscoveryCycle:
                     read_urls=tuple(t['url'] for t in followup['read_targets']),inquiry_item_ids=(item_id,))
                 if group_enabled:read_receipts.append(followed.receipt_id)
                 current()
-        return {**parameters,'expression_parameters':{**parameters['expression_parameters'],'inquiry_item_ids':(item_id,),
+        return self._retain_parameters(observed,{**parameters,'expression_parameters':{**parameters['expression_parameters'],'inquiry_item_ids':(item_id,),
             **({'record_reading_assessment':True} if assessment_enabled and read_receipts else {}),
-            **({'research_read_receipt_ids':tuple(read_receipts)} if read_receipts else {})}}
+            **({'research_read_receipt_ids':tuple(read_receipts)} if read_receipts else {})}})

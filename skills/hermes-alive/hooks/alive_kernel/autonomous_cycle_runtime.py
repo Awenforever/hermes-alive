@@ -40,12 +40,15 @@ class AutonomousCycleRuntime:
             execute=False,authorization_parameters=None,send_parameters=None,worker_id=None,
             reconciliation_cursor=0,binding_limit=16,receipt_limit=128,
             reconsider_after_seconds=None,cognition_configuration_id=None,
-            interpret_feedback=False,feedback_model=None,channel_execution='publisher',defer_until_eligible=False):
+            interpret_feedback=False,feedback_model=None,channel_execution='publisher',defer_until_eligible=False,
+            prepare_expression=None,listing_fingerprint=None,reuse_reconsideration=True):
         if (type(execute) is not bool or type(interpret_feedback) is not bool or type(defer_until_eligible) is not bool
+                or type(reuse_reconsideration) is not bool
                 or defer_until_eligible and (not execute or channel_execution!='standard')
                 or channel_execution not in ('publisher','standard')
                 or (feedback_model is not None and (not interpret_feedback or not isinstance(feedback_model,str)
                     or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}',feedback_model)))
+                or prepare_expression is not None and not callable(prepare_expression)
                 or not isinstance(expression_parameters,dict)
                 or not isinstance(operation_id,str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}',operation_id)
                 or any(key in expression_parameters for key in ('subject','operation_id','policy_context'))):
@@ -79,13 +82,14 @@ class AutonomousCycleRuntime:
                     raise ValueError('owner policy changed during reconsideration')
                 return self.reconsideration.capture(subject=subject,
                     configuration_id=cognition_configuration_id, execute=execute, policy=current_policy,
-                    parameters=expression_parameters, window_seconds=reconsider_after_seconds)
+                    parameters=expression_parameters, window_seconds=reconsider_after_seconds,
+                    listing_fingerprint=listing_fingerprint)
             async def capture():
                 return await context_value(expression_parameters.get('read_context'),snapshot)
             before = await capture()
             waiting = self.reconsideration.current(subject=subject,
                 configuration_id=cognition_configuration_id, context=before)
-            if waiting is not None and waiting.event.payload['operation_id']!=operation_id:
+            if reuse_reconsideration and waiting is not None and waiting.event.payload['operation_id']!=operation_id:
                 async def forbidden(**_):
                     raise ValueError('reconsideration cannot repeat spent inference')
                 try:
@@ -105,6 +109,17 @@ class AutonomousCycleRuntime:
                             configuration_id=cognition_configuration_id,context=after) is not None):
                     return AutonomousCycleResult('waiting_for_change',reconciliation,
                         reconsideration_event_id=waiting.event.event_id)
+        if prepare_expression is not None:
+            prepared_expression=await prepare_expression()
+            if (not isinstance(prepared_expression,dict) or any(key in prepared_expression
+                    for key in ('subject','operation_id','policy_context'))):
+                raise ValueError('expression preparation exceeded current cycle scope')
+            expression_parameters=prepared_expression
+            if self.reconciliation._owner_policy(subject).event_id!=policy.event_id:
+                raise ValueError('owner policy changed during expression preparation')
+            parameters={**expression_parameters,'subject':subject,'operation_id':operation_id,
+                'policy_context':policy.context}
+            if capture is not None:before=await capture()
         if not execute:
             assessed=await self.preparation.assess(**parameters)
             expression=assessed.expression

@@ -73,7 +73,7 @@ async def test(root):
     assert runtime.preparation.expression.planning.synth.load_completed(
         subject='user:test',operation_id=origin).reconsiderations[0].reconsider_at==hint.reconsider_at
     runtime.reconsideration.clock=lambda:datetime.now(timezone.utc)
-    # Old signed wait records survive upgrades but cannot become current v2 waits.
+    # Old signed wait records survive upgrades but cannot become current waits.
     legacy=_thaw_json(wait.event.payload)
     legacy.pop('integrity_authenticator'); legacy.pop('timing')
     legacy['method']='alive-reconsideration-v1'
