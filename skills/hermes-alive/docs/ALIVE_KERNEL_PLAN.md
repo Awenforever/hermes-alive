@@ -4,6 +4,20 @@ Status: active
 
 Last reviewed: 2026-10-24
 
+Recovery qualification update (2026-10-24): ADR0221 runtime r53 is terminal PASS
+in 94 portable suites, 16 actual supported-Core checks and eight recovery suites.
+The actual inherited-model public-digest diagnostic generated one isolated local
+share and two main-dialogue followups through the real context hook. No external
+delivery/live-search claim. Content remains below acceptance: internal unanswered
+research notes can become unwanted recipient commentary. A same-selection A/B
+removing notes reduced that commentary but introduced generic advice instead;
+neither arm qualifies, so no author-context removal is adopted. The synthetic
+style fixture also imposed an unnecessary fixed evaluation sequence; next use
+conditional style and concrete current public material, without production changes.
+Quality remains 0/10. Temporal long-life qualification now reproduces expired
+ACTIVE agenda rows exhausting the wait scan; ADR0222 fixes this before LIMIT,
+without changing lifecycle rows or suppressing genuinely incomplete live agenda.
+
 Ordinary content recovery (2026-10-24; ADR0221): the native configured discovery
 path now consumes bounded rejection eligibility before reading and fresh planning.
 Frozen candidate anchors remain distinct from the full retained facts. All-held

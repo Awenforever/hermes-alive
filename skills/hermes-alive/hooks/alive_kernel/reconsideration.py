@@ -84,8 +84,9 @@ class ReconsiderationStore:
             allowed = tuple(s.value for s in Sensitivity)[:tuple(Sensitivity).index(clearance)+1]
             placeholders = ','.join('?' for _ in allowed)
             deadlines = connection.execute('SELECT item_id,state,available_at,due_at,expires_at FROM agenda_items_v1 '
-                'WHERE subject=? AND state IN (?,?) AND sensitivity IN ('+placeholders+') ORDER BY item_id LIMIT 129',
-                (subject, 'active', 'snoozed', *allowed)).fetchall()
+                'WHERE subject=? AND state IN (?,?) AND sensitivity IN ('+placeholders+') '
+                'AND (expires_at IS NULL OR expires_at>?) ORDER BY item_id LIMIT 129',
+                (subject, 'active', 'snoozed', *allowed,now.isoformat())).fetchall()
         state['inbound_sequence'] = inbound or 0
         state['agenda_boundaries'] = [list(row) for row in deadlines]
         # A bounded incomplete agenda must not silently claim no upcoming deadline.
