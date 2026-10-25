@@ -15,7 +15,7 @@ from types import SimpleNamespace as NS
 from unittest.mock import patch
 
 skill=Path(__file__).resolve().parents[1]
-sys.path[:0]=[str(skill/'hooks'),str(skill/'scripts'),str(skill/'tests')]
+sys.path[:0]=[str(skill/'hooks'),str(skill/'scripts'),str(skill/'__tests__')]
 from alive_kernel.core_context_read import CoreContextRead,ContextReadUncertainError
 from alive_kernel.native_cognition_host import NativeCognitionHost
 from alive_kernel.native_worker_protocol import NativeWorkerError

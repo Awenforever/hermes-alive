@@ -199,7 +199,7 @@ def main() -> int:
         assert all(path.read_bytes() == value for path, value in preserved.items())
         if args.verify_installed_hooks:
             installed_test = (profile / "plugins" / "hermes-alive" / "skills"
-                              / "hermes-alive" / "tests"
+                              / "hermes-alive" / "__tests__"
                               / "run_alive_kernel_official_hook_contract.py")
             receipt = run(managed + [str(installed_test), "--installed-profile", str(profile)])
             assert "HERMES_ALIVE_ADMITTED_HOOK_CONTRACT_OK" in receipt.splitlines()

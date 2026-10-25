@@ -197,7 +197,7 @@ controlled production acceptance.
 - [Data and Privacy](docs/DATA_AND_PRIVACY.md)
 - [Testing and Acceptance](docs/TESTING_AND_ACCEPTANCE.md)
 - [Discovery Development](docs/DISCOVERY_DEVELOPMENT.md)
-- [Test Guide](tests/TESTING.md)
+- [Test Guide](__tests__/TESTING.md)
 
 ## License
 

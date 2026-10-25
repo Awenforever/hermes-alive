@@ -34,7 +34,7 @@ REQUIRED = [
     "skills/hermes-alive/scripts/install.sh",
     "skills/hermes-alive/scripts/verify.sh",
     "skills/hermes-alive/scripts/uninstall.sh",
-    "skills/hermes-alive/tests/run_all.sh",
+    "skills/hermes-alive/__tests__/run_all.sh",
     "REPOSITORY_MANIFEST.sha256",
 ]
 

@@ -186,7 +186,7 @@ bash scripts/uninstall.sh --purge
 - [数据与隐私](docs/DATA_AND_PRIVACY.md)
 - [测试与验收](docs/TESTING_AND_ACCEPTANCE.md)
 - [Discovery 开发](docs/DISCOVERY_DEVELOPMENT.md)
-- [测试指南](tests/TESTING.md)
+- [测试指南](__tests__/TESTING.md)
 
 ## License
 

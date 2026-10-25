@@ -165,7 +165,7 @@ def main() -> int:
     assert rejected.risks == (SemanticRisk.POLARITY_SHIFT,)
 
     fixture = json.loads(
-        (ROOT / "tests" / "fixtures" / "semantic_fidelity_seed_v1.json").read_text(
+        (ROOT / "__tests__" / "fixtures" / "semantic_fidelity_seed_v1.json").read_text(
             encoding="utf-8"
         )
     )

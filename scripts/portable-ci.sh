@@ -37,7 +37,7 @@ export HERMES_HOME="${CI_HOME}"
 export HERMES_ALIVE_SHARED_DIR="${SHARED}"
 export HERMES_CLI="${BIN}/hermes"
 export PATH="${BIN}:${PATH}"
-export PYTHONPATH="${ROOT}/ci/fakes:${SKILL}/hooks:${SKILL}/tests"
+export PYTHONPATH="${ROOT}/ci/fakes:${SKILL}/hooks:${SKILL}/__tests__"
 export PYTHONDONTWRITEBYTECODE=1
 export PYTHONPYCACHEPREFIX="${PYCACHE}"
 export HERMES_ALIVE_TEST_MODE=1
@@ -54,7 +54,7 @@ run_and_require() {
   local marker="$2"
   local log="${CI_HOME}/$(basename "${test_file}").log"
 
-  if "${PYTHON}" "${SKILL}/tests/${test_file}" > "${log}" 2>&1; then
+  if "${PYTHON}" "${SKILL}/__tests__/${test_file}" > "${log}" 2>&1; then
     :
   else
     local test_status=$?
@@ -168,7 +168,7 @@ run_and_require run_topic_dedup_contracts.py '^watcher_pre_each_send_guards=PASS
 run_and_require run_matrix.py '^HERMES_ALIVE_MATRIX_RESULT=PASS$'
 
 HERMES_ALIVE_STRESS_SCALE="${HERMES_ALIVE_STRESS_SCALE:-0.05}" \
-  "${PYTHON}" "${SKILL}/tests/run_stress.py" \
+  "${PYTHON}" "${SKILL}/__tests__/run_stress.py" \
   > "${CI_HOME}/run_stress.py.log" 2>&1
 grep -q '^HERMES_ALIVE_STRESS_RESULT=PASS$' \
   "${CI_HOME}/run_stress.py.log" || {

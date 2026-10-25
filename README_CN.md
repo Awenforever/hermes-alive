@@ -145,7 +145,7 @@ bash "$HERMES_HOME/skills/hermes-alive/scripts/uninstall.sh" --purge
 - [运行策略](skills/hermes-alive/docs/RUNTIME_POLICIES.md)
 - [生命周期与持久化](skills/hermes-alive/docs/LIFECYCLE_AND_PERSISTENCE.md)
 - [数据与隐私](skills/hermes-alive/docs/DATA_AND_PRIVACY.md)
-- [测试指南](skills/hermes-alive/tests/TESTING.md)
+- [测试指南](skills/hermes-alive/__tests__/TESTING.md)
 
 ## 许可证
 

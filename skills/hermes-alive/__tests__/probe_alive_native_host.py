@@ -31,7 +31,7 @@ args=parser.parse_args()
 if args.hold_first_request and args.request_ready_file is None:
     parser.error('--hold-first-request requires an owned --request-ready-file')
 args.core=args.core.resolve(strict=True); args.kernel_package=args.kernel_package.resolve(strict=True)
-sys.path[:0]=[str(args.core),str(args.kernel_package/'hooks'),str(args.kernel_package/'tests')]
+sys.path[:0]=[str(args.core),str(args.kernel_package/'hooks'),str(args.kernel_package/'__tests__')]
 root=Path(tempfile.mkdtemp(prefix='alive-native-boundary-'))
 profile=root/'profile'; profile.mkdir(mode=0o700)
 home=root/'home'; home.mkdir(mode=0o700)
@@ -52,7 +52,7 @@ if args.scoped_completion:
     from alive_kernel.native_completion import NativeCompletionHub
     hub=NativeCompletionHub()
     sys.modules['alive_native_completion_probe_bus']=SimpleNamespace(hub=hub)
-    fixture=args.kernel_package/'tests'/'fixtures'/'native-completion-observer'
+    fixture=args.kernel_package/'__tests__'/'fixtures'/'native-completion-observer'
     shutil.copytree(fixture,profile/'plugins'/'alive-native-completion-fixture')
     configuration['plugins']=dict(enabled=['alive-native-completion-fixture'])
     os.environ['HERMES_BUNDLED_PLUGINS']=str(profile/'empty-bundled')

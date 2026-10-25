@@ -22,7 +22,7 @@ if a.core_scope=='launch':
     # Synthetic launch home must be selected before Core constants are imported.
     os.environ['HERMES_HOME']=str(a.output/'profile')
 package=Path(__file__).resolve().parents[1]
-sys.path[:0]=[str(package/'hooks'),str(package/'tests'),str(a.core.resolve(strict=True))]
+sys.path[:0]=[str(package/'hooks'),str(package/'__tests__'),str(a.core.resolve(strict=True))]
 
 async def main():
     from hermes_constants import set_hermes_home_override,reset_hermes_home_override

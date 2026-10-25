@@ -15,7 +15,7 @@ home=a.output/'profile';home.mkdir(mode=0o700)
 workers=a.output/'workers';workers.mkdir(mode=0o700)
 os.environ['HERMES_HOME']=str(home)
 package=Path(__file__).resolve().parents[1]
-sys.path[:0]=[str(a.core.resolve(strict=True)),str(package/'hooks'),str(package/'tests')]
+sys.path[:0]=[str(a.core.resolve(strict=True)),str(package/'hooks'),str(package/'__tests__')]
 configuration=dict(model=dict(default='configured-primary',provider='custom:owner'),
     custom_providers=[dict(name='owner',model='configured-primary',base_url='https://provider.invalid/v1',
         key_env='OWNER_MAIN_KEY',api_mode='chat_completions')],

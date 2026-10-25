@@ -28,7 +28,7 @@ from alive_kernel.semantic_review import (
 
 
 def load_fixture():
-    return json.loads((ROOT / "tests/fixtures/semantic_fidelity_seed_v1.json").read_text(
+    return json.loads((ROOT / "__tests__/fixtures/semantic_fidelity_seed_v1.json").read_text(
         encoding="utf-8"
     ))
 

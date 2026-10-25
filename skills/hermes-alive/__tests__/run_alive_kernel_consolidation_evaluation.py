@@ -24,7 +24,7 @@ from alive_kernel.consolidation_evaluation import (  # noqa: E402
 
 def main() -> int:
     fixture = json.loads(
-        (ROOT / "tests" / "fixtures" / "consolidation_replay_seed_v1.json").read_text(
+        (ROOT / "__tests__" / "fixtures" / "consolidation_replay_seed_v1.json").read_text(
             encoding="utf-8"
         )
     )

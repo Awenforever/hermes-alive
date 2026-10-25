@@ -15,7 +15,7 @@ parser.add_argument('--core',type=Path,required=True)
 args=parser.parse_args()
 core=args.core.resolve(strict=True)
 package=Path(__file__).resolve().parents[1]
-sys.path[:0]=[str(core),str(package/'hooks'),str(package/'tests')]
+sys.path[:0]=[str(core),str(package/'hooks'),str(package/'__tests__')]
 
 
 async def exercise(root):

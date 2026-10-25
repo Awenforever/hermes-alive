@@ -21,7 +21,7 @@ async def exercise(root):
     child_environment={**os.environ,'TMPDIR':str(child_tmp),'TEMP':str(child_tmp),'TMP':str(child_tmp),
         'HERMES_ALIVE_SHARED_DIR':str(root/'child-runtime')}
     child=ManagedModelProcess(command=(str(Path(sys.executable).absolute()),'-B',
-        str(package/'tests'/'probe_alive_native_host.py'),'--core',str(core),
+        str(package/'__tests__'/'probe_alive_native_host.py'),'--core',str(core),
         '--kernel-package',str(package),'--scoped-completion','--deny-child-processes'),
         cwd=root,environment=child_environment,private_tmp_dir=root,timeout_seconds=30,termination_grace_seconds=1)
     result=await child.run(b'{"fixture":"synthetic-native-worker-no-tools"}')

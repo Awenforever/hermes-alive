@@ -37,7 +37,13 @@ model/provider or network changes are authorized by this development plan.
   assembler now exposes discovery phases and bounded retry, so unchanged input
   waits rather than repeatedly reasoning. Profile replacement/deletion and
   admitted input wake it; cooldown and pause perform no extra inference.
-- Protected final-current-purpose extension (ADR0226) is under qualification.
+- r69 / `6763f57`: protected final-current-purpose extension (ADR0226) passes
+  eight source/clock/authorization/repair/history/protocol suites and the expanded
+  Windows delayed-selection regression, then full PASS98 portable. The real
+  public-source regression settled with one local submission, two main replies
+  and zero pending work; credentials audited/removed. Its version3 selection
+  reached authorization after344s using a48s final review, naturally exercising
+  the delayed-value path. This is not natural version2 proof or a fresh quality round.
   The real dated product warning was refused after slow composition because
   final fact review lacked a fresh purpose witness. Keep protected warning meaning
   and short permits; do not weaken expiry or force it into an editorial brief.
@@ -70,9 +76,10 @@ model/provider or network changes are authorized by this development plan.
 - r63 / `51515f2`: six focused suites pass after aligning source choice and final
   review with planning's existing allowance for an interesting fact to suffice.
   Initial real product-news retrieval failed before any model call; a separate
-  isolated Exa/Parallel configuration is under actual live/model examination.
+  isolated Exa/Parallel run generated a valid protected warning but was refused
+  for selection_stale after slow composition. No local submission or main reply.
   This hypothesis about unnecessary critical prose is not a style success claim.
-- ADR0225 is being qualified vertically: optional native owner-confirmed personal
+- ADR0225 has actual native component qualification: owner-confirmed personal
   profile read, current Core USER advice in cognition, and actual Core updates,
   disable/delete/forgetting checks. No second chat logger or permanent import;
   real external-provider recall and production memory remain out of scope of
@@ -87,10 +94,13 @@ competing active plans. ADRs remain the record of architectural decisions.
 
 ## Next work in order
 
-1. Qualify the opt-in current Core profile path through actual installed CLI,
-   confirmation and cognition. Inspect the r63 product-news model output before
-   counting any value-criteria improvement; settle and audit its private model job.
-   Never count a wrapper's zero exit as a useful share.
+1. Resolve the actual public Git install blocker (ADR0227). Supported Core refused
+   hostile test fixtures in the unrecognized nested tests layout. Preserve test
+   data and scanning; qualify the recognized test directory, actual admission
+   and managed dependencies. Caution still needs an explicit informed decision.
+   The r69 original share remains announcement-like; main followup still makes
+   unnecessary self-criticisms about faithful paraphrases. Sample feedback is
+   pending. Never count exit0 or a local submission as a useful fresh round.
 2. Complete ordinary memory/profile operation. Prefer safe reuse of Hermes' existing
    memory ownership instead of creating a second chat logger. Develop with
    synthetic scoped providers first; separate body retention, model processing
@@ -102,6 +112,10 @@ competing active plans. ADRs remain the record of architectural decisions.
    or phrase-by-phrase style blacklist. Reduce unnecessary stages if actual
    latency/cost evidence supports it; do not build another policy framework to
    avoid examining weak content.
+   A few fixed approved query strings currently constrain long-term breadth.
+   Develop public-topic exploration without turning private profile text into
+   public search queries or making interests exclusive filters. Measure useful
+   domestic and out-of-interest discovery, not merely more provider names.
 4. Run longitudinal synthetic daily-turn scenarios through actual native
    interfaces: noisy work topics versus durable interests, changing preferences,
    independent explicit corrections, attributed feedback, forgotten material,
