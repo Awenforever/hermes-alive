@@ -1,5 +1,6 @@
 """Source review of exact retained expression, not just its drafting ancestor."""
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 import json
 import re
 
@@ -73,6 +74,12 @@ class _ExpressionAnchor:
     actual_model: str
 
 
+@dataclass(frozen=True, slots=True)
+class FinalValueAssessment:
+    assessed_at: datetime
+    valid_until: datetime | None = None
+
+
 class ExpressionSourceSupportReviewer(SourceSupportReviewer):
     """Reuse review lifecycle, substituting a verified final expression snapshot.
 
@@ -93,6 +100,18 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
                 'discovery-source-and-value-v1','discovery-source-and-value-v2','discovery-source-and-value-v3'):
             return _DISCOVERY_FINAL_PROMPT_V1
         return super().prompt_for_snapshot(snapshot)
+
+    def _review_window_enabled(self,snapshot):
+        if not super()._review_window_enabled(snapshot):return False
+        # This interval protocol belongs to delegated background discovery.
+        # Exact human confirmation has its own subsequent admission message and
+        # keeps the established point assessment, not an unchanged-input claim.
+        from .deliberation import ActionAuthority
+        binding=snapshot.get('expression_binding',{})
+        header=self.journal.get(snapshot.get('candidate',{}).get('id',''))
+        if header is None:return False
+        stored=self.expressions._selected_draft(binding.get('selection_event_id'),header.event.subject)[1]
+        return stored.selection.candidate.authority is ActionAuthority.USER_DELEGATED
 
     def correction_context(self, review_event_id, *, subject, selection_event_id):
         """One retained negative review can correct the original runtime wording.
@@ -221,11 +240,25 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
         if (findings is None or findings['verdict'] != 'supported' or record is None
                 or record.event.payload.get('require_independence') != witness['require_independence']):
             raise SourceSupportError('final wording is no longer supported')
-        if record.event.payload.get('assessment_clock')==self.REVIEW_CLOCK:
+        if record.event.payload.get('assessment_clock') in (self.REVIEW_CLOCK,self.REVIEW_WINDOW_CLOCK):
             start=self.journal.get(record.event.causation_id)
             if start is None or start.event.observed_at<header.event.observed_at:
                 raise SourceSupportError('final value review predates the actual expression')
-            return start.event.observed_at
+            if record.event.payload.get('assessment_clock')==self.REVIEW_WINDOW_CLOCK:
+                # verify_current already matched the interval to the protected
+                # exact request and rejected completion outside that interval.
+                from contextlib import closing
+                selection=self.journal.get(selection_event_id)
+                with closing(self.journal._connect()) as connection:
+                    changed=connection.execute('SELECT 1 FROM experience_events WHERE subject=? '
+                        'AND event_type=? AND sequence>? LIMIT 1',
+                        (subject,'conversation.inbound',selection.sequence)).fetchone()
+                if changed is not None:
+                    raise SourceSupportError('owner input changed after the assessed selection')
+                until=start.event.observed_at+timedelta(
+                    seconds=start.event.payload['assessment_window_seconds'])
+                return FinalValueAssessment(record.event.observed_at,until)
+            return FinalValueAssessment(start.event.observed_at)
 
     def snapshot(self, *, subject, interpretation_id, candidate_id,
                  clearance=Sensitivity.PRIVATE):

@@ -379,6 +379,7 @@ class SendTimeAuthorizer:
         candidate = None
         selection_stale=False
         current_value_anchor=None
+        current_value_until=None
         stored = None
         action_contract_binding: str | None = None
         executable_content_id: str | None = None
@@ -599,16 +600,22 @@ class SendTimeAuthorizer:
         if final_wording_witness is not None:
             from .expression_support import ExpressionSourceSupportReviewer
             try:
-                current_value_anchor=ExpressionSourceSupportReviewer(self.journal,
+                assessment=ExpressionSourceSupportReviewer(self.journal,
                     content_vault=self.deliberation.content_vault,
                     context_vault=self.context_vault).require_current_witness(final_wording_witness,
                         subject=owner, expression_event_id=expression_event_id,
                         selection_event_id=selection_event_id)
+                if assessment is not None:
+                    current_value_anchor=assessment.assessed_at
+                    current_value_until=(assessment.valid_until or
+                        current_value_anchor+self.MAX_SELECTION_AGE)
             except ValueError:
                 reasons.append("final_wording_not_current")
         if current_value_anchor is not None and (current_value_anchor>current or
                 self.journal.get(final_wording_witness['review_event_id']).event.observed_at>current):
             reasons.append('final_value_assessment_from_future')
+        if current_value_until is not None and current>=current_value_until:
+            reasons.append('final_value_assessment_expired')
         if selection_stale:
             # A source/value review made AFTER wording is complete can re-assess
             # the same intent now. It never renews the old selection or a permit.
@@ -616,7 +623,7 @@ class SendTimeAuthorizer:
                 and capability=='hermes.channel.send' and candidate.action_kind in (ActionKind.SHARE,ActionKind.ASK)
                 and current_value_anchor is not None
                 and selection_record.event.observed_at<=current_value_anchor<=current
-                and current-current_value_anchor<self.MAX_SELECTION_AGE)
+                  and current<current_value_until)
             if fresh:
                 from contextlib import closing
                 with closing(self.journal._connect()) as connection:
@@ -627,8 +634,8 @@ class SendTimeAuthorizer:
         reasons = list(dict.fromkeys(reasons))
         authorized = not reasons
         valid_until = current + permit_ttl if authorized else None
-        if authorized and selection_stale:
-            valid_until=min(valid_until,current_value_anchor+self.MAX_SELECTION_AGE)
+        if authorized and current_value_until is not None:
+            valid_until=min(valid_until,current_value_until)
         payload = {
             "operation_id": operation,
             "selection_event_id": selection_event_id,

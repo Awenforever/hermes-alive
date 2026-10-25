@@ -94,11 +94,22 @@ competing active plans. ADRs remain the record of architectural decisions.
 
 ## Next work in order
 
-1. Settle actual public Git admission and managed dependencies (ADR0227). r72's
+1. Continue content understanding and bounded final assessment (ADR0228/0229).
+   r73's source/cited-reading/real-model run settled without publication: final
+   review took408s and its point-in-time value assessment expired. More benchmark
+   numbers were retrieved, but the original message still lists facts without
+   explaining their practical meaning; it is not a useful quality pass. Check
+   actual authoring context and selected-purpose continuity before another
+   rewrite; do not confuse extra data, source approval or a timing fix with
+   recipient understanding.
+   Actual public Git admission and managed dependencies are now verified after
+   Core's own retry of an intermittent dependency TLS failure. r72's
    full PASS98 and six actual Core setup/scan/control suites pass after moving
    every fixture into the recognized __tests__ layout. No file or scan rule is
-   omitted; a runtime canary remains dangerous. Real public install is running
-   with an explicit reviewed caution decision, not a dangerous-verdict bypass.
+   omitted; a runtime canary remains dangerous. Actual public Git revision
+   upgrade, runtime uninstall/plugin removal and Git reinstall preserve synthetic
+   encrypted content, journal/checkpoint and original key identities in one
+   consumer profile. No real-account migration, full-feature or fleet claim.
    The recipient rejected r69's announcement-like output: it contains information
    without a usable concept of the result, demonstrated work or cost. Align
    reading, writing and existing final review on concrete understanding (ADR0228)

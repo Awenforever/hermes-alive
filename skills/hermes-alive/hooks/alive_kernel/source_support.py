@@ -5,7 +5,7 @@ import hashlib
 import json
 import math
 import re
-from datetime import datetime,timezone
+from datetime import datetime,timedelta,timezone
 
 from .content_vault import ContentReference
 from .events import EventEnvelope, Sensitivity, _thaw_json
@@ -101,6 +101,7 @@ class SourceSupportReviewer:
     # deadline/call count; use the existing worker ceiling, not a model exception.
     max_tokens = 8192
     REVIEW_CLOCK = 'review-start-v1'
+    REVIEW_WINDOW_CLOCK = 'review-window-v2'
 
     def _assessment_now(self):
         return datetime.now(timezone.utc)
@@ -109,7 +110,14 @@ class SourceSupportReviewer:
         return snapshot.get('assessment_scope',{}).get('kind') in (
             'final_discovery_source_and_value', 'final_source_and_recipient_purpose')
 
-    def _assessment_request(self,snapshot,as_of=None):
+    @staticmethod
+    def _review_window_enabled(snapshot):
+        kind=snapshot.get('assessment_scope',{}).get('kind')
+        return (kind=='final_discovery_source_and_value' or
+            kind=='final_source_and_recipient_purpose' and
+            snapshot.get('communication_situation',{}).get('kind')=='discovery_share')
+
+    def _assessment_request(self,snapshot,as_of=None,review_until=None):
         prompt=self.prompt_for_snapshot(snapshot)
         if as_of is None:return prompt,snapshot
         if (snapshot.get('assessment_scope',{}).get('kind') not in (
@@ -119,7 +127,38 @@ class SourceSupportReviewer:
         prompt+=('\nreview_as_of is the host clock for THIS assessment. Earlier interpretation '
             'timestamps are provenance, not the current date. Assess the exact message and its '
             'recipient value at review_as_of; a past decision alone does not establish current value.')
-        return prompt,{**snapshot,'review_as_of':as_of.astimezone(timezone.utc).isoformat()}
+        request={**snapshot,'review_as_of':as_of.astimezone(timezone.utc).isoformat()}
+        if review_until is not None:
+            if (not self._review_window_enabled(snapshot)
+                    or not as_of<review_until<=as_of+timedelta(seconds=MAX_STAGE_SECONDS)):
+                raise SourceSupportError('bounded discovery assessment interval required')
+            prompt+=('\nreview_valid_until bounds THIS requested assessment interval. A supported '
+                'verdict must mean this exact message remains a useful, temporally faithful '
+                'contribution throughout [review_as_of, review_valid_until], assuming the supplied '
+                'source evidence and owner context do not change. Account for known dates and '
+                'conditions that may change during the interval; do not assume they freeze. '
+                'If that interval cannot be supported, return uncertain or unsupported. This '
+                'does not predict unknown world events, approve sending or extend a permission.')
+            request['review_valid_until']=review_until.isoformat()
+        return prompt,request
+
+    def _stored_review_until(self,start,completed,snapshot):
+        """Reconstruct the host-requested interval, never a model-chosen expiry."""
+        clock=start.event.payload.get('assessment_clock')
+        if clock!=self.REVIEW_WINDOW_CLOCK:return None
+        seconds=start.event.payload.get('assessment_window_seconds')
+        budget=start.event.payload.get('timeout_seconds')
+        if (not self._review_window_enabled(snapshot)
+                or type(seconds) not in (int,float) or not math.isfinite(seconds)
+                or not 1<=seconds<=MAX_STAGE_SECONDS
+                or type(budget) not in (int,float) or not math.isfinite(budget)
+                or not seconds<=budget<=MAX_STAGE_SECONDS
+                or completed.event.payload.get('assessment_window_seconds')!=seconds):
+            raise SourceSupportError('invalid retained discovery assessment interval')
+        until=start.event.observed_at+timedelta(seconds=seconds)
+        if not start.event.observed_at<=completed.event.observed_at<=until:
+            raise SourceSupportError('review completed outside its assessed interval')
+        return until
 
     @property
     def review_prompt(self):
@@ -169,10 +208,12 @@ class SourceSupportReviewer:
                                             candidate_id=candidate_id, clearance=clearance)
             payload = record.event.payload
             has_clock='assessment_clock' in payload or 'assessment_clock' in start.event.payload
-            if has_clock and (payload.get('assessment_clock')!=self.REVIEW_CLOCK
-                    or start.event.payload.get('assessment_clock')!=self.REVIEW_CLOCK
+            clock=payload.get('assessment_clock')
+            if has_clock and (clock not in (self.REVIEW_CLOCK,self.REVIEW_WINDOW_CLOCK)
+                    or start.event.payload.get('assessment_clock')!=clock
                     or record.event.observed_at<start.event.observed_at):return None
-            expected_prompt,_=self._assessment_request(data,start.event.observed_at if has_clock else None)
+            review_until=self._stored_review_until(start,record,data)
+            expected_prompt,_=self._assessment_request(data,start.event.observed_at if has_clock else None,review_until)
             independent = bool(payload['reviewer_domain'] != payload['generator_domain']
                                and payload['reviewer_model'] != payload['generator_model'])
             required = payload.get('require_independence', True)
@@ -196,6 +237,7 @@ class SourceSupportReviewer:
             if self.vault.digest_json(retained) != ref.digest or retained['snapshot'] != data:
                 return None
             if has_clock and retained.get('review_as_of')!=start.event.observed_at.isoformat():return None
+            if retained.get('review_valid_until')!=(review_until.isoformat() if review_until is not None else None):return None
             findings = self.validate_stored_findings(retained['findings'], data)
             if findings['verdict'] != payload['verdict']:
                 return None
@@ -326,10 +368,15 @@ class SourceSupportReviewer:
 
     async def run(self, *, subject, interpretation_id, candidate_id, operation_id,
                   call, resolve_domain, reviewer_model=None, clearance=Sensitivity.PRIVATE,
-                  require_independence=True, protocol_recovery=False, timeout_seconds=40):
+                  require_independence=True, protocol_recovery=False, timeout_seconds=40,
+                  discovery_window_seconds=None):
         if (type(timeout_seconds) not in (int,float) or not math.isfinite(timeout_seconds)
                 or not 1<=timeout_seconds<=MAX_STAGE_SECONDS):
             raise SourceSupportError('source review timeout outside host budget')
+        if discovery_window_seconds is not None and (type(discovery_window_seconds) not in (int,float)
+                or not math.isfinite(discovery_window_seconds)
+                or not 1<=discovery_window_seconds<=timeout_seconds):
+            raise SourceSupportError('discovery assessment interval outside host budget')
         if type(require_independence) is not bool or type(protocol_recovery) is not bool:
             raise SourceSupportError('invalid review independence requirement')
         if not isinstance(operation_id,str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}',operation_id):
@@ -341,8 +388,13 @@ class SourceSupportReviewer:
             raise SourceSupportError('generator independence domain is unknown')
         digest = self.vault.digest_json(snapshot)
         review_as_of=self._assessment_now().astimezone(timezone.utc) if self._review_clock_enabled(snapshot) else None
-        review_prompt,request=self._assessment_request(snapshot,review_as_of)
-        clock_fields={'assessment_clock':self.REVIEW_CLOCK} if review_as_of is not None else {}
+        review_until=(review_as_of+timedelta(seconds=discovery_window_seconds)
+            if discovery_window_seconds is not None and review_as_of is not None
+            and self._review_window_enabled(snapshot) else None)
+        review_prompt,request=self._assessment_request(snapshot,review_as_of,review_until)
+        clock_fields=({'assessment_clock':self.REVIEW_WINDOW_CLOCK,
+                       'assessment_window_seconds':discovery_window_seconds} if review_until is not None
+                      else {'assessment_clock':self.REVIEW_CLOCK} if review_as_of is not None else {})
         prompt_digest = hashlib.sha256(review_prompt.encode()).hexdigest()
         prefix = 'opportunity.source-support:' + operation_id
         if self.journal.get(prefix + ':started') is not None:
@@ -373,7 +425,7 @@ class SourceSupportReviewer:
                     candidate_id=candidate_id, clearance=clearance)
                 if (self.vault.digest_json(current)!=digest or result!=generated
                         or resolve_domain(generated.actual_model)!=generator_domain
-                        or self._assessment_request(current,review_as_of)[0]!=review_prompt):
+                        or self._assessment_request(current,review_as_of,review_until)[0]!=review_prompt):
                     raise SourceSupportError('source-review context changed before inference')
                 if recovered:
                     invalid = self.vault.resolve_json(invalid_ref.content_id, expected_subject=subject,
@@ -392,7 +444,7 @@ class SourceSupportReviewer:
                                                  candidate_id=candidate_id, clearance=clearance)
                 if (self.vault.digest_json(current)!=digest or result!=generated
                         or resolve_domain(generated.actual_model)!=generator_domain
-                        or hashlib.sha256(self._assessment_request(current,review_as_of)[0].encode()).hexdigest()!=prompt_digest):
+                        or hashlib.sha256(self._assessment_request(current,review_as_of,review_until)[0].encode()).hexdigest()!=prompt_digest):
                     raise SourceSupportError('source-review context changed during model wait')
                 text, model, provider = SemanticComparator._response(response, route)
                 domain = resolve_domain(model)
@@ -425,7 +477,8 @@ class SourceSupportReviewer:
                     continue
                 break
             ref = self.vault.put_json({'snapshot':snapshot,'findings':findings,'raw_review':text,
-                **({'review_as_of':review_as_of.isoformat()} if review_as_of is not None else {})}, subject=subject,
+                **({'review_as_of':review_as_of.isoformat()} if review_as_of is not None else {}),
+                **({'review_valid_until':review_until.isoformat()} if review_until is not None else {})}, subject=subject,
                 purpose='opportunity.source-support', sensitivity=Sensitivity(clearance),
                 retention_until=bundle.retention_until, content_id=prefix)
             completed_at=self._assessment_now().astimezone(timezone.utc) if review_as_of is not None else None
