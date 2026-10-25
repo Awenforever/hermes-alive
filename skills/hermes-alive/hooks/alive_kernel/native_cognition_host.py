@@ -5,6 +5,7 @@ profile scope, loaded model configuration, credential grants and scheduling.
 """
 import asyncio
 import hashlib
+from datetime import datetime,timezone
 
 from .native_core_acquisition import CoreScopedModelAcquirer
 from .native_host_caller import HostModelBinding,HostNativeCaller
@@ -141,6 +142,7 @@ class NativeCognitionHost:
                 if (self.preparation is None
                         or not self.host.runtime.reconciliation._owner_policy(self.host.subject).enabled):return bound
                 async def prepare():
+                    nonlocal bound
                     expected=read_binding()
                     def validated(prepared):
                         if (read_binding()!=expected or not isinstance(prepared,dict)
@@ -149,6 +151,21 @@ class NativeCognitionHost:
                                 or self.context_reads is not None and prepared['expression_parameters'].get('read_context') is not read_context):
                             raise NativeWorkerError('cycle preparation changed current native authority')
                         return prepared
+                    binder=getattr(self.preparation,'bind_parameters',None)
+                    if callable(binder):
+                        # Bind current operation metadata before phased reading,
+                        # not in a monolithic adapter that hides those phases.
+                        bound=validated(await binder(cycle=cycle,parameters=bound,read_binding=read_binding))
+                    if self.host.execute and bound.get('defer_until_eligible') is True:
+                        authorization=bound.get('authorization_parameters')
+                        if not isinstance(authorization,dict):
+                            raise NativeWorkerError('cadence wait needs current qualified authorization metadata')
+                        now=datetime.now(timezone.utc)
+                        ready=self.host.runtime.outbox.next_delegated_start(
+                            authorization.get('delegation_event_id'),subject=self.host.subject,
+                            policy_event_id=self.host.runtime.reconciliation._owner_policy(self.host.subject).event_id,
+                            route_binding_id=authorization.get('route_binding_id'),now=now)
+                        if ready>now:return validated(bound)
                     phased=all(callable(getattr(self.preparation,name,None)) for name in
                         ('observe','reason','restore_parameters'))
                     if not phased:

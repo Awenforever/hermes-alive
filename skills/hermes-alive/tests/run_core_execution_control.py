@@ -10,6 +10,7 @@ import shutil
 import tempfile
 from datetime import datetime,timezone,timedelta
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import run_core_session_routing as core
 from run_core_guided_setup import cli
@@ -52,6 +53,12 @@ async def test(home):
         setup=importlib.import_module(loaded.module.__name__+'.kernel_setup_bridge')
         execution=importlib.import_module(loaded.module.__name__+'.kernel_execution_bridge')
         store=setup.setup_store(binding)
+        assert staged['confirmation_summary']['use_personal_hermes_curated_user_profile'] is False
+        from tools.memory_tool import MemoryStore
+        with patch.object(MemoryStore,'load_from_disk',side_effect=AssertionError('default opt-out read Core memory')):
+            context_values=execution.kernel('cognition_context').CognitionContextReader(store.journal).read(
+                subject=store.configuration().subject,clearance=execution.kernel('events').Sensitivity.PRIVATE)
+            assert not any(p.kind=='core_curated_advisory' for p in context_values)
         assert execution.expression_language(SimpleNamespace(options={}))=='fr'
         assert execution.expression_language(store.configuration())=='zh-CN'
         # Public-plugin namespace imports must work WITHOUT legacy hooks on
@@ -258,9 +265,118 @@ async def test(home):
         core.reset_hermes_home_override(token)
 
 
+async def test_native_wait(home):
+    """Exercise the REAL installed Core wrapper, not a directly injected preparer."""
+    home.mkdir()
+    shutil.copytree(core.repo,home/'plugins/hermes-alive')
+    (home/'config.yaml').write_text(json.dumps({'plugins':{'enabled':['hermes-alive']},
+        'model':{'provider':'auto','default':'synthetic-model'}}))
+    rc,staged=cli(home,'setup','--confirm-model-calls','--confirm-delivery',
+        '--confirm-outbound-retention','--public-query','synthetic public observation','--confirm-public-reads',
+        '--confirm-hermes-profile-memory')
+    assert rc==0
+    assert cli(home,'install-runtime','--engine','kernel')[0]==0
+    token=core.set_hermes_home_override(home);manager=None
+    try:
+        manager=core.get_plugin_manager();manager.discover_and_load()
+        loaded=manager._plugins['hermes-alive'];binding=loaded.module._gateway_host_binding
+        from hermes_cli.plugins import get_plugin_command_handler
+        from tools.registry import registry
+        handler=get_plugin_command_handler('alive')
+        adapter=core.Adapter(core.Platform.TELEGRAM)
+        runner=core.runner_for(home,{core.Platform.TELEGRAM:adapter});adapter.gateway_runner=runner
+        await adapter.connect()
+        source=core.SessionSource(platform=core.Platform.TELEGRAM,chat_id='7654321',
+            user_id='synthetic-wait-owner',message_id='synthetic-wait-confirm')
+        entry=runner.session_store.get_or_create_session(source)
+        async def invoke(arguments):return await runner._hm_run_plugin_handler(
+            handler,None,source,session_entry=entry,args=arguments)
+        assert '已确认' in await invoke(staged['confirmation_command'].removeprefix('/alive '))
+        from tools.memory_tool import MemoryStore
+        core_profile=MemoryStore();core_profile.load_from_disk()
+        profile_marker='SYNTHETIC_CURRENT_PROFILE_EVIDENCE'
+        updated_marker='SYNTHETIC_UPDATED_PROFILE_EVIDENCE'
+        assert core_profile.add('user',profile_marker)['success']
+        models=[];reads=[]
+        def search(args,**kw):
+            reads.append(args)
+            return json.dumps({'success':True,'data':{'web':[{'url':'https://example.invalid/wait',
+                'title':'Synthetic public observation','description':'Synthetic public listing, no new verified finding.'}]}})
+        registry.register(name='web_search',toolset='web',schema={'name':'web_search',
+            'description':'Synthetic public native-wait fixture','parameters':{'type':'object'}},
+            handler=search,override=True,scope=str(home))
+        assert '已启用' in await invoke('enable')
+        # Stop the managed lifetime before yielding; keep its actual signed
+        # activation/normal assembler, then drive exact durable native steps.
+        binding.arguments['stop'].set();await binding.task
+        native=binding.native;build=binding.arguments['build_parameters']
+        assert native.context_reads is not None
+        class Caller:
+            pending=()
+            def __init__(self,*,cycle,read_binding):self.calls=0;self.read_binding=read_binding
+            async def reap_pending(self,**kw):return {'closed':0,'remaining':0}
+            async def __call__(self,**kw):
+                self.read_binding();self.calls+=1;models.append(kw['task'])
+                encoded=json.dumps(kw['messages'])
+                if profile_marker is not None:assert profile_marker in encoded
+                else:assert 'SYNTHETIC_CURRENT_PROFILE_EVIDENCE' not in encoded and updated_marker not in encoded
+                if isinstance(kw.get('route_info'),dict):kw['route_info']['provider']='synthetic-provider'
+                if kw['task']=='alive_discovery_reading':
+                    value={'source_refs':[],'question':None,'value_hypothesis':'No useful new reading in this synthetic case.'}
+                elif kw['task']=='alive_opportunity_candidates':value={'candidates':[]}
+                else:raise AssertionError('unexpected native model task '+kw['task'])
+                return SimpleNamespace(model='synthetic-model',choices=[SimpleNamespace(
+                    message=SimpleNamespace(content=json.dumps(value)))])
+        native.caller_factory=lambda **kw:Caller(**kw)
+        execution=importlib.import_module(loaded.module.__name__+'.kernel_execution_bridge')
+        async def allow(self,url):return url=='https://example.invalid/wait'
+        with patch.object(execution.kernel('core_discovery_tools').CoreDiscoveryTools,'allow_url',allow):
+            first=await native.step(build())
+            assert first.disposition=='silence'
+            assert models==['alive_discovery_reading','alive_opportunity_candidates']
+            again=await native.step(build())
+            assert again.disposition=='waiting_for_change',(again.disposition,models)
+            assert len(models)==2,'installed wrapper repeated spent inference during unchanged wait'
+            assert len(reads)==2 and native.last_call_count==0
+            assert native.preparation.supports_bounded_retry is True
+            assert all(callable(getattr(native.preparation,name,None))
+                       for name in ('observe','reason','restore_parameters'))
+            assert core_profile.replace('user',profile_marker,updated_marker)['success']
+            profile_marker=updated_marker
+            assert (await native.step(build())).disposition=='silence' and len(models)==4
+            assert (await native.step(build())).disposition=='waiting_for_change' and len(models)==4
+            assert core_profile.remove('user',profile_marker)['success']
+            profile_marker=None
+            assert (await native.step(build())).disposition=='silence' and len(models)==6
+            assert (await native.step(build())).disposition=='waiting_for_change' and len(models)==6
+            count=(len(models),len(reads))
+            with patch.object(native.host.runtime.outbox,'next_delegated_start',
+                    return_value=datetime.now(timezone.utc)+timedelta(seconds=60)):
+                assert (await native.step(build())).disposition=='waiting_for_change'
+            assert (len(models),len(reads))==count,'cadence wait performed discovery work'
+            from gateway.run_inbound_consumer import run_post_admission_hook
+            assert await run_post_admission_hook(runner,SimpleNamespace(message_id='synthetic-wait-wake',
+                text='A synthetic new turn'),source,entry.session_key)==(False,None)
+            assert (await native.step(build())).disposition=='silence'
+            assert len(models)==8,'admitted owner input did not wake native discovery'
+            assert (await native.step(build())).disposition=='waiting_for_change' and len(models)==8
+            assert '已暂停' in await invoke('pause')
+            count=(len(models),len(reads))
+            assert (await native.step(build())).disposition=='paused'
+            assert (len(models),len(reads))==count and not native.pending
+        assert not native.host.journal.read(event_type='dispatch.started')
+        assert all(args=={'query':'synthetic public observation','limit':3} for args in reads)
+        print('HERMES_ALIVE_CORE_NATIVE_DISCOVERY_WAIT_OK')
+    finally:
+        if manager is not None:manager.unload()
+        core.reset_hermes_home_override(token)
+
+
 if __name__=='__main__':
     with tempfile.TemporaryDirectory(prefix='alive-core-execution-control-') as directory:
-        try:asyncio.run(test(Path(directory)/'profile'))
+        try:
+            asyncio.run(test(Path(directory)/'profile'))
+            asyncio.run(test_native_wait(Path(directory)/'native-wait-profile'))
         finally:
             from hermes_state_registry import close_all_under
             close_all_under(directory)

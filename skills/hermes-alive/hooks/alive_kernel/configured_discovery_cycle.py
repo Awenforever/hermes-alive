@@ -20,6 +20,7 @@ from .host_discovery import (HostDiscoveryReader, HostDiscoveryError, HostReadUn
                              SOURCE_EXCERPT_POLICY, source_prompt_excerpt, read_scope_metadata)
 from .model_json import parse_model_json, ModelJSONError
 from .model_timeouts import DEFAULT_STAGE_SECONDS
+from .core_context_read import context_value
 from . import citation_selection
 
 
@@ -208,7 +209,8 @@ class ConfiguredDiscoveryCycle:
     async def _select(self,*,operation_id,evidence,search_receipt_id,parameters,call,current,
                       followup=False,visited=(),citation_references=False):
         journal,vault=self.ingestor.journal,self.ingestor.vault
-        digest=self.inquiries.context_digest(subject=self.subject)
+        read_context=parameters['expression_parameters'].get('read_context')
+        digest=await context_value(read_context,lambda:self.inquiries.context_digest(subject=self.subject))
         prompt=(_FOLLOWUP_REFERENCES_PROMPT if citation_references else _FOLLOWUP_PROMPT) if followup else _PROMPT_V1
         snapshot=dict(method='cited-public-followup-v1' if followup else 'public-reading-choice-v1',
             search_receipt_id=search_receipt_id,system_prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
@@ -219,8 +221,8 @@ class ConfiguredDiscoveryCycle:
             snapshot['already_read_urls']=list(visited)
         else:
             snapshot['owner_context_digest']=digest
-            snapshot['user_context']=[c.to_prompt() for c in self.inquiries.owner_context.read(
-                subject=self.subject,clearance=Sensitivity.PRIVATE)]
+            snapshot['user_context']=await context_value(read_context,lambda:[c.to_prompt()
+                for c in self.inquiries.owner_context.read(subject=self.subject,clearance=Sensitivity.PRIVATE)])
         catalogs={}
         if followup and citation_references:
             snapshot['method']=citation_selection.METHOD
@@ -251,7 +253,7 @@ class ConfiguredDiscoveryCycle:
                                      expected_sensitivity=Sensitivity.PRIVATE)
             if vault.digest_json(value)!=ref.digest:raise HostDiscoveryError('reading choice evidence changed')
             return value
-        validate_context()
+        await context_value(read_context,validate_context)
         start,done=journal.get(prefix+':started'),journal.get(prefix+':completed')
         if start is not None:
             if (start.event.event_type!='discovery.reading_choice_started'
@@ -282,7 +284,7 @@ class ConfiguredDiscoveryCycle:
                 response=await asyncio.wait_for(call(task='alive_discovery_followup' if followup else 'alive_discovery_reading',model=expression.get('requested_model'),
                     messages=[dict(role='system',content=prompt),dict(role='user',content=json.dumps(snapshot,ensure_ascii=False))],
                     temperature=.2,max_tokens=1600,timeout=seconds,route_info={}),timeout=seconds)
-                validate_context()
+                await context_value(read_context,validate_context)
                 text,model=DeliberationSynthesizer._response(response)
                 try:decoded=parse_model_json(text)
                 except ModelJSONError:
@@ -299,7 +301,7 @@ class ConfiguredDiscoveryCycle:
                 journal.append(EventEnvelope(event_id=prefix+':failed',event_type='discovery.reading_choice_failed',
                     causation_id=prefix+':started',**common,payload=dict(authority_granted=False)))
                 raise
-        validate_context()
+        await context_value(read_context,validate_context)
         if followup and citation_references:
             choice={**choice,'read_targets':list(citation_selection.read_targets(choice,catalogs))}
         return choice,model,digest

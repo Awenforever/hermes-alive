@@ -115,6 +115,13 @@ async def test(home):
         assert profile_text.encode() not in store.journal.path.read_bytes()
         assert advice()==observed
         assert len(store.journal.read(event_type='memory.core_profile_observed'))==1
+        foreign_home=home/'synthetic-foreign-home'
+        foreign_token=core.set_hermes_home_override(foreign_home)
+        try:
+            with patch.object(MemoryStore,'load_from_disk',side_effect=AssertionError('foreign home read Core profile')):
+                assert advice()==[]
+            assert not foreign_home.exists()
+        finally:core.reset_hermes_home_override(foreign_token)
         with patch.object(MemoryStore,'load_from_disk',side_effect=AssertionError('unauthorized Core profile read')):
             assert not any(p.kind=='core_curated_advisory' for p in reader.read(
                 subject=configured.subject,clearance=Sensitivity.PUBLIC))

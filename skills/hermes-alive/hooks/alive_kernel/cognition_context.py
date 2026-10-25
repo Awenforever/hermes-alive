@@ -1,4 +1,4 @@
-"""Bounded, owner-scoped explicit memory evidence for model interpretation."""
+"""Bounded explicit memory and separately consented Core profile advice."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

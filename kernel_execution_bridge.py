@@ -176,23 +176,39 @@ def assemble(binding):
         follow_citations=configured.options['cited_reads'],record_reading_assessment=True,
         validate_consent=validate)
     class Preparation:
+        supports_bounded_retry=discovery.supports_bounded_retry
         @property
         def pending(self):return discovery.pending
         async def reap_pending(self,*,timeout_seconds=0):
             return await discovery.reap_pending(timeout_seconds=timeout_seconds)
-        async def __call__(self,*,cycle,parameters,call,read_binding):
+        async def bind_parameters(self,*,cycle,parameters,read_binding):
             validate()
             authorization={'authorization_operation_id':'core-auth:'+store.vault.digest_json(
                 {'cycle':cycle.operation_id,'activation':active['activation_event_id']})[:40],
                 'route_binding_id':active['route_binding_id'],'delegation_event_id':active['delegation_event_id']}
-            parameters={**parameters,'authorization_parameters':authorization,'defer_until_eligible':True}
+            return {**parameters,'authorization_parameters':authorization,'defer_until_eligible':True}
+        async def observe(self,**kwargs):
+            validate()
+            return await discovery.observe(**kwargs)
+        async def reason(self,observed,**kwargs):
+            validate()
+            return await discovery.reason(observed,**kwargs)
+        def restore_parameters(self,**kwargs):
+            validate()
+            return discovery.restore_parameters(**kwargs)
+        async def __call__(self,*,cycle,parameters,call,read_binding):
+            # Direct embedding retains the same behavior; NativeCognitionHost
+            # uses the exposed binder and phases to reconcile/wait FIRST.
+            parameters=await self.bind_parameters(cycle=cycle,parameters=parameters,read_binding=read_binding)
             now=datetime.now(timezone.utc)
             if runtime.outbox.next_delegated_start(active['delegation_event_id'],subject=configured.subject,
                     policy_event_id=active['policy_event_id'],route_binding_id=active['route_binding_id'],now=now)>now:
                 return parameters
             return await discovery(cycle=cycle,parameters=parameters,call=call,read_binding=read_binding)
+    context_reads=(kernel('core_context_read').CoreContextRead(binding.context)
+        if configured.options.get('use_hermes_user_profile') is True else None)
     native=kernel('core_shadow_assembly').native_for_host(binding.context,host,home=binding.home,
-        preparation=Preparation(),validate_consent=validate,context_reads=None)
+        preparation=Preparation(),validate_consent=validate,context_reads=context_reads)
     def parameters():
         if not runtime.reconciliation._owner_policy(configured.subject).enabled:
             # A cross-process operator pause must enter the existing paused
