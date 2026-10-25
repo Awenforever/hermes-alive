@@ -18,7 +18,7 @@ from run_alive_kernel_expression_runtime import scenario
 from alive_kernel import AutonomyPolicyProjection, EventEnvelope, ExperienceJournal, PolicyContext, ReceiptLevel, Sensitivity
 from alive_kernel.autonomous_cycle_runtime import AutonomousCycleRuntime
 from alive_kernel.action_delegation import ActionDelegationStore
-from alive_kernel.conversation_continuity import ShareContinuityStore, ContinuityUnavailable
+from alive_kernel.conversation_continuity import ShareContinuityStore, ContinuityUnavailable, continuation_context
 from alive_kernel.content_vault import ContentReference
 from alive_kernel.privacy import LocalIdentityProtector
 from alive_kernel.retention import RetentionDirection
@@ -160,9 +160,14 @@ async def test(home, mode, *, exercise=None):
             conversation = json.loads(text.split('\n',1)[1])['alive_shares'][0]
             assert conversation['text'] == expressed.text
             assert set(conversation) == {'prepared_at','text','sources'}
-            assert conversation['sources'][0] == {
+            expected_source = {
                 key:value for key,value in shares[0]['sources'][0].items()
-                if key not in ('event_id','excerpt_policy')}
+                if key not in ('event_id','excerpt_policy','reading_scope')}
+            expected_source['reading_scope'] = {'evidence_basis':'retained_excerpt'}
+            assert conversation['sources'][0] == expected_source
+            # Operational diagnostics stay unchanged; only model-facing evidence
+            # is projected. A negative proof flag is not a negative world fact.
+            assert shares[0]['sources'][0]['reading_scope'] == {'collector_scope_reported':False}
             assert 'submission_status' not in text and 'success_reported' not in text
             assert shares[0]['submission_status'] and shares[0]['share_id']
             assert 'bicycles, not cars' in text and json.dumps(messages) == original
@@ -228,7 +233,30 @@ async def test(home, mode, *, exercise=None):
         core.reset_hermes_home_override(token)
 
 
+def test_collection_limits_are_not_world_negatives():
+    shares = [{'prepared_at':'2026-01-01T00:00:00+00:00','text':'Exact shared words.',
+        'sources':[{'event_id':'private-source-id','title':'Observed result',
+            'url':'https://example.invalid/result','excerpt':'An author reports a result.',
+            'reading_status':'retained_excerpt','reading_scope':{
+                'reported_read_scope':'search_listing','independent_verification_proven':False,
+                'video_consumption_proven':False,'reported_content_representation':'machine_summary'}},
+            {'event_id':'private-erased-id','reading_status':'no_longer_retained'}]}]
+    original = json.dumps(shares)
+    text = continuation_context(shares)
+    references = json.loads(text.split('\n',1)[1])['alive_shares']
+    assert references[0]['text'] == 'Exact shared words.'
+    assert references[0]['sources'][0]['reading_scope'] == {
+        'evidence_basis':'retained_excerpt','reported_read_scope':'search_listing',
+        'reported_content_representation':'machine_summary'}
+    assert references[0]['sources'][1] == {'reading_status':'no_longer_retained'}
+    assert 'independent_verification_proven' not in text and 'video_consumption_proven' not in text
+    assert 'private-source-id' not in text and 'private-erased-id' not in text
+    assert json.dumps(shares) == original  # No rewriting of the protected trace.
+    assert continuation_context([]) == ''
+
+
 if __name__ == '__main__':
+    test_collection_limits_are_not_world_negatives()
     with tempfile.TemporaryDirectory(prefix='alive-share-continuity-') as directory:
         try:
             for mode in ('success','false','exception','no-consent','wrong-direction','late-off'):

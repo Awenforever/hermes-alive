@@ -16,7 +16,7 @@ and safe portable operation. Component counts are not the completion metric.
 | Personalization | Owner-confirmed optional interests/communication preferences; separately opted-in current Core USER advice, actual native change/delete/wait qualification | External-provider recall, noise-aware daily learning and attributed feedback |
 | Agenda and initiative | Native discovery/commitment decisions, bounded rejection recovery, waits invalidated by actual admitted input | Sustained useful initiative and changing interests over time; no reward for empty repeated ticks |
 | Content and judgment | Source-led composition, final wording review, real main-model examples | Samples remain too much like cautious paper digests; factual review is not a usefulness verdict |
-| Conversation continuity | Exact share/source excerpts reach actual Core main requests; real replies after context reduction no longer recite transport status | Self-attribution/source-analysis errors remain; natural old-quote/compaction/restart behavior |
+| Conversation continuity | Exact share/source excerpts reach actual Core main requests; real replies after context reduction no longer recite transport status | Missing evidence still becomes global negative claims in real followup; qualify ADR0230, plus natural old-quote/compaction/restart behavior |
 | Sources | Actual Core free search and substantive extraction demonstrated in isolated profiles | More useful live selection across Chinese and other sources, currentness, provenance and inaccessible/full-read boundaries |
 | Authority and transport | Original delegation/policy/source checks and short physical permits preserved, including delayed-composition regression | Real daemon and channel outcomes under a separately approved production window; Enhance remains sole physical FIFO/token/retry owner |
 | Portability and migration | Managed supported-Core component integration | Independent Git consumer install/configure/run/upgrade/uninstall-preserve/reinstall across four agreed targets, plus legacy-state migration and rollback |
@@ -94,7 +94,15 @@ competing active plans. ADRs remain the record of architectural decisions.
 
 ## Next work in order
 
-1. Continue content understanding and bounded final assessment (ADR0228/0229).
+1. Continue content understanding and bounded final assessment (ADR0228/0229/0230).
+   r76's complete98 portable suites pass. A new science sample is substantially
+   more understandable, but the interesting relationship still needs to come
+   through without a forced benefits/opinion paragraph. A fresh technical share
+   explained a retrieval failure concretely, while its main followup incorrectly
+   treated missing replication evidence as proof that no replication exists.
+   Qualify the narrow conversation evidence projection in ADR0230; do not claim
+   a writing-prompt replacement fixes this. A fixed-evidence four-call comparison
+   found overstatement and an incorrect model-name change in the shorter prompt.
    r73's source/cited-reading/real-model run settled without publication: final
    review took408s and its point-in-time value assessment expired. More benchmark
    numbers were retrieved, but the original message still lists facts without
@@ -120,6 +128,10 @@ competing active plans. ADRs remain the record of architectural decisions.
    synthetic scoped providers first; separate body retention, model processing
    and inferred advice from explicit user facts. No private-history collection
    follows from an outbound retention or sharing grant.
+   Actual Core synthetic dialogue probes distinguish replay repair from a pure
+   tail read, and demonstrate that user roles and row limits alone do not provide
+   human attribution or body-size bounds. No private-dialogue connector is yet
+   enabled; native attributed feedback and noise-aware daily learning remain open.
 3. Improve source choice and expression together on fresh material, using the
    confirmed profile as a soft prior and keeping exploration outside it. No
    mandatory critical paragraph, source boilerplate, model-written shared past,
