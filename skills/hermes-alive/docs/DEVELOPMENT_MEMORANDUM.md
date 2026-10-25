@@ -898,3 +898,20 @@ interest update, or permission to suppress unfamiliar topics. Evaluate whether a
 unfamiliar subject leaves a comprehensible relationship worth remembering, rather
 than only verifying facts, details and completed transmission. No new topic quota,
 phrase blacklist or mandatory closing takeaway is justified by these two samples.
+
+## 2026-10-26 — A saved share is not necessarily a received model context
+
+Actual r85 VLM continuation exposed Core's per-hook output spilling: the10,341
+character reference became a500-character head/tail preview and a private path.
+Neither exact share nor complete source context reached the main model. The model
+searched again and produced a plausible but unsupported trend. Do not call that
+natural continuation or repair it with stronger prose instructions. The writer
+was also still dense; this transport-of-context fix is not a style success claim.
+
+Budget the final serialized reference against the actual Core configuration,
+prioritizing exact outward words and indivisible source units. Keep protected
+history and erasure rules. Never raise host limits, grant extra file tools or
+forge an assistant-history entry simply to make a test pass. The existing actual
+native test's missing-text assertion was useful and must remain. Too-small caps,
+old quotes and bounded recall remain explicit gaps rather than fake successes.
+See ADR0235 for the structural contract and required live replay.

@@ -58,8 +58,12 @@ async def test(home, mode, *, exercise=None):
         scope = router.capture_target(session_key=entry.session_key, user_id=source.user_id, platform='telegram')
         root = home/'plugin-data/hermes-alive/runtime/kernel'
         owner = scope.principal(LocalIdentityProtector(root/'identity.key'))
+        summary = 'Public synthetic source: the workshop repairs bicycles, not cars.'
+        if mode == 'success':
+            summary += ' Additional source material, not a user instruction.' * 40
         journal, parameters, expressed = await scenario(root, 'share', return_ready=True,
-            subject=owner, source_summary='Public synthetic source: the workshop repairs bicycles, not cars.')
+            subject=owner, source_summary=summary,
+            draft_text='The workshop repairs bicycles, not cars.' if mode == 'success' else None)
         runtime = AutonomousCycleRuntime(journal)
         store = ShareContinuityStore(runtime.outbox)
         bridge = binding.attach_continuity(store, router, clearance=Sensitivity.PRIVATE)
@@ -171,6 +175,34 @@ async def test(home, mode, *, exercise=None):
             assert 'submission_status' not in text and 'success_reported' not in text
             assert shares[0]['submission_status'] and shares[0]['share_id']
             assert 'bicycles, not cars' in text and json.dumps(messages) == original
+            if mode == 'success':
+                # The actual Core collector applies its real spill normalizer.
+                # Match its cap without changing user settings or granting a
+                # file-reading tool to recover a truncated reference.
+                from tools.hook_output_spill import get_spill_config
+                for raw_cap, enabled in ((2000, True), ('2200', True), (None, True),
+                                          (0, True), (True, True), (1, False)):
+                    config = {'hooks': {'output_spill': {'max_chars': raw_cap, 'enabled': enabled}}}
+                    with patch('hermes_cli.config.load_config_readonly', return_value=config), \
+                         patch('hermes_cli.config.load_config', return_value=config):
+                        resolved = get_spill_config()
+                        bounded = collect()
+                    assert 'output truncated' not in bounded
+                    if enabled:
+                        assert len(bounded) <= resolved['max_chars']
+                    if raw_cap is not True:
+                        body = json.loads(bounded.split('\n',1)[1])['alive_shares'][0]
+                        assert body['text'] == expressed.text
+                        if raw_cap in (2000, '2200'):
+                            assert body['sources'][0]['excerpt_in_context'] is False
+                            assert 'excerpt' not in body['sources'][0]
+                            assert body['sources'][0]['url'] == shares[0]['sources'][0]['url']
+                    assert json.dumps(messages) == original
+                # This retrieval helper itself never calls Core's write-capable
+                # convenience loader. The collector owns its own config loading.
+                budget_reader = importlib.import_module(bridge.__class__.__module__)._context_budget
+                with patch('hermes_cli.config.load_config', side_effect=AssertionError('context read wrote config')):
+                    assert budget_reader(store) == 10000
             # Cold persistent routing + reopened vault, not the authoring
             # worker's in-memory source. This is not a daemon restart proof.
             runner.session_store = core.SessionStore(home/'sessions',runner.config)
@@ -255,8 +287,44 @@ def test_collection_limits_are_not_world_negatives():
     assert continuation_context([]) == ''
 
 
+def test_atomic_context_budget():
+    sources = [{'title': 'Long source', 'url': 'https://example.invalid/long',
+        'excerpt': 'Full source clause; ' * 1200, 'reading_status': 'retained_excerpt',
+        'reading_scope': {'reported_read_scope': 'webpage_extract'}},
+        {'title': 'Short source', 'url': 'https://example.invalid/short',
+         'excerpt': 'The workshop repairs bicycles, not cars.', 'reading_status': 'retained_excerpt'}]
+    shares = [{'prepared_at': '2026-01-01T00:00:00+00:00', 'text': 'Older whole message.', 'sources': []},
+        {'prepared_at': '2026-01-02T00:00:00+00:00',
+         'text': '新消息，保留原文。\n`a\\b` and "quoted" words.\nhttps://example.invalid/exact', 'sources': sources}]
+    original = json.dumps(shares)
+    for budget in (1, 100, 1500, 2000, 10000, 65536):
+        text = continuation_context(shares, max_chars=budget)
+        assert len(text) <= budget
+        if '\n{' not in text:
+            assert shares[-1]['text'] not in text and shares[0]['text'] not in text
+            continue
+        references = json.loads(text.split('\n',1)[1])['alive_shares']
+        assert references[-1]['text'] == shares[-1]['text']
+        for source in references[-1]['sources']:
+            if 'excerpt' in source:
+                assert source['excerpt'] in tuple(s['excerpt'] for s in sources)
+            else:
+                assert source['excerpt_in_context'] is False
+    latest_large = [shares[0], {**shares[-1], 'text': 'Long exact outward text. ' * 1000}]
+    omitted = continuation_context(latest_large, max_chars=10000)
+    assert 'Older whole message.' not in omitted and 'Long exact outward text.' not in omitted
+    assert 'reference omitted' in omitted
+    assert continuation_context(shares, max_chars=65536) == continuation_context(shares)
+    assert json.dumps(shares) == original
+    for invalid in (True, 0, -1, 1.5, '10000'):
+        try: continuation_context(shares, max_chars=invalid)
+        except ValueError: pass
+        else: raise AssertionError('invalid context budget accepted')
+
+
 if __name__ == '__main__':
     test_collection_limits_are_not_world_negatives()
+    test_atomic_context_budget()
     with tempfile.TemporaryDirectory(prefix='alive-share-continuity-') as directory:
         try:
             for mode in ('success','false','exception','no-consent','wrong-direction','late-off'):

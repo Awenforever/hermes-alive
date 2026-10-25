@@ -1,7 +1,7 @@
 # Hermes Alive Kernel — Living Development Plan
 
 Status: active; development branch only, no production acceptance.
-Last reviewed: 2026-10-25 (Asia/Shanghai).
+Last reviewed: 2026-10-26 (Asia/Shanghai).
 
 ## Current product state
 
@@ -27,6 +27,16 @@ to Hermes; channel delivery belongs to Hermes/Enhance. No production, Core, wmw,
 model/provider or network changes are authorized by this development plan.
 
 ## Latest qualified slices
+
+- r85 / `710ea7a`: complete99 portable suites and ten focused authoring/Core
+  suites pass. Actual clock-aware public composition correctly treats an old
+  forecast as historical; it is not a quality round. The fresh VLM native run
+  inherited Hermes main/fallback, recovered via official fallback, submitted one
+  local share and settled pending work, then failed the exact-context assertion
+  in its first main turn. Core spilled the10,341-character hook into a preview;
+  its main reply overstated a performance trend. No dialogue or quality credit.
+  [ADR0235](adr/0235-core-hook-budgeted-conversation-reference.md) now addresses
+  the actual final context boundary without changing host limits or permissions.
 
 - r84 / `2f497aa`: twelve focused suites pass, including actual Core standard
   submission, continuity, routing and execution controls. Windows17 standard
