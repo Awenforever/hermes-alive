@@ -6,7 +6,7 @@ durable before spending and never silently repeated after an uncertain outcome.
 """
 import asyncio
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import timedelta, timezone
 import hashlib
 import json
 from urllib.parse import urlsplit
@@ -22,6 +22,7 @@ from .model_json import parse_model_json, ModelJSONError
 from .model_timeouts import DEFAULT_STAGE_SECONDS
 from .core_context_read import context_value
 from . import citation_selection
+from . import public_source_refinement
 
 
 _PROMPT_V1 = """Choose at most two exact supplied source_refs worth reading for a
@@ -92,6 +93,7 @@ class _DiscoveryObservation:
     current: object
     research_enabled: bool
     citation_references: bool
+    public_refinement: bool
     group_enabled: bool
     assessment_enabled: bool
     listing_fingerprint: str | None
@@ -100,7 +102,7 @@ class _DiscoveryObservation:
 class ConfiguredDiscoveryCycle:
     supports_bounded_retry=True
     def __init__(self,context,ingestor,*,subject,approved_queries,validate_consent,follow_citations=False,
-                 record_reading_assessment=False):
+                 record_reading_assessment=False,refine_public_sources=False):
         from .core_shadow_assembly import public_discovery_settings
         from .native_worker_protocol import identifier
         identifier(subject)
@@ -109,10 +111,14 @@ class ConfiguredDiscoveryCycle:
         if not callable(validate_consent):raise HostDiscoveryError('current disclosure consent validator required')
         if type(follow_citations) is not bool:raise HostDiscoveryError('explicit cited-read consent required')
         if type(record_reading_assessment) is not bool:raise HostDiscoveryError('explicit reading assessment mode required')
+        if type(refine_public_sources) is not bool or refine_public_sources and not follow_citations:
+            raise HostDiscoveryError('public refinement requires separate consent and bounded followup reads')
         self.context,self.ingestor,self.subject=context,ingestor,subject
         self.queries,self.validate_consent=approved_queries,validate_consent
         self.follow_citations=follow_citations
         self.record_reading_assessment=record_reading_assessment
+        self.refine_public_sources=refine_public_sources
+        self._refinement_query=None
         self.inquiries=DiscoveryInquiryContext(ingestor)
         self.tools=None
         self._observation=None
@@ -124,6 +130,7 @@ class ConfiguredDiscoveryCycle:
         self._closed=True
         self._observation_epoch+=1
         self._observation=None
+        self._refinement_query=None
         if self.tools is not None:self.tools.close()
 
     @property
@@ -190,6 +197,12 @@ class ConfiguredDiscoveryCycle:
             kind='discovery.citation_selection_opened',payload=dict(
                 method=citation_selection.METHOD,authority_granted=False))
 
+    def _public_refinement_enabled(self,cycle):
+        return self._cycle_mode(cycle,prefix='discovery.public-refinement:',
+            kind='discovery.public_refinement_opened',payload=dict(
+                method=public_source_refinement.METHOD,max_additional_queries=1,
+                max_followup_urls=2,authority_granted=False))
+
     def _bundle_enabled(self,cycle):
         return self._cycle_mode(cycle,prefix='discovery.research-group:',
             kind='discovery.research_group_opened',payload=dict(
@@ -216,11 +229,19 @@ class ConfiguredDiscoveryCycle:
         return True
 
     async def _select(self,*,operation_id,evidence,search_receipt_id,parameters,call,current,
-                      followup=False,visited=(),citation_references=False):
+                      followup=False,visited=(),citation_references=False,source_refinement=False,
+                      public_only=False):
         journal,vault=self.ingestor.journal,self.ingestor.vault
+        if (source_refinement or public_only) and any(
+                read_scope_metadata(e.content).get('reported_read_scope') not in ('search_listing','webpage_extract')
+                for e in evidence):
+            raise HostDiscoveryError('public source planning requires current public collector material')
         read_context=parameters['expression_parameters'].get('read_context')
         digest=await context_value(read_context,lambda:self.inquiries.context_digest(subject=self.subject))
         prompt=(_FOLLOWUP_REFERENCES_PROMPT if citation_references else _FOLLOWUP_PROMPT) if followup else _PROMPT_V1
+        if source_refinement:
+            if not followup or not citation_references:raise HostDiscoveryError('bounded public refinement mode required')
+            prompt=public_source_refinement.PROMPT
         snapshot=dict(method='cited-public-followup-v1' if followup else 'public-reading-choice-v1',
             search_receipt_id=search_receipt_id,system_prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
             sources=[dict(source_ref=e.observation_event_id,title=e.content['title'],url=e.content['url'],
@@ -228,18 +249,30 @@ class ConfiguredDiscoveryCycle:
                 published_at=e.content.get('published_at')) for e in evidence])
         if followup:
             snapshot['already_read_urls']=list(visited)
-        else:
+        elif not public_only:
             snapshot['owner_context_digest']=digest
             snapshot['user_context']=await context_value(read_context,lambda:[c.to_prompt()
                 for c in self.inquiries.owner_context.read(subject=self.subject,clearance=Sensitivity.PRIVATE)])
         catalogs={}
         if followup and citation_references:
-            snapshot['method']=citation_selection.METHOD
+            snapshot['method']=public_source_refinement.METHOD if source_refinement else citation_selection.METHOD
             for source in snapshot['sources']:
                 source['citations']=citation_selection.citations(source['excerpt'],visited)
                 catalogs[source['source_ref']]=source['citations']
+        if source_refinement:snapshot['already_queried']=list(self.queries)
+        elif public_only:snapshot['method']='public-source-read-choice-v1'
+        if source_refinement or public_only:
+            collection=journal.get(search_receipt_id)
+            if (collection is None or collection.event.subject!=self.subject
+                    or collection.event.event_type!='discovery.host_read_completed'
+                    or collection.event.source!='alive.host-discovery'
+                    or collection.event.actor!='system:alive-host-reader'):
+                raise HostDiscoveryError('owning public collection clock unavailable')
+            snapshot['collection_as_of']=collection.event.observed_at.astimezone(timezone.utc).isoformat()
+            snapshot['collection_clock_is_not_publication_date']=True
         refs={e.observation_event_id:e for e in evidence}
-        parse_choice=lambda raw:(citation_selection.normalize(raw,catalogs) if followup and citation_references else
+        parse_choice=lambda raw:(public_source_refinement.normalize(raw,catalogs,self.queries) if source_refinement else
+            citation_selection.normalize(raw,catalogs) if followup and citation_references else
             self._followup_choice(raw,refs,visited) if followup else self._choice(raw,refs))
         prefix='discovery.reading-choice:'+vault.digest_json(dict(subject=self.subject,operation=operation_id))[:40]
         common=dict(source='alive.configured-discovery',actor='system:alive-configured-reader',
@@ -275,7 +308,8 @@ class ConfiguredDiscoveryCycle:
             result=resolve(done,'discovery.reading-choice')
             if result['input_digest']!=vault.digest_json(snapshot):
                 raise HostDiscoveryError('reading result differs from its original input')
-            choice=(citation_selection.validate(result['choice'],catalogs)
+            choice=(public_source_refinement.validate(result['choice'],catalogs,self.queries) if source_refinement else
+                citation_selection.validate(result['choice'],catalogs)
                 if followup and citation_references else parse_choice(result['choice']))
             model=result['actual_model']
         else:
@@ -312,7 +346,9 @@ class ConfiguredDiscoveryCycle:
                 raise
         await context_value(read_context,validate_context)
         if followup and citation_references:
-            choice={**choice,'read_targets':list(citation_selection.read_targets(choice,catalogs))}
+            targets=(public_source_refinement.read_targets(choice,catalogs,self.queries) if source_refinement else
+                     citation_selection.read_targets(choice,catalogs))
+            choice={**choice,'read_targets':list(targets)}
         return choice,model,digest
 
     async def observe(self,*,cycle,parameters,read_binding):
@@ -327,6 +363,7 @@ class ConfiguredDiscoveryCycle:
         if self._closed:raise HostDiscoveryError('public discovery capability is retired')
         if self.pending:raise HostReadUncertainError('previous public read has not physically settled')
         self._observation=None
+        self._refinement_query=None
         self._observation_epoch+=1
         epoch=self._observation_epoch
         expected=read_binding()
@@ -339,6 +376,8 @@ class ConfiguredDiscoveryCycle:
         current()
         research_enabled=self.follow_citations and self._research_enabled(cycle)
         citation_references=research_enabled and self._citation_references_enabled(cycle)
+        public_refinement=(research_enabled and self.refine_public_sources
+                           and self._public_refinement_enabled(cycle))
         # Understanding an already authorized initial read does not grant or
         # require permission for additional cited-URL network reads.
         group_enabled=(research_enabled or self.record_reading_assessment) and self._bundle_enabled(cycle)
@@ -346,7 +385,15 @@ class ConfiguredDiscoveryCycle:
             prefix='discovery.reading-assessment:',kind='discovery.reading_assessment_opened',
             payload=dict(method='inquiry-reading-assessment-v1',authority_granted=False))
         if self.tools is not None:self.tools.close()
-        self.tools=CoreDiscoveryTools(self.context,read_binding=current,approved_queries=self.queries)
+        def allow_refinement_query(query):
+            current()
+            grant=self._refinement_query
+            if not public_refinement or grant is None or grant[:2]!=(cycle.operation_id,query):return False
+            active=self.ingestor.active_evidence(subject=self.subject,clearance=Sensitivity.PRIVATE,
+                limit=32,observation_event_ids=grant[2])
+            return {e.observation_event_id for e in active}==set(grant[2])
+        self.tools=CoreDiscoveryTools(self.context,read_binding=current,approved_queries=self.queries,
+            **({'query_validator':allow_refinement_query} if public_refinement else {}))
         reader=HostDiscoveryReader(self.ingestor,subject=self.subject,search=self.tools.search,
             extract=self.tools.extract,allow_url=self.tools.allow_url,is_current=lambda:current()==expected)
         found=await reader.collect(operation_id=cycle.operation_id+':search',queries=self.queries)
@@ -359,9 +406,10 @@ class ConfiguredDiscoveryCycle:
             subject=self.subject,queries=list(self.queries),
             observations=sorted(found.observation_ids),research_enabled=research_enabled,
             citation_references=citation_references,group_enabled=group_enabled,
-            assessment_enabled=assessment_enabled)) if found.failures==0 else None)
+            assessment_enabled=assessment_enabled,**({'public_refinement':True} if public_refinement else {})))
+            if found.failures==0 else None)
         result=_DiscoveryObservation(cycle.operation_id,expected,found,tuple(evidence),reader,current,
-            research_enabled,citation_references,group_enabled,assessment_enabled,fingerprint)
+            research_enabled,citation_references,public_refinement,group_enabled,assessment_enabled,fingerprint)
         self._observation=result
         return result
 
@@ -497,16 +545,51 @@ class ConfiguredDiscoveryCycle:
             read_urls=tuple(dict.fromkeys(e.content['url'] for e in selected)),inquiry_item_ids=(item_id,))
         current()
         read_receipts=[read.receipt_id] if read.observation_ids and group_enabled else []
-        if research_enabled and read.observation_ids:
+        if research_enabled and (read.observation_ids or observed.public_refinement):
             extracts=self.ingestor.active_evidence(subject=self.subject,clearance=Sensitivity.PRIVATE,
-                limit=32,observation_event_ids=read.observation_ids)
+                limit=32,observation_event_ids=read.observation_ids) if read.observation_ids else ()
             if ({e.observation_event_id for e in extracts}!=set(read.observation_ids)
                     or any(read_scope_metadata(e.content).get('reported_read_scope')!='webpage_extract' for e in extracts)):
                 raise HostDiscoveryError('follow-up input is not current retained page evidence')
-            followup,_,_=await self._select(operation_id=cycle.operation_id+':followup',evidence=extracts,
+            followup_evidence=extracts
+            if observed.public_refinement:
+                # A failed page read still leaves real public listing material.
+                # Do not substitute the private inquiry or recipient profile.
+                followup_evidence=tuple({e.observation_event_id:e for e in (*selected,*extracts)}.values())
+            followup,_,_=await self._select(operation_id=cycle.operation_id+':followup',evidence=followup_evidence,
                 search_receipt_id=read.receipt_id,parameters=parameters,call=call,current=current,followup=True,
-                visited=tuple(dict.fromkeys(e.content['url'] for e in selected)),citation_references=citation_references)
-            if followup['read_targets']:
+                visited=tuple(dict.fromkeys(e.content['url'] for e in selected)),citation_references=citation_references,
+                source_refinement=observed.public_refinement)
+            query=followup.get('search_query')
+            if query:
+                # _select has retained and reopened the exact public-only choice.
+                # The capability is usable only during this canonical search;
+                # its start-before-IO receipt prevents replay replenishment.
+                self._refinement_query=(cycle.operation_id,query,
+                    tuple(e.observation_event_id for e in followup_evidence))
+                try:
+                    refined=await reader.collect(operation_id=cycle.operation_id+':refinement-search',
+                        queries=(query,),inquiry_item_ids=(item_id,))
+                finally:
+                    self._refinement_query=None
+                current()
+                listings=self.ingestor.active_evidence(subject=self.subject,clearance=Sensitivity.PRIVATE,
+                    limit=32,observation_event_ids=refined.observation_ids) if refined.observation_ids else ()
+                if ({e.observation_event_id for e in listings}!=set(refined.observation_ids)
+                        or any(read_scope_metadata(e.content).get('reported_read_scope')!='search_listing' for e in listings)):
+                    raise HostDiscoveryError('refined search is not current public listing evidence')
+                if listings:
+                    next_read,_,_=await self._select(operation_id=cycle.operation_id+':refined-reading',
+                        evidence=listings,search_receipt_id=refined.receipt_id,parameters=parameters,
+                        call=call,current=current,public_only=True)
+                    by_ref={e.observation_event_id:e for e in listings}
+                    urls=tuple(dict.fromkeys(by_ref[r].content['url'] for r in next_read['source_refs']))
+                    if urls:
+                        followed=await reader.collect(operation_id=cycle.operation_id+':followup-read',
+                            read_urls=urls,inquiry_item_ids=(item_id,))
+                        if group_enabled and followed.observation_ids:read_receipts.append(followed.receipt_id)
+                        current()
+            elif followup['read_targets']:
                 followed=await reader.collect(operation_id=cycle.operation_id+':followup-read',
                     read_urls=tuple(t['url'] for t in followup['read_targets']),inquiry_item_ids=(item_id,))
                 if group_enabled:read_receipts.append(followed.receipt_id)

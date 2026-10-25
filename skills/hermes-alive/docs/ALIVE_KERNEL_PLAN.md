@@ -144,13 +144,15 @@ competing active plans. ADRs remain the record of architectural decisions.
    Develop public-topic exploration without turning private profile text into
    public search queries or making interests exclusive filters. Measure useful
    domestic and out-of-interest discovery, not merely more provider names.
-   First compare the same writer on a real listing versus original source
-   extracts. An actual Core research experiment found primary material after an
+   Two paired same-writer comparisons on one existing topic found more concrete
+   explanation and better license qualifications with original source extracts.
+   This is not fresh-round or statistical proof. An actual Core research experiment found primary material after an
    initial HTML failure, but did not finish composition within its requested
    runtime and exceeded a prompt-only page budget. Do not embed that unadapted
-   Agent loop. Consider the bounded, separately opted-in refinement proposal in
-   [ADR0231](adr/0231-bounded-public-source-refinement-proposal.md) only if reading
-   depth demonstrably improves understanding; no new general agent framework.
+   Agent loop. The bounded, separately opted-in refinement candidate in
+   [ADR0231](adr/0231-bounded-public-source-refinement-proposal.md) now needs
+   actual installed/native and real-source qualification. Its owner guidance is
+   [ALIVE_KERNEL_SETUP.md](ALIVE_KERNEL_SETUP.md); no new general agent framework.
 4. Run longitudinal synthetic daily-turn scenarios through actual native
    interfaces: noisy work topics versus durable interests, changing preferences,
    independent explicit corrections, attributed feedback, forgotten material,

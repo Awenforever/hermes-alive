@@ -38,6 +38,53 @@ async def exercise(home):
     except HostDiscoveryError:pass
     else:raise AssertionError('unapproved query disclosed')
     assert len(calls)==1
+    # A derived query needs a current host grant, not a model's permission flag.
+    approved=[False];checks=[]
+    def query_grant(query):
+        checks.append(query)
+        return approved[0] and query=='public original source'
+    derived=CoreDiscoveryTools(ctx,read_binding=lambda:state[0],approved_queries=('public',),
+        query_validator=query_grant)
+    try:await derived.search('public original source',limit=1)
+    except HostDiscoveryError:pass
+    else:raise AssertionError('ungranted derived query disclosed')
+    assert len(calls)==1
+    approved[0]=True
+    assert json.loads(await derived.search('public original source',limit=1))['success']
+    assert checks.count('public original source')==3  # Denial, pre-schedule and inside physical worker.
+    assert len(calls)==2
+    approved[0]=False
+    try:await derived.search('public original source',limit=1)
+    except HostDiscoveryError:pass
+    else:raise AssertionError('revoked derived query disclosed')
+    derived.close()
+    before_dispatch=len(calls);late_checks=[]
+    def expiring_grant(query):
+        late_checks.append(query)
+        return len(late_checks)==1
+    late=CoreDiscoveryTools(ctx,read_binding=lambda:state[0],approved_queries=('public',),
+        query_validator=expiring_grant)
+    try:await late.search('public original source',limit=1)
+    except HostDiscoveryError:pass
+    else:raise AssertionError('grant revocation between scheduling and IO was ignored')
+    assert len(late_checks)==2 and len(calls)==before_dispatch and not late.pending
+    validation_entered=threading.Event();validation_release=threading.Event();validation_calls=[]
+    def slow_grant(query):
+        validation_calls.append(query)
+        if len(validation_calls)==2:
+            validation_entered.set()
+            assert validation_release.wait(5)
+        return True
+    slow=CoreDiscoveryTools(ctx,read_binding=lambda:state[0],approved_queries=('public',),
+        query_validator=slow_grant,timeout_seconds=.1)
+    try:
+        try:await slow.search('public original source',limit=1)
+        except HostReadUncertainError:pass
+        else:raise AssertionError('slow grant validation did not remain physically pending')
+        assert validation_entered.is_set() and slow.pending and len(calls)==before_dispatch
+    finally:validation_release.set()
+    assert (await slow.reap_pending(timeout_seconds=2))['remaining']==0
+    assert len(calls)==before_dispatch,'HTTP dispatch began after scope retired during grant validation'
     # A timeout does not release the physical lock or permit a new generation.
     held=make(.03)
     try:
@@ -49,7 +96,7 @@ async def exercise(home):
         try:await replacement.search('public',limit=1)
         except TimeoutError:pass
         else:raise AssertionError('new generation bypassed pending physical read')
-        assert len(calls)==2
+        assert len(calls)==3
     finally:release.set()
     assert (await held.reap_pending(timeout_seconds=2))==dict(remaining=0,retired=True)
     try:await held.search('public',limit=1)

@@ -174,6 +174,7 @@ def assemble(binding):
         kernel('discovery_opportunities').DiscoveryOpportunityIngestor(store.journal,content_vault=store.vault),
         subject=configured.subject,approved_queries=tuple(configured.options['public_queries']),
         follow_citations=configured.options['cited_reads'],record_reading_assessment=True,
+        refine_public_sources=configured.options.get('refine_public_sources',False),
         validate_consent=validate)
     class Preparation:
         supports_bounded_retry=discovery.supports_bounded_retry

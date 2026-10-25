@@ -33,7 +33,7 @@ def cli(home,*arguments):
     raise AssertionError('actual Core plugin CLI did not return a result')
 
 
-async def test(home):
+async def test(home,*,public_refinement=False):
     home.mkdir()
     installed=home/'plugins/hermes-alive'
     shutil.copytree(core.repo,installed)
@@ -48,14 +48,19 @@ async def test(home):
     rc,denied=cli(home,'setup','--confirm-model-calls','--confirm-delivery')
     assert rc==2 and denied['confirmation_required'] is True
     explicit_interests='Scientific history and public infrastructure; other worthwhile discoveries are welcome.'
+    public_options=('--public-query','public synthetic topic','--confirm-public-reads','--confirm-cited-reads',
+                    '--confirm-public-refinement') if public_refinement else ()
     rc,staged=cli(home,'setup','--confirm-model-calls','--confirm-delivery',
                   '--confirm-outbound-retention','--retention-days','30',
-                  '--interests',explicit_interests,'--confirm-hermes-profile-memory')
+                  '--interests',explicit_interests,'--confirm-hermes-profile-memory',*public_options)
     assert rc==0 and staged['ok'] and staged['delivery_enabled'] is False
     assert staged['phase']=='awaiting_authorized_conversation_confirmation'
     assert staged['confirmation_summary']['interest_preferences']==explicit_interests
     assert staged['confirmation_summary']['explicit_interest_memory_until_updated_or_forgotten'] is True
-    assert staged['confirmation_summary']['public_queries']==[]
+    assert staged['confirmation_summary']['public_queries']==(['public synthetic topic'] if public_refinement else [])
+    assert staged['confirmation_summary']['public_source_refinement'] is public_refinement
+    assert staged['confirmation_summary']['additional_public_queries_per_cycle']==int(public_refinement)
+    assert staged['confirmation_summary']['private_context_in_public_query_planning'] is False
     assert staged['confirmation_summary']['use_personal_hermes_curated_user_profile'] is True
     assert staged['confirmation_summary']['external_memory_provider_recall_enabled'] is False
     command=staged['confirmation_command'].removeprefix('/alive ')
@@ -90,6 +95,7 @@ async def test(home):
         store=setup_bridge.setup_store(binding)
         configured=store.configuration()
         assert configured is not None and configured.options['model'] is None
+        assert configured.options.get('refine_public_sources',False) is public_refinement
         from importlib import import_module
         package=store.__class__.__module__.rsplit('.',1)[0]
         CognitionContextReader=import_module(package+'.cognition_context').CognitionContextReader
@@ -215,7 +221,9 @@ async def test(home):
 
 if __name__=='__main__':
     with tempfile.TemporaryDirectory(prefix='alive-core-guided-setup-') as directory:
-        try:asyncio.run(test(Path(directory)/'profile'))
+        try:
+            asyncio.run(test(Path(directory)/'profile'))
+            asyncio.run(test(Path(directory)/'refinement-profile',public_refinement=True))
         finally:
             from hermes_state_registry import close_all_under
             close_all_under(directory)

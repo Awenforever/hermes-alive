@@ -65,6 +65,8 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
     setup.add_argument('--public-query',action='append',default=[])
     setup.add_argument('--confirm-public-reads',action='store_true')
     setup.add_argument('--confirm-cited-reads',action='store_true')
+    setup.add_argument('--confirm-public-refinement',action='store_true',
+        help='Additionally authorize one source-only public query within the bounded followup budget; requires cited reads')
     setup.add_argument('--replace',action='store_true',help='Explicitly replace a prior pending/configured setup; preserves history')
     actions.add_parser("uninstall-runtime", help="Remove owned runtime code while preserving user state")
     actions.add_parser("enable", help="Enable proactive delivery")
@@ -222,7 +224,8 @@ def alive_command(args: argparse.Namespace) -> int:
     if action == 'setup':
         if (not args.confirm_model_calls or not args.confirm_delivery or not args.confirm_outbound_retention
                 or bool(args.public_query) != args.confirm_public_reads
-                or args.confirm_cited_reads and not args.public_query):
+                or args.confirm_cited_reads and not args.public_query
+                or getattr(args,'confirm_public_refinement',False) and not args.confirm_cited_reads):
             print(json.dumps({'ok':False,'confirmation_required':True,'delivery_enabled':False}))
             return 2
         if _effective_enabled():
@@ -244,6 +247,7 @@ def alive_command(args: argparse.Namespace) -> int:
         intent,code=setup.stage({'model_calls':True,'delivery':True,
             'outbound_retention_days':args.retention_days,'outbound_retention_confirmed':True,'model':args.model,
             'public_queries':args.public_query,'cited_reads':args.confirm_cited_reads,
+            **({'refine_public_sources':True} if getattr(args,'confirm_public_refinement',False) else {}),
             **({'language':args.language} if getattr(args,'language',None) else {}),
             **({'communication_preference':args.communication_preference}
                if getattr(args,'communication_preference',None) else {}),
@@ -257,6 +261,10 @@ def alive_command(args: argparse.Namespace) -> int:
             'expires_in_seconds':900,'restart_required':True,'delivery_enabled':False,'model_calls_started':False,
             'confirmation_summary':{'model':args.model or 'inherit_hermes','outbound_history_days':args.retention_days,
                 'inbound_history':False,'automatic_profile_learning':False,'public_queries':args.public_query,
+                'cited_public_reads':bool(args.confirm_cited_reads),
+                'public_source_refinement':bool(getattr(args,'confirm_public_refinement',False)),
+                'additional_public_queries_per_cycle':1 if getattr(args,'confirm_public_refinement',False) else 0,
+                'private_context_in_public_query_planning':False,
                 'configuration_kept_until_removed':True,
                 'conversation_language':getattr(args,'language',None) or 'follows_hermes_locale',
                 'communication_preference':getattr(args,'communication_preference',None),

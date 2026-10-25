@@ -152,6 +152,7 @@ run_and_require run_inquiry_owner_context.py '^HERMES_ALIVE_INQUIRY_OWNER_CONTEX
 run_and_require run_discovery_authoring.py '^HERMES_ALIVE_DISCOVERY_AUTHORING_OK$'
 run_and_require run_source_excerpt_scope.py '^HERMES_ALIVE_SOURCE_EXCERPT_SCOPE_OK$'
 run_and_require run_core_discovery_tools.py '^HERMES_ALIVE_CORE_DISCOVERY_TOOLS_OK$'
+run_and_require run_public_source_refinement.py '^HERMES_ALIVE_PUBLIC_SOURCE_REFINEMENT_OK$'
 run_and_require run_configured_discovery_cycle.py '^HERMES_ALIVE_CONFIGURED_DISCOVERY_CYCLE_OK$'
 run_and_require run_discovery_observation_phase.py '^HERMES_ALIVE_DISCOVERY_OBSERVATION_PHASE_OK$'
 run_and_require run_native_discovery_wait.py '^HERMES_ALIVE_NATIVE_DISCOVERY_WAIT_OK$'

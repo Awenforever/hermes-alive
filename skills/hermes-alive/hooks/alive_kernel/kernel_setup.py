@@ -36,20 +36,23 @@ def validate_options(options):
     required={'model_calls','delivery','outbound_retention_days','outbound_retention_confirmed',
               'model','public_queries','cited_reads'}
     if (not isinstance(options, dict) or not required<=set(options)
-            or set(options)-required-{'language','communication_preference','interest_preferences','use_hermes_user_profile'}
+            or set(options)-required-{'language','communication_preference','interest_preferences','use_hermes_user_profile',
+                                     'refine_public_sources'}
             or options['model_calls'] is not True or options['delivery'] is not True
             or options['outbound_retention_confirmed'] is not True
             or type(options['outbound_retention_days']) is not int
             or not 1 <= options['outbound_retention_days'] <= 365
             or type(options['cited_reads']) is not bool
-            or 'use_hermes_user_profile' in options and type(options['use_hermes_user_profile']) is not bool):
+            or any(key in options and type(options[key]) is not bool
+                   for key in ('use_hermes_user_profile','refine_public_sources'))):
         raise KernelSetupError('explicit model/delivery/retention choices required')
     model = options['model']
     queries = options['public_queries']
     if (model is not None and (not isinstance(model,str) or not model.strip() or len(model)>512)
             or not isinstance(queries,list) or len(queries)>3
             or any(not isinstance(q,str) or not q.strip() or len(q)>128 for q in queries)
-            or len(set(queries)) != len(queries) or options['cited_reads'] and not queries):
+            or len(set(queries)) != len(queries) or options['cited_reads'] and not queries
+            or options.get('refine_public_sources') is True and not options['cited_reads']):
         raise KernelSetupError('bounded approved public queries and optional Core model alias required')
     if ('language' in options and (not isinstance(options['language'],str)
             or not re.fullmatch(r'[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8}){0,3}',options['language']))

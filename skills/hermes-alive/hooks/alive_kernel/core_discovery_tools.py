@@ -14,20 +14,24 @@ from .host_discovery import HostDiscoveryError,HostReadUncertainError
 
 DEFAULT_READ_STAGE_SECONDS=180
 MAX_READ_STAGE_SECONDS=600
+_RETIRED_BEFORE_IO=object()
 
 
 class CoreDiscoveryTools:
-    def __init__(self, context, *, read_binding, approved_queries, timeout_seconds=DEFAULT_READ_STAGE_SECONDS):
+    def __init__(self, context, *, read_binding, approved_queries, timeout_seconds=DEFAULT_READ_STAGE_SECONDS,
+                 query_validator=None):
         if (not callable(read_binding) or not isinstance(approved_queries, tuple)
                 or len(approved_queries)>3 or any(not isinstance(q,str) or not q.strip()
                 or len(q)>128 for q in approved_queries)
                 or type(timeout_seconds) not in (int,float)
-                or not math.isfinite(timeout_seconds) or not 0<timeout_seconds<=MAX_READ_STAGE_SECONDS):
+                or not math.isfinite(timeout_seconds) or not 0<timeout_seconds<=MAX_READ_STAGE_SECONDS
+                or query_validator is not None and not callable(query_validator)):
             raise HostDiscoveryError('explicit bounded approved public queries required')
         self.context=context
         self.home=Path(context._manager.scope_key).resolve()
         self.read_binding=read_binding
         self.approved_queries=approved_queries
+        self.query_validator=query_validator
         # Independent total host wait, not a provider request timeout. Core's
         # ordinary extract dispatch alone may take120s, followed by its rescue.
         # A60s host cap falsely retired legitimate requests before Core settled.
@@ -69,12 +73,15 @@ class CoreDiscoveryTools:
             # Same lock across instances/module generations/processes. It is held
             # by the worker, not the waiting task: cancellation cannot release it.
             with file_lock(self.home/'plugin-data/hermes-alive/runtime/kernel/public-read.lock',timeout=0):
+                if self._closed:return _RETIRED_BEFORE_IO
                 self._current(binding)
                 return operation()
         self._active=asyncio.create_task(asyncio.to_thread(worker))
         self._active.add_done_callback(lambda task: None if task.cancelled() else task.exception())
         try:
             result=await asyncio.wait_for(asyncio.shield(self._active),self.timeout_seconds)
+            if result is _RETIRED_BEFORE_IO:
+                raise HostDiscoveryError('Core public-read capability retired before disclosure')
             self._current(binding)
             return result
         except TimeoutError:
@@ -95,17 +102,32 @@ class CoreDiscoveryTools:
             return asyncio.run(async_is_safe_url(normalized[0])) is True
         return await self._invoke(check)
 
-    async def _dispatch(self,name,args):
-        result=await self._invoke(lambda:self.context.dispatch_tool(name,args))
+    async def _dispatch(self,name,args,*,validate_request=None):
+        binding=self._current()
+        def invoke():
+            if validate_request is not None:validate_request()
+            # Grant verification can itself take time. A retired worker returns
+            # only this control outcome, never a fabricated web-tool response.
+            if self._closed:return _RETIRED_BEFORE_IO
+            self._current(binding)
+            return self.context.dispatch_tool(name,args)
+        result=await self._invoke(invoke)
         if isinstance(result,dict): result=json.dumps(result,ensure_ascii=False,allow_nan=False)
         if not isinstance(result,str) or len(result)>262144:
             raise HostDiscoveryError('Core public-read result exceeds boundary')
         return result
 
     async def search(self,query,*,limit):
-        if query not in self.approved_queries or type(limit) is not int or not 1<=limit<=5:
+        if not isinstance(query,str) or type(limit) is not int or not 1<=limit<=5:
             raise HostDiscoveryError('query not approved for external disclosure')
-        return await self._dispatch('web_search',dict(query=query,limit=limit))
+        def validate_query():
+            if query not in self.approved_queries and (
+                    self.query_validator is None or self.query_validator(query) is not True):
+                raise HostDiscoveryError('query not approved for external disclosure')
+        validate_query()
+        # Revalidate the host-owned additional scope inside the physical worker,
+        # after its profile lock/current-generation check and before disclosure.
+        return await self._dispatch('web_search',dict(query=query,limit=limit),validate_request=validate_query)
 
     async def extract(self,urls,*,char_limit):
         if (not isinstance(urls,list) or len(urls)!=1 or not isinstance(urls[0],str)

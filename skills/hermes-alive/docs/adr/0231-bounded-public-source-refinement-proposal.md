@@ -1,7 +1,7 @@
 # ADR0231 — A bounded public-source refinement, if the evidence warrants it
 
 Date: 2026-10-25 (Asia/Shanghai).
-Status: proposal, not an implemented capability or production authorization.
+Status: opt-in candidate implemented; installed/native and real-source qualification pending.
 
 One real discovery run reached a useful technical topic through a search listing,
 but could not open the aggregator page. The existing exact-query and cited-link
@@ -54,3 +54,30 @@ pending work and failures. Then run fresh real-source complete-chain cases with
 original output and realistic followup. Neither a successful tool call nor this
 proposal counts toward the ten useful error-free rounds. Ordinary feedback,
 memory, fleet lifecycle and production acceptance remain separate open work.
+
+## Candidate implementation and evidence
+
+Two paired real-model comparisons held the writer fixed while changing the
+actual listing to primary model-card/paper/project extracts. The latter enabled
+more concrete explanation and better license qualifications. This is one
+existing topic, not fresh-round or statistical proof. It supports testing this
+bounded reading extension rather than another writing-prompt replacement.
+
+The candidate reuses the existing supervised Core tool/model capabilities.
+The optional followup chooses a citation group or one public query. A derived
+query needs a current host-owned scope during its canonical durable search;
+model permission fields do not grant it. Source-only query planning and refined
+reading selection exclude owner context and private inquiry text. The normal
+writer may still use separately authorized recipient context.
+
+New installation consent is `--confirm-public-refinement`, in addition to
+approved public reads and cited reads. It is absent by default and included in
+the confirmation summary and protected configuration. Already-started cycles
+do not acquire the new mode. Replay reuses the same query/read decisions and
+does not replenish IO. An unusable optional decision preserves existing evidence;
+it is not a deterministic recipient-message fallback.
+
+Grant validation may take time. The physical worker rechecks its original scope
+immediately before dispatch after validation. A worker retired before IO returns
+only an internal control outcome; the caller rejects it, and it never becomes a
+web response or reading receipt. Pending physical work still holds its lock.
