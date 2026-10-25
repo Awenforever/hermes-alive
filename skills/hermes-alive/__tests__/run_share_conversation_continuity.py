@@ -135,6 +135,48 @@ async def test(home, mode, *, exercise=None, long_reference=False):
         assert shares[0]['submission_status'] == {'false':'error_reported',
             'exception':'submission_unconfirmed'}.get(mode,'success_reported')
         assert not shares[0]['external_delivery_proven']
+        sequence_before_lookup = journal.last_sequence()
+        match = reopened.find_reported_message(scope=scope.binding_document(),
+            clearance=Sensitivity.PRIVATE, message_id='opaque-synthetic')
+        if mode == 'success':
+            assert match['share_id'] == shares[0]['share_id']
+            assert not any(match[k] for k in ('canonical_quote_target_proven',
+                'external_delivery_proven', 'complete_bubble_inventory_proven', 'feedback_authority_granted'))
+        else:
+            assert match is None  # Error returns and uncertain sends never become targets.
+        with patch.object(reopened.vault, 'resolve_json', side_effect=AssertionError('unmatched ID decrypted')):
+            assert reopened.find_reported_message(scope=scope.binding_document(),
+                clearance=Sensitivity.PRIVATE, message_id='a-different-message') is None
+        assert journal.last_sequence() == sequence_before_lookup
+        if mode == 'success':
+            original_get = reopened.journal.get
+            share_record = original_get(shares[0]['share_id'])
+            observation_id = share_record.event.causation_id + ':adapter-observation'
+            observation = original_get(observation_id)
+            forged = replace(observation, event=replace(observation.event,
+                payload={**observation.event.payload, 'reported_message_reference':'changed-without-signature'}))
+            with patch.object(reopened.journal, 'get', side_effect=lambda key: forged if key == observation_id else original_get(key)):
+                with patch.object(reopened.vault, 'resolve_json', side_effect=AssertionError('forged report decrypted')):
+                    assert reopened.find_reported_message(scope=scope.binding_document(),
+                        clearance=Sensitivity.PRIVATE, message_id='opaque-synthetic') is None
+            # Even a duplicated structural candidate must not choose whichever
+            # row happens to be newest or decrypt either candidate.
+            duplicate = replace(share_record, event=replace(share_record.event,
+                event_id=share_record.event.event_id + ':ambiguous'))
+            original_reverse = reopened.journal.iter_reverse
+            def ambiguous_headers(**kwargs):
+                return iter((share_record, duplicate)) if kwargs.get('event_types') == ('conversation.share_prepared',) else original_reverse(**kwargs)
+            with patch.object(reopened.journal, 'iter_reverse', side_effect=ambiguous_headers):
+                with patch.object(reopened.vault, 'resolve_json', side_effect=AssertionError('ambiguous ID decrypted')):
+                    assert reopened.find_reported_message(scope=scope.binding_document(),
+                        clearance=Sensitivity.PRIVATE, message_id='opaque-synthetic') is None
+            with patch.object(reopened.vault, 'resolve_json', side_effect=AssertionError('public lookup decrypted')):
+                assert reopened.find_reported_message(scope=scope.binding_document(),
+                    clearance=Sensitivity.PUBLIC, message_id='opaque-synthetic') is None
+        for invalid in ('', ' spaced ', 'bad\nID', 'x'*513, True):
+            try: reopened.find_reported_message(scope=scope.binding_document(), clearance=Sensitivity.PRIVATE, message_id=invalid)
+            except ValueError: pass
+            else: raise AssertionError('invalid reported message ID accepted')
         assert shares[0]['sources'][0]['url'] == 'https://example.invalid/workshop'
         assert 'bicycles, not cars' in shares[0]['sources'][0]['excerpt']
         assert shares[0]['sources'][0]['reading_status'] == 'retained_excerpt'
@@ -150,6 +192,8 @@ async def test(home, mode, *, exercise=None, long_reference=False):
                 assert not reopened.read(scope=replace(scope,**change).binding_document(), clearance=Sensitivity.PRIVATE)
                 assert reopened.read_reference(scope=replace(scope,**change).binding_document(),
                     clearance=Sensitivity.PRIVATE, share_id=shares[0]['share_id']) is None
+                assert reopened.find_reported_message(scope=replace(scope,**change).binding_document(),
+                    clearance=Sensitivity.PRIVATE, message_id='opaque-synthetic') is None
         # Actual Core hook dispatcher/turn collector gets the persisted body and
         # source. No test-only context string or fake user history is supplied.
         variables = core.set_session_vars(platform='telegram', chat_id=source.chat_id, user_id=source.user_id,
@@ -299,6 +343,8 @@ async def test(home, mode, *, exercise=None, long_reference=False):
         record = journal.read(event_type='conversation.share_prepared')[0]
         future = datetime.now(timezone.utc) + timedelta(days=31)
         assert not reopened.read(scope=scope.binding_document(), clearance=Sensitivity.PRIVATE, now=future)
+        assert reopened.find_reported_message(scope=scope.binding_document(), clearance=Sensitivity.PRIVATE,
+            message_id='opaque-synthetic', now=future) is None
         source_record = journal.get(shares[0]['sources'][0]['event_id'])
         source_id = ContentReference.from_event_payload(source_record.event.payload['content']).content_id
         class Future(datetime):
@@ -341,6 +387,8 @@ async def test(home, mode, *, exercise=None, long_reference=False):
         else:
             store.vault.erase_item(source_id)
         assert not reopened.read(scope=scope.binding_document(), clearance=Sensitivity.PRIVATE)
+        assert reopened.find_reported_message(scope=scope.binding_document(), clearance=Sensitivity.PRIVATE,
+            message_id='opaque-synthetic') is None
         lookup_vars = core.set_session_vars(platform='telegram', chat_id=source.chat_id, user_id=source.user_id,
             session_key=entry.session_key, session_id=entry.session_id)
         try:

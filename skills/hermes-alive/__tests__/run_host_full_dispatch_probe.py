@@ -130,6 +130,12 @@ def main():
         os.environ.pop('HERMES_ALIVE_SHARED_DIR', None)
         os.environ['HERMES_ALIVE_KERNEL_SHADOW_ENABLED'] = 'true'
         sys.path.insert(0, str(args.hermes_root.resolve(strict=True)))
+        # Core imports its cached source-version identity during Gateway startup.
+        # Populate that known read-only Git probe before the stricter effect
+        # guard; the guarded dispatch still cannot spawn arbitrary subprocesses.
+        from hermes_cli import version_info
+        assert Path(version_info.__file__).resolve().parents[1] == args.hermes_root.resolve()
+        version_info.get_version_info()
         sys.addaudithook(forbid_network)
         print(json.dumps(asyncio.run(run())))
     print('HERMES_ALIVE_HOST_FULL_DISPATCH_PROBE_OK')

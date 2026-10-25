@@ -187,7 +187,7 @@ class ShareContinuityStore:
             raise ContinuityUnavailable('share dependency explicitly erased')
         return body
 
-    def _outcome(self, start_id, owner, now):
+    def _adapter_observation(self, start_id, owner, now):
         observation = self.journal.get(start_id + ':adapter-observation')
         if observation is not None:
             event = observation.event
@@ -199,8 +199,12 @@ class ShareContinuityStore:
                     and event.observed_at <= now
                     and event.causation_id == start_id and payload.get('start_event_id') == start_id
                     and self.protector.verify_json('transport.adapter.observation.v1', payload, signature)):
-                return payload['report_kind']
-        return 'submission_unconfirmed'
+                return payload
+        return None
+
+    def _outcome(self, start_id, owner, now):
+        payload = self._adapter_observation(start_id, owner, now)
+        return payload['report_kind'] if payload is not None else 'submission_unconfirmed'
 
     def read(self, *, scope, clearance, limit=4, now=None, include_sources=True):
         """Read under an already-admitted Core turn, never an action permission.
@@ -260,6 +264,50 @@ class ShareContinuityStore:
             return None
         return {'share_id': record.event.event_id, 'prepared_at': record.event.observed_at.isoformat(),
                 'text': body['text'], 'sources': sources, 'source_count': len(body['sources'])}
+
+    def find_reported_message(self, *, scope, clearance, message_id, now=None):
+        """Resolve one exact adapter-reported ID, not the latest share.
+
+        Internal host lookup only: caller must separately authenticate any quote
+        and obtain inbound retention/processing consent before recording feedback.
+        A match does not prove remote delivery, a human reply or all media/bubbles.
+        No raw ID, feedback, event or retention renewal is written here.
+        """
+        if (not isinstance(message_id, str) or not 1 <= len(message_id) <= 512
+                or message_id != message_id.strip()
+                or any(ord(c) < 32 or ord(c) == 127 or 0xD800 <= ord(c) <= 0xDFFF for c in message_id)):
+            raise ValueError('bounded exact adapter message ID required')
+        current = self.outbox._utc(now)
+        document, owner, fingerprint = self._identity(scope)
+        route = {'profile': document['runtime_profile'], 'platform': document['platform'],
+                 'chat_id': document['chat_id'], 'thread_id': document['thread_id'] or None}
+        expected = self.protector.authenticate_json('adapter_report.message_ref.v1',
+            {'route': route, 'message_id': message_id})
+        cutoff = self._erasure_cutoff(owner, current)
+        matches = []
+        for record in self.journal.iter_reverse(event_types=(_EVENT,), subject=owner, max_records=128):
+            if record.sequence <= cutoff:
+                break
+            event = record.event
+            if (event.payload.get('scope_fingerprint') != fingerprint
+                    or not _allowed(event.sensitivity, clearance)):
+                continue
+            observation = self._adapter_observation(event.causation_id, owner, current)
+            if (observation is not None and observation.get('report_kind') == 'success_reported'
+                    and observation.get('reported_message_reference') == expected):
+                matches.append(event.event_id)
+                if len(matches) > 1:
+                    return None  # Ambiguity is resolved before any body decryption.
+        if len(matches) != 1:
+            return None
+        reference = self.read_reference(scope=scope, clearance=clearance,
+            share_id=matches[0], include_sources=False, now=now)
+        if reference is None:
+            return None
+        return {'share_id': reference['share_id'], 'prepared_at': reference['prepared_at'],
+                'match_scope': 'exact_standard_adapter_report_in_bounded_conversation_window',
+                'canonical_quote_target_proven': False, 'external_delivery_proven': False,
+                'complete_bubble_inventory_proven': False, 'feedback_authority_granted': False}
 
     def _sources(self, body, owner, clearance):
         from .discovery_opportunities import DiscoveryOpportunityIngestor

@@ -195,7 +195,9 @@ competing active plans. ADRs remain the record of architectural decisions.
    have joint evidence. Do not repeat that structural control as a fresh quality
    round. Inspect what source-led writing actually conveys and separate limited
    study findings from broad causal or capability claims in main followup.
-2. Test ordinary longitudinal behavior through admitted native interfaces:
+2. Complete attributed feedback through admitted native interfaces. ADR0238 adds
+   an exact read-only adapter-ID lookup candidate; it is not quote confirmation,
+   delivery proof or inbound retention authority. Then test ordinary behavior:
    transient work topics, third-party quotations, later owner corrections, soft
    interests and outside exploration. Attribute feedback to the actual retained
    share and authenticated owner; ambiguity must not become a durable preference.

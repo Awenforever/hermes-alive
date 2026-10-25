@@ -1030,3 +1030,29 @@ mounts and exact retained synthetic evidence. This is not a fresh dependency
 bootstrap, four-device qualification or real-account migration. Useful rounds0/10.
 The living plan's next-work list now replaces stale completed component tasks;
 historical detailed evidence remains in Git/ADRs and the collaboration log.
+
+## 2026-10-26 — Negative composition controls and attributed-reference groundwork
+
+A fixed-writer source-depth control retrieved the same paper HTML, a more detailed
+PDF and the project page through actual Core tools. Two inherited-main model
+outputs stayed numerical digests; the deeper arm accumulated more metrics. A
+separate two-subject/four-call comparison added explicitly invented organization
+examples without changing each subject's evidence. Science became more focused,
+but the robotics account remained inventory-like. Do not adopt those examples,
+raise source budgets or label either experiment a fresh useful pass. Core's
+original HTML extraction was itself abbreviated, not solely our local6k limit.
+
+Next work addresses actual longitudinal feedback rather than another writing
+rule. Current-Core actual Gateway admission and canonical routed-profile metadata
+experiments pass after preloading Core's known read-only version identity before
+the test effect guard. The guard still forbids arbitrary subprocesses/network.
+These are installed fixture observers, not enabled product feedback capture.
+The running/busy lane does not imply that metadata survived to every queued turn.
+
+ADR0238 adds a read-only exact reported-ID locator over authenticated adapter
+observations and retained share scope. It does not infer delivery or pick the
+newest share, enable inbound retention, classify sentiment, collect chat history
+or grant permanent preference authority. Existing one-subject forgetting and
+source-dependency erasure checks remain mandatory. Before integrating feedback,
+prove actual owner/quote corroboration and obtain independent consent for its
+bounded body retention/model use. A reported-ID match alone cannot supply that.

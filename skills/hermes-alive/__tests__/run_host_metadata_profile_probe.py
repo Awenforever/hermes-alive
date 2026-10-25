@@ -120,6 +120,12 @@ def main():
         os.environ['HERMES_BUNDLED_PLUGINS'] = str(root / 'empty-bundled')
         os.environ['HERMES_ALIVE_TEST_METADATA_MODE'] = 'task' if args.task_mode else 'profile-cache'
         sys.path.insert(0, str(args.hermes_root.resolve(strict=True)))
+        # Core imports its cached source-version identity during Gateway startup.
+        # Populate that known read-only Git probe before the stricter effect
+        # guard; the guarded dispatch still cannot spawn arbitrary subprocesses.
+        from hermes_cli import version_info
+        assert Path(version_info.__file__).resolve().parents[1] == args.hermes_root.resolve()
+        version_info.get_version_info()
         sys.addaudithook(forbid_network)
         print(json.dumps(asyncio.run(run(*homes, canonical=args.canonical_mode))))
     print('HERMES_ALIVE_HOST_METADATA_PROFILE_PROBE_OK')
