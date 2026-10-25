@@ -1,0 +1,107 @@
+"""Slow cognition is not an expired physical permit; synthetic review clock/IO."""
+import asyncio,json,sys,tempfile
+from pathlib import Path
+from datetime import datetime,timedelta,timezone
+from dataclasses import replace
+from unittest.mock import patch
+sys.path[:0]=[str(Path(__file__).resolve().parents[1]/'hooks'),str(Path(__file__).resolve().parent)]
+from alive_kernel import ExperienceJournal,DiscoveryCandidate,DiscoveryOpportunityIngestor,PolicyContext,AutonomyPolicyProjection,ActionAuthority,EventEnvelope,Sensitivity
+from alive_kernel.action_delegation import ActionDelegationStore
+from alive_kernel.send_preparation_runtime import SendPreparationRuntime
+from alive_kernel.expression_support import ExpressionSourceSupportReviewer
+from alive_kernel.source_support import SourceSupportReviewer
+from alive_kernel_testkit import install_terminal_route
+from run_discovery_authoring import proposal,response
+
+async def exercise(root,*,historical=False):
+    journal=ExperienceJournal(root/'experience.sqlite3')
+    source=DiscoveryOpportunityIngestor(journal).ingest(DiscoveryCandidate(source='synthetic public',
+        title='Synthetic observation memory',summary='The model can revisit past visual observations.',
+        url='https://example.invalid/visual-memory'),subject='user:test')
+    runtime=SendPreparationRuntime(journal)
+    policy=AutonomyPolicyProjection(journal)
+    policy.apply(policy.append_update(subject='user:test',actor='user:test',expected_revision=0,
+        enabled=True,context=PolicyContext(can_interrupt=True),operation_id='synthetic-policy'))
+    route=install_terminal_route(journal,subject='user:test',content_vault=runtime.vault)
+    grant=ActionDelegationStore(journal).grant(subject='user:test',actor='user:test',
+        policy_event_id=policy.current('user:test').event_id,route_binding_id=route,
+        action_kinds=('share',),maximum_sensitivity=Sensitivity.PRIVATE,
+        expires_at=datetime.now(timezone.utc)+timedelta(hours=1),operation_id='synthetic-grant',allow_natural_expression=True)
+    calls=[]
+    async def call(**kw):
+        task=kw['task'];calls.append(task)
+        data=json.loads(kw['messages'][1]['content']) if task!='alive_deliberation' else None
+        if kw.get('route_info') is not None:kw['route_info']['provider']='synthetic-provider'
+        if task=='alive_opportunity_candidates':
+            return response(proposal(source.agenda_item_id,dict(version=3,recipient_goal='Share the concrete capability.',
+                speech_act='share',contents=[],behavior_constraints=[])))
+        if task=='alive_deliberation':
+            choices=json.loads(kw['messages'][1]['content'].split('\n',1)[1])
+            return response(dict(candidate_id=next(c['candidate_id'] for c in choices
+                if c['candidate_id'].startswith('opportunity-candidate:')),rationale='Synthetic useful choice.'))
+        if task=='alive_semantic_render':return response('The model can revisit past visual observations. [Source](https://example.invalid/visual-memory)')
+        if task=='alive_semantic_review':return response(dict(atom_reviews=[dict(atom_id=a['atom_id'],preserved=True,risks=[])
+            for a in data['meaning']['atoms']],added_claims_detected=False,speech_act_preserved=True,protected_literals_preserved=True))
+        assert task=='alive_source_support'
+        assert ('review_as_of' in data) is not historical
+        return response(dict(verdict='supported',unsupported_claims=[],uncertainties=[],reason='Synthetic source/value assessment.'))
+    expressed=await runtime.expression.run(subject='user:test',operation_id='synthetic-expression',call=call,
+        policy_context=policy.current('user:test').context,authority=ActionAuthority.USER_DELEGATED,
+        recipient_meaning=True,grounding=True,require_independent_grounding=False,
+        resolve_domain=lambda *args:'synthetic-family')
+    selected=journal.get(expressed.planning.selection_event_id)
+    later=selected.event.observed_at+timedelta(minutes=6)
+    origin=expressed.planning.interpretation_event_id.removeprefix('opportunity.synthesis:').removesuffix(':completed')
+    reviewer=ExpressionSourceSupportReviewer(journal,content_vault=runtime.vault)
+    with patch.object(SourceSupportReviewer,'_assessment_now',lambda self:later),patch.object(
+            SourceSupportReviewer,'_review_clock_enabled',lambda self,data:not historical):
+        receipt=await reviewer.run(subject='user:test',interpretation_id=origin,candidate_id=expressed.expression_event_id,
+            operation_id='synthetic-final-value',call=call,resolve_domain=lambda *args:'synthetic-family',require_independence=False)
+    witness=dict(review_event_id=receipt.event_id,interpretation_id=origin,require_independence=False)
+    args=dict(selection_event_id=selected.event.event_id,subject='user:test',capability='hermes.channel.send',
+        route_binding_id=route,delegation_event_id=grant.event.event_id,
+        expression_event_id=expressed.expression_event_id,final_wording_witness=witness)
+    def authorize(name,at=later,**changes):return runtime.authorizer.evaluate(
+        **{**args,'operation_id':name,'now':at,**changes})
+    decision=authorize('synthetic-first')
+    assert decision.authorized is not historical,decision.reasons
+    assert journal.get(selected.event.event_id)==selected,'fresh value review rewrote an old selection'
+    if historical:
+        assert 'selection_stale' in decision.reasons
+    else:
+        assert decision.valid_until==later+timedelta(seconds=30)
+        almost=authorize('synthetic-near-boundary',later+timedelta(minutes=4,seconds=50))
+        assert almost.authorized and almost.valid_until==later+timedelta(minutes=5)
+        expired=authorize('synthetic-first',later+timedelta(seconds=31))
+        assert not expired.authorized and 'permit_expired' in expired.reasons
+        old=authorize('synthetic-old-review',later+timedelta(minutes=5))
+        assert not old.authorized and 'selection_stale' in old.reasons
+        future=authorize('synthetic-future',later-timedelta(seconds=1))
+        assert not future.authorized and 'final_value_assessment_from_future' in future.reasons
+        missing=authorize('synthetic-missing-final',final_wording_witness=None)
+        assert not missing.authorized and 'final_wording_required' in missing.reasons
+        undelegated=authorize('synthetic-no-delegation',delegation_event_id=None)
+        assert not undelegated.authorized and 'user_delegation_unproven' in undelegated.reasons
+        record=journal.get(receipt.event_id);start=journal.get(record.event.causation_id)
+        alias='opportunity.source-support:synthetic-forged-clock'
+        journal.append(replace(start.event,event_id=alias+':started',observed_at=later+timedelta(seconds=1)))
+        journal.append(replace(record.event,event_id=alias+':completed',causation_id=alias+':started',observed_at=later+timedelta(seconds=1)))
+        forged=authorize('synthetic-forged',later+timedelta(seconds=2),final_wording_witness={**witness,'review_event_id':alias+':completed'})
+        assert not forged.authorized and 'final_wording_not_current' in forged.reasons
+        journal.append(EventEnvelope(event_type='conversation.inbound',source='synthetic-fixture',
+            actor='system:alive-configured-input',subject='user:other',payload={'raw_content_stored':False}))
+        assert authorize('synthetic-other-owner').authorized
+        journal.append(EventEnvelope(event_type='conversation.inbound',source='synthetic-fixture',
+            actor='system:alive-configured-input',subject='user:test',payload={'raw_content_stored':False}))
+        changed=authorize('synthetic-new-input')
+        assert not changed.authorized and 'selection_stale' in changed.reasons
+    assert not journal.read(event_type='action.attempted')
+    assert not journal.read(event_type='dispatch.started')
+    assert calls.count('alive_source_support')==1
+
+if __name__=='__main__':
+    with tempfile.TemporaryDirectory(prefix='alive-late-selection-') as d:
+        for historical in (False,True):
+            print('LATE_SELECTION_CASE='+('historical' if historical else 'current-review'),flush=True)
+            asyncio.run(exercise(Path(d)/str(historical),historical=historical))
+    print('HERMES_ALIVE_LATE_SELECTION_CURRENTNESS_OK')

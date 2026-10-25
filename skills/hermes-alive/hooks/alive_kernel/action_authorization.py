@@ -377,6 +377,8 @@ class SendTimeAuthorizer:
         gate_event_id = ""
         sensitivity = Sensitivity.PRIVATE
         candidate = None
+        selection_stale=False
+        current_value_anchor=None
         stored = None
         action_contract_binding: str | None = None
         executable_content_id: str | None = None
@@ -435,8 +437,7 @@ class SendTimeAuthorizer:
                 )
                 if candidate_id not in refreshed.admissible_ids:
                     reasons.append("current_policy_rejected")
-            if current - selection_event.observed_at > self.MAX_SELECTION_AGE:
-                reasons.append("selection_stale")
+            selection_stale=current-selection_event.observed_at>self.MAX_SELECTION_AGE
             if selection_event.observed_at > current:
                 reasons.append("selection_from_future")
 
@@ -598,16 +599,36 @@ class SendTimeAuthorizer:
         if final_wording_witness is not None:
             from .expression_support import ExpressionSourceSupportReviewer
             try:
-                ExpressionSourceSupportReviewer(self.journal,
+                current_value_anchor=ExpressionSourceSupportReviewer(self.journal,
                     content_vault=self.deliberation.content_vault,
                     context_vault=self.context_vault).require_current_witness(final_wording_witness,
                         subject=owner, expression_event_id=expression_event_id,
                         selection_event_id=selection_event_id)
             except ValueError:
                 reasons.append("final_wording_not_current")
+        if current_value_anchor is not None and (current_value_anchor>current or
+                self.journal.get(final_wording_witness['review_event_id']).event.observed_at>current):
+            reasons.append('final_value_assessment_from_future')
+        if selection_stale:
+            # A source/value review made AFTER wording is complete can re-assess
+            # the same intent now. It never renews the old selection or a permit.
+            fresh=(candidate is not None and candidate.authority is ActionAuthority.USER_DELEGATED
+                and capability=='hermes.channel.send' and candidate.action_kind in (ActionKind.SHARE,ActionKind.ASK)
+                and current_value_anchor is not None
+                and selection_record.event.observed_at<=current_value_anchor<=current
+                and current-current_value_anchor<self.MAX_SELECTION_AGE)
+            if fresh:
+                from contextlib import closing
+                with closing(self.journal._connect()) as connection:
+                    fresh=connection.execute('SELECT 1 FROM experience_events WHERE subject=? '
+                        'AND event_type=? AND sequence>? LIMIT 1',
+                        (owner,'conversation.inbound',selection_record.sequence)).fetchone() is None
+            if not fresh:reasons.append('selection_stale')
         reasons = list(dict.fromkeys(reasons))
         authorized = not reasons
         valid_until = current + permit_ttl if authorized else None
+        if authorized and selection_stale:
+            valid_until=min(valid_until,current_value_anchor+self.MAX_SELECTION_AGE)
         payload = {
             "operation_id": operation,
             "selection_event_id": selection_event_id,

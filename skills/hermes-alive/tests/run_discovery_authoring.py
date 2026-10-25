@@ -199,10 +199,11 @@ async def strict_scope(root):
     assert not result.candidates and result.rejected_count==1
 
 
-with tempfile.TemporaryDirectory(prefix='alive-discovery-author-') as directory:
-    for mode in ('supported','unsupported','recovery','proposal-recovery','no-grounding','source-withdrawn'):
-        root=Path(directory)/mode;root.mkdir();asyncio.run(exercise(root,mode))
-    for mode in ('supported','recovery','proposal-recovery'):
-        root=Path(directory)/('historical-'+mode);root.mkdir();asyncio.run(exercise(root,mode,historical=True))
-    root=Path(directory)/'strict';root.mkdir();asyncio.run(strict_scope(root))
-print('HERMES_ALIVE_DISCOVERY_AUTHORING_OK')
+if __name__=='__main__':
+    with tempfile.TemporaryDirectory(prefix='alive-discovery-author-') as directory:
+        for mode in ('supported','unsupported','recovery','proposal-recovery','no-grounding','source-withdrawn'):
+            root=Path(directory)/mode;root.mkdir();asyncio.run(exercise(root,mode))
+        for mode in ('supported','recovery','proposal-recovery'):
+            root=Path(directory)/('historical-'+mode);root.mkdir();asyncio.run(exercise(root,mode,historical=True))
+        root=Path(directory)/'strict';root.mkdir();asyncio.run(strict_scope(root))
+    print('HERMES_ALIVE_DISCOVERY_AUTHORING_OK')

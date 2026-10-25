@@ -4,6 +4,19 @@ Status: active
 
 Last reviewed: 2026-10-24
 
+Actual slow-cognition failure (2026-10-24; ADR0224): the VISTA public regression
+completed nine logical auxiliary calls, including a correction, then the real
+native host denied the prepared message solely as selection_stale. Its five-minute
+selection clock had included composition/repair latency. No physical attempt or
+main followup occurred. The proposed fix keeps that default bound and short send
+permits, while explicitly clocking the final source/value assessment after actual
+wording. Only a current supported review, unchanged owner inputs and all original
+source/policy/delegation/route checks can qualify an older delegated discovery
+selection. Old records are not promoted and old permits never renewed. Windows
+initial clock regression passes; final qualification is in progress. Source/style
+quality is still not passed. Prior r57 is terminal PASS97 portable /17 actual Core;
+those results do not qualify this new authorization change.
+
 Ordinary-input wiring (2026-10-24; ADR0223): the configured native engine now
 observes current Core-admitted target input independently of the legacy shadow
 environment switch. It resolves the actual profile/receiver/conversation and

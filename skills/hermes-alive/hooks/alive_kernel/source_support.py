@@ -5,6 +5,7 @@ import hashlib
 import json
 import math
 import re
+from datetime import datetime,timezone
 
 from .content_vault import ContentReference
 from .events import EventEnvelope, Sensitivity, _thaw_json
@@ -99,6 +100,24 @@ class SourceSupportReviewer:
     # visible continuations. Keep exact-completion admission and the same stage
     # deadline/call count; use the existing worker ceiling, not a model exception.
     max_tokens = 8192
+    REVIEW_CLOCK = 'review-start-v1'
+
+    def _assessment_now(self):
+        return datetime.now(timezone.utc)
+
+    def _review_clock_enabled(self,snapshot):
+        return snapshot.get('assessment_scope',{}).get('kind')=='final_discovery_source_and_value'
+
+    def _assessment_request(self,snapshot,as_of=None):
+        prompt=self.prompt_for_snapshot(snapshot)
+        if as_of is None:return prompt,snapshot
+        if (snapshot.get('assessment_scope',{}).get('kind')!='final_discovery_source_and_value'
+                or not isinstance(as_of,datetime) or as_of.tzinfo is None or as_of.utcoffset() is None):
+            raise SourceSupportError('current value assessment needs its trusted review clock')
+        prompt+=('\nreview_as_of is the host clock for THIS assessment. Earlier interpretation '
+            'timestamps are provenance, not the current date. Assess the exact message and its '
+            'recipient value at review_as_of; a past decision alone does not establish current value.')
+        return prompt,{**snapshot,'review_as_of':as_of.astimezone(timezone.utc).isoformat()}
 
     @property
     def review_prompt(self):
@@ -147,6 +166,11 @@ class SourceSupportReviewer:
             data, generated = self.snapshot(subject=subject, interpretation_id=interpretation_id,
                                             candidate_id=candidate_id, clearance=clearance)
             payload = record.event.payload
+            has_clock='assessment_clock' in payload or 'assessment_clock' in start.event.payload
+            if has_clock and (payload.get('assessment_clock')!=self.REVIEW_CLOCK
+                    or start.event.payload.get('assessment_clock')!=self.REVIEW_CLOCK
+                    or record.event.observed_at<start.event.observed_at):return None
+            expected_prompt,_=self._assessment_request(data,start.event.observed_at if has_clock else None)
             independent = bool(payload['reviewer_domain'] != payload['generator_domain']
                                and payload['reviewer_model'] != payload['generator_model'])
             required = payload.get('require_independence', True)
@@ -159,7 +183,7 @@ class SourceSupportReviewer:
                     or payload['generator_model'] != generated.actual_model
                     or payload['snapshot_digest'] != start.event.payload['snapshot_digest']
                     or payload['prompt_digest'] != start.event.payload['prompt_digest']
-                    or payload['prompt_digest'] != hashlib.sha256(self.prompt_for_snapshot(data).encode()).hexdigest()
+                    or payload['prompt_digest'] != hashlib.sha256(expected_prompt.encode()).hexdigest()
                     or self.vault.digest_json(data) != payload['snapshot_digest']
                     or not payload['reviewer_domain'] or not payload['generator_domain']
                     or payload['delivery_authority_granted'] or payload['world_truth_proven']):
@@ -169,6 +193,7 @@ class SourceSupportReviewer:
                 expected_purpose='opportunity.source-support', expected_sensitivity=Sensitivity(clearance))
             if self.vault.digest_json(retained) != ref.digest or retained['snapshot'] != data:
                 return None
+            if has_clock and retained.get('review_as_of')!=start.event.observed_at.isoformat():return None
             findings = self.validate_stored_findings(retained['findings'], data)
             if findings['verdict'] != payload['verdict']:
                 return None
@@ -313,7 +338,9 @@ class SourceSupportReviewer:
         if not generator_domain:
             raise SourceSupportError('generator independence domain is unknown')
         digest = self.vault.digest_json(snapshot)
-        review_prompt = self.prompt_for_snapshot(snapshot)
+        review_as_of=self._assessment_now().astimezone(timezone.utc) if self._review_clock_enabled(snapshot) else None
+        review_prompt,request=self._assessment_request(snapshot,review_as_of)
+        clock_fields={'assessment_clock':self.REVIEW_CLOCK} if review_as_of is not None else {}
         prompt_digest = hashlib.sha256(review_prompt.encode()).hexdigest()
         prefix = 'opportunity.source-support:' + operation_id
         if self.journal.get(prefix + ':started') is not None:
@@ -322,28 +349,29 @@ class SourceSupportReviewer:
                     subject=subject, sensitivity=Sensitivity(clearance))
         started = self.journal.append(EventEnvelope(event_id=prefix+':started',
             event_type='opportunity.source_support_started', causation_id=generated.receipt_event_id,
-            payload={'snapshot_digest':digest,'candidate_id':candidate_id,
+            payload={'snapshot_digest':digest,'candidate_id':candidate_id,**clock_fields,
                      'prompt_digest':prompt_digest,
                      'require_independence':require_independence,
                      'timeout_seconds':timeout_seconds,
                      'deadline_policy':'shared-stage-v1',
                      'completion_token_allowance':self.max_tokens,
                      'protocol_recovery_enabled':protocol_recovery,
-                     'generator_model':generated.actual_model,'delivery_authority_granted':False}, **base))
+                     'generator_model':generated.actual_model,'delivery_authority_granted':False},
+            **(dict(observed_at=review_as_of,occurred_at=review_as_of) if review_as_of is not None else {}),**base))
         if not started.created:
             raise SourceSupportError('source-support operation already attempted')
         deadline = asyncio.get_running_loop().time() + timeout_seconds
         try:
             bundle = ContentReference.from_event_payload(self.journal.get(generated.receipt_event_id).event.payload['content'])
             messages = [{'role':'system','content':review_prompt},{'role':'user',
-                         'content':json.dumps(snapshot, ensure_ascii=False)}]
+                         'content':json.dumps(request, ensure_ascii=False)}]
             recovered = False
             for attempt in range(2 if protocol_recovery else 1):
                 current, result = self.snapshot(subject=subject, interpretation_id=interpretation_id,
                     candidate_id=candidate_id, clearance=clearance)
                 if (self.vault.digest_json(current)!=digest or result!=generated
                         or resolve_domain(generated.actual_model)!=generator_domain
-                        or self.prompt_for_snapshot(current)!=review_prompt):
+                        or self._assessment_request(current,review_as_of)[0]!=review_prompt):
                     raise SourceSupportError('source-review context changed before inference')
                 if recovered:
                     invalid = self.vault.resolve_json(invalid_ref.content_id, expected_subject=subject,
@@ -362,7 +390,7 @@ class SourceSupportReviewer:
                                                  candidate_id=candidate_id, clearance=clearance)
                 if (self.vault.digest_json(current)!=digest or result!=generated
                         or resolve_domain(generated.actual_model)!=generator_domain
-                        or hashlib.sha256(self.prompt_for_snapshot(current).encode()).hexdigest()!=prompt_digest):
+                        or hashlib.sha256(self._assessment_request(current,review_as_of)[0].encode()).hexdigest()!=prompt_digest):
                     raise SourceSupportError('source-review context changed during model wait')
                 text, model, provider = SemanticComparator._response(response, route)
                 domain = resolve_domain(model)
@@ -389,23 +417,27 @@ class SourceSupportReviewer:
                         raise SourceSupportError('source-review recovery already attempted')
                     # Fresh evidence is reconsidered; never mutate an invalid verdict in code.
                     messages = [{'role':'system','content':review_prompt + '\n' + PROTOCOL_RECOVERY_PROMPT},
-                        {'role':'user','content':json.dumps({'original_evidence':snapshot,
+                        {'role':'user','content':json.dumps({'original_evidence':request,
                             'invalid_review':text}, ensure_ascii=False)}]
                     recovered = True
                     continue
                 break
-            ref = self.vault.put_json({'snapshot':snapshot,'findings':findings,'raw_review':text}, subject=subject,
+            ref = self.vault.put_json({'snapshot':snapshot,'findings':findings,'raw_review':text,
+                **({'review_as_of':review_as_of.isoformat()} if review_as_of is not None else {})}, subject=subject,
                 purpose='opportunity.source-support', sensitivity=Sensitivity(clearance),
                 retention_until=bundle.retention_until, content_id=prefix)
+            completed_at=self._assessment_now().astimezone(timezone.utc) if review_as_of is not None else None
             record = self.journal.append(EventEnvelope(event_id=prefix+':completed',
                 event_type='opportunity.source_support_completed', causation_id=prefix+':started',
-                payload={'snapshot_digest':digest,'candidate_id':candidate_id,'verdict':findings['verdict'],
+                payload={'snapshot_digest':digest,'candidate_id':candidate_id,'verdict':findings['verdict'],**clock_fields,
                     'prompt_digest':prompt_digest,
                     'generator_model':generated.actual_model,'reviewer_model':model,'reviewer_provider':provider,
                     'generator_domain':generator_domain,'reviewer_domain':domain,'content':ref.to_event_payload(),
                     'require_independence':require_independence,'independent_review':independent,
                     'protocol_recovered':recovered,
-                    'world_truth_proven':False,'delivery_authority_granted':False}, **base))
+                    'world_truth_proven':False,'delivery_authority_granted':False},
+                **(dict(observed_at=completed_at,occurred_at=completed_at)
+                   if review_as_of is not None else {}),**base))
             return SourceSupportReceipt(record.event.event_id, findings['verdict'], model, digest, independent)
         except BaseException as exc:
             self.journal.append(EventEnvelope(event_id=prefix+':failed',

@@ -187,6 +187,11 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
         if (findings is None or findings['verdict'] != 'supported' or record is None
                 or record.event.payload.get('require_independence') != witness['require_independence']):
             raise SourceSupportError('final wording is no longer supported')
+        if record.event.payload.get('assessment_clock')==self.REVIEW_CLOCK:
+            start=self.journal.get(record.event.causation_id)
+            if start is None or start.event.observed_at<header.event.observed_at:
+                raise SourceSupportError('final value review predates the actual expression')
+            return start.event.observed_at
 
     def snapshot(self, *, subject, interpretation_id, candidate_id,
                  clearance=Sensitivity.PRIVATE):
