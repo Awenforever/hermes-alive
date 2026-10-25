@@ -78,7 +78,8 @@ class ReconsiderationStore:
                 # memory, feedback and unknown events still wake the owner.
                 ignored+=('discovery.host_read_started','discovery.host_read_completed',
                     'discovery.research_cycle_opened','discovery.citation_selection_opened',
-                    'discovery.research_group_opened','discovery.reading_assessment_opened')
+                    'discovery.research_group_opened','discovery.reading_assessment_opened',
+                    'discovery.public_refinement_opened','discovery.search_views_opened')
             frontier = connection.execute('SELECT MAX(sequence) FROM experience_events WHERE subject=? AND event_type NOT IN ('+
                 ','.join('?' for _ in ignored)+')',(subject,*ignored)).fetchone()[0]
             allowed = tuple(s.value for s in Sensitivity)[:tuple(Sensitivity).index(clearance)+1]

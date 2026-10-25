@@ -265,15 +265,17 @@ async def test(home):
         core.reset_hermes_home_override(token)
 
 
-async def test_native_wait(home):
+async def test_native_wait(home,*,refinement=False):
     """Exercise the REAL installed Core wrapper, not a directly injected preparer."""
     home.mkdir()
     shutil.copytree(core.repo,home/'plugins/hermes-alive')
     (home/'config.yaml').write_text(json.dumps({'plugins':{'enabled':['hermes-alive']},
         'model':{'provider':'auto','default':'synthetic-model'}}))
-    rc,staged=cli(home,'setup','--confirm-model-calls','--confirm-delivery',
+    setup_args=['setup','--confirm-model-calls','--confirm-delivery',
         '--confirm-outbound-retention','--public-query','synthetic public observation','--confirm-public-reads',
-        '--confirm-hermes-profile-memory')
+        '--confirm-hermes-profile-memory']
+    if refinement:setup_args+=['--confirm-cited-reads','--confirm-public-refinement']
+    rc,staged=cli(home,*setup_args)
     assert rc==0
     assert cli(home,'install-runtime','--engine','kernel')[0]==0
     token=core.set_hermes_home_override(home);manager=None
@@ -377,6 +379,7 @@ if __name__=='__main__':
         try:
             asyncio.run(test(Path(directory)/'profile'))
             asyncio.run(test_native_wait(Path(directory)/'native-wait-profile'))
+            asyncio.run(test_native_wait(Path(directory)/'refinement-wait-profile',refinement=True))
         finally:
             from hermes_state_registry import close_all_under
             close_all_under(directory)

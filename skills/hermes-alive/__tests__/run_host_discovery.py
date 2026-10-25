@@ -164,6 +164,49 @@ async def exercise(root):
     assert read_scope_metadata({'source':'hermes.web.extract','attributes':{
         'read_scope':'webpage_extract','content_representation':'future-provider-format'}})[
             'reported_content_representation']=='unspecified'
+    # Search snippets are query-dependent views. A second query must not revoke
+    # the first query's reading task merely because it describes the same URL
+    # differently. Actual changes within the SAME query still supersede it.
+    views={'PUBLIC_VIEW_A':'First query view.','PUBLIC_VIEW_B':'Different query view.'}
+    view_calls=[]
+    async def view_search(query,*,limit):
+        view_calls.append(query)
+        return json.dumps({'success':True,'data':{'web':[{'url':'https://example.invalid/views',
+            'title':'One original article','description':views[query]},
+            {'url':'https://example.invalid/views?utm_source=duplicate','title':'Duplicate result',
+             'description':'A second snippet in the same result batch is not another page revision.'}]}})
+    scoped=HostDiscoveryReader(ingestor,subject='user:test',search=view_search,extract=extract,
+        allow_url=allow_synthetic_url,is_current=lambda:True,scope_search_views=True)
+    first=await scoped.collect(operation_id='view-a',queries=('PUBLIC_VIEW_A',))
+    second=await scoped.collect(operation_id='view-b',queries=('PUBLIC_VIEW_B',))
+    assert len(first.observation_ids)==len(second.observation_ids)==1
+    both=(*first.observation_ids,*second.observation_ids)
+    assert len(ingestor.active_evidence(subject='user:test',clearance=Sensitivity.PRIVATE,
+        observation_event_ids=both,limit=32))==2
+    assert await scoped.collect(operation_id='view-a',queries=('PUBLIC_VIEW_A',))==first
+    assert len(view_calls)==2
+    views['PUBLIC_VIEW_A']='A material update within the first query view.'
+    changed=await scoped.collect(operation_id='view-a-updated',queries=('PUBLIC_VIEW_A',))
+    assert changed.observation_ids!=first.observation_ids
+    assert not ingestor.active_evidence(subject='user:test',clearance=Sensitivity.PRIVATE,
+        observation_event_ids=first.observation_ids,limit=32)
+    assert ingestor.active_evidence(subject='user:test',clearance=Sensitivity.PRIVATE,
+        observation_event_ids=second.observation_ids,limit=32)
+    before=len(view_calls)
+    try:await scoped.collect(operation_id='view-a',queries=('PUBLIC_VIEW_A',))
+    except HostDiscoveryError:pass
+    else:raise AssertionError('real material change was ignored on scoped replay')
+    assert len(view_calls)==before
+    retained=journal.get(second.observation_ids[0]).event.payload['content']
+    ingestor.vault.erase_item(retained['content_id'])
+    assert not ingestor.active_evidence(subject='user:test',clearance=Sensitivity.PRIVATE,
+        observation_event_ids=second.observation_ids,limit=32)
+    try:await scoped.collect(operation_id='view-b',queries=('PUBLIC_VIEW_B',))
+    except HostDiscoveryError:pass
+    else:raise AssertionError('query-scoped evidence bypassed erasure')
+    try:await scoped.collect(operation_id='first',**parameters)
+    except HostDiscoveryError:pass
+    else:raise AssertionError('a started legacy receipt was reinterpreted under new identity semantics')
     for path in root.glob('experience.sqlite3*'):
         data=path.read_bytes()
         assert b'PRIVATE_QUERY' not in data and b'PRIVATE_PAGE_FACT' not in data

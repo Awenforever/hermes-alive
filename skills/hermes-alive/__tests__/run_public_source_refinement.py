@@ -16,8 +16,9 @@ from alive_kernel import (ExperienceJournal, DiscoveryOpportunityIngestor, Event
     MemoryProjection, MemoryProposal, MemoryKind, MemoryAuthority, Sensitivity)
 from alive_kernel.configured_discovery_cycle import ConfiguredDiscoveryCycle
 from alive_kernel.core_discovery_tools import CoreDiscoveryTools
-from alive_kernel.host_discovery import HostDiscoveryError
+from alive_kernel.host_discovery import HostDiscoveryError, HostDiscoveryReader
 from alive_kernel.kernel_setup import validate_options, KernelSetupError
+from alive_kernel.research_evidence import resolve_research_reads
 from alive_kernel import public_source_refinement as selection
 
 
@@ -72,13 +73,20 @@ async def exercise(root,mode):
                 entered.set();assert release.wait(10),'fixture did not release public query worker'
             if args['query']=='public original project' and mode=='search-failed':
                 return {'success':False,'error':'synthetic public search unavailable'}
+            if args['query']=='public original project' and mode in ('overlap','only-overlap'):
+                items=[dict(url=seed,title='Public method',description='A different query gives another excerpt of the SAME source.')]
+                if mode=='overlap':
+                    items.append(dict(url=seed+'?utm_source=duplicate',title='Duplicate result',description='Another snippet in the SAME result batch.'))
+                    items.append(dict(url=original,title='Original method',description='Original supporting evidence.'))
+                return {'success':True,'data':{'web':items}}
             url=seed if args['query']=='public seed' else original
             return {'success':True,'data':{'web':[dict(url=url,title='Public method',
                 description='A public account names a method whose original evidence is worth reading.')]}}
         assert name=='web_extract' and args['urls'] in ([seed],[original])
         url=args['urls'][0]
         if url==original and mode=='refined-page-failed':return {'results':[dict(url=url,error='unavailable')]}
-        if url==seed and mode!='cited':return {'results':[dict(url=url,error='unavailable')]}
+        if url==seed and mode not in ('cited','overlap','only-overlap'):
+            return {'results':[dict(url=url,error='unavailable')]}
         content=('PUBLIC_PRIMARY_BODY: The method compares two observation conditions.' if url==original else
                  'Public material. [Original]('+original+')')
         return {'results':[dict(url=url,title='Public observations',content=content)]}
@@ -93,7 +101,14 @@ async def exercise(root,mode):
     cycle=NS(operation_id='synthetic-source-refinement')
     parameters={'expression_parameters':{'model_timeout_seconds':30}}
     binding=lambda:'synthetic-current-owner'
+    if mode=='legacy-search':
+        legacy_tools=CoreDiscoveryTools(context,read_binding=binding,approved_queries=('public seed',))
+        legacy=HostDiscoveryReader(ingestor,subject='user:test',search=legacy_tools.search,
+            extract=legacy_tools.extract,allow_url=legacy_tools.allow_url,is_current=lambda:True)
+        await legacy.collect(operation_id=cycle.operation_id+':search',queries=('public seed',))
+        legacy_tools.close()
     observed=await preparation.observe(cycle=cycle,parameters=parameters,read_binding=binding)
+    assert observed.reader.scope_search_views is (mode!='legacy-search')
     if mode=='old-cycle':
         preparation.close();preparation=make(True)
         observed=await preparation.observe(cycle=cycle,parameters=parameters,read_binding=binding)
@@ -156,7 +171,7 @@ async def exercise(root,mode):
         assert not preparation.pending
         return
     assert mode not in ('revoked','erased')
-    if mode in ('off','old-cycle'):
+    if mode in ('off','old-cycle','legacy-search'):
         assert len(network)==2 and len(models)==1
     elif mode=='malformed':
         assert len(network)==2 and len(models)==2
@@ -169,15 +184,40 @@ async def exercise(root,mode):
     elif mode=='refined-page-failed':
         assert len(network)==4 and len(models)==3
         assert not result['expression_parameters'].get('research_read_receipt_ids')
+    elif mode=='only-overlap':
+        assert len(network)==3 and len(models)==2
+        assert len(result['expression_parameters']['research_read_receipt_ids'])==1
+        assert tuple(ingestor.active_evidence(subject='user:test',clearance=Sensitivity.PRIVATE,
+            observation_event_ids=observed.found.observation_ids,limit=32))==observed.evidence
+        before=list(network)
+        async def forbidden(**kw):raise AssertionError('overlapping-result replay repeated inference')
+        assert await preparation.reason(observed,cycle=cycle,parameters=parameters,call=forbidden,read_binding=binding)==result
+        assert network==before
     else:
         assert len(network)==4 and len(models)==3
-        assert len(result['expression_parameters']['research_read_receipt_ids'])==1
+        assert len(result['expression_parameters']['research_read_receipt_ids'])==(2 if mode=='overlap' else 1)
         assert any('PUBLIC_PRIMARY_BODY' in e.content['summary'] for e in ingestor.active_evidence(
             subject='user:test',clearance=Sensitivity.PRIVATE,limit=32))
         before=list(network)
         async def forbidden(**kw):raise AssertionError('replay repeated model inference')
         repeated=await preparation.reason(observed,cycle=cycle,parameters=parameters,call=forbidden,read_binding=binding)
         assert repeated==result and network==before
+    receipts=result['expression_parameters'].get('research_read_receipt_ids',())
+    if receipts:
+        inquiries=preparation.inquiries.read(subject='user:test',clearance=Sensitivity.PRIVATE,
+            item_ids=result['expression_parameters']['inquiry_item_ids'])
+        material=resolve_research_reads(ingestor,subject='user:test',clearance=Sensitivity.PRIVATE,
+            receipt_ids=receipts,inquiries=inquiries)
+        assert len(material)==len(receipts)
+    if mode in ('overlap','only-overlap'):
+        before=list(network)
+        preparation.close()
+        preparation=make(True)
+        restored=await preparation.observe(cycle=cycle,parameters=parameters,read_binding=binding)
+        async def forbidden_cold(**kw):raise AssertionError('cold research recovery repeated inference')
+        assert await preparation.reason(restored,cycle=cycle,parameters=parameters,
+            call=forbidden_cold,read_binding=binding)==result
+        assert network==before,'cold research recovery replenished query/read budget'
     try:await preparation.tools.search('public original project',limit=1)
     except HostDiscoveryError:pass
     else:raise AssertionError('additional query grant survived its single canonical search')
@@ -202,7 +242,7 @@ async def allow_synthetic_url(self,url):
 contracts()
 with tempfile.TemporaryDirectory(prefix='alive-public-refinement-') as folder:
     parent=Path(folder)
-    for mode in ('off','old-cycle','on','cited','malformed','revoked','erased','search-failed','refined-page-failed','uncertain-search'):
+    for mode in ('off','old-cycle','legacy-search','on','overlap','only-overlap','cited','malformed','revoked','erased','search-failed','refined-page-failed','uncertain-search'):
         home=parent/mode
         with patch.dict(sys.modules,hermes_constants=NS(get_hermes_home=lambda:home)):
             with patch.object(CoreDiscoveryTools,'allow_url',allow_synthetic_url):

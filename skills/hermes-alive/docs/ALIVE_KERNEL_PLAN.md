@@ -104,6 +104,13 @@ competing active plans. ADRs remain the record of architectural decisions.
 ## Next work in order
 
 1. Continue content understanding and bounded final assessment (ADR0228/0229/0230).
+   The r79 archaeology run exposed a concrete identity failure before composition:
+   a second query's different snippet for the same URL replaced the listing
+   supporting its own reading question. [ADR0232](adr/0232-query-dependent-search-evidence-identity.md)
+   separates query views without weakening genuine changes, deletion or expiry.
+   Its candidate requires structural and actual-source regression before another
+   quality claim. Natural consecutive-dialogue proof remains pending because
+   this run stopped before either main turn.
    r76's complete98 portable suites pass. A new science sample is substantially
    more understandable, but the interesting relationship still needs to come
    through without a forced benefits/opinion paragraph. A fresh technical share

@@ -384,6 +384,8 @@ class ConfiguredDiscoveryCycle:
         assessment_enabled=self.record_reading_assessment and group_enabled and self._cycle_mode(cycle,
             prefix='discovery.reading-assessment:',kind='discovery.reading_assessment_opened',
             payload=dict(method='inquiry-reading-assessment-v1',authority_granted=False))
+        scoped_search_views=self._cycle_mode(cycle,prefix='discovery.search-views:',
+            kind='discovery.search_views_opened',payload=dict(method='public-query-view-v1',authority_granted=False))
         if self.tools is not None:self.tools.close()
         def allow_refinement_query(query):
             current()
@@ -395,7 +397,8 @@ class ConfiguredDiscoveryCycle:
         self.tools=CoreDiscoveryTools(self.context,read_binding=current,approved_queries=self.queries,
             **({'query_validator':allow_refinement_query} if public_refinement else {}))
         reader=HostDiscoveryReader(self.ingestor,subject=self.subject,search=self.tools.search,
-            extract=self.tools.extract,allow_url=self.tools.allow_url,is_current=lambda:current()==expected)
+            extract=self.tools.extract,allow_url=self.tools.allow_url,is_current=lambda:current()==expected,
+            scope_search_views=scoped_search_views)
         found=await reader.collect(operation_id=cycle.operation_id+':search',queries=self.queries)
         evidence=(self.ingestor.active_evidence(subject=self.subject,clearance=Sensitivity.PRIVATE,
             limit=32,observation_event_ids=found.observation_ids) if found.observation_ids else ())
@@ -406,7 +409,8 @@ class ConfiguredDiscoveryCycle:
             subject=self.subject,queries=list(self.queries),
             observations=sorted(found.observation_ids),research_enabled=research_enabled,
             citation_references=citation_references,group_enabled=group_enabled,
-            assessment_enabled=assessment_enabled,**({'public_refinement':True} if public_refinement else {})))
+            assessment_enabled=assessment_enabled,**({'public_refinement':True} if public_refinement else {}),
+            **({'scoped_search_views':True} if scoped_search_views else {})))
             if found.failures==0 else None)
         result=_DiscoveryObservation(cycle.operation_id,expected,found,tuple(evidence),reader,current,
             research_enabled,citation_references,public_refinement,group_enabled,assessment_enabled,fingerprint)
@@ -578,6 +582,9 @@ class ConfiguredDiscoveryCycle:
                 if ({e.observation_event_id for e in listings}!=set(refined.observation_ids)
                         or any(read_scope_metadata(e.content).get('reported_read_scope')!='search_listing' for e in listings)):
                     raise HostDiscoveryError('refined search is not current public listing evidence')
+                from .discovery_opportunities import canonicalize_discovery_url
+                visited={canonicalize_discovery_url(e.content['url']) for e in selected}
+                listings=tuple(e for e in listings if canonicalize_discovery_url(e.content['url']) not in visited)
                 if listings:
                     next_read,_,_=await self._select(operation_id=cycle.operation_id+':refined-reading',
                         evidence=listings,search_receipt_id=refined.receipt_id,parameters=parameters,

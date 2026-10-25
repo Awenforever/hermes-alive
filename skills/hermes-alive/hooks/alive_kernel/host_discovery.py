@@ -10,7 +10,7 @@ from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit
 
-from .discovery_opportunities import DiscoveryCandidate
+from .discovery_opportunities import DiscoveryCandidate, canonicalize_discovery_url
 from .events import EventEnvelope, Sensitivity
 from .native_worker_protocol import identifier
 from .model_json import parse_model_json
@@ -73,12 +73,15 @@ class HostDiscoveryReader:
     also retires this instance. An incomplete durable operation is not retried.
     """
     def __init__(self, ingestor, *, subject, search, extract, allow_url, is_current,
-                 context_vault=None):
+                 context_vault=None, scope_search_views=False):
         self.subject=identifier(subject)
         if not all(callable(f) for f in (search,extract,allow_url,is_current)):
             raise HostDiscoveryError('explicit host read capabilities required')
+        if type(scope_search_views) is not bool:
+            raise HostDiscoveryError('explicit public search-view identity required')
         self.ingestor=ingestor
         self.context_vault=context_vault
+        self.scope_search_views=scope_search_views
         self.search,self.extract,self.allow_url,self.is_current=search,extract,allow_url,is_current
         self._busy=False
         self._uncertain=False
@@ -97,7 +100,7 @@ class HostDiscoveryReader:
         if not isinstance(value,dict): raise HostDiscoveryError('invalid host read output')
         return value
 
-    async def _admit(self, item, *, kind, observed, expected_url=None):
+    async def _admit(self, item, *, kind, observed, expected_url=None, search_query=None):
         if not isinstance(item,dict): raise HostDiscoveryError('invalid source observation')
         url=item.get('url')
         title=item.get('title')
@@ -120,9 +123,17 @@ class HostDiscoveryReader:
         self._current()
         # Distinct evidence scopes cannot overwrite one another on later fetches:
         # a new listing is not a retraction/replacement of a prior original read.
+        # Different queries can describe the same page differently without a
+        # material change to the page. Keep those search views separate too.
+        view={}
+        if kind=='search' and self.scope_search_views:
+            if not isinstance(search_query,str) or not search_query.strip():
+                raise HostDiscoveryError('public search view lacks its owning query')
+            view['external_id']='query-view:'+self.ingestor.vault.digest_json(dict(
+                query=search_query,url=canonicalize_discovery_url(url)))
         try:
             candidate=DiscoveryCandidate(source='hermes.web.'+kind,title=title,url=url,
-                summary=content,observed_at=observed,published_at=None,
+                summary=content,observed_at=observed,published_at=None,**view,
                 attributes=dict(read_scope='search_listing' if kind=='search' else 'webpage_extract',
                     publication_date_unresolved=True,independently_verified=False,
                     video_watched=False,page_may_contain_navigation=kind=='extract',
@@ -152,6 +163,7 @@ class HostDiscoveryReader:
             raise HostDiscoveryError('owned host read is busy or uncertain')
         self._current()
         request=dict(queries=list(queries),read_urls=list(read_urls),limit=limit)
+        if queries and self.scope_search_views:request['search_view_identity']='query-v1'
         from .discovery_inquiry import DiscoveryInquiryContext
         inquiry_context = DiscoveryInquiryContext(self.ingestor,context_vault=self.context_vault)
         inquiries = inquiry_context.read(subject=self.subject, clearance=Sensitivity.PRIVATE,
@@ -238,12 +250,20 @@ class HostDiscoveryReader:
                         self._current(); check_inquiries(); failures+=1
                         outcomes.append((kind,index,'read_failed')); continue
                     before_failures=failures
+                    seen_search_urls=set()
                     for item in items:
                         if kind=='extract' and (not isinstance(item,dict) or item.get('error')):
                             failures+=1; continue
                         try:
+                            view_url=None
+                            if kind=='search' and self.scope_search_views and isinstance(item,dict):
+                                try:view_url=canonicalize_discovery_url(item.get('url'))
+                                except ValueError:pass  # _admit reports malformed items normally.
+                                if view_url and view_url in seen_search_urls:continue
                             observations.append(await self._admit(item,kind=kind,observed=datetime.now(timezone.utc),
-                                expected_url=value if kind=='extract' else None))
+                                expected_url=value if kind=='extract' else None,
+                                search_query=value if kind=='search' else None))
+                            if view_url:seen_search_urls.add(view_url)
                         except HostDiscoveryError:
                             self._current(); failures+=1
                     outcomes.append((kind,index,'partial_or_refused' if failures>before_failures
