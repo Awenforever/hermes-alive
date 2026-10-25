@@ -966,3 +966,13 @@ into old inputs, count this as a fresh useful round, or add topic-specific wordi
 filters. Evaluate concrete empirical additions separately from faithful explanation
 and clearly bounded inference. This avoids training the product back into sterile
 summary or mandatory disclaimers. General followup quality remains unqualified.
+
+## 2026-10-26 — One responsibility for source-fact judgment
+
+Actual fresh content exposed contradictory source-aware verdicts, not a missing
+source contract. Do not guess that the negative was false, relabel its historical
+receipt, or paper over it with another reviewer. ADR0237 assigns required meaning
+boundaries and source/value judgment to separate scopes. New signed boundary
+receipts explicitly do not certify factual additions. Final source evidence is
+still mandatory and owns concrete negative findings and the bounded correction.
+Qualification is pending; production remains untouched and useful rounds0/10.

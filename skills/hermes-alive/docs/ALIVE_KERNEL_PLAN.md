@@ -28,6 +28,14 @@ model/provider or network changes are authorized by this development plan.
 
 ## Latest qualified slices
 
+Candidate in progress (ADR0237): assign required meaning/literal/speech-act
+boundaries and final source/value judgment to separate scopes. A real source-aware
+review disagreement was withheld safely but had no concrete offending claim. New
+receipts must not turn a boundary check into factual certification; final-source
+proof remains mandatory. r99 five focused suites and a same-topic actual-model scope regression pass;
+new source-correction/cold recovery and full regression remain pending.
+No fresh useful content or production acceptance follows from that control.
+
 - Retained-reference reader (ADR0236): r90/r92 five-suite Core focuses pass;
   r91 compact-notice collector also passes. Encrypted authorized text longer than
   the hook cap is reconstructed exactly through bounded pages, with original

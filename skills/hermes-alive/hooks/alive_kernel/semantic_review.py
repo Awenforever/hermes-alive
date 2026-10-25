@@ -660,6 +660,15 @@ class SemanticReviewStore:
         ):
             return None
 
+    def _assessment_scope(self,candidate,subject):
+        from .review_contracts import SPLIT_SOURCE_REVIEW,BOUNDARY_ASSESSMENT
+        reader=getattr(self,'expression_context_for_selection',None)
+        context=reader(candidate.selection_event_id,subject) if reader else None
+        if (context and context.get('method') in ('discovery-source-authoring-v2','discovery-source-authoring-v3')
+                and context.get('semantic_source_contract')==SPLIT_SOURCE_REVIEW):
+            return BOUNDARY_ASSESSMENT
+        return None
+
     def record_review(
         self,
         *,
@@ -692,6 +701,9 @@ class SemanticReviewStore:
             == candidate.renderer_independence_domain
         ):
             raise SemanticReviewError("review does not bind the stored renderer evidence")
+        scope=self._assessment_scope(candidate,candidate_record.event.subject)
+        if scope is not None and review.added_claims_detected:
+            raise SemanticReviewError('boundary-only review cannot assert a source-addition verdict')
         document = self.meanings.resolve(candidate.meaning_event_id)
         assessment = _assess_review(document, candidate.text, review, require_independence=require_independence)
         if assessment.disposition is ReviewDisposition.INVALID:
@@ -729,6 +741,8 @@ class SemanticReviewStore:
             "route_authority_granted": False,
             "delivery_authority_granted": False,
         }
+        if scope is not None:
+            payload['assessment_scope']=scope
         if protocol_recovery_event_id is not None:
             if not isinstance(protocol_recovery_event_id,str) or not _ID_RE.fullmatch(protocol_recovery_event_id):
                 raise SemanticReviewError('invalid semantic protocol recovery reference')
@@ -785,6 +799,9 @@ class SemanticReviewStore:
             )
             candidate_record = self.journal.get(candidate_event_id)
             if candidate is None or candidate_record is None:
+                return None
+            scope=self._assessment_scope(candidate,event.subject)
+            if payload.get('assessment_scope')!=scope or scope is not None and payload['added_claims_detected'] is not False:
                 return None
             atom_reviews_raw = payload["atom_reviews"]
             if not isinstance(atom_reviews_raw, (list, tuple)):

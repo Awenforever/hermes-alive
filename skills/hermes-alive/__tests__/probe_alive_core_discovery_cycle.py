@@ -102,9 +102,9 @@ async def main():
             assert 'communication_plan' not in data['candidate']
             value=dict(verdict='supported',unsupported_claims=[],uncertainties=[],reason='Synthetic finding, not satisfaction.')
         elif 'meaning' in data and 'candidate' in data:
-            assert data['source_context']['semantic_source_contract']=='bounded-group-source-v1'
-            assert 'AND original source_context' in body['messages'][0]['content']
-            assert 'PRIMARY_READ_EVIDENCE' in raw and 'DEEP_READ_EVIDENCE' in raw
+            assert 'source_context' not in data
+            assert 'only the explicitly required meaning boundaries' in body['messages'][0]['content']
+            assert 'PRIMARY_READ_EVIDENCE' not in raw and 'DEEP_READ_EVIDENCE' not in raw
             stage='semantic';value=dict(atom_reviews=[dict(atom_id=x['atom_id'],preserved=True,risks=[]) for x in data['meaning']['atoms']],
                 added_claims_detected=False,speech_act_preserved=True,protected_literals_preserved=True)
         elif 'meaning' in data:

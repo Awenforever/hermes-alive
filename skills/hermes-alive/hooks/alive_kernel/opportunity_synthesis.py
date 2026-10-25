@@ -35,7 +35,7 @@ from . import reading_assessment
 
 _DISCOVERY_AUTHORING = 'source-led-v2'
 _DISCOVERY_AUTHORING_MODES = ('source-led-v1','source-led-v2','source-led-v3')
-_GROUP_SOURCE_REVIEW = 'bounded-group-source-v1'
+from .review_contracts import SPLIT_SOURCE_REVIEW
 
 
 class OpportunitySynthesisError(ValueError):
@@ -1071,8 +1071,9 @@ class OpportunitySynthesizer:
                 or authoring != bundle.get('discovery_authoring')
                 or authoring not in (None,*_DISCOVERY_AUTHORING_MODES)
                 or source_review!=bundle.get('discovery_source_review')
-                or source_review not in (None,'bounded-group-source-v1')
-                or source_review is not None and authoring!='source-led-v3'
+                or source_review not in (None,'bounded-group-source-v1',SPLIT_SOURCE_REVIEW)
+                or source_review=='bounded-group-source-v1' and authoring!='source-led-v3'
+                or source_review==SPLIT_SOURCE_REVIEW and authoring not in ('source-led-v2','source-led-v3')
                 or (authoring=='source-led-v3') != bool(start.event.payload.get('research_read_receipt_ids'))
                 or (authoring is not None and output != 'intent-only-v1')
                 or (editorial is not None and output != 'intent-only-v1')
@@ -1295,7 +1296,8 @@ class OpportunitySynthesizer:
             recipient_output='intent-only-v1' if recipient_meaning else None,
             editorial_context='origin-purpose-v1' if recipient_meaning else None,
             discovery_authoring=('source-led-v3' if focus else _DISCOVERY_AUTHORING) if recipient_meaning else None,
-            **({'discovery_source_review':_GROUP_SOURCE_REVIEW} if focus else {}),
+            **({'discovery_source_review':SPLIT_SOURCE_REVIEW}
+               if recipient_meaning and (focus or _DISCOVERY_AUTHORING=='source-led-v2') else {}),
             **({'reading_assessment':reading_assessment.REFERENCE_METHOD} if assess_reading else {}),
             kind='model_prompt' if candidate_evidence else 'system_candidate_deferred' if deferred else 'system_no_material',
             system_prompt_sha256=hashlib.sha256(system_prompt.encode()).hexdigest() if candidate_evidence else None,
@@ -1455,7 +1457,7 @@ class OpportunitySynthesizer:
                  "recipient_output":method['recipient_output'],
                  "editorial_context":method['editorial_context'],
                  "discovery_authoring":method['discovery_authoring'],
-                 **({'discovery_source_review':method['discovery_source_review']} if focus else {}),
+                 **({'discovery_source_review':method['discovery_source_review']} if method.get('discovery_source_review') else {}),
                  **({'reading_assessment_method':reading_assessment.REFERENCE_METHOD,
                      'reading_assessment':assessment} if assess_reading else {}),
                  "source_presentation": self._SOURCE_PRESENTATION,

@@ -71,7 +71,8 @@ for cursor,order,admitted,expected in ((0,('1','2','3','4','5','6'),('6','1','2'
     except HostDiscoveryError:pass
     else:raise AssertionError('forged priority cursor accepted')
 for context,expected in ((dict(method='discovery-source-authoring-v3'),'semantic-findings-v1'),
-        (dict(method='discovery-source-authoring-v3',semantic_source_contract='bounded-group-source-v1'),'semantic-source-findings-v1')):
+        (dict(method='discovery-source-authoring-v3',semantic_source_contract='bounded-group-source-v1'),'semantic-source-findings-v1'),
+        (dict(method='discovery-source-authoring-v3',semantic_source_contract='boundaries-and-source-v1'),'required-boundaries-v1')):
     original,system,protocol=SemanticComparator._review_contract({'atoms':[]},'Synthetic text',context)
     assert protocol==expected
     assert ('source_context' in original)==(expected=='semantic-source-findings-v1')
@@ -255,10 +256,9 @@ async def exercise(root,mode,*,primary_url=None):
                 value='The museum describes observing without intervention: [conservation method]('+url+').'
             elif task=='alive_semantic_review':
                 if mode not in ('page-failed','legacy-replay','unconsented-followup','historical-followup-replay'):
-                    assert data['source_context']['semantic_source_contract']=='bounded-group-source-v1'
-                    assert 'AND original source_context' in kw['messages'][0]['content']
-                    if pressure or mode in ('primary-read','replay','private-followup','erase-group-after-final'):
-                        assert 'PRIMARY_READ_EVIDENCE' in json.dumps(data['source_context'])
+                    assert 'source_context' not in data
+                    assert 'only the explicitly required meaning boundaries' in kw['messages'][0]['content']
+                    assert 'PRIMARY_READ_EVIDENCE' not in json.dumps(data)
                 value=dict(atom_reviews=[dict(atom_id=a['atom_id'],preserved=True,risks=[]) for a in data['meaning']['atoms']],
                     added_claims_detected=False,speech_act_preserved=True,protected_literals_preserved=True)
             elif task=='alive_source_support':

@@ -27,6 +27,26 @@ from alive_kernel.discovery_inquiry import DiscoveryInquiryContext
 from alive_kernel.semantic_comparator import SemanticComparator
 
 
+def check_review_scopes():
+    from alive_kernel.review_contracts import SPLIT_SOURCE_REVIEW,BOUNDARY_ASSESSMENT
+    meaning={'atoms':[{'atom_id':'required-link'}]}
+    context={'method':'discovery-source-authoring-v2','semantic_source_contract':SPLIT_SOURCE_REVIEW}
+    data,prompt,method=SemanticComparator._review_contract(meaning,'Untrusted candidate',context)
+    assert method==BOUNDARY_ASSESSMENT and set(data)=={'meaning','candidate'}
+    good=dict(atom_reviews=[dict(atom_id='required-link',preserved=True,risks=[])],
+        speech_act_preserved=True,protected_literals_preserved=True)
+    for extra in ({},{'added_claims_detected':False}):
+        parsed=SemanticComparator._validated_review(json.dumps({**good,**extra}),meaning,method)
+        assert parsed['added_claims_detected'] is False
+    negative={**good,'atom_reviews':[dict(atom_id='required-link',preserved=False,risks=['omission'])]}
+    assert SemanticComparator._validated_review(json.dumps(negative),meaning,method)['atom_reviews'][0].preserved is False
+    for bad in ('{',json.dumps({**good,'added_claims_detected':True}),
+                json.dumps({**good,'speech_act_preserved':'true'})):
+        try:SemanticComparator._validated_review(bad,meaning,method)
+        except SemanticReviewError:pass
+        else:raise AssertionError('boundary checker admitted opaque source judgment or invalid evidence')
+
+
 def check_authoring_clock(root):
     root.mkdir()
     journal=ExperienceJournal(root/'journal.sqlite3')
@@ -128,12 +148,21 @@ async def exercise(root,mode,*,historical=False):
                 ingestor.vault.erase_item(original.event.payload['content']['content_id'])
             # A selected sourced fact absent from required atoms is allowed; an
             # unused source specification and operational caveat need not appear.
-            return response('The project describes keeping watch when evidence is insufficient: '
+            if mode=='repair' and data.get('correction'):
+                return response(json.dumps({'edits':[dict(exact_text='I shared this yesterday. ',
+                    claim_index=0,replacement='')]}))
+            return response(('I shared this yesterday. ' if mode=='repair' else '')+
+                'The project describes keeping watch when evidence is insufficient: '
                 '[observation design](https://example.invalid/design).')
         if task=='alive_semantic_review':
             semantic_calls.append(data)
             original=data.get('original_evidence',data)
-            assert original['source_context']['method']=='discovery-source-authoring-v'+('1' if historical else '2')
+            if historical:
+                assert original['source_context']['method']=='discovery-source-authoring-v1'
+            else:
+                assert 'source_context' not in original
+                assert 'only the explicitly required meaning boundaries' in kw['messages'][0]['content']
+                assert 'FAMILY_SPEC_OPTIONAL' not in json.dumps(original)
             for marker in ('PRIVATE_RESEARCH_GOAL','PRIVATE_MODEL_CONSTRAINT','PRIVATE_READING_QUESTION','PRIVATE_VALUE_HYPOTHESIS'):
                 assert (marker in json.dumps(original)) is historical
             if mode=='recovery' and len(semantic_calls)==1:return response('{}')
@@ -143,13 +172,16 @@ async def exercise(root,mode,*,historical=False):
         if task=='alive_source_support':
             assert data['expression_binding']['assessment_mode']=='discovery-source-and-value-v'+('1' if historical else '2')
             assert ('communication_plan' in data['candidate']) is historical
+            assert (data['expression_binding'].get('semantic_assessment_scope')=='required-boundaries-v1') is (not historical)
             for marker in ('PRIVATE_RESEARCH_GOAL','PRIVATE_MODEL_CONSTRAINT'):
                 assert (marker in json.dumps(data)) is historical
             assert data['candidate']['id'].startswith('message.model_candidate:')
             assert data['assessment_scope']['kind']=='final_discovery_source_and_value'
             assert 'ACTUAL final discovery message' in kw['messages'][0]['content']
-            return response(dict(verdict='unsupported' if mode=='unsupported' else 'supported',
-                unsupported_claims=['Synthetic purpose mismatch'] if mode=='unsupported' else [],uncertainties=[],
+            unsupported=mode=='unsupported' or mode=='repair' and 'I shared this yesterday.' in data['candidate']['text']
+            return response(dict(verdict='unsupported' if unsupported else 'supported',
+                unsupported_claims=(['I shared this yesterday. is unsupported prior conversation.']
+                    if mode=='repair' else ['Synthetic purpose mismatch']) if unsupported else [],uncertainties=[],
                 reason='Synthetic final assessment, not world truth or user satisfaction.'))
         raise AssertionError(task)
     runtime=SendPreparationRuntime(journal,content_vault=ingestor.vault)
@@ -169,12 +201,31 @@ async def exercise(root,mode,*,historical=False):
     # patch ends, reopening under today's defaults must still reconstruct v1.
     with patch('alive_kernel.opportunity_synthesis._DISCOVERY_AUTHORING',
                'source-led-v1' if historical else 'source-led-v2'):
-        assessed=await runtime.assess(allow_repair=False,**params)
+        assessed=await runtime.assess(allow_repair=mode=='repair',**params)
     expressed=assessed.expression
     assert assessed.quality_disposition==('final_unsupported' if mode=='unsupported' else 'supported')
     assert 'FAMILY_SPEC_OPTIONAL' not in expressed.text and not expressed.delivery_authorized
-    assert calls.count('alive_source_support')==1  # No plan-as-message preflight judges.
-    assert len(calls)==(6 if mode in ('recovery','proposal-recovery') else 5)
+    semantic=journal.get(expressed.review_event_id)
+    assert (semantic.event.payload.get('assessment_scope')=='required-boundaries-v1') is (not historical)
+    if not historical:
+        generic=runtime.expression.store
+        assert generic.verify_review(semantic,allow_correlated=True) is not None
+        for mutation in ({'assessment_scope':None},{'added_claims_detected':True}):
+            payload=_thaw_json(semantic.event.payload)
+            payload.pop('integrity_authenticator')
+            payload.update(mutation)
+            if payload.get('assessment_scope') is None:payload.pop('assessment_scope',None)
+            payload['integrity_authenticator']=generic.protector.authenticate_json('message.semantic_review.v1',
+                generic._authentication_document('message.semantic_review.v1',payload))
+            forged=replace(semantic,event=replace(semantic.event,payload=payload))
+            assert generic.verify_review(forged,allow_correlated=True) is None
+    assert calls.count('alive_source_support')==(2 if mode=='repair' else 1)
+    assert len(calls)==(8 if mode=='repair' else 6 if mode in ('recovery','proposal-recovery') else 5)
+    if mode=='repair':
+        assert assessed.repair_disposition=='completed' and assessed.initial_final_review_event_id!=assessed.final_review_event_id
+        assert 'I shared this yesterday.' not in expressed.text
+        assert calls.count('alive_semantic_render')==calls.count('alive_semantic_review')==2
+        assert len(journal.read(event_type='expression.local_correction_completed'))==1
     generated=interpreter.load_completed(subject='user:test',operation_id=expressed.planning.interpretation_event_id.removeprefix(
         'opportunity.synthesis:').removesuffix(':completed'))
     saved=interpreter.retained_proposal(receipt_event_id=generated.receipt_event_id,
@@ -183,7 +234,7 @@ async def exercise(root,mode,*,historical=False):
     assert inquiries.read(subject='user:test',clearance=Sensitivity.PRIVATE,item_ids=('inquiry:private-research',))==[inquiry]
     async def forbidden(**kw):raise AssertionError('completed authoring inferred again')
     reopened=SendPreparationRuntime(ExperienceJournal(journal.path),content_vault=ingestor.vault)
-    assert await reopened.assess(allow_repair=False,**{**params,'call':forbidden})==assessed
+    assert await reopened.assess(allow_repair=mode=='repair',**{**params,'call':forbidden})==assessed
     policy=AutonomyPolicyProjection(journal)
     policy.apply(policy.append_update(subject='user:test',actor='user:test',expected_revision=0,
         enabled=True,context=PolicyContext(can_interrupt=True),operation_id='enable'))
@@ -237,11 +288,18 @@ async def strict_scope(root):
 
 
 if __name__=='__main__':
+    import argparse
+    cases=('supported','unsupported','recovery','proposal-recovery','no-grounding','source-withdrawn','repair')
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--case',choices=cases)
+    selected=parser.parse_args().case
     with tempfile.TemporaryDirectory(prefix='alive-discovery-author-') as directory:
-        check_authoring_clock(Path(directory)/'clock-contract')
-        for mode in ('supported','unsupported','recovery','proposal-recovery','no-grounding','source-withdrawn'):
+        check_review_scopes()
+        if not selected:check_authoring_clock(Path(directory)/'clock-contract')
+        for mode in ((selected,) if selected else cases):
             root=Path(directory)/mode;root.mkdir();asyncio.run(exercise(root,mode))
-        for mode in ('supported','recovery','proposal-recovery'):
-            root=Path(directory)/('historical-'+mode);root.mkdir();asyncio.run(exercise(root,mode,historical=True))
-        root=Path(directory)/'strict';root.mkdir();asyncio.run(strict_scope(root))
-    print('HERMES_ALIVE_DISCOVERY_AUTHORING_OK')
+        if not selected:
+            for mode in ('supported','recovery','proposal-recovery'):
+                root=Path(directory)/('historical-'+mode);root.mkdir();asyncio.run(exercise(root,mode,historical=True))
+            root=Path(directory)/'strict';root.mkdir();asyncio.run(strict_scope(root))
+    print('HERMES_ALIVE_DISCOVERY_AUTHORING_CASE_OK' if selected else 'HERMES_ALIVE_DISCOVERY_AUTHORING_OK')
