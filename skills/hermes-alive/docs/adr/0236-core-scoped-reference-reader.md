@@ -141,3 +141,22 @@ adds neither cross-session access nor an external-memory provider. r94 is an
 immutable intermediate build without a completed focus; the final candidate
 requires new Core qualification. Real-model retained-source proof remains r92;
 its outputs are not general reasoning or fresh-source quality proof.
+
+## Final scoped-reader qualification, 2026-10-26
+
+r95's five actual Core focus suites pass, including expired source refusal,
+original retained-data expiry before decryption, replacement retirement,
+default platform toolset resolution and explicit suppression. r96 differs only
+in internal documentation/manifests: exact runtime and test bytes/modes match
+across460 files. Its full99 portable regression passes, terminal0. Committed
+r96 tree de8bcd4cd820c350ab15c0304538fd78adc6f28d, commit0cd9555.
+The candidate retains the original privacy/authority contracts. No production,
+external delivery or fleet claim follows from these component results.
+
+The preceding model-semantic verdicts require calibration: independent inspection
+of the versioned primary preprint found attention-mask experiments and support
+for the frame-count efficiency trend. See the memorandum's evaluation-calibration
+entry. A model's later self-criticism must not establish absence of experiments,
+and faithful plain-language explanation is not automatically a new empirical
+claim. Original physical missing-context failures remain unchanged. Old-source
+controls still do not qualify fresh content quality.

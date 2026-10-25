@@ -47,7 +47,9 @@ model/provider or network changes are authorized by this development plan.
   The64-entry map and generation/owner/retention guards stay. An empty successful excerpt would be
   misleading. r95 five-suite actual Core regression passes, including original-data expiry
   before decryption, source expiry, replacement retirement and Core toolset
-  suppression. Full regression and the release gate remain pending.
+  suppression. r96 full99 portable regression also passes on the exact committed tree
+  de8bcd4cd820c350ab15c0304538fd78adc6f28d (0cd9555). This does not
+  replace independent Git/fleet or real-content acceptance; release remains pending.
 
 The supported test supply still matches the latest non-prerelease official
 [Hermes v0.22.5 release](https://github.com/NousResearch/hermes-agent/releases/tag/v0.22.5),
