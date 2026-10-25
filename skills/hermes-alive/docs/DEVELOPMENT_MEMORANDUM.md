@@ -802,3 +802,28 @@ fake conversation history and while preserving cold-store reattachment and erasu
 The same diagnostic's synthesis still sounded like a cautious paper digest and
 is not a quality pass. Removing transport metadata cannot by itself fix source
 choice or voice. A positive model check does not establish that a user wants it.
+
+## 2026-10-25 — Consistent value criteria through the discovery stages
+
+Actual live Chinese-source r59 completed with substantive search listings and
+page extracts, two USTC timeouts followed by a successful Core-owned official
+fallback, one local submission and two real main replies. No outstanding work or
+external send; credential audit false/export removed. The message remains a formal
+old-paper digest; the second main reply also invented which numbers it had said.
+Quality remains0/10.
+
+A frozen public-message comparison used actual Core mirror/SQLite history and
+AIAgent against the existing reference sidecar. Native assistant history avoided
+that particular numerical self-attribution in this sample but still made a false
+source correction. This single non-independent comparison does not qualify a
+production history mirror, idempotent crash recovery or semantic reliability.
+No product mirror or Core data mutation is adopted; experiment only.
+
+A real policy inconsistency remains in product prompts: planning explicitly allows
+an interesting fact to suffice, while final value assessment treats faithful source
+compression as insufficient and source choice mandates a research question. Align
+these stages: useful curation can convey the source's own interesting observation
+without inventing an extra opinion, research gap or critical turn. Preserve factual,
+source-scope, privacy and authority checks. This is a hypothesis about an incentive,
+not proof that the style problem is solved. Test new material and original outputs;
+do not add phrase blacklists or a required conversational template.

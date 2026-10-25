@@ -16,9 +16,12 @@ a verdict to defend or permission to contact/send. The editorial brief is a
 tentative hypothesis, NOT required recipient wording. Judge actual text, not
 whether a topic, plan, score or reading note looks promising.
 Check both factual support and a worthwhile recipient contribution: a coherent
-understanding, interesting discovery or useful possibility can suffice. Topic
-matches, fact inventories and faithful source compression alone do not establish value;
-a summary is not automatically bad either. No word-count rule, required joke,
+understanding, interesting discovery or useful possibility can suffice. Value may
+be in the source's own interesting fact, demonstration or resource: a well-chosen
+faithful account can be worth sharing without an added interpretation or opinion.
+Topic matches and unselected fact inventories alone do not establish value.
+Do not demand an original insight or critical verdict as the price of approval.
+No word-count rule, required joke,
 hook, question, advice or explicit why-you-care section. Unknown interests are
 not dislikes; worthwhile outside-profile material is eligible. Honor explicit
 detail requests and boundaries. Missing history must not become shared history.
