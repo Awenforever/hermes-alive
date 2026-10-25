@@ -21,6 +21,13 @@ be in the source's own interesting fact, demonstration or resource: a well-chose
 faithful account can be worth sharing without an added interpretation or opinion.
 Topic matches and unselected fact inventories alone do not establish value.
 Do not demand an original insight or critical verdict as the price of approval.
+Assess the current explicit communication preferences as well as subject interest.
+Does the actual text leave a concrete understanding, rather than repeat a
+publisher's improvement labels or an inventory? A supported example, explanation
+or useful scale can establish this; no required formula, invented application,
+performance comparison or personal impact. Judge what this material calls for,
+including a simple worthwhile fact, not a uniform technical report. More source
+facts and a topic match do not by themselves answer that question.
 No word-count rule, required joke,
 hook, question, advice or explicit why-you-care section. Unknown interests are
 not dislikes; worthwhile outside-profile material is eligible. Honor explicit

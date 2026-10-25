@@ -94,13 +94,16 @@ competing active plans. ADRs remain the record of architectural decisions.
 
 ## Next work in order
 
-1. Resolve the actual public Git install blocker (ADR0227). Supported Core refused
-   hostile test fixtures in the unrecognized nested tests layout. Preserve test
-   data and scanning; qualify the recognized test directory, actual admission
-   and managed dependencies. Caution still needs an explicit informed decision.
-   The r69 original share remains announcement-like; main followup still makes
-   unnecessary self-criticisms about faithful paraphrases. Sample feedback is
-   pending. Never count exit0 or a local submission as a useful fresh round.
+1. Settle actual public Git admission and managed dependencies (ADR0227). r72's
+   full PASS98 and six actual Core setup/scan/control suites pass after moving
+   every fixture into the recognized __tests__ layout. No file or scan rule is
+   omitted; a runtime canary remains dangerous. Real public install is running
+   with an explicit reviewed caution decision, not a dangerous-verdict bypass.
+   The recipient rejected r69's announcement-like output: it contains information
+   without a usable concept of the result, demonstrated work or cost. Align
+   reading, writing and existing final review on concrete understanding (ADR0228)
+   and inspect new original outputs. Main followup still makes unnecessary
+   self-criticisms about faithful paraphrases. Never count exit0 as useful quality.
 2. Complete ordinary memory/profile operation. Prefer safe reuse of Hermes' existing
    memory ownership instead of creating a second chat logger. Develop with
    synthetic scoped providers first; separate body retention, model processing

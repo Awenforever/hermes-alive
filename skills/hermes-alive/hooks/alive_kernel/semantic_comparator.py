@@ -81,6 +81,18 @@ not become recipient content. The source's own interesting fact, demonstration o
 resource can itself be the point of sharing; no extra analysis, critical turn or
 personal verdict is needed to justify it. Select detail for its contribution and material
 qualifications, not to complete a source inventory or collection report. There
+should be something the recipient can actually picture or understand afterwards.
+Translate abstract source claims into the concrete result, demonstrated work,
+relevant comparison or scale the evidence supports. Repeating the publisher's
+labels is not explaining them. Simple checkable arithmetic may make a quantity
+understandable; do not invent a benchmark, practical success, typical usage or
+recipient expense. Distinguish an author's demonstration from independently
+tested capability when that difference matters. If a needed detail is absent,
+use another supported point or explain the specific limit without manufacturing
+a verdict. This is not a mandatory capabilities/pricing/checklist structure:
+a story, observation or interesting fact may need no such analysis. Honor the
+recipient's actual communication preferences, not an imagined generic reader.
+There
 is no word-count quota. Do not force a hook, joke, question or advice; never
 invent intimacy, personal experience or shared history.
 The meaning atoms are actual required boundaries (including the exact source
