@@ -3,6 +3,34 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## 2026-10-25 — Inspect actual writer inputs before changing the genre contract
+
+The r84 actual request has meaning, presentation, language and expression_context.
+Its version3 expression context already omits recipient_goal/behavior_constraints;
+the dense retained planning brief therefore cannot simply be blamed as the
+writer's outline. Optional reading_assessment remains advisory model material.
+Two actual-model calls varied only its presence while keeping source text,
+required meaning, presentation and owner context fixed. Removing it produced no
+consistent benefit and stronger unsupported generalizations. Do not adopt that
+projection or claim that deleting planning fields solves the prose problem.
+
+A separate four-call experiment compared the current author task with a shorter
+conversational task on two public subjects. One used an exact captured native
+input; the other used constructed source-only input from actual retained science
+excerpts. The latter is not an exact native-input reproduction. Concrete
+explanation improved in places, but overstatement and temporal handling remained;
+there is no stable cross-subject replacement or new quality round. Keep current
+product prompts until better evidence. Do not turn one pleasing rewrite into a
+universal genre rule, add a phrase blacklist, or discard factual qualifications.
+
+The captured writer request lacks an explicit host current-time field; source
+published_at values were unresolved. Collection/verification flags also describe
+the collector, not world absence. These are information-contract questions for
+further investigation, not proof that another clock field alone will fix style.
+Preserve immutable old requests, original source excerpts, owner scope and short
+execution permits in any change. Full outputs and private model traces stay out
+of the public repository and shared Work directory.
+
 ## 2026-10-25 — Understandable facts still need a reason to be shared
 
 The reviewed science sample was substantially more understandable and inviting,
@@ -853,3 +881,20 @@ without inventing an extra opinion, research gap or critical turn. Preserve fact
 source-scope, privacy and authority checks. This is a hypothesis about an incentive,
 not proof that the style problem is solved. Test new material and original outputs;
 do not add phrase blacklists or a required conversational template.
+
+## 2026-10-25 — Recipient calibration: understandable is not yet memorable
+
+Actual recipient feedback on the AT2023uqm sample: substantially more readable
+and worth opening, but plain chat math is preferable and the worthwhile relation
+was not clear enough. This does not authorize a compulsory significance,
+application, national-breakthrough or personal-opinion paragraph. The explanation
+must earn its depth from the evidence and actual conversational purpose.
+
+Actual r84 Denisovan sample feedback: acceptable, but the recipient did not know
+this group existed; as exploratory material the message may leave only a vague
+impression. Interest in history does not imply specialist background in human
+palaeontology. This is sample-specific calibration, not a permanent dislike,
+interest update, or permission to suppress unfamiliar topics. Evaluate whether an
+unfamiliar subject leaves a comprehensible relationship worth remembering, rather
+than only verifying facts, details and completed transmission. No new topic quota,
+phrase blacklist or mandatory closing takeaway is justified by these two samples.

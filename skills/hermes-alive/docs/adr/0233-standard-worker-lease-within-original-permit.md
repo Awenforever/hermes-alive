@@ -36,3 +36,14 @@ revocation submits zero times. Verify one unchanged authorization and lease
 clipped to its original deadline, plus existing long-send/cancel/opaque-return
 and replay protections. Repeat actual Core source-to-share-to-consecutive-main
 behavior; do not turn a synthetic clock into real-source or delivery proof.
+
+## Actual candidate qualification
+
+r84 / `2f497aa` passes twelve focused suites and the17-case Windows standard
+execution test. The actual native regression, using the already configured
+official model in a disposable profile, subsequently completed with an
+overlapping public search, one local adapter submission, two consecutive real
+main turns and zero pending work. Exact previous text is present in subsequent
+requests. Credentials were audited before removal; no real channel was used.
+This qualifies the bounded worker handoff, not content quality, world truth,
+production inheritance, external delivery or the final platform matrix.

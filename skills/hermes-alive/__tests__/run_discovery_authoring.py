@@ -24,6 +24,39 @@ from alive_kernel.semantic_review import SemanticReviewError
 from alive_kernel_testkit import install_terminal_route
 from alive_kernel.agenda import AgendaProjection,AgendaProposal,AgendaItemKind,AgendaAuthority
 from alive_kernel.discovery_inquiry import DiscoveryInquiryContext
+from alive_kernel.semantic_comparator import SemanticComparator
+
+
+def check_authoring_clock(root):
+    root.mkdir()
+    journal=ExperienceJournal(root/'journal.sqlite3')
+    comparator=SemanticComparator(SimpleNamespace(journal=journal))
+    arguments=('user:test','selection:clock-test',Sensitivity.PRIVATE)
+    before=datetime.now(timezone.utc)
+    clock=comparator._start_authoring('clocked',*arguments,discovery=True)
+    record=journal.get('semantic.comparison:clocked:started')
+    assert before<=datetime.fromisoformat(clock)<=datetime.now(timezone.utc)
+    assert datetime.fromisoformat(clock)==record.event.observed_at
+    assert record.event.payload['authoring_clock']=='host-render-start-v1'
+    assert comparator._start_authoring('clocked',*arguments,discovery=True)==clock
+    assert len(journal.read(event_type='semantic.comparison_stage'))==1
+    comparator._receipt('legacy','started',*arguments,status='started')
+    original=journal.get('semantic.comparison:legacy:started')
+    assert comparator._start_authoring('legacy',*arguments,discovery=True) is None
+    assert journal.get(original.event.event_id)==original
+    assert 'authoring_clock' not in original.event.payload
+    assert comparator._start_authoring('ordinary',*arguments,discovery=False) is None
+    for owner,selection,discovery in (('user:foreign',arguments[1],True),
+                                    (arguments[0],'selection:changed',True),
+                                    (arguments[0],arguments[1],False)):
+        try:comparator._start_authoring('clocked',owner,selection,Sensitivity.PRIVATE,discovery=discovery)
+        except SemanticReviewError:pass
+        else:raise AssertionError('authoring clock crossed owner, source or rendering scope')
+    journal.append(replace(record.event,event_id='semantic.comparison:unknown:started',
+        payload={**record.event.payload,'authoring_clock':'unrecognized-future-contract'}))
+    try:comparator._start_authoring('unknown',*arguments,discovery=True)
+    except SemanticReviewError:pass
+    else:raise AssertionError('unknown clock contract silently reinterpreted')
 
 
 def brief():
@@ -81,6 +114,10 @@ async def exercise(root,mode,*,historical=False):
                 if c['candidate_id'].startswith('opportunity-candidate:')),rationale='synthetic selected angle'))
         kw['route_info']['provider']='synthetic-provider'
         if task=='alive_semantic_render':
+            clock=datetime.fromisoformat(data['authoring_as_of'])
+            started=journal.read(event_type='semantic.comparison_stage')[-1]
+            assert clock==started.event.observed_at and clock<=datetime.now(timezone.utc)
+            assert started.event.payload['authoring_clock']=='host-render-start-v1'
             assert data['expression_context']['method']=='discovery-source-authoring-v'+('1' if historical else '2')
             for marker in ('PRIVATE_RESEARCH_GOAL','PRIVATE_MODEL_CONSTRAINT','PRIVATE_READING_QUESTION','PRIVATE_VALUE_HYPOTHESIS'):
                 assert (marker in json.dumps(data)) is historical
@@ -201,6 +238,7 @@ async def strict_scope(root):
 
 if __name__=='__main__':
     with tempfile.TemporaryDirectory(prefix='alive-discovery-author-') as directory:
+        check_authoring_clock(Path(directory)/'clock-contract')
         for mode in ('supported','unsupported','recovery','proposal-recovery','no-grounding','source-withdrawn'):
             root=Path(directory)/mode;root.mkdir();asyncio.run(exercise(root,mode))
         for mode in ('supported','recovery','proposal-recovery'):

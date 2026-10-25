@@ -28,6 +28,16 @@ model/provider or network changes are authorized by this development plan.
 
 ## Latest qualified slices
 
+- r84 / `2f497aa`: twelve focused suites pass, including actual Core standard
+  submission, continuity, routing and execution controls. Windows17 standard
+  cases pass, including15-second local preparation, original-deadline expiry,
+  revocation and no renewed authorization. Actual public-source/native regression
+  exercises overlapping search results, one local-only submission, two genuinely
+  consecutive main turns and zero pending work. Exact share and prior actual
+  main reply reach the next request. This uses the configured official model in
+  a disposable profile, not production-default or physical-delivery proof.
+  The original body and followup still fail the content-quality target. Complete99
+  baseline is r83; r84 has the focused qualification above.
 - r79 / `b444031`: PASS99 portable suites and twelve focused suites, including
   actual Core guided setup/control/continuity. Windows executes both new source
   refinement and Core discovery-tool suites successfully. The real native
@@ -104,6 +114,19 @@ competing active plans. ADRs remain the record of architectural decisions.
 ## Next work in order
 
 1. Continue content understanding and bounded final assessment (ADR0228/0229/0230).
+   r84's real native handoff now completes, but its prose remains report-like and
+   the main model overstates geographic/methodological implications. Context
+   delivery is proven; the plugin must not take over arbitrary main-dialogue
+   reasoning. Preserve that distinction while checking source scope and natural
+   followup. The captured version3 writer request already omits recipient_goal
+   and behavior_constraints. Removing optional reading notes did not improve it
+   consistently, and a shorter conversational task failed across two public
+   subjects; neither experimental replacement is adopted. The author request
+   lacks an explicit host as-of clock. The [ADR0234](adr/0234-immutable-authoring-context-clock.md)
+   candidate binds that input to a new render's immutable start, preserving old
+   unclocked requests and execution authorization. It needs focused and actual
+   semantic qualification. Full raw sample evaluation remains
+   sample-specific and does not create permanent preferences.
    r83 passes the complete99 portable suite; the actual Core13-suite focus on
    identical r82 runtime also passes. Its new real-source run nevertheless
    failed after authorization and share-context capture, before any local
