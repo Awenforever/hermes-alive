@@ -915,3 +915,15 @@ forge an assistant-history entry simply to make a test pass. The existing actual
 native test's missing-text assertion was useful and must remain. Too-small caps,
 old quotes and bounded recall remain explicit gaps rather than fake successes.
 See ADR0235 for the structural contract and required live replay.
+
+## 2026-10-26 — Keep semantic errors separate from missing context
+
+After r86's actual cold handoff repair, both real main turns see the full original
+share and actual prior reply. The first still changes a nonexclusive bottleneck
+into an exclusive one and claims an abstract-page read; the second qualifies that
+claim. Do not turn its later self-correction into proof that the first response
+was sound. The same-source replay is diagnostic evidence only, not a new quality
+round. Do not add a TimeViper-specific wording rule or take over arbitrary Core
+main-dialogue reasoning. Next useful work must advance natural selection, scoped
+ordinary memory and missing long/quoted reference retrieval, rather than another
+isolated date/lease fix or a repeated-source quality claim.

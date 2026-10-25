@@ -51,3 +51,21 @@ foreign scope refusal, expiry and forgetting. Replay the settled public referenc
 into real consecutive main turns without rerunning its source search/composition,
 then inspect exact physical model inputs and original answers. Correct delivery
 alone does not prove semantic correctness, recipient value or fleet acceptance.
+## Actual qualification, 2026-10-26
+
+r86 /6c14c61 passes five focused suites, including actual Core plugin scan,
+guided setup/control and the expanded collector tests. Windows atomic projection
+checks pass. The first two private replay harnesses failed before inference
+because they registered the test adapter's Core factory too late; their original
+inputs and terminal failures remain. A new corrected c harness registers the
+factory before connecting, restores the original authenticated routing identity,
+reattaches the old encrypted kernel and starts no native task.
+
+Its two actual consecutive official DeepSeek main replies receive the complete
+original r85 share in physical requests, without a spill preview. Prior actual
+reply is preserved; no send or kernel-journal change occurs. No public source or
+authorship is rerun. Credentials were audited before removal. This qualifies the
+context handoff, not the model's assertions: it still converted "not only the
+visual encoder" into "not the visual encoder" and claimed an abstract-page read
+that its later reply contradicted. Quality remains0/10; no production-default,
+fresh-source, external-delivery, old-quote or fleet acceptance is claimed.

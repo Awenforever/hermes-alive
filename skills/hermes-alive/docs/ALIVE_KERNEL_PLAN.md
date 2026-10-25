@@ -28,6 +28,17 @@ model/provider or network changes are authorized by this development plan.
 
 ## Latest qualified slices
 
+- r86 / `6c14c61`: five focused suites pass, including actual Core plugin scan,
+  guided setup, execution control and the expanded conversation collector cases.
+  Windows atomic context-boundary checks pass. A cold replay of the exact settled
+  r85 encrypted/public kernel restores its original authenticated route identity,
+  performs zero sends and starts no native loop. Two consecutive real official
+  DeepSeek main turns receive the complete original share without spilling;
+  previous actual reply is in the next request and kernel history is unchanged.
+  This qualifies the handoff under default/custom hook limits, not semantic
+  accuracy: the main replies still overstate the bottleneck and misdescribe
+  which source was read. No fresh-round, production-default or fleet credit.
+
 - r85 / `710ea7a`: complete99 portable suites and ten focused authoring/Core
   suites pass. Actual clock-aware public composition correctly treats an old
   forecast as historical; it is not a quality round. The fresh VLM native run
@@ -124,6 +135,10 @@ competing active plans. ADRs remain the record of architectural decisions.
 ## Next work in order
 
 1. Continue content understanding and bounded final assessment (ADR0228/0229/0230).
+   ADR0235 now has actual Core collector and cold real-model handoff proof in
+   r86. Preserve that fix while addressing content quality and ordinary memory;
+   do not rerun the same source as fresh quality evidence. Scope-safe recall for
+   references larger than the host hook cap and older quoted topics remains open.
    r84's real native handoff now completes, but its prose remains report-like and
    the main model overstates geographic/methodological implications. Context
    delivery is proven; the plugin must not take over arbitrary main-dialogue
