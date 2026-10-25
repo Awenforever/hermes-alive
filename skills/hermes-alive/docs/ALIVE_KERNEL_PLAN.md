@@ -13,7 +13,7 @@ and safe portable operation. Component counts are not the completion metric.
 | Area | Current evidence | Still required |
 |---|---|---|
 | Experience and privacy | Protected journal/vault, provenance, deletion and replay checks | Real lifetime/migration/restore with all external associations preserved |
-| Personalization | Owner-confirmed optional interests/communication preferences; opt-in current Core-curated profile integration under qualification | Actual native profile-read/forgetting proof, external-provider recall, noise-aware daily learning and attributed feedback |
+| Personalization | Owner-confirmed optional interests/communication preferences; separately opted-in current Core USER advice, actual native change/delete/wait qualification | External-provider recall, noise-aware daily learning and attributed feedback |
 | Agenda and initiative | Native discovery/commitment decisions, bounded rejection recovery, waits invalidated by actual admitted input | Sustained useful initiative and changing interests over time; no reward for empty repeated ticks |
 | Content and judgment | Source-led composition, final wording review, real main-model examples | Samples remain too much like cautious paper digests; factual review is not a usefulness verdict |
 | Conversation continuity | Exact share/source excerpts reach actual Core main requests; real replies after context reduction no longer recite transport status | Self-attribution/source-analysis errors remain; natural old-quote/compaction/restart behavior |
@@ -28,6 +28,19 @@ model/provider or network changes are authorized by this development plan.
 
 ## Latest qualified slices
 
+- r65 / `5077671`: PASS98 portable suites and actual Core setup/control tests;
+  current personal Core profile is separate opt-in advice, with default-off,
+  foreign-home, disabled-target and pending-forgetting boundaries. No external
+  memory backend or private production data was read.
+- r67 / `6fed839`: five actual setup/control/CLI/authoring suites, nine recovery
+  suites and the focused actual installed-native wait scenario pass. The normal
+  assembler now exposes discovery phases and bounded retry, so unchanged input
+  waits rather than repeatedly reasoning. Profile replacement/deletion and
+  admitted input wake it; cooldown and pause perform no extra inference.
+- Protected final-current-purpose extension (ADR0226) is under qualification.
+  The real dated product warning was refused after slow composition because
+  final fact review lacked a fresh purpose witness. Keep protected warning meaning
+  and short permits; do not weaken expiry or force it into an editorial brief.
 - r58 / `0b16986`: PASS98 portable suites, eight clock/source/authorization/repair
   suites, seventeen supported-Core control/ingress/continuity checks, and Windows
   delayed-selection regression. Fresh final source/value review can qualify an

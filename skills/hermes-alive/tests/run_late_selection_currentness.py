@@ -13,10 +13,11 @@ from alive_kernel.source_support import SourceSupportReviewer
 from alive_kernel_testkit import install_terminal_route
 from run_discovery_authoring import proposal,response
 
-async def exercise(root,*,historical=False):
+async def exercise(root,*,historical=False,protected=False):
     journal=ExperienceJournal(root/'experience.sqlite3')
     source=DiscoveryOpportunityIngestor(journal).ingest(DiscoveryCandidate(source='synthetic public',
-        title='Synthetic observation memory',summary='The model can revisit past visual observations.',
+        title='Synthetic observation memory',summary='The model can revisit past visual observations.'
+            +(' Charges of 5 yuan begin on 2026-11-01.' if protected else ''),
         url='https://example.invalid/visual-memory'),subject='user:test')
     runtime=SendPreparationRuntime(journal)
     policy=AutonomyPolicyProjection(journal)
@@ -27,23 +28,36 @@ async def exercise(root,*,historical=False):
         policy_event_id=policy.current('user:test').event_id,route_binding_id=route,
         action_kinds=('share',),maximum_sensitivity=Sensitivity.PRIVATE,
         expires_at=datetime.now(timezone.utc)+timedelta(hours=1),operation_id='synthetic-grant',allow_natural_expression=True)
-    calls=[]
+    calls=[];final_calls=[]
+    plan=(dict(version=2,recipient_goal='Warn about the dated service charge.',speech_act='warn',
+        contents=[dict(kind='fact',text='The model can revisit past visual observations.'),
+            dict(kind='fact',text='Charges of 5 yuan begin on 2026-11-01.',
+                 protected_literals=['5 yuan','2026-11-01'])],behavior_constraints=[])
+        if protected else dict(version=3,recipient_goal='Share the concrete capability.',
+            speech_act='share',contents=[],behavior_constraints=[]))
     async def call(**kw):
         task=kw['task'];calls.append(task)
         data=json.loads(kw['messages'][1]['content']) if task!='alive_deliberation' else None
         if kw.get('route_info') is not None:kw['route_info']['provider']='synthetic-provider'
         if task=='alive_opportunity_candidates':
-            return response(proposal(source.agenda_item_id,dict(version=3,recipient_goal='Share the concrete capability.',
-                speech_act='share',contents=[],behavior_constraints=[])))
+            return response(proposal(source.agenda_item_id,plan))
         if task=='alive_deliberation':
             choices=json.loads(kw['messages'][1]['content'].split('\n',1)[1])
             return response(dict(candidate_id=next(c['candidate_id'] for c in choices
                 if c['candidate_id'].startswith('opportunity-candidate:')),rationale='Synthetic useful choice.'))
-        if task=='alive_semantic_render':return response('The model can revisit past visual observations. [Source](https://example.invalid/visual-memory)')
+        if task=='alive_semantic_render':return response('The model can revisit past visual observations. '
+            +('Charges of 5 yuan begin on 2026-11-01. ' if protected else '')
+            +'[Source](https://example.invalid/visual-memory)')
         if task=='alive_semantic_review':return response(dict(atom_reviews=[dict(atom_id=a['atom_id'],preserved=True,risks=[])
             for a in data['meaning']['atoms']],added_claims_detected=False,speech_act_preserved=True,protected_literals_preserved=True))
         assert task=='alive_source_support'
-        assert ('review_as_of' in data) is not historical
+        if 'expression_binding' in data:
+            final_calls.append(task)
+            assert ('review_as_of' in data) is not historical
+            if protected:
+                assert data['candidate']['communication_plan']==plan
+                assert data['assessment_scope']['kind']=='final_source_and_recipient_purpose'
+                assert 'protected recipient meaning' in kw['messages'][0]['content']
         return response(dict(verdict='supported',unsupported_claims=[],uncertainties=[],reason='Synthetic source/value assessment.'))
     expressed=await runtime.expression.run(subject='user:test',operation_id='synthetic-expression',call=call,
         policy_context=policy.current('user:test').context,authority=ActionAuthority.USER_DELEGATED,
@@ -79,7 +93,7 @@ async def exercise(root,*,historical=False):
         future=authorize('synthetic-future',later-timedelta(seconds=1))
         assert not future.authorized and 'final_value_assessment_from_future' in future.reasons
         missing=authorize('synthetic-missing-final',final_wording_witness=None)
-        assert not missing.authorized and 'final_wording_required' in missing.reasons
+        assert not missing.authorized and ('selection_stale' if protected else 'final_wording_required') in missing.reasons
         undelegated=authorize('synthetic-no-delegation',delegation_event_id=None)
         assert not undelegated.authorized and 'user_delegation_unproven' in undelegated.reasons
         record=journal.get(receipt.event_id);start=journal.get(record.event.causation_id)
@@ -97,11 +111,13 @@ async def exercise(root,*,historical=False):
         assert not changed.authorized and 'selection_stale' in changed.reasons
     assert not journal.read(event_type='action.attempted')
     assert not journal.read(event_type='dispatch.started')
-    assert calls.count('alive_source_support')==1
+    assert len(final_calls)==1
 
 if __name__=='__main__':
     with tempfile.TemporaryDirectory(prefix='alive-late-selection-') as d:
-        for historical in (False,True):
-            print('LATE_SELECTION_CASE='+('historical' if historical else 'current-review'),flush=True)
-            asyncio.run(exercise(Path(d)/str(historical),historical=historical))
+        for protected in (False,True):
+            for historical in (False,True):
+                print('LATE_SELECTION_CASE='+str((protected,historical)),flush=True)
+                asyncio.run(exercise(Path(d)/str(protected)/str(historical),
+                    historical=historical,protected=protected))
     print('HERMES_ALIVE_LATE_SELECTION_CURRENTNESS_OK')

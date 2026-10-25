@@ -106,12 +106,14 @@ class SourceSupportReviewer:
         return datetime.now(timezone.utc)
 
     def _review_clock_enabled(self,snapshot):
-        return snapshot.get('assessment_scope',{}).get('kind')=='final_discovery_source_and_value'
+        return snapshot.get('assessment_scope',{}).get('kind') in (
+            'final_discovery_source_and_value', 'final_source_and_recipient_purpose')
 
     def _assessment_request(self,snapshot,as_of=None):
         prompt=self.prompt_for_snapshot(snapshot)
         if as_of is None:return prompt,snapshot
-        if (snapshot.get('assessment_scope',{}).get('kind')!='final_discovery_source_and_value'
+        if (snapshot.get('assessment_scope',{}).get('kind') not in (
+                'final_discovery_source_and_value', 'final_source_and_recipient_purpose')
                 or not isinstance(as_of,datetime) or as_of.tzinfo is None or as_of.utcoffset() is None):
             raise SourceSupportError('current value assessment needs its trusted review clock')
         prompt+=('\nreview_as_of is the host clock for THIS assessment. Earlier interpretation '
