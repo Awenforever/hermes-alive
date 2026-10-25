@@ -1001,3 +1001,32 @@ in qualification: Core-curated advice is neither literal history nor explicit
 owner evidence. Avoid new topic-word patches to compensate. Content hashes alone
 prove unchanged bytes, not absence of every filesystem write; state evidence at
 that scope.
+
+## 2026-10-26 — Automatic profile reaches actual Native decisions
+
+The follow-on actual Core test closes the functional gap left above: four real
+main turns curate an initially empty USER; actual candidate interpretation
+receives exactly its current advisory value, while source-only public planning
+receives neither that private profile nor the synthetic canary. One Native local
+adapter submission and two real main followups settle with no pending owned work.
+Only an in-memory adapter runs; no production or channel send. Credential audit
+scans16files without a match, projection removed, original process terminal0.
+
+Do not conflate this with quality. The share remains a dense numerical digest,
+and followup turns evidence from a specific evaluation into stronger general
+claims about model understanding and demos. Core also makes an occasional-topic
+example more specific than its source. This is not grounds to add topic-word
+filters, silently edit Core memory, overrule source negatives or take over all
+main reasoning. Review original evidence, not a model's self-criticism. Keep
+content, profile-attribution and context-handoff failures distinguishable.
+Readable unfamiliar exploration is eligible without becoming a durable interest;
+clear prose alone does not establish a reason for unsolicited interruption.
+
+The public Git consumer lifecycle is separately repeated on421004d: actual
+upgrade from2698900, runtime uninstall/plugin removal and Git reinstall retain
+decryptable synthetic content/events/checkpoints and exact original keys. The
+settled disposable environments/cache/clone are removed after verifying no live
+mounts and exact retained synthetic evidence. This is not a fresh dependency
+bootstrap, four-device qualification or real-account migration. Useful rounds0/10.
+The living plan's next-work list now replaces stale completed component tasks;
+historical detailed evidence remains in Git/ADRs and the collaboration log.

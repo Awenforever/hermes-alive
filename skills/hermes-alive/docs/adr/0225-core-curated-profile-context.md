@@ -63,3 +63,25 @@ of owner attribution survived, but this is not faithful transcript retention. Do
 not interpret the curation record as a direct user statement or use its quoted
 keywords as an interest filter. File-content equality in the live probe proves
 unchanged content; by itself it is not a system-call or metadata-write audit.
+
+## Actual Native consumption, 2026-10-26
+
+A subsequent isolated supported-Core run starts USER empty, lets four actual
+main-model turns curate it, and then enables the installed Native Host. The
+actual internal_candidate_interpretation request contains core_curated_advisory
+whose value equals the last Core-formatted USER snapshot. This is observed at
+that stage, not inferred from another model request or a manually seeded file.
+Public query planning remains separated from private owner/profile inputs.
+Native discovery yields one in-memory adapter submission, followed by two actual
+main turns with prior returned history and exact retained share present. No
+external delivery, external memory provider or production change occurs. All
+owned work settles; exact credential audit is negative and projection removed.
+
+This qualifies the functional main-curation-to-Native handoff only. The resulting
+share still compresses many study statistics rather than explaining a concrete
+example; main followup overgeneralizes the study's limited findings. One Core
+profile entry makes an unrelated occasional reading example more specific than
+the synthetic owner's words support. Advice remains weaker than explicit facts;
+no permanent-topic patch or hidden rewrite of Core USER is justified. This run
+is not credited as a fresh useful zero-error round, perfect learning or ordinary
+private production-memory integration.

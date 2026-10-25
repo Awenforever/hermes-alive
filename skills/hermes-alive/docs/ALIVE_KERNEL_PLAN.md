@@ -13,7 +13,7 @@ and safe portable operation. Component counts are not the completion metric.
 | Area | Current evidence | Still required |
 |---|---|---|
 | Experience and privacy | Protected journal/vault, provenance, deletion and replay checks | Real lifetime/migration/restore with all external associations preserved |
-| Personalization | Owner-confirmed preferences and current Core USER advice; four actual main turns automatically curate a synthetic profile and each current value reaches Alive without reader writes | External-provider recall, noise-aware daily learning and attributed feedback |
+| Personalization | Owner-confirmed preferences and current Core USER advice; real main turns automatically curate a synthetic profile, Native interpretation consumes its exact current value and two real followups complete | External-provider recall, noise-aware daily learning and attributed feedback |
 | Agenda and initiative | Native discovery/commitment decisions, bounded rejection recovery, waits invalidated by actual admitted input | Sustained useful initiative and changing interests over time; no reward for empty repeated ticks |
 | Content and judgment | Source-led composition, final wording review, real main-model examples | Samples remain too much like cautious paper digests; factual review is not a usefulness verdict |
 | Conversation continuity | Exact share/source excerpts reach actual Core main requests; real replies after context reduction no longer recite transport status | Missing evidence still becomes global negative claims in real followup; qualify ADR0230, plus natural old-quote/compaction/restart behavior |
@@ -45,8 +45,14 @@ model/provider or network changes are authorized by this development plan.
   reminders, and one intermediate patch dropped a qualification before the model
   restored it. Do not call this perfect denoising or an atomic semantic update.
   No manual USER seeding, external provider or private production history was
-  used. Native selection with this automatically curated profile, broader noisy
-  daily learning, attributed feedback and external recall remain open.
+  used. A subsequent actual Native integration repeats actual Core curation with
+  initially empty USER and consumes the exact final advice in candidate
+  interpretation; public planning remains source-only. It produces one local
+  adapter submission and two actual main turns, with no owned work pending.
+  This proves integration, not useful content: the share remains number-heavy
+  and followup overstates what a limited benchmark establishes. Core also turns
+  one unrelated reading example into a more specific inferred topic. Broader
+  noisy learning, attributed feedback and external recall remain open.
 
 - Retained-reference reader (ADR0236): r90/r92 five-suite Core focuses pass;
   r91 compact-notice collector also passes. Encrypted authorized text longer than
@@ -183,113 +189,37 @@ competing active plans. ADRs remain the record of architectural decisions.
 
 ## Next work in order
 
-1. Continue content understanding and bounded final assessment (ADR0228/0229/0230).
-   ADR0235 now has actual Core collector and cold real-model handoff proof in
-   r86. Preserve that fix while addressing content quality and ordinary memory;
-   do not rerun the same source as fresh quality evidence. Scope-safe recall for
-   references larger than the host hook cap and older quoted topics remains open.
-   [ADR0236](adr/0236-core-scoped-reference-reader.md) now proposes a Core-owned
-   tool for bounded exact-reference reads in the current authenticated task and
-   conversation. Its implementation is a candidate, not qualified ordinary memory
-   or cross-session recall. Prove actual registry/main-tool behavior and forgetting
-   before relying on the handle in dialogue.
-   r84's real native handoff now completes, but its prose remains report-like and
-   the main model overstates geographic/methodological implications. Context
-   delivery is proven; the plugin must not take over arbitrary main-dialogue
-   reasoning. Preserve that distinction while checking source scope and natural
-   followup. The captured version3 writer request already omits recipient_goal
-   and behavior_constraints. Removing optional reading notes did not improve it
-   consistently, and a shorter conversational task failed across two public
-   subjects; neither experimental replacement is adopted. The author request
-   lacks an explicit host as-of clock. The [ADR0234](adr/0234-immutable-authoring-context-clock.md)
-   candidate binds that input to a new render's immutable start, preserving old
-   unclocked requests and execution authorization. It needs focused and actual
-   semantic qualification. Full raw sample evaluation remains
-   sample-specific and does not create permanent preferences.
-   r83 passes the complete99 portable suite; the actual Core13-suite focus on
-   identical r82 runtime also passes. Its new real-source run nevertheless
-   failed after authorization and share-context capture, before any local
-   adapter call: worker ownership expired inside the still-valid original send
-   permit. [ADR0233](adr/0233-standard-worker-lease-within-original-permit.md)
-   aligns the worker lease with that original bounded window without renewal.
-   No share/main-turn or quality credit is claimed for that failed run.
-   The r79 archaeology run exposed a concrete identity failure before composition:
-   a second query's different snippet for the same URL replaced the listing
-   supporting its own reading question. [ADR0232](adr/0232-query-dependent-search-evidence-identity.md)
-   separates query views without weakening genuine changes, deletion or expiry.
-   Its candidate requires structural and actual-source regression before another
-   quality claim. Natural consecutive-dialogue proof remains pending because
-   this run stopped before either main turn.
-   r76's complete98 portable suites pass. A new science sample is substantially
-   more understandable, but the interesting relationship still needs to come
-   through without a forced benefits/opinion paragraph. A fresh technical share
-   explained a retrieval failure concretely, while its main followup incorrectly
-   treated missing replication evidence as proof that no replication exists.
-   The narrow conversation evidence projection in ADR0230 passes structural
-   checks, but its real main-model comparison still ends with an unsupported
-   conclusion after a correct uncertainty disclaimer. The semantic issue remains
-   open. Do not claim a writing-prompt replacement fixes this. A fixed-evidence four-call comparison
-   found overstatement and an incorrect model-name change in the shorter prompt.
-   r73's source/cited-reading/real-model run settled without publication: final
-   review took408s and its point-in-time value assessment expired. More benchmark
-   numbers were retrieved, but the original message still lists facts without
-   explaining their practical meaning; it is not a useful quality pass. Check
-   actual authoring context and selected-purpose continuity before another
-   rewrite; do not confuse extra data, source approval or a timing fix with
-   recipient understanding.
-   Actual public Git admission and managed dependencies are now verified after
-   Core's own retry of an intermittent dependency TLS failure. r72's
-   full PASS98 and six actual Core setup/scan/control suites pass after moving
-   every fixture into the recognized __tests__ layout. No file or scan rule is
-   omitted; a runtime canary remains dangerous. Actual public Git revision
-   upgrade, runtime uninstall/plugin removal and Git reinstall preserve synthetic
-   encrypted content, journal/checkpoint and original key identities in one
-   consumer profile. No real-account migration, full-feature or fleet claim.
-   The recipient rejected r69's announcement-like output: it contains information
-   without a usable concept of the result, demonstrated work or cost. Align
-   reading, writing and existing final review on concrete understanding (ADR0228)
-   and inspect new original outputs. Main followup still makes unnecessary
-   self-criticisms about faithful paraphrases. Never count exit0 as useful quality.
-2. Complete ordinary memory/profile operation. Prefer safe reuse of Hermes' existing
-   memory ownership instead of creating a second chat logger. Develop with
-   synthetic scoped providers first; separate body retention, model processing
-   and inferred advice from explicit user facts. No private-history collection
-   follows from an outbound retention or sharing grant.
-   Actual Core synthetic dialogue probes distinguish replay repair from a pure
-   tail read, and demonstrate that user roles and row limits alone do not provide
-   human attribution or body-size bounds. No private-dialogue connector is yet
-   enabled; native attributed feedback and noise-aware daily learning remain open.
-3. Improve source choice and expression together on fresh material, using the
-   confirmed profile as a soft prior and keeping exploration outside it. No
-   mandatory critical paragraph, source boilerplate, model-written shared past,
-   or phrase-by-phrase style blacklist. Reduce unnecessary stages if actual
-   latency/cost evidence supports it; do not build another policy framework to
-   avoid examining weak content.
-   A few fixed approved query strings currently constrain long-term breadth.
-   Develop public-topic exploration without turning private profile text into
-   public search queries or making interests exclusive filters. Measure useful
-   domestic and out-of-interest discovery, not merely more provider names.
-   Two paired same-writer comparisons on one existing topic found more concrete
-   explanation and better license qualifications with original source extracts.
-   This is not fresh-round or statistical proof. An actual Core research experiment found primary material after an
-   initial HTML failure, but did not finish composition within its requested
-   runtime and exceeded a prompt-only page budget. Do not embed that unadapted
-   Agent loop. The bounded, separately opted-in refinement candidate in
-   [ADR0231](adr/0231-bounded-public-source-refinement-proposal.md) has actual
-   installed/native source-recovery qualification in r79. Fresh content quality,
-   realistic consecutive main turns, consumer upgrade and fleet remain open.
-   Its owner guidance is
-   [ALIVE_KERNEL_SETUP.md](ALIVE_KERNEL_SETUP.md); no new general agent framework.
-4. Run longitudinal synthetic daily-turn scenarios through actual native
-   interfaces: noisy work topics versus durable interests, changing preferences,
-   independent explicit corrections, attributed feedback, forgotten material,
-   replay, restart and uncertainty. Show that later choices actually change for
-   the right reasons, without losing exploration or resurrecting erased data.
-5. Earn ten consecutive fresh useful full-chain rounds with original outputs
-   reviewed, then complete migration/rollback and independent Git/fleet gates.
-   Repeated VISTA/topic regressions and silence on unsuitable material do not
-   become new positive rounds. Obtain the required concrete production window
-   only after the candidate is ready; no wmw installation overlays.
+1. Improve actual fresh content beyond the qualified automatic-profile Native
+   integration. Real Core main turns, exact current advice in interpretation,
+   source-only public planning, a local share and two actual main followups now
+   have joint evidence. Do not repeat that structural control as a fresh quality
+   round. Inspect what source-led writing actually conveys and separate limited
+   study findings from broad causal or capability claims in main followup.
+2. Test ordinary longitudinal behavior through admitted native interfaces:
+   transient work topics, third-party quotations, later owner corrections, soft
+   interests and outside exploration. Attribute feedback to the actual retained
+   share and authenticated owner; ambiguity must not become a durable preference.
+   Reuse Core memory ownership, not another chat logger. External-provider recall
+   and old quoted/cross-session continuation remain distinct open slices.
+3. Improve fresh selection and sharing only where the original evidence exposes
+   a general failure. A readable unfamiliar-topic explanation can still be a weak
+   proactive choice; evaluate what the person can understand from it without
+   demanding an opinion, utility paragraph or permanent interest tag. Keep useful
+   domestic and outside-interest discovery alongside familiar material. No topic
+   word patches, phrase blacklist, fixed exploration quota or extra judge chain.
+   Inspect source and actual main followup separately: a correct context handoff
+   does not establish arbitrary main-response accuracy.
+4. Earn ten consecutive fresh useful complete rounds, retaining original inputs,
+   source evidence, actual outputs, continuation and explicit failure reasons.
+   Existing-topic regressions, safe silence and successful model calls do not
+   advance that counter. Keep the current source/value versus required-boundary
+   split; original authorization and forgetting checks remain mandatory.
+5. Preserve the current public Git consumer lifecycle qualification; finish legacy migration/rollback,
+   four agreed device targets (WSL thin layer), onboarding/default-engine and
+   release consistency. Existing synthetic state-preservation evidence does not
+   prove real-account migration or all features. Requalify if runtime changes;
+   obtain a fresh concrete production window only when ready. Never overlay wmw
+   with maintainer repairs to manufacture a distribution pass.
 
 Do not append execution diaries above this plan. Update this state and priorities
 when evidence changes; put detailed runs in the shared status or history. The
