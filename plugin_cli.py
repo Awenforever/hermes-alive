@@ -59,6 +59,7 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
     setup.add_argument('--model',default=None,help='Optional Core-configured alias; default inherits Hermes')
     setup.add_argument('--language',help='Optional conversation language tag; otherwise follows Hermes locale')
     setup.add_argument('--communication-preference',help='Explicit communication preference, stored privately after owner confirmation')
+    setup.add_argument('--interests',help='Optional interests in the owner\'s words; soft preferences, privately retained after confirmation')
     setup.add_argument('--public-query',action='append',default=[])
     setup.add_argument('--confirm-public-reads',action='store_true')
     setup.add_argument('--confirm-cited-reads',action='store_true')
@@ -243,7 +244,9 @@ def alive_command(args: argparse.Namespace) -> int:
             'public_queries':args.public_query,'cited_reads':args.confirm_cited_reads,
             **({'language':args.language} if getattr(args,'language',None) else {}),
             **({'communication_preference':args.communication_preference}
-               if getattr(args,'communication_preference',None) else {})},replace=args.replace)
+               if getattr(args,'communication_preference',None) else {}),
+            **({'interest_preferences':args.interests}
+               if getattr(args,'interests',None) else {})},replace=args.replace)
         from hermes_cli.plugins_state import save_plugin_setting
         save_plugin_setting('hermes-alive',('kernel_setup',),{'pending_intent_id':intent.event.event_id})
         print(json.dumps({'ok':True,'confirmation_command':'/alive confirm '+code,
@@ -253,6 +256,8 @@ def alive_command(args: argparse.Namespace) -> int:
                 'configuration_kept_until_removed':True,
                 'conversation_language':getattr(args,'language',None) or 'follows_hermes_locale',
                 'communication_preference':getattr(args,'communication_preference',None),
+                'interest_preferences':getattr(args,'interests',None),
+                'explicit_interest_memory_until_updated_or_forgotten':bool(getattr(args,'interests',None)),
                 'explicit_communication_memory_until_updated_or_forgotten':bool(getattr(args,'communication_preference',None))},
             'phase':'awaiting_authorized_conversation_confirmation'}))
         return 0

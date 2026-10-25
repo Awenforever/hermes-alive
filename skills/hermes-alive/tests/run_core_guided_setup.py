@@ -46,10 +46,15 @@ async def test(home):
     assert rc==2 and denied['confirmation_required'] is True
     rc,denied=cli(home,'setup','--confirm-model-calls','--confirm-delivery')
     assert rc==2 and denied['confirmation_required'] is True
+    explicit_interests='Scientific history and public infrastructure; other worthwhile discoveries are welcome.'
     rc,staged=cli(home,'setup','--confirm-model-calls','--confirm-delivery',
-                  '--confirm-outbound-retention','--retention-days','30')
+                  '--confirm-outbound-retention','--retention-days','30',
+                  '--interests',explicit_interests)
     assert rc==0 and staged['ok'] and staged['delivery_enabled'] is False
     assert staged['phase']=='awaiting_authorized_conversation_confirmation'
+    assert staged['confirmation_summary']['interest_preferences']==explicit_interests
+    assert staged['confirmation_summary']['explicit_interest_memory_until_updated_or_forgotten'] is True
+    assert staged['confirmation_summary']['public_queries']==[]
     command=staged['confirmation_command'].removeprefix('/alive ')
     token_text=command.split()[1]
     rc,installed_result=cli(home,'install-runtime','--engine','kernel-shadow')
@@ -82,6 +87,14 @@ async def test(home):
         store=setup_bridge.setup_store(binding)
         configured=store.configuration()
         assert configured is not None and configured.options['model'] is None
+        from importlib import import_module
+        package=store.__class__.__module__.rsplit('.',1)[0]
+        CognitionContextReader=import_module(package+'.cognition_context').CognitionContextReader
+        Sensitivity=import_module(package+'.events').Sensitivity
+        preferences=CognitionContextReader(store.journal).read(subject=configured.subject,clearance=Sensitivity.PRIVATE)
+        assert any(p.predicate=='profile.interests' and p.value==explicit_interests
+            and p.source_event_ids==(configured.event_id,) for p in preferences)
+        assert explicit_interests.encode() not in store.journal.path.read_bytes()
         assert configured.scope['chat_id']==source.chat_id
         assert configured.scope['session_id']==entry.session_id
         assert not store.journal.read(event_type='action.delegation_granted')

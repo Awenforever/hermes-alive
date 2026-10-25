@@ -41,6 +41,15 @@ outbound-history retention period. Never invent a preference, copy the developer
 profile or silently convert sample feedback into lasting memory. These choices
 grant neither additional actions nor permission to read private chats.
 
+Also offer optional interests in the user's own words (`--interests "<their words>"`).
+Leaving them unset is valid and has no developer-supplied recommendation. Explain
+that these are soft preferences: valuable discoveries outside them remain welcome.
+Keep them separate from approved public search queries; never disclose a private
+interest in a search merely because it was saved as memory. Show the exact interest
+wording and its independent until-updated-or-forgotten memory lifetime in the
+confirmation summary. Only the target owner's confirmation creates explicit
+`profile.interests` memory. This does not enable automatic chat learning.
+
 After approval, stage configuration with the confirmed values:
 
 ```text
@@ -53,7 +62,7 @@ intentional replacement, explain that old data/grants remain separate before
 using `--replace`. Show the returned confirmation_summary in the user's language,
 then give that user the one-time `/alive confirm ...` command. Never persist its
 actual code in shared docs/logs or send it to another user's conversation.
-Show the actual staged language, exact communication wording and its memory
+Show the actual staged language, exact communication/interest wording and its memory
 lifecycle BEFORE asking for confirmation. Do not replace it with "configured" or
 hide a developer-supplied preference behind the code. The summary is private to
 this intended owner; do not copy it into shared operational logs.

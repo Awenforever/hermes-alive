@@ -2,7 +2,24 @@
 
 Status: active
 
-Last reviewed: 2026-10-24
+Last reviewed: 2026-10-25
+
+Explicit personalization slice: optional owner-worded interests are now staged
+through the existing encrypted setup, shown verbatim at confirmation, and seeded
+as existing typed profile.interests memory only after native owner confirmation.
+No default developer interests, inferred daily-chat preferences, topic gate or
+automatic public-query disclosure. Replacement/forgetting/replay use existing
+memory rules, including no recreation of erased proposals. This is a bootstrap
+for useful discovery, not completion of ordinary noise-aware profile learning.
+Windows setup tests pass; current Core CLI/confirmation qualification is pending.
+
+Current live-source evidence updates the diagnostic below: default keyless
+Firecrawl extraction failed with empty content/TLS timeout. The same actual Core
+extract tool with Parallel selected ONLY in a new isolated profile read the exact
+NSFC page successfully. The actual native live-search/source/model cycle is now
+running with this isolated Core choice and no registry handlers replaced; inspect
+its substantive source results and final text before any quality claim. Core owns
+provider selection. Alive receives tool capabilities, not a provider hardcode.
 
 Current qualification: ADR0224 canonical r58 (commit 0b16986) is terminal PASS98
 portable, eight clock/source/authorization/repair suites, seventeen supported-Core

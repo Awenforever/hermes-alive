@@ -125,28 +125,30 @@ def later_choice(root):
     assert not retention.policy('user:ordering').enabled
 
 
-def communication(root):
+def communication(root,option='communication_preference',predicate='profile.communication'):
     from alive_kernel.cognition_context import CognitionContextReader
     from alive_kernel.memory import MemoryProjection
     store=KernelSetupStore(root,initialize=True)
     for extra in ({'language':'not a language'},{'language':None},
-                  {'communication_preference':' '},{'communication_preference':'x'*1001},
-                  {'communication_preference':'a'+'\n'*900}):
+                  {option:' '},{option:'x'*1001},{option:None},
+                  {option:'a'+'\n'*900}):
         refuse(lambda:store.stage({**OPTIONS,**extra}))
-    preference='Prefer an accessible explanation with depth chosen for the material.'
-    intent,token=store.stage({**OPTIONS,'language':'zh-CN','communication_preference':preference})
+    preference=('Prefer an accessible explanation with depth chosen for the material.'
+        if option=='communication_preference' else 'Interested in public science and history, with room for other discoveries.')
+    intent,token=store.stage({**OPTIONS,'language':'zh-CN',option:preference})
     assert not store.journal.read(event_type='memory.proposed')
     configured=store.confirm(intent.event.event_id,token,scope=SCOPE)
     reader=CognitionContextReader(store.journal)
     values=reader.read(subject=configured.subject,clearance=Sensitivity.PRIVATE)
-    assert len(values)==1 and values[0].predicate=='profile.communication' and values[0].value==preference
+    assert len(values)==1 and values[0].predicate==predicate and values[0].value==preference
     assert values[0].source_event_ids==(configured.event_id,)
     assert not reader.read(subject='user:foreign',clearance=Sensitivity.PRIVATE)
     assert preference.encode() not in store.journal.path.read_bytes()
     assert store.confirm(intent.event.event_id,token,scope=SCOPE)==configured
     assert len(store.journal.read(event_type='memory.proposed'))==1
-    replacement='Prefer concise explanations unless the topic merits detail.'
-    second,code=store.stage({**OPTIONS,'communication_preference':replacement},replace=True)
+    replacement=('Prefer concise explanations unless the topic merits detail.'
+        if option=='communication_preference' else 'Recently more interested in archaeology; this is not an exclusive subject list.')
+    second,code=store.stage({**OPTIONS,option:replacement},replace=True)
     latest=store.confirm(second.event.event_id,code,scope=SCOPE)
     values=reader.read(subject=configured.subject,clearance=Sensitivity.PRIVATE)
     assert len(values)==1 and values[0].value==replacement
@@ -219,4 +221,5 @@ with tempfile.TemporaryDirectory(prefix='alive-guided-setup-') as directory:
     lost_key(Path(directory)/'lost-key')
     preserve_legacy(Path(directory)/'legacy')
     communication(Path(directory)/'communication')
+    communication(Path(directory)/'interests','interest_preferences','profile.interests')
 print('HERMES_ALIVE_KERNEL_SETUP_OK')
