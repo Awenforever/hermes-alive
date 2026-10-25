@@ -3,6 +3,32 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## 2026-10-25 — Understandable facts still need a reason to be shared
+
+The reviewed science sample was substantially more understandable and inviting,
+but a readable inventory alone does not always convey what is worth noticing.
+Let the supported relationship or consequence become clear in the explanation.
+Do not append a mandatory significance, application, national-breakthrough or
+personal-verdict paragraph. An interesting observation can stand on its own;
+not every topic needs a practical use. Never invent a causal mechanism to make
+an explanation feel satisfying. This is sample evaluation, not permission to
+create permanent user preferences. Simple calculations should read as ordinary
+chat notation, while explicitly protected literals remain exact (ADR0230).
+
+r79 demonstrates a bounded source-recovery improvement, not a complete writing
+or reasoning repair. Its actual version3 editorial plan had empty contents and
+did not require the writer's extra file/size inventory. Do not blame mandatory
+meaning atoms without checking the actual retained plan. Its first main reply
+also introduced causal explanations not established by the retained sources.
+
+Two independent tool-free main requests with empty conversation history prove
+reference injection only. They do not qualify consecutive natural conversation.
+For that proof, carry the actual Core-returned messages into the next turn,
+verify the preceding real assistant reply reaches the next physical request,
+and allow Core-owned public research when needed. Preserve originals and reading
+limits; a successful tool call or a correct caveat does not repair a false claim
+elsewhere in the same response. No invented history or product Core patch follows.
+
 ## Initial semantic additions must not bypass review or miss bounded repair
 
 2026-10-24, Codex; ADR0216. The first semantic discovery review could reject an

@@ -28,6 +28,15 @@ model/provider or network changes are authorized by this development plan.
 
 ## Latest qualified slices
 
+- r79 / `b444031`: PASS99 portable suites and twelve focused suites, including
+  actual Core guided setup/control/continuity. Windows executes both new source
+  refinement and Core discovery-tool suites successfully. The real native
+  repeated-topic test recovered from an unreachable aggregator through one
+  derived public search and read an original dataset card; source-only planning
+  excluded the fictional private profile. One local submission and two independent
+  main requests settled. This is source-recovery qualification, not natural
+  consecutive dialogue, a fresh quality round or fleet acceptance. The first
+  reply still presented unsupported causal explanations as facts.
 - r65 / `5077671`: PASS98 portable suites and actual Core setup/control tests;
   current personal Core profile is separate opt-in advice, with default-off,
   foreign-home, disabled-target and pending-forgetting boundaries. No external
@@ -150,8 +159,10 @@ competing active plans. ADRs remain the record of architectural decisions.
    initial HTML failure, but did not finish composition within its requested
    runtime and exceeded a prompt-only page budget. Do not embed that unadapted
    Agent loop. The bounded, separately opted-in refinement candidate in
-   [ADR0231](adr/0231-bounded-public-source-refinement-proposal.md) now needs
-   actual installed/native and real-source qualification. Its owner guidance is
+   [ADR0231](adr/0231-bounded-public-source-refinement-proposal.md) has actual
+   installed/native source-recovery qualification in r79. Fresh content quality,
+   realistic consecutive main turns, consumer upgrade and fleet remain open.
+   Its owner guidance is
    [ALIVE_KERNEL_SETUP.md](ALIVE_KERNEL_SETUP.md); no new general agent framework.
 4. Run longitudinal synthetic daily-turn scenarios through actual native
    interfaces: noisy work topics versus durable interests, changing preferences,
