@@ -104,6 +104,13 @@ competing active plans. ADRs remain the record of architectural decisions.
 ## Next work in order
 
 1. Continue content understanding and bounded final assessment (ADR0228/0229/0230).
+   r83 passes the complete99 portable suite; the actual Core13-suite focus on
+   identical r82 runtime also passes. Its new real-source run nevertheless
+   failed after authorization and share-context capture, before any local
+   adapter call: worker ownership expired inside the still-valid original send
+   permit. [ADR0233](adr/0233-standard-worker-lease-within-original-permit.md)
+   aligns the worker lease with that original bounded window without renewal.
+   No share/main-turn or quality credit is claimed for that failed run.
    The r79 archaeology run exposed a concrete identity failure before composition:
    a second query's different snippet for the same URL replaced the listing
    supporting its own reading question. [ADR0232](adr/0232-query-dependent-search-evidence-identity.md)

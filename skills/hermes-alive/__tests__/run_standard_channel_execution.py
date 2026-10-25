@@ -121,7 +121,15 @@ async def test(root, mode):
             profile_id='synthetic',hermes_home=home,resolve_target=lambda p,t:('123','7',None),
             extract_media=lambda text:([],text),observe_profile_home=lambda:root if profile_changed[0] else home,
             clock=clock))
-    successful = mode in ('success','false','unknown','long')
+    prepared_executions=[]
+    if mode in ('prepare-delay','prepare-expired','prepare-revoked'):
+        class LocalPreparation:
+            def prepare(self,execution,**kwargs):
+                prepared_executions.append(execution)
+                logical_offset[0]+=timedelta(seconds=31 if mode=='prepare-expired' else 15)
+                if mode=='prepare-revoked':host.revoke_route(binding_id)
+        cycle_args['send_parameters']['continuity']=LocalPreparation()
+    successful = mode in ('success','false','unknown','long','prepare-delay')
     try:
         result = await runtime.cycle(**cycle_args)
     except (ValueError,TimeoutError,OSError,asyncio.CancelledError):
@@ -154,8 +162,16 @@ async def test(root, mode):
         else: raise AssertionError('normal return evidence overwritten')
     finally:
         if mode=='write-failure': DispatchOutbox.record_adapter_observation = original_record
-    should_send = mode in ('success','false','unknown','long','cancel','exception','write-failure')
+    should_send = mode in ('success','false','unknown','long','cancel','exception','write-failure','prepare-delay')
     assert len(received) == int(should_send), (mode,received)
+    if prepared_executions:
+        execution=prepared_executions[0]
+        assert execution.lease.lease_until<=execution.lease.execute_by
+        authorizations=journal.read(event_type='action.authorization_evaluated')
+        assert len(authorizations)==1,'local preparation renewed authorization'
+        permit=authorizations[0].event
+        assert permit.payload['permit_ttl_seconds']==30
+        assert execution.lease.lease_until<=datetime.fromisoformat(permit.payload['valid_until'])
     if received:
         chat,body,metadata = received[0]
         assert chat=='123' and body==expressed.text
@@ -165,7 +181,7 @@ async def test(root, mode):
     assert len(journal.read(event_type='dispatch.started')) == 1
     assert not journal.read(event_type='transport.publisher.bound')
     assert not journal.read(event_type='delivery.succeeded') and not journal.read(event_type='outcome.recorded')
-    if mode != 'revoked':
+    if mode not in ('revoked','prepare-revoked'):
         async def forbidden(**_): raise AssertionError('recovery repeated inference')
         reopened = AutonomousCycleRuntime(ExperienceJournal(journal.path))
         replay = await reopened.cycle(**{**cycle_args,'expression_parameters':{**expression,'call':forbidden}})
@@ -225,7 +241,8 @@ async def test(root, mode):
 async def main():
     with tempfile.TemporaryDirectory(prefix='alive-standard-channel-') as directory:
         for mode in ('success','false','unknown','long','cancel','exception','missing','disconnected',
-                     'wrong-thread','forged-model','wrong-platform','wrong-profile','revoked','write-failure'):
+                     'wrong-thread','forged-model','wrong-platform','wrong-profile','revoked','write-failure',
+                     'prepare-delay','prepare-expired','prepare-revoked'):
             await test(Path(directory)/mode,mode)
 
 

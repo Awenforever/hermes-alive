@@ -158,7 +158,11 @@ class AutonomousCycleRuntime:
         if prepared.authorization is None or not prepared.authorization.authorized:
             return AutonomousCycleResult('not_authorized',reconciliation,prepared=prepared)
         lease = self.outbox.acquire(worker_id=worker_id,subject=subject,
-            attempt_id=prepared.attempt_event_id.removeprefix('action.attempt:'))
+            attempt_id=prepared.attempt_event_id.removeprefix('action.attempt:'),
+            # Standard submission includes bounded local context persistence.
+            # Use the existing lease ceiling; acquire still clips lease_until
+            # to the ORIGINAL authorization execute_by. No permit is renewed.
+            **({'lease_ttl':self.outbox.MAX_LEASE_TTL} if channel_execution=='standard' else {}))
         if lease is None:
             return AutonomousCycleResult('attempt_unavailable',reconciliation,prepared=prepared)
         submit = (self.preparation.execute_prepared_with_channel if channel_execution == 'standard'
