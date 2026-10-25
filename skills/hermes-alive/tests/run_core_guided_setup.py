@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from unittest.mock import patch
 
 import run_core_session_routing as core
 
@@ -49,12 +50,14 @@ async def test(home):
     explicit_interests='Scientific history and public infrastructure; other worthwhile discoveries are welcome.'
     rc,staged=cli(home,'setup','--confirm-model-calls','--confirm-delivery',
                   '--confirm-outbound-retention','--retention-days','30',
-                  '--interests',explicit_interests)
+                  '--interests',explicit_interests,'--confirm-hermes-profile-memory')
     assert rc==0 and staged['ok'] and staged['delivery_enabled'] is False
     assert staged['phase']=='awaiting_authorized_conversation_confirmation'
     assert staged['confirmation_summary']['interest_preferences']==explicit_interests
     assert staged['confirmation_summary']['explicit_interest_memory_until_updated_or_forgotten'] is True
     assert staged['confirmation_summary']['public_queries']==[]
+    assert staged['confirmation_summary']['use_personal_hermes_curated_user_profile'] is True
+    assert staged['confirmation_summary']['external_memory_provider_recall_enabled'] is False
     command=staged['confirmation_command'].removeprefix('/alive ')
     token_text=command.split()[1]
     rc,installed_result=cli(home,'install-runtime','--engine','kernel-shadow')
@@ -95,6 +98,37 @@ async def test(home):
         assert any(p.predicate=='profile.interests' and p.value==explicit_interests
             and p.source_event_ids==(configured.event_id,) for p in preferences)
         assert explicit_interests.encode() not in store.journal.path.read_bytes()
+        # Consume the current Core-curated profile, not a second chat logger or
+        # a permanent user-explicit MemoryProposal. These are synthetic files.
+        from tools.memory_tool import MemoryStore
+        core_profile=MemoryStore();core_profile.load_from_disk()
+        profile_text='SYNTHETIC_CORE_CURATED_USER_PROFILE_SENTINEL'
+        assert core_profile.add('user',profile_text)['success']
+        before={p.name:p.read_bytes() for p in (home/'memories').iterdir() if p.is_file()}
+        reader=CognitionContextReader(store.journal)
+        def advice():return [p for p in reader.read(subject=configured.subject,clearance=Sensitivity.PRIVATE)
+                            if p.kind=='core_curated_advisory']
+        observed=advice()
+        assert len(observed)==1 and profile_text in observed[0].value
+        assert observed[0].predicate=='profile.hermes_curated'
+        assert before=={p.name:p.read_bytes() for p in (home/'memories').iterdir() if p.is_file()}
+        assert profile_text.encode() not in store.journal.path.read_bytes()
+        assert advice()==observed
+        assert len(store.journal.read(event_type='memory.core_profile_observed'))==1
+        with patch.object(MemoryStore,'load_from_disk',side_effect=AssertionError('unauthorized Core profile read')):
+            assert not any(p.kind=='core_curated_advisory' for p in reader.read(
+                subject=configured.subject,clearance=Sensitivity.PUBLIC))
+            assert not reader.read(subject='user:foreign',clearance=Sensitivity.PRIVATE)
+            from hermes_yaml import safe_load
+            saved_config_bytes=(home/'config.yaml').read_bytes()
+            saved_config=safe_load(saved_config_bytes.decode('utf-8'))
+            disabled_config={**saved_config,'memory':{'user_profile_enabled':False}}
+            (home/'config.yaml').write_text(json.dumps(disabled_config))
+            try:assert advice()==[]
+            finally:(home/'config.yaml').write_bytes(saved_config_bytes)
+        assert core_profile.remove('user',profile_text)['success']
+        assert advice()==[],'forgotten Core profile came back from an Alive cache'
+        assert len(store.journal.read(event_type='memory.proposed'))==1
         assert configured.scope['chat_id']==source.chat_id
         assert configured.scope['session_id']==entry.session_id
         assert not store.journal.read(event_type='action.delegation_granted')
@@ -155,6 +189,17 @@ async def test(home):
         assert refused_setup['identity_replaced'] is False and not store.root.exists()
         backup.rename(store.root)
         assert store.configuration().event_id==configured.event_id
+        # A pending Alive subject-forget blocks an old read grant before the
+        # erase worker runs, without deleting Core's separately owned memory.
+        assert core_profile.add('user','SYNTHETIC_UPDATED_CORE_PROFILE')['success']
+        assert 'SYNTHETIC_UPDATED_CORE_PROFILE' in advice()[0].value
+        retention=import_module(package+'.retention').RetentionProjection(store.journal)
+        retention.append_erasure_request(subject=configured.subject,actor=configured.subject,
+            operation_id='synthetic-profile-context-forget')
+        profile_reader=import_module(package+'.core_profile_context').read_core_profile_evidence
+        with patch.object(MemoryStore,'load_from_disk',side_effect=AssertionError('forgotten Core read grant revived')):
+            assert profile_reader(store.journal,subject=configured.subject) is None
+        assert 'SYNTHETIC_UPDATED_CORE_PROFILE' in (home/'memories/USER.md').read_text()
         print('HERMES_ALIVE_CORE_GUIDED_SETUP_OK')
     finally:
         if manager is not None:manager.unload()

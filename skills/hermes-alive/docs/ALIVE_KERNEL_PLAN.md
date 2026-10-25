@@ -13,10 +13,10 @@ and safe portable operation. Component counts are not the completion metric.
 | Area | Current evidence | Still required |
 |---|---|---|
 | Experience and privacy | Protected journal/vault, provenance, deletion and replay checks | Real lifetime/migration/restore with all external associations preserved |
-| Personalization | Owner-confirmed optional interests and communication preferences reach typed encrypted memory through actual Core CLI/confirmation | Noise-aware ordinary conversation learning; existing external-memory integration; expiry, correction and forgetting across that live loop |
+| Personalization | Owner-confirmed optional interests/communication preferences; opt-in current Core-curated profile integration under qualification | Actual native profile-read/forgetting proof, external-provider recall, noise-aware daily learning and attributed feedback |
 | Agenda and initiative | Native discovery/commitment decisions, bounded rejection recovery, waits invalidated by actual admitted input | Sustained useful initiative and changing interests over time; no reward for empty repeated ticks |
 | Content and judgment | Source-led composition, final wording review, real main-model examples | Samples remain too much like cautious paper digests; factual review is not a usefulness verdict |
-| Conversation continuity | Exact share and retained source excerpts reach actual Core main requests; cold-store reattachment tested | Natural topic followup after compaction/restart/old quotations; latest model-facing context reduction still needs a real reply |
+| Conversation continuity | Exact share/source excerpts reach actual Core main requests; real replies after context reduction no longer recite transport status | Self-attribution/source-analysis errors remain; natural old-quote/compaction/restart behavior |
 | Sources | Actual Core free search and substantive extraction demonstrated in isolated profiles | More useful live selection across Chinese and other sources, currentness, provenance and inaccessible/full-read boundaries |
 | Authority and transport | Original delegation/policy/source checks and short physical permits preserved, including delayed-composition regression | Real daemon and channel outcomes under a separately approved production window; Enhance remains sole physical FIFO/token/retry owner |
 | Portability and migration | Managed supported-Core component integration | Independent Git consumer install/configure/run/upgrade/uninstall-preserve/reinstall across four agreed targets, plus legacy-state migration and rollback |
@@ -47,6 +47,23 @@ model/provider or network changes are authorized by this development plan.
 - Actual Core keyless search succeeded; default Firecrawl extraction returned
   empty/error with TLS timeout. An isolated Core Parallel selection retrieved
   substantive primary text. Returning an envelope is not a successful read.
+- Actual live Chinese-source r59: one local submission, two main replies and no
+  pending work. Substantive research content came from a search listing; the
+  article extraction was footer/navigation only. Main followup mixed source-only
+  numbers with what it had actually said. Native assistant-history comparison
+  avoided that one error but made another false correction; no product mirror
+  or successful quality round is adopted. Core-owned official model fallback
+  recovered after two USTC timeouts; no routing change was made.
+- r63 / `51515f2`: six focused suites pass after aligning source choice and final
+  review with planning's existing allowance for an interesting fact to suffice.
+  Initial real product-news retrieval failed before any model call; a separate
+  isolated Exa/Parallel configuration is under actual live/model examination.
+  This hypothesis about unnecessary critical prose is not a style success claim.
+- ADR0225 is being qualified vertically: optional native owner-confirmed personal
+  profile read, current Core USER advice in cognition, and actual Core updates,
+  disable/delete/forgetting checks. No second chat logger or permanent import;
+  real external-provider recall and production memory remain out of scope of
+  that slice and are still required for the full goal.
 
 Full r58 tests do not automatically qualify later code, and focused results do
 not claim fleet, consumer installation, physical delivery or production quality.
@@ -57,10 +74,11 @@ competing active plans. ADRs remain the record of architectural decisions.
 
 ## Next work in order
 
-1. Finish and inspect the actual live-source r59 cycle, including its two model
-   timeouts, pending physical work and credential cleanup. Never restart from an
-   observation timeout or count a wrapper's zero exit as a useful share.
-2. Close ordinary memory/profile operation. Prefer safe reuse of Hermes' existing
+1. Qualify the opt-in current Core profile path through actual installed CLI,
+   confirmation and cognition. Inspect the r63 product-news model output before
+   counting any value-criteria improvement; settle and audit its private model job.
+   Never count a wrapper's zero exit as a useful share.
+2. Complete ordinary memory/profile operation. Prefer safe reuse of Hermes' existing
    memory ownership instead of creating a second chat logger. Develop with
    synthetic scoped providers first; separate body retention, model processing
    and inferred advice from explicit user facts. No private-history collection

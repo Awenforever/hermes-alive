@@ -36,12 +36,13 @@ def validate_options(options):
     required={'model_calls','delivery','outbound_retention_days','outbound_retention_confirmed',
               'model','public_queries','cited_reads'}
     if (not isinstance(options, dict) or not required<=set(options)
-            or set(options)-required-{'language','communication_preference','interest_preferences'}
+            or set(options)-required-{'language','communication_preference','interest_preferences','use_hermes_user_profile'}
             or options['model_calls'] is not True or options['delivery'] is not True
             or options['outbound_retention_confirmed'] is not True
             or type(options['outbound_retention_days']) is not int
             or not 1 <= options['outbound_retention_days'] <= 365
-            or type(options['cited_reads']) is not bool):
+            or type(options['cited_reads']) is not bool
+            or 'use_hermes_user_profile' in options and type(options['use_hermes_user_profile']) is not bool):
         raise KernelSetupError('explicit model/delivery/retention choices required')
     model = options['model']
     queries = options['public_queries']
@@ -323,6 +324,8 @@ class KernelSetupStore:
         if self.vault.digest_json(options) != reference.digest:
             raise KernelSetupError('setup choices changed')
         options = validate_options(options)
+        if options.get('use_hermes_user_profile') is True and document['chat_type'] != 'dm':
+            raise KernelSetupError('personal Core profile memory requires a private target conversation')
         content = self.vault.put_json({'scope':document, 'options':options}, subject=owner,
             purpose='setup.configuration', sensitivity=Sensitivity.PRIVATE,
             content_id='setup-configuration:' + self.protector.authenticate_json('setup.configuration.id.v1',

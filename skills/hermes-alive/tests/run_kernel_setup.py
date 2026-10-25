@@ -130,6 +130,8 @@ def communication(root,option='communication_preference',predicate='profile.comm
     from alive_kernel.memory import MemoryProjection
     store=KernelSetupStore(root,initialize=True)
     for extra in ({'language':'not a language'},{'language':None},
+                  {'use_hermes_user_profile':None},{'use_hermes_user_profile':1},
+                  {'use_hermes_user_profile':'true'},
                   {option:' '},{option:'x'*1001},{option:None},
                   {option:'a'+'\n'*900}):
         refuse(lambda:store.stage({**OPTIONS,**extra}))
@@ -157,6 +159,18 @@ def communication(root,option='communication_preference',predicate='profile.comm
     assert store.confirm(second.event.event_id,code,scope=SCOPE)==latest
     assert not reader.read(subject=configured.subject,clearance=Sensitivity.PRIVATE)
     assert len(store.journal.read(event_type='memory.proposed'))==2
+
+
+def personal_profile_scope(root):
+    store=KernelSetupStore(root,initialize=True)
+    intent,token=store.stage({**OPTIONS,'use_hermes_user_profile':True})
+    try:store.confirm(intent.event.event_id,token,scope={**SCOPE,'chat_type':'group'})
+    except KernelSetupError as error:
+        assert str(error)=='personal Core profile memory requires a private target conversation'
+    else:raise AssertionError('personal profile authorized into a group')
+    assert store.configuration() is None
+    configured=store.confirm(intent.event.event_id,token,scope=SCOPE)
+    assert configured.options['use_hermes_user_profile'] is True
 
 
 def lost_key(root):
@@ -222,4 +236,5 @@ with tempfile.TemporaryDirectory(prefix='alive-guided-setup-') as directory:
     preserve_legacy(Path(directory)/'legacy')
     communication(Path(directory)/'communication')
     communication(Path(directory)/'interests','interest_preferences','profile.interests')
+    personal_profile_scope(Path(directory)/'personal-profile-scope')
 print('HERMES_ALIVE_KERNEL_SETUP_OK')

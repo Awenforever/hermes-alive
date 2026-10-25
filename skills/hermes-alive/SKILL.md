@@ -50,6 +50,22 @@ wording and its independent until-updated-or-forgotten memory lifetime in the
 confirmation summary. Only the target owner's confirmation creates explicit
 `profile.interests` memory. This does not enable automatic chat learning.
 
+Offer a separate, default-off choice to consult Hermes' existing curated personal
+profile. Only if the user confirms that this Hermes profile belongs to them and
+allows its curated memory to be processed, add `--confirm-hermes-profile-memory`.
+Explain that the current built-in USER profile becomes advisory private context
+for the configured models and protected generation records; it is not imported
+as a new user-explicit fact or used to construct public searches. Core's standard
+loader can read both curated memory files; this feature exposes only its user
+profile, and does not initialize or recall an external memory provider. It does
+not harvest chat transcripts. The target must be a private conversation; decline
+this choice for groups and shared profiles. Leaving it off is fully valid.
+Changes or deletions in Core are re-read rather than restored from an Alive cache.
+Core can disable its user profile independently. A subject-forget in Alive blocks
+the old read grant and does not delete Core's separately owned memory; any later
+opt-in requires a new owner confirmation. Do not infer this permission from an
+interest, a sharing grant or outbound-history retention.
+
 After approval, stage configuration with the confirmed values:
 
 ```text

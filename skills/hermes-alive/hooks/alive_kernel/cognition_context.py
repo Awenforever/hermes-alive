@@ -29,7 +29,7 @@ class CognitionContextEvidence:
 
 
 class CognitionContextReader:
-    """Read explicit user statements, not inferred preferences or permission."""
+    """Explicit memories plus separately consented, current Core profile advice."""
 
     def __init__(self, journal, *, content_vault=None):
         self.journal = journal
@@ -81,4 +81,9 @@ class CognitionContextReader:
             ))
             if len(accepted) == limit:
                 break
+        if len(accepted) < limit and Sensitivity(clearance) in (Sensitivity.PRIVATE, Sensitivity.RESTRICTED):
+            from .core_profile_context import read_core_profile_evidence
+            profile = read_core_profile_evidence(self.journal, subject=subject)
+            if profile is not None:
+                accepted.append(CognitionContextEvidence(**profile))
         return tuple(accepted)
