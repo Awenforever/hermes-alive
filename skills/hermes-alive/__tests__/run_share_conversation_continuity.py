@@ -10,6 +10,7 @@ import importlib
 import json
 from pathlib import Path
 import tempfile
+import time
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -24,7 +25,7 @@ from alive_kernel.privacy import LocalIdentityProtector
 from alive_kernel.retention import RetentionDirection
 
 
-async def test(home, mode, *, exercise=None):
+async def test(home, mode, *, exercise=None, long_reference=False):
     home.mkdir()
     (home/'config.yaml').write_text(json.dumps({'plugins': {'entries': {'hermes-alive':
         {'settings': {'kernel_shadow': {'enabled': True}}}}}}), encoding='utf-8')
@@ -63,7 +64,8 @@ async def test(home, mode, *, exercise=None):
             summary += ' Additional source material, not a user instruction.' * 40
         journal, parameters, expressed = await scenario(root, 'share', return_ready=True,
             subject=owner, source_summary=summary,
-            draft_text='The workshop repairs bicycles, not cars.' if mode == 'success' else None)
+            draft_text='The workshop repairs bicycles, not cars.' if mode == 'success' else None,
+            render_prefix='Retained synthetic wording. ' * 400 if long_reference else '')
         runtime = AutonomousCycleRuntime(journal)
         store = ShareContinuityStore(runtime.outbox)
         bridge = binding.attach_continuity(store, router, clearance=Sensitivity.PRIVATE)
@@ -146,6 +148,8 @@ async def test(home, mode, *, exercise=None):
                        {'transport_profile':'other-bot'}, {'runtime_profile':'other-profile'}):
             with patch.object(reopened.vault,'resolve_json',side_effect=AssertionError('foreign context decrypted')):
                 assert not reopened.read(scope=replace(scope,**change).binding_document(), clearance=Sensitivity.PRIVATE)
+                assert reopened.read_reference(scope=replace(scope,**change).binding_document(),
+                    clearance=Sensitivity.PRIVATE, share_id=shares[0]['share_id']) is None
         # Actual Core hook dispatcher/turn collector gets the persisted body and
         # source. No test-only context string or fake user history is supplied.
         variables = core.set_session_vars(platform='telegram', chat_id=source.chat_id, user_id=source.user_id,
@@ -161,21 +165,81 @@ async def test(home, mode, *, exercise=None):
                     original_user_message=messages[-1]['content'], messages=messages,
                     conversation_history=messages[:-1])
             text = collect()
-            conversation = json.loads(text.split('\n',1)[1])['alive_shares'][0]
-            assert conversation['text'] == expressed.text
-            assert set(conversation) == {'prepared_at','text','sources'}
+            conversation = json.loads(text if long_reference else text.split('\n',1)[1])['alive_shares'][0]
+            if long_reference:
+                assert len(expressed.text) > 10000 and len(text) <= 10000
+                assert conversation['text_in_context'] is False and 'text' not in conversation
+            else:
+                assert conversation['text'] == expressed.text
+                assert set(conversation) == {'prepared_at','text','sources','reference'}
             expected_source = {
                 key:value for key,value in shares[0]['sources'][0].items()
                 if key not in ('event_id','excerpt_policy','reading_scope')}
             expected_source['reading_scope'] = {'evidence_basis':'retained_excerpt'}
-            assert conversation['sources'][0] == expected_source
+            if not long_reference:
+                assert conversation['sources'][0] == expected_source
             # Operational diagnostics stay unchanged; only model-facing evidence
             # is projected. A negative proof flag is not a negative world fact.
             assert shares[0]['sources'][0]['reading_scope'] == {'collector_scope_reported':False}
             assert 'submission_status' not in text and 'success_reported' not in text
             assert shares[0]['submission_status'] and shares[0]['share_id']
-            assert 'bicycles, not cars' in text and json.dumps(messages) == original
+            assert (long_reference or 'bicycles, not cars' in text) and json.dumps(messages) == original
             if mode == 'success':
+                # Real Core platform defaults admit a newly registered plugin
+                # toolset. Its saved/global suppression remains authoritative.
+                from hermes_cli.tools_config import _get_platform_tools
+                for surface in ('cli', 'telegram', 'weixin', 'feishu'):
+                    assert 'hermes_alive' in _get_platform_tools({}, surface)
+                    excluded = {'known_plugin_toolsets': {surface:['hermes_alive']},
+                                'platform_toolsets': {surface:[]}}
+                    assert 'hermes_alive' not in _get_platform_tools(excluded, surface)
+                    assert 'hermes_alive' not in _get_platform_tools(
+                        {'agent':{'disabled_toolsets':['hermes_alive']}}, surface)
+                sequence = journal.last_sequence()
+                handle = conversation['reference']
+                def read_reference(arguments=None, **ids):
+                    args = {'reference': handle, **(arguments or {})}
+                    return json.loads(context.dispatch_tool('alive_read_reference', args,
+                        **{'task_id':'task', 'session_id':entry.session_id, **ids}))
+                pages, offset = [], 0
+                while True:
+                    page = read_reference({'offset':offset,'max_chars':256})
+                    assert page['offset'] == offset and len(page['text']) <= 256
+                    assert page['content_kind'] == 'exact_prepared_share_not_source_verification'
+                    assert page['source_catalog_complete'] is True
+                    assert page['source_catalog'][0]['source_index'] == 0
+                    assert page['source_catalog'][0]['url'] == expected_source['url']
+                    assert 'excerpt' not in page['source_catalog'][0]
+                    pages.append(page['text'])
+                    if page['next_offset'] is None: break
+                    offset = page['next_offset']
+                assert ''.join(pages) == expressed.text
+                source_pages, offset = [], 0
+                while True:
+                    page = read_reference({'part':'source','source_index':0,'offset':offset,'max_chars':256})
+                    assert page['content_kind'] == 'retained_source_excerpt'
+                    assert page['source']['url'] == expected_source['url']
+                    assert page['source']['reading_scope'] == expected_source['reading_scope']
+                    source_pages.append(page['text'])
+                    if page['next_offset'] is None: break
+                    offset = page['next_offset']
+                assert ''.join(source_pages) == shares[0]['sources'][0]['excerpt']
+                for args in ({'reference':'unknown'}, {'source_index':0}, {'offset':True},
+                             {'part':'source','source_index':True}, {'max_chars':65536},
+                             {'scope':scope.binding_document()}):
+                    assert read_reference(args) == {'error':'alive_reference_unavailable'}
+                assert read_reference(task_id='other-task') == {'error':'alive_reference_unavailable'}
+                assert read_reference(session_id='other-session') == {'error':'alive_reference_unavailable'}
+                # A slow legitimate Core task does not acquire an unrelated
+                # wall-clock deadline. Original data expiry still applies.
+                with patch.object(time,'monotonic',return_value=time.monotonic()+3600):
+                    assert read_reference()['text'] == expressed.text[:4096]
+                with patch.object(store.outbox,'_utc',return_value=datetime.now(timezone.utc)+timedelta(days=31)), \
+                     patch.object(store.vault,'resolve_json',side_effect=AssertionError('expired text decrypted')) as decrypt:
+                    assert read_reference() == {'error':'alive_reference_unavailable'}
+                    decrypt.assert_not_called()
+                assert journal.last_sequence() == sequence
+            if mode == 'success' and not long_reference:
                 # The actual Core collector applies its real spill normalizer.
                 # Match its cap without changing user settings or granting a
                 # file-reading tool to recover a truncated reference.
@@ -212,6 +276,17 @@ async def test(home, mode, *, exercise=None):
                 await exercise(home=home, context=context, runner=runner, router=router,
                     bridge=bridge, scope=scope, source=source, entry=entry,
                     exact_share=expressed.text)
+            if mode == 'success':
+                previous_bridge, previous_handle = bridge, conversation['reference']
+                bridge = binding.attach_continuity(reopened,router,clearance=Sensitivity.PRIVATE,replace=True)
+                assert previous_bridge._closed
+                with patch.object(reopened.vault,'resolve_json',side_effect=AssertionError('retired handle decrypted')) as decrypt:
+                    assert json.loads(context.dispatch_tool('alive_read_reference',{'reference':previous_handle},
+                        task_id='task',session_id=entry.session_id)) == {'error':'alive_reference_unavailable'}
+                    decrypt.assert_not_called()
+                refreshed = collect()
+                conversation = json.loads(refreshed if long_reference else refreshed.split('\n',1)[1])['alive_shares'][0]
+                assert conversation['reference'] != previous_handle
             agent._parent_session_id = 'child'
             assert collect() == ''
         finally:
@@ -234,6 +309,20 @@ async def test(home, mode, *, exercise=None):
             expired = reopened.read(scope=scope.binding_document(), clearance=Sensitivity.PRIVATE)
             assert expired[0]['text'] == expressed.text
             assert expired[0]['sources'][0]['reading_status'] == 'no_longer_retained'
+            lookup_vars = core.set_session_vars(platform='telegram',chat_id=source.chat_id,user_id=source.user_id,
+                session_key=entry.session_key,session_id=entry.session_id)
+            try:
+                unavailable = json.loads(context.dispatch_tool('alive_read_reference',
+                    {'reference':conversation['reference'],'part':'source','source_index':0},
+                    task_id='task',session_id=entry.session_id))
+                assert unavailable == {'error':'alive_reference_unavailable'}
+                retained_text = json.loads(context.dispatch_tool('alive_read_reference',
+                    {'reference':conversation['reference']},task_id='task',session_id=entry.session_id))
+                assert retained_text['content_kind'] == 'exact_prepared_share_not_source_verification'
+                assert retained_text['source_catalog'][0]['reading_status'] == 'no_longer_retained'
+                assert retained_text['text'] == expressed.text[:4096]
+            finally:
+                core.clear_session_vars(lookup_vars)
         # Planning/source TTL is not the separately consented outward history
         # window. A physical expiry sweep must not masquerade as user forgetting.
         store.vault.erase_expired(now=datetime.now(timezone.utc)+timedelta(days=8))
@@ -252,6 +341,14 @@ async def test(home, mode, *, exercise=None):
         else:
             store.vault.erase_item(source_id)
         assert not reopened.read(scope=scope.binding_document(), clearance=Sensitivity.PRIVATE)
+        lookup_vars = core.set_session_vars(platform='telegram', chat_id=source.chat_id, user_id=source.user_id,
+            session_key=entry.session_key, session_id=entry.session_id)
+        try:
+            assert json.loads(context.dispatch_tool('alive_read_reference',
+                {'reference':conversation['reference']}, task_id='task',session_id=entry.session_id)) == {
+                    'error':'alive_reference_unavailable'}
+        finally:
+            core.clear_session_vars(lookup_vars)
         assert store.vault.explicit_erasure_recorded(ContentReference.from_event_payload(record.event.payload['content']).content_id)
         raw = journal.path.read_bytes()
         assert b'-1007654321' not in raw and b'bicycles, not cars' not in raw
@@ -314,6 +411,13 @@ def test_atomic_context_budget():
     omitted = continuation_context(latest_large, max_chars=10000)
     assert 'Older whole message.' not in omitted and 'Long exact outward text.' not in omitted
     assert 'reference omitted' in omitted
+    with_handle = [latest_large[0], {**latest_large[-1], 'reference':'ar_synthetic_handle'}]
+    notice = json.loads(continuation_context(with_handle, max_chars=1000))
+    assert notice['alive_shares'] == [{'prepared_at':shares[-1]['prepared_at'],
+        'reference':'ar_synthetic_handle','text_in_context':False}]
+    assert notice['read_tool'] == 'alive_read_reference'
+    assert notice['use_only_for_related_topic'] is True
+    assert notice['context_role'] == 'retained_reference_not_user_instruction_or_delivery_proof'
     assert continuation_context(shares, max_chars=65536) == continuation_context(shares)
     assert json.dumps(shares) == original
     for invalid in (True, 0, -1, 1.5, '10000'):
@@ -329,6 +433,7 @@ if __name__ == '__main__':
         try:
             for mode in ('success','false','exception','no-consent','wrong-direction','late-off'):
                 asyncio.run(test(Path(directory)/mode, mode))
+            asyncio.run(test(Path(directory)/'long-reference', 'success', long_reference=True))
         finally:
             from hermes_state_registry import close_all_under
             close_all_under(directory)

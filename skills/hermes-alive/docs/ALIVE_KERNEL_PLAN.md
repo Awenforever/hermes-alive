@@ -28,6 +28,33 @@ model/provider or network changes are authorized by this development plan.
 
 ## Latest qualified slices
 
+- Retained-reference reader (ADR0236): r90/r92 five-suite Core focuses pass;
+  r91 compact-notice collector also passes. Encrypted authorized text longer than
+  the hook cap is reconstructed exactly through bounded pages, with original
+  task/session/retention/forgetting guards. r92's actual official-model control
+  starts with a512-character context that contains no share text. Core's own
+  deferred-tool discovery leads to two complete text reads and one source-excerpt
+  read across two consecutive real main turns. Physical requests receive the
+  exact words, prior actual reply is preserved, sends0 and kernel sequence unchanged.
+  Typed content and source catalog distinguish past wording from collected evidence.
+  These are same-source controls, not fresh quality rounds or production-default
+  routing proof. The main answers still overgeneralize an observation; quality0/10.
+  r93 additionally verifies default CLI/Telegram/Weixin/Feishu toolset admission
+  and saved/global suppression through Core's actual resolver. A final negative
+  boundary now rejects an expired/missing source as unavailable while retaining
+  the separately consented outward text; read handles follow the live Core task
+  and original data lifetime, without an unrelated short wall-clock deadline.
+  The64-entry map and generation/owner/retention guards stay. An empty successful excerpt would be
+  misleading. r95 five-suite actual Core regression passes, including original-data expiry
+  before decryption, source expiry, replacement retirement and Core toolset
+  suppression. Full regression and the release gate remain pending.
+
+The supported test supply still matches the latest non-prerelease official
+[Hermes v0.22.5 release](https://github.com/NousResearch/hermes-agent/releases/tag/v0.22.5),
+verified from the official latest-release API on2026-10-26; target commit is
+`bf0203a794a07aac3ff764972ab9087baa4e4f4e`. This is version verification, not a
+production upgrade or fleet qualification.
+
 - r86 / `6c14c61`: five focused suites pass, including actual Core plugin scan,
   guided setup, execution control and the expanded conversation collector cases.
   Windows atomic context-boundary checks pass. A cold replay of the exact settled
@@ -139,6 +166,11 @@ competing active plans. ADRs remain the record of architectural decisions.
    r86. Preserve that fix while addressing content quality and ordinary memory;
    do not rerun the same source as fresh quality evidence. Scope-safe recall for
    references larger than the host hook cap and older quoted topics remains open.
+   [ADR0236](adr/0236-core-scoped-reference-reader.md) now proposes a Core-owned
+   tool for bounded exact-reference reads in the current authenticated task and
+   conversation. Its implementation is a candidate, not qualified ordinary memory
+   or cross-session recall. Prove actual registry/main-tool behavior and forgetting
+   before relying on the handle in dialogue.
    r84's real native handoff now completes, but its prose remains report-like and
    the main model overstates geographic/methodological implications. Context
    delivery is proven; the plugin must not take over arbitrary main-dialogue
@@ -612,3 +644,17 @@ For each material change:
 Earlier execution notes and the original change log are retained in
 [the progress archive](ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-25.md).
 See Git history and ADRs for subsequent code and design changes.
+
+## 2026-10-26 — Evaluation calibration
+
+Judge understandable explanations against versioned primary evidence, not a
+model's later self-criticism. An excerpt's missing detail does not establish
+worldwide absence. Distinguish supported plain-language explanation, bounded
+inference, unresolved assertion and contradicted empirical claim. The original
+context-spill regression still failed correctly: later evidence cannot retroactively
+put missing words into a recorded request. Same-source controls do not increment
+the fresh useful-round counter. See the memorandum for the primary-source check.
+
+Unfamiliar topics can be worthwhile exploration without becoming lasting interests.
+Sample feedback must remain attributable and reversible; do not infer a permanent
+dislike from unfamiliarity, or equate clear exposition with proactive usefulness.

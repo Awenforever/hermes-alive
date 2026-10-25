@@ -81,10 +81,29 @@ class GatewayHostBinding:
         from .gateway_conversation_bridge import CoreShareContinuity
         fresh=CoreShareContinuity(store,router,clearance=clearance)
         previous=self._continuity
+        if previous is None:
+            from .gateway_conversation_bridge import READ_REFERENCE_SCHEMA
+            registered = self.context.register_tool(name='alive_read_reference', toolset='hermes_alive',
+                schema=READ_REFERENCE_SCHEMA, handler=self._read_reference,
+                check_fn=lambda: not self.closed and self._continuity is not None)
+            if registered is None:
+                fresh.close()
+                raise ValueError('Core reference reader registration unavailable')
+            self.context.register_hook('pre_llm_call',self._conversation_context)
         if previous is not None:previous.close()
         self._continuity=fresh
-        if previous is None:self.context.register_hook('pre_llm_call',self._conversation_context)
         return self._continuity
+
+    def _read_reference(self, args, **values):
+        result = {'error': 'alive_reference_unavailable'}
+        if not self.closed and self._continuity is not None:
+            try:
+                self._require_home()
+                result = self._continuity.read_reference(args, **values)
+            except ValueError:
+                pass
+        # Core registry handlers return JSON text, unlike hook context values.
+        return json.dumps(result, ensure_ascii=False, separators=(',', ':'))
 
     def _conversation_context(self,**values):
         if self.closed or self._continuity is None:return None

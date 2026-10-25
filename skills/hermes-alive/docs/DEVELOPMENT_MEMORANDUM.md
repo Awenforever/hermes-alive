@@ -927,3 +927,42 @@ round. Do not add a TimeViper-specific wording rule or take over arbitrary Core
 main-dialogue reasoning. Next useful work must advance natural selection, scoped
 ordinary memory and missing long/quoted reference retrieval, rather than another
 isolated date/lease fix or a repeated-source quality claim.
+
+## 2026-10-26 — Readable history needs an actual Core retrieval path
+
+The new reader was qualified with Core's actual tool registry and deferred-tool
+search, not by disabling that mechanism. A dict return was incompatible with the
+registry, and an oversized fixture exceeded the existing channel limit; both
+failed snapshots remain. The fixed component reconstructs authorized long text
+and source excerpts with scoped expiring handles. A real model recovers a share
+missing from its initial context and can then inspect a selected original excerpt.
+Neither the exact prior words nor a catalog certifies source truth. Keep their
+content kinds distinct, and do not call a later self-correction a successful first
+answer. Same-source diagnostics do not advance the fresh-round counter.
+
+A separate fresh Hermes-source native test ended137 before local submission.
+Its evidence remained in_progress, models had both success and timeout/fallback
+activity, credentials were audited/removed, and production remained running with
+no restarts. Available Docker history does not prove the interruption cause;
+do not label it OOM, model unavailability or plugin failure without evidence.
+New isolated launchers capture their own labeled Docker lifecycle immediately.
+Do not restart the interrupted source task merely because a shell handle is lost.
+
+## 2026-10-26 — Calibrate judgments without rewriting evidence
+
+The earlier blanket dismissal of a video-length efficiency trend was too strong.
+Independent inspection of the versioned primary preprint
+https://arxiv.org/html/2511.16595v2 shows attention-mask/information-blocking
+experiments in section3.2 and the frame-count efficiency comparison in section4.2.
+Transfer before dropping is supported there; ordinary explanatory phrasing need
+not be a verbatim publisher sentence. The accepted CVF PDF returned403, so this
+check does not claim to have inspected that PDF or assume identical versions.
+A main model's self-criticism is not independent verification.
+
+Supersedes the earlier unqualified semantic verdict about that trend, not the
+recorded missing-context failure. The original physical request lacked the share;
+that remains a valid hard failure. Do not insert subsequently retrieved evidence
+into old inputs, count this as a fresh useful round, or add topic-specific wording
+filters. Evaluate concrete empirical additions separately from faithful explanation
+and clearly bounded inference. This avoids training the product back into sterile
+summary or mandatory disclaimers. General followup quality remains unqualified.
