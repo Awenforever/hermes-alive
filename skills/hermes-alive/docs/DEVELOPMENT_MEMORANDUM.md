@@ -976,3 +976,28 @@ boundaries and source/value judgment to separate scopes. New signed boundary
 receipts explicitly do not certify factual additions. Final source evidence is
 still mandatory and owns concrete negative findings and the bounded correction.
 Qualification is pending; production remains untouched and useful rounds0/10.
+
+## 2026-10-26 — Qualification and daily-profile boundary
+
+ADR0237 implementation passes full99 on r100 plus actual Core, real main-model
+scope control and Linux/Windows bounded source correction/recovery. Do not repeat
+old source-fact judging in the required-boundary stage or treat its compatibility
+false flag as source support. No production or fresh content quality claim.
+
+A new actual Core-main memory probe demonstrates automatic builtin USER curation
+and exact current advice in Alive after four synthetic turns, without manual USER
+seeding or a second chat logger. The profile still contains negative/noise guards,
+and the main model temporarily removed then restored a qualification. Do not
+pretend daily denoising or atomic semantic memory is solved. The next useful
+step is a complete native discovery cycle using an automatically curated profile,
+while keeping source-only public planning separate and inferred advice weaker
+than explicit owner facts. Provider initialization can spawn untracked background
+work; neither a generic shutdown call nor a pre_llm_call hook that exposes no live
+agent constitutes a safe external-provider integration. No arbitrary external
+provider was initialized during this probe.
+
+The quoted third-party reminder also changed polarity. Preserve this limitation
+in qualification: Core-curated advice is neither literal history nor explicit
+owner evidence. Avoid new topic-word patches to compensate. Content hashes alone
+prove unchanged bytes, not absence of every filesystem write; state evidence at
+that scope.

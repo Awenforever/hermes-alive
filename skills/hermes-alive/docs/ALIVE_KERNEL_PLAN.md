@@ -13,7 +13,7 @@ and safe portable operation. Component counts are not the completion metric.
 | Area | Current evidence | Still required |
 |---|---|---|
 | Experience and privacy | Protected journal/vault, provenance, deletion and replay checks | Real lifetime/migration/restore with all external associations preserved |
-| Personalization | Owner-confirmed optional interests/communication preferences; separately opted-in current Core USER advice, actual native change/delete/wait qualification | External-provider recall, noise-aware daily learning and attributed feedback |
+| Personalization | Owner-confirmed preferences and current Core USER advice; four actual main turns automatically curate a synthetic profile and each current value reaches Alive without reader writes | External-provider recall, noise-aware daily learning and attributed feedback |
 | Agenda and initiative | Native discovery/commitment decisions, bounded rejection recovery, waits invalidated by actual admitted input | Sustained useful initiative and changing interests over time; no reward for empty repeated ticks |
 | Content and judgment | Source-led composition, final wording review, real main-model examples | Samples remain too much like cautious paper digests; factual review is not a usefulness verdict |
 | Conversation continuity | Exact share/source excerpts reach actual Core main requests; real replies after context reduction no longer recite transport status | Missing evidence still becomes global negative claims in real followup; qualify ADR0230, plus natural old-quote/compaction/restart behavior |
@@ -28,13 +28,25 @@ model/provider or network changes are authorized by this development plan.
 
 ## Latest qualified slices
 
-Candidate in progress (ADR0237): assign required meaning/literal/speech-act
-boundaries and final source/value judgment to separate scopes. A real source-aware
-review disagreement was withheld safely but had no concrete offending claim. New
-receipts must not turn a boundary check into factual certification; final-source
-proof remains mandatory. r99 five focused suites and a same-topic actual-model scope regression pass;
-new source-correction/cold recovery and full regression remain pending.
-No fresh useful content or production acceptance follows from that control.
+- Split review responsibilities (ADR0237), implementation ffce973 / frozen r100:
+  r99 five focuses, actual-model same-topic request-scope control, new Linux and
+  Windows source-correction/cold recovery and r100 full99 portable regression pass.
+  Required meaning/literal/speech-act boundaries and final source/value judgment
+  have separate scopes. A boundary receipt never certifies source facts; current
+  final-source proof stays mandatory. The real control submits one local share
+  and completes two real main turns without production sends. This is not a new
+  useful round, arbitrary main-response accuracy or four-device acceptance.
+
+- Main-owned profile curation (ADR0225): four actual main-model synthetic turns
+  call Core's memory tool five times, with an initially empty USER profile.
+  Current profile advice reaches Alive exactly after each turn; reader content checks
+  show no Core profile content changes. Stable interests, later qualifications and exploration
+  preference survive the final state. Core also retained low-value negative
+  reminders, and one intermediate patch dropped a qualification before the model
+  restored it. Do not call this perfect denoising or an atomic semantic update.
+  No manual USER seeding, external provider or private production history was
+  used. Native selection with this automatically curated profile, broader noisy
+  daily learning, attributed feedback and external recall remain open.
 
 - Retained-reference reader (ADR0236): r90/r92 five-suite Core focuses pass;
   r91 compact-notice collector also passes. Encrypted authorized text longer than

@@ -86,3 +86,18 @@ negative, exact local correction, both new boundary receipts, final re-review
 and cold no-inference recovery. Its targeted execution is still pending; full
 regression on the changed runtime remains required. Old full99r96 does not qualify
 this implementation. No policy sample keyword or source-specific rule was added.
+
+## r100 component qualification, 2026-10-26
+
+Implementation ffce973ee6bedaf25d3b1beadf4a12e66402f4f9, exact frozen tree
+748f347219eb73cfd02ebfa96cba09cfde8e7487, passes complete99 portable regression.
+The new source-correction/cold-recovery case passes on Linux and native Windows.
+Windows took several minutes; this is component evidence, not an installed fleet
+claim or a latency guarantee. No provider or Core workaround was introduced.
+Actual same-topic model requests show the boundary-only input and the scoped
+final-source input, then one local submission and two consecutive real main
+responses. Original outputs, including remaining content limitations, stay in
+private evidence. No source-fact vote or silent negative override occurred.
+Fresh useful rounds remain0/10; production, migration and distribution gates
+remain open. Later documentation qualification can reuse these tests only with
+exact non-documentation bytes and Git modes unchanged.
