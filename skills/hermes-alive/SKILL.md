@@ -64,10 +64,14 @@ explicit new setup, not guessed routing. Installing the kernel hook and restarti
 still need the operator's normal lifecycle approval.
 
 Status must say `configured_not_activated` after confirmation. Exact share-reader
-attachment is available, but the live execution/supervision and supported legacy
-migration are still pending. `enable` deliberately refuses this partial engine;
-do not manually edit installed code/flags or start the legacy watcher to bypass
-that refusal. Continue the product's full qualification before deployment.
+attachment and native execution/supervision are implemented for development
+validation. Activation is a separate `/alive enable` command in the confirmed
+authorized conversation; the installation CLI's `enable` refuses to substitute
+for that owner command. `/alive pause` revokes active sharing and `/alive status`
+reports the actual host state. This development engine has not completed content,
+migration, fleet or production qualification: do not silently switch an existing
+installation to it, enable it for a user or restart their gateway as part of setup.
+Do not edit installed flags or start a legacy sender to bypass those boundaries.
 
 ### Experimental kernel shadow mode (development branch only)
 

@@ -4,6 +4,29 @@ Status: active
 
 Last reviewed: 2026-10-24
 
+Current qualification: ADR0224 canonical r58 (commit 0b16986) is terminal PASS98
+portable, eight clock/source/authorization/repair suites, seventeen supported-Core
+control/ingress/continuity checks, and the Windows clock regression. Public VISTA
+replay submitted once to an in-memory adapter and produced two real main-model
+followups with original share context. That faster replay's selection-to-permit
+interval was only74s: it does NOT prove a natural >5-minute recovery. The actual
+API synthetic-clock cases qualify that exception. Useful content remains FAIL0/10.
+
+Next concrete correction: conversational continuation exposes exact text and
+source/reading boundaries, while opaque IDs, transport receipts and excerpt-policy
+machinery remain in the authenticated diagnostic store. A real main reply had
+recited submission status during a topic followup. This is a context-surface
+separation, not an attempt to fake delivery or rewrite the original share.
+Qualification pending for this change. The installation contract is also updated
+to describe the implemented owner command rather than the obsolete enable-refusal
+stage. Neither change authorizes production activation or a legacy migration.
+
+Live-source diagnostic: actual Core keyless search returned results, but its
+default extraction returned an explicit TLS timeout with empty content. Returning
+a tool envelope does not prove a page was read. Validate substantive extraction
+before counting a live-source round; isolate any Core provider configuration and
+never hardcode a developer's provider into Alive.
+
 Actual slow-cognition failure (2026-10-24; ADR0224): the VISTA public regression
 completed nine logical auxiliary calls, including a correction, then the real
 native host denied the prepared message solely as selection_stale. Its five-minute

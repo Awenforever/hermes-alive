@@ -157,7 +157,14 @@ async def test(home, mode, *, exercise=None):
                     original_user_message=messages[-1]['content'], messages=messages,
                     conversation_history=messages[:-1])
             text = collect()
-            assert expressed.text in json.loads(text.split('\n',1)[1])['alive_shares'][0]['text']
+            conversation = json.loads(text.split('\n',1)[1])['alive_shares'][0]
+            assert conversation['text'] == expressed.text
+            assert set(conversation) == {'prepared_at','text','sources'}
+            assert conversation['sources'][0] == {
+                key:value for key,value in shares[0]['sources'][0].items()
+                if key not in ('event_id','excerpt_policy')}
+            assert 'submission_status' not in text and 'success_reported' not in text
+            assert shares[0]['submission_status'] and shares[0]['share_id']
             assert 'bicycles, not cars' in text and json.dumps(messages) == original
             # Cold persistent routing + reopened vault, not the authoring
             # worker's in-memory source. This is not a daemon restart proof.

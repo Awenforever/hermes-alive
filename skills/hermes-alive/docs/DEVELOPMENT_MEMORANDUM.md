@@ -786,3 +786,19 @@ The input script therefore takes precedence over a container's often-generic
 `C.UTF-8` locale for CJK, Cyrillic, and Arabic place names. A regression test
 must prove that Chinese text sent under `C.UTF-8` uses Open-Meteo's `zh` index,
 resolves in one request, and never touches Nominatim.
+
+## 2026-10-25 — Conversational evidence and operational history
+
+The public VISTA r58 diagnostic delivered to an in-memory adapter and used the
+actual Core pre-LLM hook for followups. One main reply discussed adapter delivery
+status when asked about the shared subject. Its context contained the store's
+complete operational receipt. Keep diagnostic observability in ShareContinuityStore,
+but project only exact text, preparation time, and source excerpts with genuine
+reading/provenance limits into ordinary model context. No changed source, invented
+reading, fake transcript, delivery claim or lost diagnostic record is permitted.
+The actual Core continuity regression must prove this separation without supplying
+fake conversation history and while preserving cold-store reattachment and erasure.
+
+The same diagnostic's synthesis still sounded like a cautious paper digest and
+is not a quality pass. Removing transport metadata cannot by itself fix source
+choice or voice. A positive model check does not establish that a user wants it.
