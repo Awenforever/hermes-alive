@@ -100,8 +100,10 @@ competing active plans. ADRs remain the record of architectural decisions.
    through without a forced benefits/opinion paragraph. A fresh technical share
    explained a retrieval failure concretely, while its main followup incorrectly
    treated missing replication evidence as proof that no replication exists.
-   Qualify the narrow conversation evidence projection in ADR0230; do not claim
-   a writing-prompt replacement fixes this. A fixed-evidence four-call comparison
+   The narrow conversation evidence projection in ADR0230 passes structural
+   checks, but its real main-model comparison still ends with an unsupported
+   conclusion after a correct uncertainty disclaimer. The semantic issue remains
+   open. Do not claim a writing-prompt replacement fixes this. A fixed-evidence four-call comparison
    found overstatement and an incorrect model-name change in the shorter prompt.
    r73's source/cited-reading/real-model run settled without publication: final
    review took408s and its point-in-time value assessment expired. More benchmark
@@ -142,6 +144,13 @@ competing active plans. ADRs remain the record of architectural decisions.
    Develop public-topic exploration without turning private profile text into
    public search queries or making interests exclusive filters. Measure useful
    domestic and out-of-interest discovery, not merely more provider names.
+   First compare the same writer on a real listing versus original source
+   extracts. An actual Core research experiment found primary material after an
+   initial HTML failure, but did not finish composition within its requested
+   runtime and exceeded a prompt-only page budget. Do not embed that unadapted
+   Agent loop. Consider the bounded, separately opted-in refinement proposal in
+   [ADR0231](adr/0231-bounded-public-source-refinement-proposal.md) only if reading
+   depth demonstrably improves understanding; no new general agent framework.
 4. Run longitudinal synthetic daily-turn scenarios through actual native
    interfaces: noisy work topics versus durable interests, changing preferences,
    independent explicit corrections, attributed feedback, forgotten material,

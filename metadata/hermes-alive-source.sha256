@@ -272,7 +272,7 @@ fbabb024702d8394fe6af3f145afb25fcb11b0674369aa0d2ece030b485f9f64  ./__tests__/ru
 c820346cb0721a679f22c1e15a59f23616f6d7a70adf2511e45e4a15a13c0e2c  ./__tests__/run_transport_publisher_withdrawal.py
 6210bc2e2fb0f3c78fe10a87ac68b007982a555a90e5c3245924e2c6c71c372f  ./__tests__/run_transport_reconciliation_runtime.py
 ed5065f1271617efd9df6f0c5ef5473d73e343f122df77f5668aa292abca617e  ./__tests__/run_watcher_retention_maintenance.py
-b58b45fce6e234367a86809126407d19bd953e0543ac6f2a236117ea6273476d  ./docs/ALIVE_KERNEL_PLAN.md
+410a2607bc40d7b65732a545e546a8d0aa9cc26db4179a59e187ea186f5ccbf2  ./docs/ALIVE_KERNEL_PLAN.md
 bb1240b8645d5bde807e126c36ee12164e2ad602609064402df28740e0e3b315  ./docs/ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-25.md
 97ab9e52cbfbc23d98822e39ecd598be1bb7ccd78395cf59aca7929a3ed98d5d  ./docs/ARCHITECTURE.md
 60a2ffe527b49c1598e8275b205985b63653270b499cdb29a2f7ab672e88fc0e  ./docs/DATA_AND_PRIVACY.md
@@ -517,7 +517,8 @@ df801641c3403167a86e2452913d4fbbd139db5f9c200e307eff3c4a251420da  ./docs/adr/022
 ce12cd2b9a2547899c78ea678420eb344ba070823d3a135bb6718da225d1a404  ./docs/adr/0227-test-layout-and-public-install-scanning.md
 0b37747b6b7d3283b64595ae10929ef215157df729ff52055b7cd62ae75320c0  ./docs/adr/0228-evidence-to-recipient-understanding.md
 f25e1b67e9de20f9f04fdbbb308eea89d9adb39b294e2a1205f72ef9202b5170  ./docs/adr/0229-bounded-final-assessment-interval.md
-ec2de0648c2894451592ae04785ecdc84d6f8dcb4da255f65ff97f0feb0995f6  ./docs/adr/0230-evidence-limits-and-conversation-understanding.md
+816ac8cfd7a78e60a2b733da6698c6e52c52159acf0128166494a232fbf16ac8  ./docs/adr/0230-evidence-limits-and-conversation-understanding.md
+1a6dfdd7f8aec26289c4a2968a2e56b477ab7188c8dd6b8d531ba7408e905328  ./docs/adr/0231-bounded-public-source-refinement-proposal.md
 4d6108e5f522390a4f9008265a2681771192c500c4c34a02179e24a238b55332  ./docs/evidence/deepseek-seed-20261012.json
 40941e141314d626c51ad4d22ccc19c76dcf4b770a85daa0881d135089fb75ea  ./docs/evidence/qwen-route-20261012.json
 460cffae94c5494e13515ab9c2dc42331e9fd14260bf4182086d5f3bd9e19114  ./hooks/HOOK.yaml

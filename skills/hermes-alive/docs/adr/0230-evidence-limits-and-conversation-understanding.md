@@ -1,7 +1,7 @@
 # ADR0230 — Collection limits are not negative facts about the world
 
 Date: 2026-10-25 (Asia/Shanghai).
-Status: development candidate; synthetic and actual-model qualification required.
+Status: structurally qualified; actual main-model overclaim remains unresolved.
 
 Fresh real-source trials establish two distinct product problems. One scientific
 share was understandable but did not clearly convey what made its central
@@ -62,3 +62,16 @@ Replay the original public continuation through the actual main model before
 claiming behavioral improvement. Deterministic projection tests prove scope
 handling, not that a model cannot overclaim. Real content usefulness, ten fresh
 full-chain rounds, fleet lifecycle and production acceptance remain separate.
+
+## Qualification update, 2026-10-25
+
+The actual supported-Core continuity/setup/control/authoring focus passes, as
+does the complete98 portable suite. Two actual-model notation cases produce
+plain-text arithmetic for semantic content while preserving an explicitly
+protected LaTeX literal exactly. These checks do not establish article quality.
+
+A fixed-share before/after main-model comparison still fails semantically. The
+new response correctly says missing material is not proof of nonexistence, then
+ends with a stronger negative conclusion not justified by that material. Keep
+the clearer evidence projection, but do not report this as a complete repair or
+promote the correct disclaimer into proof that the whole reply is faithful.
