@@ -1098,3 +1098,15 @@ can reject a healthy deferred tool registration before any model request. Always
 use the current Core agent close lifecycle; a nonexistent cleanup method can
 mask the first failure. Preserve failed experiment evidence and label requested
 model inference separately from an observed response.
+
+## 2026-10-26 — Confirmation is a fallback, not the normal daily workload
+
+The owner selected first guided authorization followed by direct acceptance of
+explicitly assigned ongoing work. Casual remarks and quotations are not tasks;
+ambiguity calls for a question. Keep ADR0240's per-item confirmation as an
+optional conservative path and useful authority foundation, not a permanent
+requirement to confirm every natural request. The requested mode is not yet
+implemented or enabled. Its permission must explicitly cover intake and bounded
+item retention, with delegated semantic interpretation distinguished from literal
+owner confirmation. Existing long-lived proactive-contact consent alone does not
+silently provide it, and saved tasks still do not grant unrelated external action.

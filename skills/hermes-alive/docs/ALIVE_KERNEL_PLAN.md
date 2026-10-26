@@ -12,6 +12,18 @@ and safe portable operation. Component counts are not the completion metric.
 Whole-kernel acceptance also requires non-discovery behavior; this counter is
 not a completion measure for the entire agent.
 
+### Owner decision — 2026-10-26
+
+Normal use must accept clearly assigned ongoing work directly after the first
+guided authorization. Casual remarks, quotations and ambiguous intentions require
+semantic distinction; ask when uncertain. Per-item preview/confirmation is an
+optional mode, not the required everyday experience. The new ADR0240 temporary
+proposal/confirmation path is a qualified foundation and conservative fallback;
+the requested first-grant intake mode has **not** yet been implemented or deployed.
+Do not confuse long-lived proactive-contact consent with this distinct intake
+and item-retention choice. Record delegated interpretation honestly instead of
+relabeling a model inference as a literal owner-confirmed item.
+
 | Area | Current evidence | Still required |
 |---|---|---|
 | Experience and privacy | Protected journal/vault, provenance, deletion and replay checks | Real lifetime/migration/restore with all external associations preserved |
@@ -219,6 +231,12 @@ competing active plans. ADRs remain the record of architectural decisions.
    request versus explicit casual chat. This does not exhaust ordinary intent
    or establish longitudinal behavior. Do not silently expand this into recording
    every incoming message.
+   Apply the owner's first-grant intake decision above: guide and confirm its
+   scope/retention once, retain only the interpreted item, distinguish current
+   direct assignment from quotation/tentative/negated/revised work, and ask when
+   uncertain. Qualify those distinctions with real Core/main-model cases before
+   replacing the current conservative confirmation mode. The initial consent
+   must not silently authorize unrelated external tools or physical delivery.
 3. Verify continuity and adaptation across days and restart: recall why an item
    exists, inspect actual outcomes, cancel/snooze/complete correctly, respect
    forgetting and use attributed feedback without permanent-interest shortcuts.

@@ -40,6 +40,12 @@ requested reports or detailed work may need a different level of detail.
 
 ## Continuing items from conversation
 
+The target normal experience is one guided authorization, followed by direct
+acceptance of clearly assigned follow-up work; ask only for unclear intentions.
+An optional per-item confirmation mode remains available. As of 2026-10-26 the
+implementation below is the conservative confirmation foundation; the first-grant
+intake mode is still development work. Do not tell an owner it is already active.
+
 After confirmed kernel setup, Hermes can use `alive_agenda` to propose an ongoing
 item in the configured conversation. It shows the task, constraints, any explicit
 dates, retention period and a `/alive agenda accept <handle>` command. The
