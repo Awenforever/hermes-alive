@@ -61,6 +61,10 @@ configured later. Do not silently expand the owner's automatic scope.
 
 ## Runtime truth and limits
 
+2026-10-26 follow-up: ADR0246 supersedes the missing lifecycle-observation path
+described below. Active Native cognition now observes changed Core metadata;
+independent result checking and autonomous follow-on work remain unfinished.
+
 Core completed/failed/unknown are execution facts, not semantic outcome receipts.
 Keep task_success_proven=false and the original agenda active. Do not promise
 automatic result checking or notification: that capability is not yet connected.

@@ -1200,3 +1200,20 @@ and Core record, with protected causal references instead of another Alive copy.
 Status lookup by exact item ID supports recovery when chat history lost work IDs.
 Current tests control model meaning/replies and verify real mechanics; no actual
 main-model use, autonomous work choice or learned later decision is proven yet.
+
+## 2026-10-26 — Work progress must return to cognition
+
+ADR0246 reconnects Core lifecycle observations to the existing Native owner
+cycle. Do not leave handed-off work invisible after suppressing user-to-do
+reminders, and do not fix that by blindly announcing every runner transition.
+Current facts are signed, causally associated, compared with Core again and
+visible to the existing cognitive decision; unchanged facts can remain silent.
+No duplicate task body, Core output body, generic poller or physical queue.
+
+The initial actual-Core integration control proved changed state reaches the
+assembled Native prompt, unchanged state spends no further inference, real Core
+completion leaves task success false and the original agenda active. Controlled
+abstention is not proof of real-model judgment, notification usefulness or
+independent task success. The fresh useful-sharing gate is still 0/10. Continue
+toward independent outcomes and changed later decisions, not repeated component
+green checks or a content-only plugin.

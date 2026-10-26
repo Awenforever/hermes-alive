@@ -35,7 +35,8 @@ AGENDA_SCHEMA = {
                    'Toolsets outside the automatic scope require showing the complete preview and owner confirmation command. '
                    'work_status reads an exact work_id or finds prior work by an exact known item_id after history reduction; '
                    'it never submits a job. Core completed/failed/unknown does not prove task success or no effects. '
-                   'Submitting work does not enable result monitoring. Do not promise automatic checking or notification '
+                   'Active Alive can observe Core lifecycle changes, which are not independent result verification. '
+                   'Do not promise automatic result checking or notification '
                    'unless the returned actual result-followup capability is enabled. '
                    'Do not turn quoted text, inferred interests or casual remarks into obligations.',
     'parameters': {'type': 'object', 'properties': {

@@ -123,6 +123,28 @@ async def test(home):
         cfg={'mcp_servers':{'synthetic-new-server':{'command':'not-executed'}}}
         assert set(_resolve_cron_enabled_toolsets({'enabled_toolsets':['file']},cfg))>{'file'}
         assert set(_resolve_cron_enabled_toolsets(job,cfg))=={'file'}
+        # Drive the actually assembled Native owner loop, not a separate poller.
+        # Replies are controlled abstention; lifecycle facts and wakeups are real.
+        native=binding.native;build=binding.arguments['build_parameters'];progress_prompts=[]
+        class ProgressCaller:
+            pending=()
+            def __init__(self,*,cycle,read_binding):self.calls=0;self.read_binding=read_binding
+            async def reap_pending(self,**kw):return {'closed':0,'remaining':0}
+            async def __call__(self,**kw):
+                self.read_binding();self.calls+=1
+                assert kw['task']=='alive_opportunity_candidates',kw['task']
+                progress_prompts.append(json.dumps(kw['messages'],ensure_ascii=False))
+                if isinstance(kw.get('route_info'),dict):kw['route_info']['provider']='synthetic-provider'
+                return SimpleNamespace(model='synthetic-model',choices=[SimpleNamespace(
+                    message=SimpleNamespace(content=json.dumps({'candidates':[]})))])
+        native.caller_factory=lambda **kw:ProgressCaller(**kw)
+        first=await native.step(build())
+        assert first.disposition=='silence',first.disposition
+        assert len(progress_prompts)==1 and 'submitted_to_core' in progress_prompts[0]
+        observations=list(store.journal.read(event_type='work.observed'))
+        assert len(observations)==1
+        assert (await native.step(build())).disposition=='waiting_for_change'
+        assert len(progress_prompts)==1 and len(list(store.journal.read(event_type='work.observed')))==1
         requests=[]
         def respond(client,request,*args,**kwargs):
             if not request.url.path.endswith('/chat/completions'):
@@ -159,8 +181,35 @@ async def test(home):
         assert by_item['work_id']==started['work_id'] and len(jobs.list_jobs(include_disabled=True))==1
         assert tool({'operation':'list','item_id':row['item_id']})['items'][0]['state']=='active'
         reader=execution.kernel('cognition_opportunities').CognitionOpportunityReader(store.journal)
+        # A changed Core state invalidates the old snapshot until the next host
+        # observation; it must never reappear as a reminder to perform the task.
         assert reader.commitments(subject=store.configuration().subject,
             clearance=execution.kernel('events').Sensitivity.PRIVATE)==()
+        after=await native.step(build())
+        assert after.disposition=='silence' and len(progress_prompts)==2,after.disposition
+        assert 'core_completed_result_unverified' in progress_prompts[-1]
+        assert 'task_success_proven' in progress_prompts[-1] and 'not result contents' in progress_prompts[-1]
+        evidence=reader.commitments(subject=store.configuration().subject,
+            clearance=execution.kernel('events').Sensitivity.PRIVATE)
+        assert len(evidence)==1 and evidence[0].content['core_work']['task_success_proven'] is False
+        assert evidence[0].observation_event_id!=observations[0].event.event_id
+        assert reader.active_evidence(subject=store.configuration().subject,
+            clearance=execution.kernel('events').Sensitivity.PRIVATE,
+            observation_event_ids=(evidence[0].observation_event_id,))[0]==evidence[0]
+        assert (await native.step(build())).disposition=='waiting_for_change'
+        assert len(progress_prompts)==2 and len(list(store.journal.read(event_type='work.observed')))==2
+        assert len(jobs.list_jobs(include_disabled=True))==1 and artifact.read_text()==body
+        # Actual authored Core-definition drift must also wake the same host,
+        # without executing the broadened job or hiding the uncertainty.
+        jobs.update_job(started['job_id'],{'enabled_toolsets':['terminal']})
+        assert (await native.step(build())).disposition=='silence'
+        assert len(progress_prompts)==3 and 'core_job_definition_changed' in progress_prompts[-1]
+        jobs.update_job(started['job_id'],{'enabled_toolsets':['file','no_mcp']})
+        assert (await native.step(build())).disposition=='silence'
+        assert len(progress_prompts)==4 and 'core_completed_result_unverified' in progress_prompts[-1]
+        assert len(list(store.journal.read(event_type='work.observed')))==3
+        for observation in store.journal.read(event_type='work.observed'):
+            assert 'INDEPENDENT_SYNTHETIC_ARTIFACT' not in observation.event.canonical_json()
         assert tick(verbose=False,sync=True,headless=True)==0
         # New attempts, even in the automatic scope, disclose prior effects.
         text='请再做一次刚才的工作。';tool=turn('work-repeat',text)
@@ -229,6 +278,11 @@ async def test(home):
         assert latest_execution(prepared[0]['id']) is None
         held=tool({'operation':'work_status','item_id':fourth_row['item_id']})
         assert held['status']=='prepared_not_activated_by_alive' and held['automatic_result_followup_enabled'] is False
+        observations_before_pause=len(list(store.journal.read(event_type='work.observed')))
+        calls_before_pause=len(progress_prompts)
+        assert (await native.step(build())).disposition=='paused'
+        assert len(progress_prompts)==calls_before_pause
+        assert len(list(store.journal.read(event_type='work.observed')))==observations_before_pause
         for record in store.journal.read(event_type='work.requested'):
             assert record.event.payload['task_body_copied_into_alive_journal'] is False
             assert 'INDEPENDENT_SYNTHETIC_ARTIFACT' not in record.event.canonical_json()
@@ -263,6 +317,9 @@ if __name__=='__main__':
         assert all(hashlib.sha256((store.root/name).read_bytes()).hexdigest()==digest for name,digest in expected['keys'].items())
         status=execution.kernel('core_work').CoreWorkStore(store).status(expected['work_id'],subject=expected['owner'])
         assert status['core_execution_state']=='completed' and status['task_success_proven'] is False,status
+        observation=execution.kernel('core_work').CoreWorkStore(store).current_observation(
+            status['item_id'],subject=expected['owner'])
+        assert observation is not None and observation[1]==status
         print('HERMES_ALIVE_CORE_WORK_COLD_ASSOCIATION_OK')
     else:
         asyncio.run(test(Path(os.environ['HERMES_HOME'])))

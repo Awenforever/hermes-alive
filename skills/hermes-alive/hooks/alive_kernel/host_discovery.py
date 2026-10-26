@@ -5,6 +5,7 @@ The host owns read authorization, URL safety, deadlines and physical cancellatio
 Queries must already be approved for external disclosure, not arbitrary memories.
 """
 import asyncio
+import json
 from dataclasses import dataclass
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
@@ -47,6 +48,7 @@ def provenance_metadata(content):
         metadata.update(original_proposal_authority=content.get('original_proposal_authority'),
             literal_owner_confirmation=content.get('literal_owner_confirmation') is True,
             original_user_message_preserved=False,authority_is_not_execution_permission=True)
+        if 'core_work' in content:metadata['core_work']=dict(content['core_work'])
     return metadata
 
 
@@ -62,6 +64,11 @@ def source_prompt_excerpt(content, *, policy=None):
     """
     if policy not in (None, SOURCE_EXCERPT_POLICY):
         raise HostDiscoveryError('unknown source excerpt policy')
+    if 'core_work' in content:
+        # Preserve the same lifecycle qualifications for interpretation, factual
+        # review and follow-on context. No output body or success claim is added.
+        return json.dumps({'assignment_context':content['summary'],
+            'core_work_lifecycle':dict(content['core_work'])},ensure_ascii=False)
     depth = (policy == SOURCE_EXCERPT_POLICY
              and read_scope_metadata(content).get('reported_read_scope') == 'webpage_extract')
     return content['summary'][:8192 if depth else 1800]

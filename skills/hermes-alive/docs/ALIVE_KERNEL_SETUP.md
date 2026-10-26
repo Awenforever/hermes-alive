@@ -117,8 +117,11 @@ the owner's one-time `/alive agenda work-confirm ...` command before submission.
 Core owns execution and saves the result locally. Submitting the job is not
 proof that it ran or met the goal. `alive_agenda work_status` can query an exact
 work ID or recover its association from the known item ID, without resubmission.
-Automatic result followup and autonomous Native work selection are not connected
-yet; do not promise them. Pause stops new Alive handoffs; already accepted Core
+While Alive is active, its existing owner cycle observes changed Core lifecycle
+facts and brings them into cognitive decisions. Unchanged state may stay quiet.
+This does not inspect output bodies or verify that the assigned goal was met.
+Independent automatic result followup and autonomous Native work selection remain
+unfinished; do not promise them. Pause stops new observation and handoffs; accepted Core
 tasks require Core's own task management. This experimental slice still needs
 project-context, cancellation, lifecycle, migration and fleet qualification.
 

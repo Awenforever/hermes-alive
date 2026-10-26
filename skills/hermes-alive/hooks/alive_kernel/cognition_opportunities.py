@@ -4,6 +4,7 @@ Commitments remain agenda state, never web facts, completed work or action grant
 The established typed-agenda vault is explicit; no adjacent-vault probing occurs.
 """
 from contextlib import closing
+from dataclasses import replace
 from datetime import datetime, timezone
 import json
 import re
@@ -179,12 +180,20 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
                 (subject,'commitment','active','snoozed',*allowed,now.isoformat(),now.isoformat())).fetchall()
         commitments=[]
         for row in rows:
-            if observation_event_ids is not None and row['proposal_event_id'] not in observation_event_ids:
-                continue
             from .core_work import owns_commitment
-            if owns_commitment(self.journal,subject=subject,item_id=row['item_id']):
-                continue
             value=self._commitment(row,subject=subject,now=now)
+            if value is not None and owns_commitment(self.journal,subject=subject,item_id=row['item_id']):
+                from .core_work import CoreWorkStore
+                from .kernel_setup import KernelSetupStore
+                work=CoreWorkStore(KernelSetupStore(self.journal.path.parent,journal=self.journal))
+                observation=work.current_observation(row['item_id'],subject=subject)
+                if observation is None:continue  # Never ask the user to do handed-off work.
+                event_id,status=observation
+                value=replace(value,observation_event_id=event_id,content=_freeze_json({
+                    **dict(value.content),'source':'Core-owned work lifecycle observation',
+                    'title':'Ongoing delegated work','core_work':status}))
+            if value is not None and observation_event_ids is not None and value.observation_event_id not in observation_event_ids:
+                continue
             if value is not None:
                 commitments.append(value)
                 if len(commitments)==limit: break

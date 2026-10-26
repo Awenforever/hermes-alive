@@ -35,8 +35,8 @@ class CoreWorkStore:
         from hermes_constants import get_hermes_home
         if get_hermes_home().resolve()!=self.home:raise ValueError('Core work profile changed')
 
-    def _append(self,work_id,suffix,owner,payload,*,causation=None):
-        event=EventEnvelope(event_id=work_id+':'+suffix,event_type='work.'+suffix,
+    def _append(self,work_id,suffix,owner,payload,*,causation=None,event_type=None):
+        event=EventEnvelope(event_id=work_id+':'+suffix,event_type=event_type or 'work.'+suffix,
             source=self.SOURCE,actor='system:alive-core-work',subject=owner,
             causation_id=causation,sensitivity=Sensitivity.PRIVATE,payload=payload)
         document=json.loads(event.canonical_json())
@@ -44,7 +44,7 @@ class CoreWorkStore:
             self.protector.authenticate_json('alive.core-work.event.v1',document)})
         return self.journal.append(event)
 
-    def _read(self,work_id,suffix,owner):
+    def _read(self,work_id,suffix,owner,*,event_type=None):
         if not isinstance(work_id,str) or not re.fullmatch(r'core-work:[a-f0-9]{64}',work_id):
             raise ValueError('exact Core work identifier required')
         record=self.journal.get(work_id+':'+suffix)
@@ -53,7 +53,7 @@ class CoreWorkStore:
         signature=payload.pop('integrity_authenticator',None)
         document=json.loads(event.canonical_json());document['payload']=payload
         if (event.source!=self.SOURCE or event.actor!='system:alive-core-work' or event.subject!=owner
-                or event.event_type!='work.'+suffix or event.sensitivity is not Sensitivity.PRIVATE
+                or event.event_type!=(event_type or 'work.'+suffix) or event.sensitivity is not Sensitivity.PRIVATE
                 or not self.protector.verify_json('alive.core-work.event.v1',document,signature)):
             raise ValueError('Core work ownership or integrity changed')
         return payload
@@ -173,6 +173,52 @@ class CoreWorkStore:
                 "AND json_extract(canonical_json,'$.payload.item_id')=? ORDER BY sequence DESC LIMIT 1",
                 (subject,'work.requested',item_id)).fetchone()
         return self.status(row['event_id'].removesuffix(':requested'),subject=subject) if row else None
+
+    def refresh_observations(self,configured,*,validate):
+        """Existing host-cycle read; no poller, result-body ingestion or retry.
+
+        Record changed lifecycle facts only. Neither Core completion nor its
+        model's local output establishes the assigned outcome. This bounded
+        scan does not claim an exhaustive work inventory.
+        """
+        validate();self._home()
+        if configured.options.get('core_background_work') is not True:return ()
+        with closing(self.journal._connect()) as connection:
+            rows=connection.execute("SELECT e.event_id FROM experience_events e "
+                "JOIN agenda_items_v1 a ON a.item_id=json_extract(e.canonical_json,'$.payload.item_id') "
+                "AND a.subject=e.subject WHERE e.subject=? AND e.event_type='work.requested' "
+                "AND a.state IN ('active','snoozed') ORDER BY e.sequence DESC LIMIT 128",
+                (configured.subject,)).fetchall()
+        observed=[];seen=set()
+        for row in rows:
+            validate();self._home()
+            work_id=row['event_id'].removesuffix(':requested')
+            request=self._read(work_id,'requested',configured.subject)
+            if request['item_id'] in seen:continue
+            seen.add(request['item_id'])
+            if request['configuration_event_id']!=configured.event_id:continue
+            state=self.status(work_id,subject=configured.subject)
+            suffix='observation:'+self.protector.authenticate_json('alive.core-work.observation.v1',state)
+            if self._read(work_id,suffix,configured.subject,event_type='work.observed') is None:
+                validate();self._home()
+                self._append(work_id,suffix,configured.subject,state,causation=work_id+':requested',
+                    event_type='work.observed')
+            observed.append(work_id+':'+suffix)
+        return tuple(observed)
+
+    def current_observation(self,item_id,*,subject):
+        """Use a signed host observation only while its Core facts still match."""
+        current=self.previous(item_id,subject=subject)
+        if current is None:return None
+        work_id=current['work_id']
+        configured=self.store.configuration()
+        request=self._read(work_id,'requested',subject)
+        if (configured is None or configured.subject!=subject
+                or configured.options.get('core_background_work') is not True
+                or configured.event_id!=request['configuration_event_id']):return None
+        suffix='observation:'+self.protector.authenticate_json('alive.core-work.observation.v1',current)
+        saved=self._read(work_id,suffix,subject,event_type='work.observed')
+        return (work_id+':'+suffix,saved) if saved==current else None
 
     def status(self,work_id,*,subject):
         self._home()

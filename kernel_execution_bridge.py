@@ -185,6 +185,15 @@ def assemble(binding):
             return {'closed':0,'remaining':0}
         async def bind_parameters(self,*,cycle,parameters,read_binding):
             validate()
+            # Use the existing owner cycle, not another timer or output collector.
+            if configured.options.get('core_background_work') is True:
+                def current_work_authority():
+                    validate();read_binding()
+                    if not runtime.reconciliation._owner_policy(configured.subject).enabled:
+                        raise ValueError('owner autonomy policy is disabled')
+                current_work_authority()
+                kernel('core_work').CoreWorkStore(store).refresh_observations(
+                    configured,validate=current_work_authority)
             authorization={'authorization_operation_id':'core-auth:'+store.vault.digest_json(
                 {'cycle':cycle.operation_id,'activation':active['activation_event_id']})[:40],
                 'route_binding_id':active['route_binding_id'],'delegation_event_id':active['delegation_event_id']}
