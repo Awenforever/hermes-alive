@@ -13,6 +13,19 @@ import time
 from uuid import uuid4
 
 
+_CREATION_FIELDS = frozenset(('operation','task','constraint','due_at','available_at'))
+_CHANGE_FIELDS = frozenset(('operation','item_id','item_version','evidence_span','available_at'))
+_OPERATION_FIELDS = {
+    'propose':_CREATION_FIELDS,
+    'record':_CREATION_FIELDS|{'evidence_span'},
+    'list':frozenset(('operation','item_id')),
+    'work_status':frozenset(('operation','work_id','item_id')),
+    'work_evidence':frozenset(('operation','work_id','evidence_reference','message_id','offset','max_chars','fingerprint','part')),
+    'work':frozenset(('operation','item_id','item_version','evidence_span','toolsets')),
+    **{name:_CHANGE_FIELDS for name in ('complete','cancel','snooze','resume')},
+}
+
+
 AGENDA_SCHEMA = {
     'name': 'alive_agenda',
     'description': 'Propose a continuing item for the current user, or list their existing Alive items. '
@@ -64,8 +77,8 @@ AGENDA_SCHEMA = {
         'item_version': {'type':'string','description':'Current opaque version from list; required for state changes. Refresh if stale.'},
         'evidence_span': {'type':'string','maxLength':1500,
                           'description':'For direct creation/state changes: exact words from the current user turn assigning or changing this item; quoted third-party instructions are not owner requests.'},
-        'task': {'type': 'string', 'maxLength': 1500},
-        'constraint': {'type': 'string', 'maxLength': 1000},
+        'task': {'type': 'string', 'maxLength': 1500,'description':'Creation only (propose/record). For work, the host uses the existing item and exact current owner message; omit this field.'},
+        'constraint': {'type': 'string', 'maxLength': 1000,'description':'Creation only (propose/record); omit for work, queries and state changes.'},
         'due_at': {'type': 'string', 'description': 'Optional ISO 8601 timestamp with explicit UTC offset; never guess an ambiguous date.'},
         'available_at': {'type': 'string', 'description': 'Optional earliest follow-up time, ISO 8601 with explicit UTC offset.'}},
         'required': ['operation'], 'additionalProperties': False}}
@@ -192,9 +205,17 @@ class CoreAgendaBridge:
                 raise ValueError('current main task required')
             if not isinstance(args, dict) or args.get('operation') not in ('propose', 'record', 'list','complete','cancel','snooze','resume','work','work_status','work_evidence'):
                 raise ValueError('bounded agenda operation required')
+            allowed=_OPERATION_FIELDS[args['operation']]
+            if set(args)-allowed:
+                # Validate before any source recording or Core IO. Do not turn
+                # a correctable call-shape error into an authority diagnosis,
+                # echo unknown argument names/values, or silently discard them.
+                return json.dumps({'error':'alive_agenda_arguments_invalid','operation':args['operation'],
+                    'allowed_fields':sorted(allowed),'request_processed':False,'new_job_created':False,
+                    'hint':'Retry this operation using only its allowed fields. For work, omit task/constraint: '
+                           'the host retains the existing assignment and exact current owner message. '
+                           'This argument error does not establish a missing tool or permission.'})
             if args['operation'] == 'list':
-                if set(args)-{'operation','item_id'}:
-                    raise ValueError('list takes no model-supplied scope')
                 if 'item_id' in args and (not isinstance(args['item_id'],str) or not args['item_id']):
                     raise ValueError('explicit item lookup requires an exact identifier')
                 result = {'items': self._items(store, configured,args.get('item_id')),
@@ -209,7 +230,7 @@ class CoreAgendaBridge:
                     result=work.previous(args['item_id'],subject=configured.subject) or {'status':'no_work_registered_for_this_item'}
                 else:raise ValueError('one exact work or item identifier required')
             elif args['operation']=='work_evidence':
-                if 'work_id' not in args or set(args)-{'operation','work_id','evidence_reference','message_id','offset','max_chars','fingerprint','part'}:
+                if 'work_id' not in args:
                     raise ValueError('exact owned work and bounded evidence fields required')
                 from .kernel_execution_bridge import kernel
                 work=kernel('core_work').CoreWorkStore(store)
@@ -218,20 +239,12 @@ class CoreAgendaBridge:
                     offset=args.get('offset',0),max_chars=args.get('max_chars',4096),fingerprint=args.get('fingerprint'),
                     part=args.get('part','records'))
             elif args['operation']=='work':
-                if set(args)-{'operation','item_id','item_version','evidence_span','toolsets'}:
-                    raise ValueError('unexpected work fields')
                 result=self._work(store,configured,scope,task_id,session_id,turn,args)
             elif args['operation'] in ('complete','cancel','snooze','resume'):
-                if set(args)-{'operation','item_id','item_version','evidence_span','available_at'}:
-                    raise ValueError('unexpected state-change fields')
                 with self.lock:
                     result=self._change(store,configured,scope,task_id,session_id,turn,args)
                 return json.dumps(result,ensure_ascii=False)
             else:
-                if set(args) - {'operation', 'task', 'constraint', 'due_at', 'available_at','evidence_span'}:
-                    raise ValueError('unexpected proposal fields')
-                if args['operation']=='propose' and 'evidence_span' in args:
-                    raise ValueError('evidence belongs only to delegated current-turn intake')
                 details = {name: args.get(name, '') for name in ('task', 'constraint')}
                 if (not isinstance(details['task'], str) or not details['task'].strip()
                         or len(details['task']) > 1500 or not isinstance(details['constraint'], str)

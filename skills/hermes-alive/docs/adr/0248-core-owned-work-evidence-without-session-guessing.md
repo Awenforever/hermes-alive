@@ -65,3 +65,10 @@ requirements. Fresh independent inspection and semantic goal assessment must
 then enter Native decisions; a foreground endpoint is not that closed loop.
 Privacy/dependency erasure, Core retention, uninstall/reinstall/migration, custom
 state locations and the final fleet remain release gates.
+
+
+Operation-specific call shapes must be explicit even when Core exposes a flat
+union tool schema. Reject unsupported fields before recording/IO, with a bounded
+public allowed-field response. Malformed arguments are not proof of an unavailable
+owner, execution permission or file tool. Preserve supplied constraints by asking
+for a corrected call rather than silently dropping them.

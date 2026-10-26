@@ -21,7 +21,7 @@ from alive_kernel import assess_reported_outcome  # noqa: E402
 
 class FakePluginContext:
     def __init__(self) -> None:
-        self.hooks: dict[str, object] = {}
+        self.hooks: dict[str, list] = {}
         self.cli: dict[str, object] = {}
         self.commands: dict[str, object] = {}
         self._manager=SimpleNamespace(scope_key=str(Path.cwd()))
@@ -31,7 +31,7 @@ class FakePluginContext:
         self.unload.append(callback)
 
     def register_hook(self, name, callback):
-        self.hooks[name] = callback
+        self.hooks.setdefault(name, []).append(callback)
 
     def register_cli_command(self, **values):
         self.cli[str(values["name"])] = values
@@ -82,10 +82,13 @@ def main() -> int:
             plugin = _load_plugin()
             context = FakePluginContext()
             plugin.register(context)
-            assert set(context.hooks) == {"post_tool_call", "post_gateway_admission"}
+            assert set(context.hooks) == {"pre_api_request", "post_tool_call", "post_gateway_admission"}
+            assert len(context.hooks['post_tool_call']) == 2
             assert set(context.cli) == {"alive"}
             assert set(context.commands)=={'alive'}
-            callback = context.hooks["post_tool_call"]
+            def callback(**values):
+                for observer in context.hooks['post_tool_call']:
+                    observer(**values)
             values = {
                 "tool_name": "terminal",
                 "task_id": "private-task-id",
@@ -101,6 +104,8 @@ def main() -> int:
                 "error_message": "private error sentinel",
             }
             callback(**values)
+            for observer in context.hooks['pre_api_request']:
+                observer(**values)
             assert not (shared / "kernel" / "experience.sqlite3").exists()
 
             os.environ["HERMES_ALIVE_KERNEL_SHADOW_ENABLED"] = "true"

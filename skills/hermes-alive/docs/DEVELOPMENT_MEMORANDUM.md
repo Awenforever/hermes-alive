@@ -1295,3 +1295,22 @@ state advice should make the model yield; the revised isolated driver advances
 Core's own tick concurrently, rather than making scheduling depend on the reply.
 Do not merely increase the iteration limit, force a tool choice or count the
 failed submission-only attempt as real-main-to-worker success.
+
+
+The independent-clock actual-model attempt r150 did not submit a job: the model
+included creation-only task/constraint fields in work. The union tool schema
+permitted those properties, while the operation rejected them with a generic
+unavailable hint mentioning authorization/time. The model therefore abandoned
+handoff and misdiagnosed file availability. Fix the API contract, not its model:
+mark creation fields clearly; validate operation shapes before side effects and
+return the public allowed field names plus an honest not-processed result. Never
+silently drop a supplied constraint, weaken owner/turn guards, or echo arbitrary
+unknown keys/values. A corrected call still needs all original authority checks.
+Actual Core qualification must prove rejected shape leaves both jobs and journal
+unchanged before the same valid call creates one job.
+
+Full r149 stopped at the receipt test: its fake context overwrote callbacks,
+unlike Core's multiple-hook API, and expected the pre-session-observer hook list.
+Fix the fake to retain and invoke both post-tool observers and the pre-API hook;
+retain the original opt-out/no-body/privacy assertions. Do not remove the observer
+or skip the failed test. The old full run is a failure, not a 99-suite pass.

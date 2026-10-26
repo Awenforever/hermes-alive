@@ -131,6 +131,12 @@ async def test(home):
         tool=turn('work-launch',text)
         payload={'operation':'work','item_id':row['item_id'],'item_version':row['item_version'],
                  'toolsets':['file'],'evidence_span':text}
+        before_invalid=store.journal.last_sequence()
+        invalid=tool({**payload,'task':'Unsupported model-supplied rewrite','constraint':'Do not silently discard me'})
+        assert invalid['error']=='alive_agenda_arguments_invalid' and not invalid['request_processed']
+        assert not invalid['new_job_created'] and 'task' not in invalid['allowed_fields']
+        assert not jobs.list_jobs(include_disabled=True)
+        assert store.journal.last_sequence()==before_invalid
         started=tool(payload);assert started.get('status')=='submitted_to_core',started
         assert tool(payload)['work_id']==started['work_id']
         assert len(jobs.list_jobs(include_disabled=True))==1
