@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit
 
 from .discovery_opportunities import DiscoveryCandidate, canonicalize_discovery_url
-from .events import EventEnvelope, Sensitivity
+from .events import EventEnvelope, Sensitivity, _thaw_json
 from .native_worker_protocol import identifier
 from .model_json import parse_model_json
 
@@ -49,7 +49,7 @@ def provenance_metadata(content):
             literal_owner_confirmation=content.get('literal_owner_confirmation') is True,
             original_user_message_preserved=content.get('original_owner_message_included') is True,
             agenda_description_is_verbatim=False,authority_is_not_execution_permission=True)
-        if 'core_work' in content:metadata['core_work']=dict(content['core_work'])
+        if 'core_work' in content:metadata['core_work']=_thaw_json(content['core_work'])
     return metadata
 
 
@@ -67,12 +67,15 @@ def source_prompt_excerpt(content, *, policy=None):
         raise HostDiscoveryError('unknown source excerpt policy')
     if 'core_work' in content or content.get('original_owner_message_included') is True:
         # Preserve the same lifecycle qualifications for interpretation, factual
-        # review and follow-on context. No output body or success claim is added.
-        return json.dumps({'interpreted_assignment_context':content['summary'],
+        # review and follow-on context. Guided record excerpts remain historical,
+        # never an independent result or a new execution authority.
+        return json.dumps(_thaw_json({'interpreted_assignment_context':content['summary'],
             **({'original_owner_message':content['original_owner_message'],
                 'source_recorded_at':content['source_recorded_at'],'source_timestamp_kind':content['source_timestamp_kind']}
                if content.get('original_owner_message_included') is True else {}),
-            **({'core_work_lifecycle':dict(content['core_work'])} if 'core_work' in content else {})},ensure_ascii=False)
+            **({'core_work_lifecycle':dict(content['core_work'])} if 'core_work' in content else {}),
+            **({'core_work_record_review':dict(content['core_work_record_review'])}
+               if 'core_work_record_review' in content else {})}),ensure_ascii=False)
     depth = (policy == SOURCE_EXCERPT_POLICY
              and read_scope_metadata(content).get('reported_read_scope') == 'webpage_extract')
     return content['summary'][:8192 if depth else 1800]

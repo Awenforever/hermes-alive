@@ -30,6 +30,8 @@ def test(root):
     store=KernelSetupStore(root,initialize=True)
     assert store.configuration() is None
     refuse(lambda:store.stage({**OPTIONS,'model_calls':False}))
+    refuse(lambda:store.stage({**OPTIONS,'review_core_work_results':True}))
+    refuse(lambda:store.stage({**OPTIONS,'review_core_work_results':'true'}))
     refuse(lambda:store.stage({**OPTIONS,'outbound_retention_confirmed':False}))
     refuse(lambda:store.stage({**OPTIONS,'outbound_retention_days':True}))
     intent,token=store.stage(OPTIONS)

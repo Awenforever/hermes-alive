@@ -1328,3 +1328,14 @@ Make the required-per-operation contract and missing-field response explicit,
 including work_id on every evidence page. Test rejection before Core DB access,
 then the corrected page against the actual owned segment. Do not guess work_id
 from arbitrary references, relax ownership, force tools or rewrite test answers.
+
+
+ADR0249 is a separately guided historical record-review slice, not independent
+result verification. Keep old grants metadata-only and stop background body IO
+on pause. Reuse the existing exact Core session association and candidate loop;
+only keyed window digests enter work.observed. Same execution status with changed
+records must invalidate the prior view and wake reconsideration. Body availability
+and partial windows must remain explicit. No source text grants instructions,
+completion, retry or new tool scope. Follow this with actual independent inspection
+and Native work decisions, not another claim that a record-reading API finishes
+the proactive agent. Controlled replies do not prove semantic judgments.

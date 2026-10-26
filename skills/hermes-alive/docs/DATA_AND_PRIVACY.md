@@ -175,3 +175,19 @@ scope and remaining deletion/migration gates.
 
 Default uninstall preserves shared user/runtime state. `purge` removes all Hermes
 Alive-owned shared state and is destructive.
+
+
+### Guided background review of owned Core records
+
+The optional `review_core_work_results` choice allows the existing active
+cognition cycle to read bounded historical definition/result windows for its
+own terminal Core work. Earlier grants are not expanded. The observer retains
+only a keyed fingerprint and structural qualifications, not result bodies or a
+private transcript ID. The original Core store owns its retention and deletion;
+no alternate store or recent-session scan is used when data are unavailable.
+Private model assessments may be retained under existing Alive candidate or
+outbound policies and are derived data, not independent observations. Pausing
+stops background body reads. Native changes in judgment remain source-linked;
+forgetting all dependent derived material and profile migration still require
+the complete release matrix. This option grants no tools, sends, retries or
+agenda-completion authority. See ADR0249.

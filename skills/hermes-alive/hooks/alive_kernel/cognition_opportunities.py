@@ -196,9 +196,11 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
                 observation=work.current_observation(row['item_id'],subject=subject)
                 if observation is None:continue  # Never ask the user to do handed-off work.
                 event_id,status=observation
+                review=work.review_evidence(status,subject=subject)
                 value=replace(value,observation_event_id=event_id,content=_freeze_json({
                     **dict(value.content),'source':'Core-owned work lifecycle observation',
-                    'title':'Ongoing delegated work','core_work':status}))
+                    'title':'Ongoing delegated work','core_work':status,
+                    **({'core_work_record_review':review} if review is not None else {})}))
             if value is not None and observation_event_ids is not None and value.observation_event_id not in observation_event_ids:
                 continue
             if value is not None:

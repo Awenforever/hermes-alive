@@ -38,6 +38,7 @@ from run_core_guided_setup import cli
 
 
 async def test(home):
+    review_records=os.environ.get('ALIVE_WORK_REVIEW_TEST')=='1'
     home.mkdir(exist_ok=True);shutil.copytree(core.repo,home/'plugins/hermes-alive')
     responses={}
     class Handler(BaseHTTPRequestHandler):
@@ -60,10 +61,12 @@ async def test(home):
                              'key_env':'OWNER_MAIN_KEY','api_mode':'chat_completions'}]}))
     (home/'.env').write_text('OWNER_MAIN_KEY=SYNTHETIC_OWNER_KEY\n')
     rc,staged=cli(home,'setup','--confirm-model-calls','--confirm-delivery','--confirm-outbound-retention',
-        '--confirm-followup-management','--confirm-core-background-work','--automatic-core-toolset','file')
+        '--confirm-followup-management','--confirm-core-background-work','--automatic-core-toolset','file',
+        *(['--confirm-core-work-result-review'] if review_records else []))
     assert rc==0 and staged['confirmation_summary']['native_core_background_work']
     assert staged['confirmation_summary']['exact_current_work_message_retained_by_core'] is True
     assert staged['confirmation_summary']['automatic_core_toolsets']==['file']
+    assert staged['confirmation_summary']['bounded_owned_core_result_review'] is review_records
     assert cli(home,'install-runtime','--engine','kernel')[0]==0
     token=core.set_hermes_home_override(home);manager=None
     try:
@@ -170,8 +173,17 @@ async def test(home):
                 assert kw['task']=='alive_opportunity_candidates',kw['task']
                 progress_prompts.append(json.dumps(kw['messages'],ensure_ascii=False))
                 if isinstance(kw.get('route_info'),dict):kw['route_info']['provider']='synthetic-provider'
+                document={'candidates':[]}
+                if review_records:
+                    current=json.loads(kw['messages'][-1]['content'])['opportunities'][0]
+                    reason=('Untrusted worker claim needs independent verification.'
+                        if 'SYNTHETIC_UNVERIFIED_WORKER_CLAIM' in progress_prompts[-1] else
+                        'Recorded write/read is available; fresh verification is still missing.'
+                        if 'core_work_record_review' in current.get('summary_excerpt','') else
+                        'Wait for attributable execution evidence.')
+                    document['abstentions']=[{'agenda_item_id':current['agenda_item_id'],'reason':reason}]
                 return SimpleNamespace(model='synthetic-model',choices=[SimpleNamespace(
-                    message=SimpleNamespace(content=json.dumps({'candidates':[]})))])
+                    message=SimpleNamespace(content=json.dumps(document)))])
         native.caller_factory=lambda **kw:ProgressCaller(**kw)
         first=await native.step(build())
         assert first.disposition=='silence',first.disposition
@@ -300,7 +312,16 @@ async def test(home):
         after=await native.step(build())
         assert after.disposition=='silence' and len(progress_prompts)==2,after.disposition
         assert 'core_completed_result_unverified' in progress_prompts[-1]
-        assert 'task_success_proven' in progress_prompts[-1] and 'not result contents' in progress_prompts[-1]
+        assert 'task_success_proven' in progress_prompts[-1]
+        if review_records:
+            assert 'core_work_record_review' in progress_prompts[-1]
+            assert 'INDEPENDENT_SYNTHETIC_ARTIFACT' in progress_prompts[-1]
+            assert 'bounded_historical_core_records' in progress_prompts[-1]
+            assert 'independent_current_result_verification' in progress_prompts[-1]
+        else:
+            assert 'not result contents' in progress_prompts[-1]
+            assert 'core_work_record_review' not in reader.commitments(
+                subject=configured.subject,clearance=execution.kernel('events').Sensitivity.PRIVATE)[0].content
         evidence=reader.commitments(subject=store.configuration().subject,
             clearance=execution.kernel('events').Sensitivity.PRIVATE)
         assert len(evidence)==1 and evidence[0].content['core_work']['task_success_proven'] is False
@@ -311,6 +332,17 @@ async def test(home):
         assert (await native.step(build())).disposition=='waiting_for_change'
         assert len(progress_prompts)==2 and len(list(store.journal.read(event_type='work.observed')))==2
         assert len(jobs.list_jobs(include_disabled=True))==1 and artifact.read_text()==body
+        if review_records:
+            review=work_store.review_evidence(evidence[0].content['core_work'],subject=configured.subject)
+            assert review['independent_current_result_verification'] is False
+            assert review['execution_records']['status']=='core_execution_evidence'
+            assert any(e['kind']=='recorded_tool_result' and e['tool_name']=='read_file'
+                and 'INDEPENDENT_SYNTHETIC_ARTIFACT' in e['content'] for e in review['execution_records']['entries'])
+            changed_view={**dict(evidence[0].content['core_work']),'record_review':{'fingerprint':'0'*64}}
+            assert work_store.review_evidence(changed_view,subject=configured.subject) is None
+        else:
+            with patch('hermes_state.SessionDB',side_effect=AssertionError('legacy grant read Core bodies')):
+                assert 'record_review' not in work_store.observation_state(started['work_id'],subject=configured.subject)
         # Actual authored Core-definition drift must also wake the same host,
         # without executing the broadened job or hiding the uncertainty.
         jobs.update_job(started['job_id'],{'enabled_toolsets':['terminal']})
@@ -322,6 +354,26 @@ async def test(home):
         assert len(list(store.journal.read(event_type='work.observed')))==3
         for observation in store.journal.read(event_type='work.observed'):
             assert 'INDEPENDENT_SYNTHETIC_ARTIFACT' not in observation.event.canonical_json()
+        if review_records:
+            # Same Core execution status, new actual Core record: the exact
+            # window digest changes, so the existing Native loop reconsiders.
+            db=SessionDB()
+            try:db.append_message(observed['session_id'],'assistant','SYNTHETIC_UNVERIFIED_WORKER_CLAIM')
+            finally:db.close()
+            assert (await native.step(build())).disposition=='silence'
+            assert len(progress_prompts)==5 and 'SYNTHETIC_UNVERIFIED_WORKER_CLAIM' in progress_prompts[-1]
+            latest=list(store.journal.read(event_type='opportunity.synthesis_completed'))[-1].event
+            result=store.vault.resolve_json(latest.payload['content']['content_id'],
+                expected_subject=configured.subject,expected_purpose='opportunity.candidates',
+                expected_sensitivity=execution.kernel('events').Sensitivity.PRIVATE)
+            assert result['abstentions'][0]['reason']=='Untrusted worker claim needs independent verification.'
+            assert latest.payload['raw_prompt_stored'] is False
+            assert (await native.step(build())).disposition=='waiting_for_change'
+            assert len(progress_prompts)==5 and len(list(store.journal.read(event_type='work.observed')))==4
+            for observation in store.journal.read(event_type='work.observed'):
+                assert 'SYNTHETIC_UNVERIFIED_WORKER_CLAIM' not in observation.event.canonical_json()
+            assert tool({'operation':'list','item_id':row['item_id']})['items'][0]['state']=='active'
+            assert len(jobs.list_jobs(include_disabled=True))==1 and artifact.read_text()==body
         assert tick(verbose=False,sync=True,headless=True)==0
         # New attempts, even in the automatic scope, disclose prior effects.
         text='请再做一次刚才的工作。';tool=turn('work-repeat',text)
@@ -395,6 +447,9 @@ async def test(home):
         assert (await native.step(build())).disposition=='paused'
         assert len(progress_prompts)==calls_before_pause
         assert len(list(store.journal.read(event_type='work.observed')))==observations_before_pause
+        with patch('hermes_state.SessionDB',side_effect=AssertionError('paused owner read Core bodies')):
+            assert execution.kernel('core_work_evidence').CoreWorkEvidence(work_store).for_review(
+                started['work_id'],subject=configured.subject,state=status) is None
         # Removing original evidence never reconstructs it from the description.
         text='持续跟进 SOURCE_ERASURE_ONLY，原文与整理稿必须区别。'
         erasure_tool=turn('source-erasure',text)
@@ -468,7 +523,16 @@ if __name__=='__main__':
             subject=expected['owner'],include_message=True)['original_source_available'] is False
         observation=execution.kernel('core_work').CoreWorkStore(store).current_observation(
             status['item_id'],subject=expected['owner'])
-        assert observation is not None and observation[1]==status
+        if os.environ.get('ALIVE_WORK_REVIEW_TEST')=='1':
+            # The persisted owner is paused. The old reviewed body remains in
+            # Core, but no background reading resumes during cold recovery.
+            with patch('hermes_state.SessionDB',side_effect=AssertionError('cold paused review read bodies')):
+                assert execution.kernel('core_work_evidence').CoreWorkEvidence(
+                    execution.kernel('core_work').CoreWorkStore(store)).for_review(
+                        expected['work_id'],subject=expected['owner'],state=status) is None
+            assert observation is None
+        else:
+            assert observation is not None and observation[1]==status
         print('HERMES_ALIVE_CORE_WORK_COLD_ASSOCIATION_OK')
     else:
         asyncio.run(test(Path(os.environ['HERMES_HOME'])))

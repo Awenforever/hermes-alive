@@ -138,7 +138,7 @@ proof that it ran or met the goal. `alive_agenda work_status` can query an exact
 work ID or recover its association from the known item ID, without resubmission.
 While Alive is active, its existing owner cycle observes changed Core lifecycle
 facts and brings them into cognitive decisions. Unchanged state may stay quiet.
-This does not inspect output bodies or verify that the assigned goal was met.
+By default this does not inspect output bodies or verify that the assigned goal was met.
 Independent automatic result followup and autonomous Native work selection remain
 unfinished; do not promise them. The current owner can inspect an exact known
 work with `work_evidence`: its bound request or bounded execution evidence.
@@ -194,3 +194,24 @@ Preserve existing state and key identity across update/uninstall/reinstall.
 Incomplete or unknown state is a recovery condition, not permission to create
 replacement keys or silently fall back to the legacy sender. Production
 updates, restarts and real sends still require the concrete authorized window.
+
+
+### Optional owned-work record review
+
+Separately explain `--confirm-core-work-result-review` alongside the Core-work
+grant. This permits active Alive cognition to read a bounded retained definition
+and record window of its own terminal work, including recorded tool outputs and
+worker statements. Core keeps the original records; Alive retains only a keyed
+window digest in its structural journal, while derived assessments follow its
+existing private candidate/outbound retention. It reads no unrelated sessions.
+Old grants remain metadata-only. Pausing stops these background body reads;
+accepted-work session-link bookkeeping and foreground explicit evidence queries
+have their separately documented scope. Missing records stay unavailable.
+
+The current window is at most 2048 content characters for the definition and
+2048 for the last 16 active rows of its observed Core session. Tool arguments
+remain indexed rather than inlined by default. Partial flags matter. A changed
+window can wake the existing cognition cycle without a new scheduler; unchanged
+records do not cause another inference. Historical records are not fresh
+independent inspection, task completion, retry permission or a new action grant.
+Do not promise autonomous verification or work selection from this option.

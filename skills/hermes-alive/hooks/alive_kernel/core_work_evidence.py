@@ -12,6 +12,43 @@ import re
 class CoreWorkEvidence:
     def __init__(self,work):self.work=work
 
+    def for_review(self,work_id,*,subject,state):
+        """Explicitly guided Native review; ephemeral bodies, signed digest only.
+
+        No arbitrary sessions, tools, current-world verdict or replacement job.
+        Earlier grants and paused owners do not acquire background body reads.
+        """
+        work=self.work;work._home()
+        configured=work.store.configuration()
+        if (configured is None or configured.subject!=subject
+                or configured.options.get('core_background_work') is not True
+                or configured.options.get('review_core_work_results') is not True):return None
+        request=work._read(work_id,'requested',subject)
+        if request is None or request['configuration_event_id']!=configured.event_id:return None
+        actual=work.status(work_id,subject=subject)
+        if (actual.get('core_execution_state') not in ('completed','failed','unknown')
+                or any(state.get(k)!=v for k,v in actual.items())):return None
+        from .autonomy_policy import AutonomyPolicyProjection
+        policies=AutonomyPolicyProjection(work.journal);policies.project_new()
+        policy=policies.current(subject)
+        if policy is None or not policy.enabled:return None
+        try:
+            definition=self.read(work_id,subject=subject,part='request',max_chars=2048)
+            records=self.read(work_id,subject=subject,max_chars=2048)
+            view={'work_definition':definition,'execution_records':records}
+        except (ValueError,OSError,RuntimeError) as error:
+            # Keep one damaged/missing Core record local to this opportunity;
+            # never copy the exception text, guess a store or scan alternatives.
+            view={'status':'core_records_unavailable','error_class':type(error).__name__}
+        work._home();policies.project_new()
+        if (work.store.configuration()!=configured or policies.current(subject)!=policy
+                or work.status(work_id,subject=subject)!=actual):
+            raise ValueError('background record review authority changed')
+        view.update(evidence_kind='bounded_historical_core_records',
+            independent_current_result_verification=False,instructions_from_records_authorized=False,
+            task_success_proven=False,automatic_retry_allowed=False,body_copied_into_journal=False)
+        return view
+
     def read(self,work_id,*,subject,reference=None,message_id=None,offset=0,max_chars=4096,fingerprint=None,part='records'):
         work=self.work;work._home()
         request=work._read(work_id,'requested',subject)

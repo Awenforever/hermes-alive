@@ -5,6 +5,7 @@ retried. The caller supplies current owner/turn/item authority on every launch.
 """
 from dataclasses import replace
 from contextlib import closing
+from collections.abc import Mapping
 import json
 import re
 
@@ -209,7 +210,7 @@ class CoreWorkStore:
             if request['item_id'] in seen:continue
             seen.add(request['item_id'])
             if request['configuration_event_id']!=configured.event_id:continue
-            state=self.status(work_id,subject=configured.subject)
+            state=self.observation_state(work_id,subject=configured.subject)
             suffix='observation:'+self.protector.authenticate_json('alive.core-work.observation.v1',state)
             if self._read(work_id,suffix,configured.subject,event_type='work.observed') is None:
                 validate();self._home()
@@ -228,9 +229,30 @@ class CoreWorkStore:
         if (configured is None or configured.subject!=subject
                 or configured.options.get('core_background_work') is not True
                 or configured.event_id!=request['configuration_event_id']):return None
+        current=self.observation_state(work_id,subject=subject)
         suffix='observation:'+self.protector.authenticate_json('alive.core-work.observation.v1',current)
         saved=self._read(work_id,suffix,subject,event_type='work.observed')
         return (work_id+':'+suffix,saved) if saved==current else None
+
+    def observation_state(self,work_id,*,subject):
+        state=self.status(work_id,subject=subject)
+        from .core_work_evidence import CoreWorkEvidence
+        view=CoreWorkEvidence(self).for_review(work_id,subject=subject,state=state)
+        if view is not None:
+            state={**state,'record_review':{
+                'fingerprint':self.protector.authenticate_json('alive.core-work.record-review.v1',view),
+                'historical_evidence_only':True,'task_success_proven':False,
+                'body_copied_into_journal':False}}
+        return state
+
+    def review_evidence(self,state,*,subject):
+        """Read only the exact current signed observation's unchanged window."""
+        if not isinstance(state.get('record_review'),Mapping):return None
+        from .core_work_evidence import CoreWorkEvidence
+        view=CoreWorkEvidence(self).for_review(state['work_id'],subject=subject,state=state)
+        if (view is None or self.protector.authenticate_json('alive.core-work.record-review.v1',view)
+                !=state['record_review'].get('fingerprint')):return None
+        return view
 
     def observe_session(self,configured,*,execution,session_id):
         """Core-only identity observation; never infer a session from a job ID."""
