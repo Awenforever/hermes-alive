@@ -193,6 +193,7 @@ _ALLOWED_TRANSITIONS = {
         AgendaState.EXPIRED,
     },
     AgendaState.SNOOZED: {
+        AgendaState.SNOOZED,
         AgendaState.ACTIVE,
         AgendaState.COMPLETED,
         AgendaState.DISMISSED,
@@ -594,6 +595,10 @@ class AgendaProjection:
             return self._decision(
                 connection, event, "rejected", "invalid_user_authority_source", item_id
             )
+        if authority is AgendaAuthority.USER_DELEGATED:
+            from .followup_intake import validates_transition
+            if not validates_transition(self.journal,event,subject=row['subject'],from_state=from_state.value):
+                return self._decision(connection,event,'rejected','invalid_delegated_transition',item_id)
         if authority is AgendaAuthority.SYSTEM_MIGRATION and (
             authority_source.event.event_type != "system.migration"
         ):
@@ -604,7 +609,7 @@ class AgendaProjection:
             AgendaItemKind(row["kind"]) is AgendaItemKind.COMMITMENT
             and to_state is not AgendaState.EXPIRED
             and authority
-            not in {AgendaAuthority.USER_EXPLICIT, AgendaAuthority.SYSTEM_MIGRATION}
+            not in {AgendaAuthority.USER_EXPLICIT, AgendaAuthority.USER_DELEGATED, AgendaAuthority.SYSTEM_MIGRATION}
         ):
             return self._decision(
                 connection, event, "rejected", "commitment_transition_requires_authority", item_id
@@ -668,11 +673,12 @@ class AgendaProjection:
         kinds: Iterable[AgendaItemKind] | None = None,
         item_ids: Iterable[str] | None = None,
         source_cursor: int | None = None,
+        include_future: bool = False,
     ) -> list[AgendaRecord]:
         clearance = Sensitivity(clearance)
         allowed = _SENSITIVITY_ORDER[: _SENSITIVITY_ORDER.index(clearance) + 1]
         selected_states = tuple(dict.fromkeys(AgendaState(value) for value in states))
-        if not selected_states or not 1 <= limit <= 1000:
+        if not selected_states or not 1 <= limit <= 1000 or type(include_future) is not bool:
             raise AgendaValidationError("states and a valid limit are required")
         now = _utc(as_of or datetime.now(timezone.utc), "as_of")
         extra = ""
@@ -712,14 +718,14 @@ class AgendaProjection:
             SELECT * FROM agenda_items_v1
             WHERE state IN ({','.join('?' for _ in selected_states)})
               AND sensitivity IN ({','.join('?' for _ in allowed)})
-              AND (available_at IS NULL OR available_at <= ?)
+              AND (? OR available_at IS NULL OR available_at <= ?)
               AND (expires_at IS NULL OR expires_at > ?)
               {extra}
             ORDER BY {order}
             LIMIT ?
         """
         parameters = [*(value.value for value in selected_states), *(v.value for v in allowed)]
-        parameters.extend((now.isoformat(), now.isoformat(), *extra_parameters, *order_parameters, limit))
+        parameters.extend((int(include_future),now.isoformat(), now.isoformat(), *extra_parameters, *order_parameters, limit))
         with closing(self._connect()) as connection:
             return [self._record(connection, row) for row in connection.execute(query, parameters)]
 

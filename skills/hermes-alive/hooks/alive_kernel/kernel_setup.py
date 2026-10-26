@@ -37,14 +37,15 @@ def validate_options(options):
               'model','public_queries','cited_reads'}
     if (not isinstance(options, dict) or not required<=set(options)
             or set(options)-required-{'language','communication_preference','interest_preferences','use_hermes_user_profile',
-                                     'refine_public_sources','accept_explicit_followups'}
+                                     'refine_public_sources','accept_explicit_followups','manage_explicit_followups'}
             or options['model_calls'] is not True or options['delivery'] is not True
             or options['outbound_retention_confirmed'] is not True
             or type(options['outbound_retention_days']) is not int
             or not 1 <= options['outbound_retention_days'] <= 365
             or type(options['cited_reads']) is not bool
             or any(key in options and type(options[key]) is not bool
-                   for key in ('use_hermes_user_profile','refine_public_sources','accept_explicit_followups'))):
+                   for key in ('use_hermes_user_profile','refine_public_sources','accept_explicit_followups','manage_explicit_followups'))
+            or options.get('manage_explicit_followups') is True and options.get('accept_explicit_followups') is not True):
         raise KernelSetupError('explicit model/delivery/retention choices required')
     model = options['model']
     queries = options['public_queries']

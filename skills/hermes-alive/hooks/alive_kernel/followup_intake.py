@@ -53,17 +53,25 @@ def set_permission(store,configured,enabled):
             'raw_content_stored':False,'external_action_authorized':False})))
 
 
-def record_request(store, configured, *, turn_identity, request_fingerprint, evidence_fingerprint, permission_id, now=None):
+def record_request(store, configured, *, turn_identity, request_fingerprint, evidence_fingerprint, permission_id,
+                   operation='record', target_item_id=None, from_state=None, available_at=None, now=None):
     """Current configured Core host only, never a public/model-callable API."""
     current = store.configuration()
     if (current is None or current.event_id != configured.event_id
             or permission(store,configured)!=(True,permission_id)):
         raise ValueError('current owner intake grant required')
+    if operation not in ('record','complete','cancel','snooze','resume'):
+        raise ValueError('bounded follow-up purpose required')
+    if operation!='record' and (configured.options.get('manage_explicit_followups') is not True
+            or not isinstance(target_item_id,str) or not target_item_id
+            or from_state not in ('active','snoozed')):
+        raise ValueError('guided management grant and exact current item required')
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
         raise ValueError('aware intake time required')
     identity = {'configuration':configured.event_id, 'owner':configured.subject,
-                'turn':turn_identity, 'request':request_fingerprint,'evidence':evidence_fingerprint}
+                'turn':turn_identity, 'request':request_fingerprint,'evidence':evidence_fingerprint,
+                'operation':operation,'target':target_item_id,'from_state':from_state,'available_at':available_at}
     event_id = 'followup.request:' + store.protector.authenticate_json(DOMAIN, identity)
     existing = store.journal.get(event_id)
     if existing is not None:
@@ -73,6 +81,7 @@ def record_request(store, configured, *, turn_identity, request_fingerprint, evi
         sensitivity=Sensitivity.PRIVATE, payload={
             'configuration_event_id':configured.event_id, 'permission_event_id':permission_id,'turn_identity':turn_identity,
             'request_fingerprint':request_fingerprint, 'evidence_fingerprint':evidence_fingerprint,
+            'operation':operation,'target_item_id':target_item_id,'from_state':from_state,'available_at':available_at,
             'retention_until':(now+timedelta(days=configured.options['outbound_retention_days'])).isoformat(),
             'interpretation':'main_model_under_owner_grant', 'literal_owner_confirmation':False,
             'raw_content_stored':False, 'external_action_authorized':False})
@@ -81,6 +90,34 @@ def record_request(store, configured, *, turn_identity, request_fingerprint, evi
         if current is None or current.event_id!=configured.event_id or permission(store,current)!=(True,permission_id):
             raise ValueError('intake permission changed')
     return store.journal.append(_signed(store,event),precondition=still_allowed)
+
+
+def _validated_source(journal,source_id,subject,observed_at):
+    """Protected historical grant; no new journal or opaque model authority."""
+    source=journal.get(source_id)
+    if source is None:raise ValueError('source unavailable')
+    event=source.event
+    if (event.source!=SOURCE or event.event_type!='conversation.inbound'
+            or event.actor!=subject or event.subject!=subject
+            or event.sensitivity is not Sensitivity.PRIVATE or event.observed_at>observed_at):
+        raise ValueError('current owner source required')
+    store=KernelSetupStore(journal.path.parent,journal=journal)
+    grant=journal.get(event.payload.get('configuration_event_id',''))
+    configured=store._configuration(grant)
+    if (configured.subject!=subject or configured.options.get('accept_explicit_followups') is not True
+            or grant.event.observed_at>event.observed_at or not _verified(store,event)):
+        raise ValueError('source grant unavailable')
+    payload=_thaw_json(event.payload)
+    if (permission(store,configured,before_sequence=source.sequence)!=(True,payload.get('permission_event_id'))
+            or payload.get('interpretation')!='main_model_under_owner_grant'
+            or payload.get('literal_owner_confirmation') is not False
+            or payload.get('raw_content_stored') is not False or payload.get('external_action_authorized') is not False):
+        raise ValueError('source authority changed')
+    expiry=datetime.fromisoformat(payload['retention_until'])
+    if (expiry.tzinfo is None or not event.observed_at<=observed_at<expiry
+            or expiry>event.observed_at+timedelta(days=configured.options['outbound_retention_days'])):
+        raise ValueError('source outside its admitted lifetime')
+    return source,configured,expiry
 
 
 def validates_proposal(journal, proposal):
@@ -92,30 +129,27 @@ def validates_proposal(journal, proposal):
                 or proposal.sensitivity is not Sensitivity.PRIVATE):return False
         sources=proposal.payload.get('source_event_ids',())
         if len(sources)!=1:return False
-        source=journal.get(sources[0])
-        if source is None:return False
-        event=source.event
-        if (event.source!=SOURCE or event.event_type!='conversation.inbound'
-                or event.actor!=proposal.subject or event.subject!=proposal.subject
-                or event.sensitivity is not Sensitivity.PRIVATE
-                or event.observed_at>proposal.observed_at):return False
-        store=KernelSetupStore(journal.path.parent,journal=journal)
-        grant=journal.get(event.payload.get('configuration_event_id',''))
-        configured=store._configuration(grant)
-        if (configured.subject!=proposal.subject
-                or configured.options.get('accept_explicit_followups') is not True
-                or grant.event.observed_at>event.observed_at):return False
-        payload=_thaw_json(event.payload)
-        if not _verified(store,event):return False
-        if permission(store,configured,before_sequence=source.sequence)!=(True,payload.get('permission_event_id')):return False
-        if (payload.get('interpretation')!='main_model_under_owner_grant'
-                or payload.get('literal_owner_confirmation') is not False
-                or payload.get('raw_content_stored') is not False
-                or payload.get('external_action_authorized') is not False):return False
-        expiry=datetime.fromisoformat(payload['retention_until'])
+        source,_configured,expiry=_validated_source(journal,sources[0],proposal.subject,proposal.observed_at)
+        if source.event.payload.get('operation','record')!='record' or source.event.payload.get('target_item_id') is not None:return False
         target=datetime.fromisoformat(proposal.payload['expires_at'])
         return (expiry.tzinfo is not None and target.tzinfo is not None
-                and proposal.observed_at<target<=expiry
-                and expiry<=event.observed_at+timedelta(days=configured.options['outbound_retention_days']))
+                and proposal.observed_at<target<=expiry)
     except (ValueError,TypeError,KeyError,OSError,RuntimeError):
         return False
+
+
+def validates_transition(journal,event,*,subject,from_state):
+    try:
+        if (event.event_type!='agenda.transitioned' or event.source!='alive.agenda'
+                or event.actor!=ACTOR or event.subject is not None
+                or event.sensitivity is not Sensitivity.INTERNAL
+                or event.payload.get('authority')!='user_delegated'):return False
+        source,configured,_expiry=_validated_source(journal,event.payload['source_event_id'],subject,event.observed_at)
+        mapping={'complete':'completed','cancel':'dismissed','snooze':'snoozed','resume':'active'}
+        payload=source.event.payload
+        return (configured.options.get('manage_explicit_followups') is True
+            and mapping.get(payload.get('operation'))==event.payload.get('to_state')
+            and payload.get('target_item_id')==event.payload.get('item_id')
+            and payload.get('from_state')==from_state
+            and payload.get('available_at')==event.payload.get('available_at'))
+    except (ValueError,TypeError,KeyError,OSError,RuntimeError):return False

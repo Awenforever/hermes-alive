@@ -73,15 +73,22 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
             change = command.event
             target = AgendaState(transition['to_state'])
             source = self.journal.get(change.payload.get('source_event_id',''))
+            if change.payload.get('authority')==AgendaAuthority.USER_DELEGATED.value:
+                from .followup_intake import validates_transition
+                authority_valid=validates_transition(self.journal,change,subject=subject,from_state=state.value)
+            else:
+                authority_valid=(change.payload.get('authority')==AgendaAuthority.USER_EXPLICIT.value
+                    and change.actor==subject and source is not None
+                    and source.event.event_type=='conversation.inbound' and source.event.actor==subject
+                    and source.event.subject==subject)
             if (command.sequence<=last_sequence or change.event_type!='agenda.transitioned'
-                    or change.source!='alive.agenda' or change.actor!=subject
+                    or change.source!='alive.agenda'
                     or change.payload.get('item_id')!=row['item_id']
                     or change.payload.get('to_state')!=target.value or transition['from_state']!=state.value
                     or target not in _ALLOWED_TRANSITIONS[state]
-                    or change.payload.get('authority')!=AgendaAuthority.USER_EXPLICIT.value
+                    or not authority_valid
                     or source is None or source.sequence>=command.sequence
-                    or source.event.event_type!='conversation.inbound' or source.event.actor!=subject
-                    or source.event.subject!=subject):
+                    ):
                 return None
             state,available,last_sequence = target,change.payload.get('available_at'),command.sequence
             admitted = True

@@ -1128,3 +1128,23 @@ but its response incorrectly conflated an active saved item with automatic
 reminder readiness. Expose and qualify actual runtime state in tool results;
 successful intake never proves an enabled host, sending or remote delivery.
 Derived source context must retain delegated-versus-literal confirmation labels.
+
+## 2026-10-26 — Manage the ongoing relationship, not only create tasks
+
+ADR0242 adds separately guided current-owner completion/cancel/snooze/resume.
+Eight real main turns operate on the same returned history; quoted third-party
+completion does not close the task. Preserve task constraints and deadlines when
+changing availability. Existing intake-only grants stay intake-only. Completion
+from owner report must not masquerade as independently observed work success.
+
+The controlled integration caught future snoozed items being hidden from both
+execution and management. Keep execution exclusion, expose them in the scoped
+management view, and verify re-snooze without an intermediate active state.
+The actual two-process startup test preserves the original protected keys,
+identity, activation, item and constraints while invalidating transient drafts.
+Commands and subsequent model turns need their own valid Core session context;
+do not loosen production checks to accommodate an incorrectly ordered fixture.
+
+Management list is still bounded to eight, so do not infer global absence from it.
+Real-model acknowledgments remain too verbose. These tests are not new useful
+sharing rounds, post-restart autonomous outcomes or production acceptance.

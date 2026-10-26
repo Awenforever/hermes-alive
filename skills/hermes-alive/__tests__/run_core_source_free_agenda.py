@@ -12,16 +12,17 @@ from unittest.mock import patch
 import run_core_session_routing as core
 from run_core_guided_setup import cli
 
-async def test(home,*,direct_intake=False):
+async def test(home,*,direct_intake=False,management=False):
  home.mkdir();shutil.copytree(core.repo,home/'plugins/hermes-alive')
  config={'plugins':{'enabled':['hermes-alive']},'model':{'provider':'custom:owner','default':'configured-primary'},
   'custom_providers':[{'name':'owner','model':'configured-primary','base_url':'https://provider.invalid/v1','key_env':'OWNER_MAIN_KEY','api_mode':'chat_completions'}],
   'agent':{'reasoning_effort':False}}
  (home/'config.yaml').write_text(json.dumps(config),encoding='utf-8');(home/'.env').write_text('OWNER_MAIN_KEY=SYNTHETIC_OWNER_KEY\n')
  rc,staged=cli(home,'setup','--confirm-model-calls','--confirm-delivery','--confirm-outbound-retention','--language','zh-CN',
-  *(['--confirm-explicit-followup-intake'] if direct_intake else []))
+  *(['--confirm-followup-management'] if management else ['--confirm-explicit-followup-intake'] if direct_intake else []))
  assert rc==0 and staged['confirmation_summary']['public_queries']==[]
  assert staged['confirmation_summary']['explicit_followup_intake']==direct_intake
+ assert staged['confirmation_summary']['explicit_followup_management']==management
  assert cli(home,'install-runtime','--engine','kernel')[0]==0
  token=core.set_hermes_home_override(home);manager=None;sent=[];requests=[];reads=[]
  try:
@@ -230,7 +231,60 @@ async def test(home,*,direct_intake=False):
    finally:saved_vault.rename(vault_root)
    assert not reads and not store.journal.read(event_type='discovery.host_read_started')
    assert 'interpret' in requests and 'author' in requests and 'final' in requests
-   assert '已标记完成' in await command('agenda done '+items[0].item_id)
+   if management:
+    import model_tools
+    assert '已开启' in await command('intake on')
+    variables=core.set_session_vars(platform='telegram',chat_id=source.chat_id,user_id=source.user_id,
+     session_key=entry.session_key,session_id=entry.session_id)
+    try:
+     def current_turn(text,turn_id):
+      _collect_pre_llm_call_context(SimpleNamespace(session_id=entry.session_id,model='configured-primary',
+       platform='telegram',_user_id=source.user_id),effective_task_id='management-task',turn_id=turn_id,
+       original_user_message=text,messages=[{'role':'user','content':text}],conversation_history=[])
+     def manage(args,turn_id):
+      return json.loads(model_tools.handle_function_call('alive_agenda',args,task_id='management-task',
+       session_id=entry.session_id,turn_id=turn_id,tool_call_id='management-fixture',enabled_tools=['alive_agenda']))
+     delayed=(datetime.now(timezone.utc)+timedelta(minutes=5)).isoformat()
+     snooze_request='请到'+delayed+'再提醒我。'
+     current_turn(snooze_request,'snooze-turn')
+     initial=manage({'operation':'list','item_id':items[0].item_id},'snooze-turn')['items'][0]
+     changed=manage({'operation':'snooze','item_id':initial['item_id'],'item_version':initial['item_version'],
+      'available_at':delayed,'evidence_span':snooze_request},'snooze-turn')
+     assert changed.get('state')=='snoozed',changed
+     assert not changed['external_jobs_or_messages_cancelled']
+     assert not agenda.list_items(clearance=events.Sensitivity.PRIVATE,subject=owner), 'snoozed future item became executable'
+     assert len(agenda.list_items(clearance=events.Sensitivity.PRIVATE,subject=owner,include_future=True))==1
+     later=(datetime.now(timezone.utc)+timedelta(minutes=10)).isoformat()
+     resnooze_request='再推迟到'+later+'提醒。'
+     current_turn(resnooze_request,'resnooze-turn')
+     stale=manage({'operation':'snooze','item_id':initial['item_id'],'item_version':initial['item_version'],
+      'available_at':delayed,'evidence_span':resnooze_request},'resnooze-turn')
+     assert stale['error']=='followup_item_changed'
+     recent=manage({'operation':'list','item_id':initial['item_id']},'resnooze-turn')['items'][0]
+     changed=manage({'operation':'snooze','item_id':initial['item_id'],'item_version':recent['item_version'],
+      'available_at':later,'evidence_span':resnooze_request},'resnooze-turn')
+     assert changed.get('state')=='snoozed' and changed['available_at']==later,changed
+     current_turn('恢复这件事的跟进。','resume-turn')
+     recent=manage({'operation':'list','item_id':initial['item_id']},'resume-turn')['items'][0]
+     resumed=manage({'operation':'resume','item_id':initial['item_id'],'item_version':recent['item_version'],
+      'evidence_span':'恢复这件事的跟进。'},'resume-turn')
+     assert resumed.get('state')=='active',resumed
+     current_turn('实验记录已经核对完成，不用再提醒了。','complete-turn')
+     recent=manage({'operation':'list','item_id':initial['item_id']},'complete-turn')['items'][0]
+     completed=manage({'operation':'complete','item_id':initial['item_id'],'item_version':recent['item_version'],
+      'evidence_span':'实验记录已经核对完成，不用再提醒了。'},'complete-turn')
+     assert completed.get('state')=='completed',completed
+     assert not completed['external_action_authorized']
+     duplicate=manage({'operation':'complete','item_id':initial['item_id'],'item_version':recent['item_version'],
+      'evidence_span':'实验记录已经核对完成，不用再提醒了。'},'complete-turn')
+     assert duplicate['status']=='already_terminal'
+     assert '已停止' in await command('intake off')
+     agenda.rebuild()
+     assert agenda.list_items(clearance=events.Sensitivity.PRIVATE,subject=owner,
+      states=(agenda_module.AgendaState.COMPLETED,))[0].item_id==initial['item_id']
+    finally:core.clear_session_vars(variables)
+   else:
+    assert '已标记完成' in await command('agenda done '+items[0].item_id)
    assert '已结束' in await command('agenda done '+items[0].item_id)
    assert json.loads(await command('agenda list'))['items'][0]['state']=='completed'
    with patch.object(native.host.runtime.outbox,'next_delegated_start',return_value=datetime.now(timezone.utc)):
@@ -245,7 +299,7 @@ async def test(home,*,direct_intake=False):
     share_id=references[-1]['share_id']) is None,'forgotten original request survived through a derived reminder'
    assert '已暂停' in await command('pause')
    assert (await native.step(build())).disposition=='paused' and not native.pending
-  print('HERMES_ALIVE_CORE_SOURCE_FREE_AGENDA_OK '+json.dumps({'delegated_intake':direct_intake,'public_reads':len(reads),'local_reminders':len(sent),'idle_wait_without_repeat':True,'completed_commitment_not_repeated':True,'actual_model_inference':False,'natural_language_intake_proven':False,'external_delivery_proven':False,'stages':requests}))
+  print('HERMES_ALIVE_CORE_SOURCE_FREE_AGENDA_OK '+json.dumps({'delegated_intake':direct_intake,'management':management,'public_reads':len(reads),'local_reminders':len(sent),'idle_wait_without_repeat':True,'completed_commitment_not_repeated':True,'actual_model_inference':False,'natural_language_intake_proven':False,'external_delivery_proven':False,'stages':requests}))
  finally:
   if manager:manager.unload()
   core.reset_hermes_home_override(token)
@@ -255,6 +309,7 @@ if __name__=='__main__':
   try:
    asyncio.run(test(Path(root)/'profile'))
    asyncio.run(test(Path(root)/'direct-profile',direct_intake=True))
+   asyncio.run(test(Path(root)/'management-profile',direct_intake=True,management=True))
   finally:
    from hermes_state_registry import close_all_under
    close_all_under(root)

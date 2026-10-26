@@ -141,6 +141,8 @@ def register_setup_command(context,binding):
             intake_summary=('明确交办自动接纳已授权，事项保留'+str(configured.options['outbound_retention_days'])
                 +'天；不留存全量聊天、不授权外部动作，可用 /alive intake off 关闭。'
                 if configured.options.get('accept_explicit_followups') is True else '')
+            if configured.options.get('manage_explicit_followups') is True:
+                intake_summary+='也已授权理解明确的完成、取消、暂缓和恢复请求；不控制外部任务或已提交消息。'
             return ('目标会话和所选权限已确认，分享接续读取已接入。'+intake_summary+
                     '当前仍未启用模型调用和主动发送。可发送 /alive enable 启用；公开检索是可选能力，'
                     '授权持续有效直到暂停或撤销，最多每日3次且间隔至少1小时；'
