@@ -57,9 +57,9 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
     setup.add_argument('--confirm-outbound-retention',action='store_true',help='Separately approve saving shares for conversation continuation')
     setup.add_argument('--retention-days',type=int,default=30,help='Approved outbound context and, if separately authorized, follow-up item retention')
     setup.add_argument('--confirm-explicit-followup-intake',action='store_true',
-        help='Authorize main-model interpretation of clearly assigned ongoing items and retain those items for the chosen retention period; not whole-chat collection or external-tool authority')
+        help='Authorize interpreting explicit ongoing requests and retaining their exact current messages (at most 6000 characters) for the selected item retention period; not whole-chat collection or execution authority')
     setup.add_argument('--confirm-followup-management',action='store_true',
-        help='Guide and authorize explicit follow-up creation and completion/cancellation/snooze/resume, with the chosen item retention period; no external job control')
+        help='Guide explicit follow-up creation/management and bounded exact request-source retention for the chosen period; no external job control')
     setup.add_argument('--confirm-core-tool-observation',action='store_true',
         help='Observe tool names, durations and terminal status only in the configured owner conversation; diagnostic validity follows retention days, structural ledger remains until removed; no arguments/results/error bodies or execution authority')
     setup.add_argument('--confirm-core-background-work',action='store_true',
@@ -258,7 +258,7 @@ def alive_command(args: argparse.Namespace) -> int:
         intent,code=setup.stage({'model_calls':True,'delivery':True,
             'outbound_retention_days':args.retention_days,'outbound_retention_confirmed':True,'model':args.model,
             'public_queries':args.public_query,'cited_reads':args.confirm_cited_reads,
-            **({'accept_explicit_followups':True} if getattr(args,'confirm_explicit_followup_intake',False)
+            **({'accept_explicit_followups':True,'retain_followup_source':True} if getattr(args,'confirm_explicit_followup_intake',False)
                 or getattr(args,'confirm_followup_management',False) else {}),
             **({'manage_explicit_followups':True} if getattr(args,'confirm_followup_management',False) else {}),
             **({'observe_core_tools':True} if getattr(args,'confirm_core_tool_observation',False) else {}),
@@ -290,6 +290,7 @@ def alive_command(args: argparse.Namespace) -> int:
                 'background_job_record_retention_owned_by_core':bool(getattr(args,'confirm_core_background_work',False)),
                 'core_tool_structural_ledger_until_removed':bool(getattr(args,'confirm_core_tool_observation',False)),
                 'followup_item_retention_days':args.retention_days if getattr(args,'confirm_explicit_followup_intake',False) or getattr(args,'confirm_followup_management',False) else None,
+                'exact_followup_source_retained':bool(getattr(args,'confirm_explicit_followup_intake',False) or getattr(args,'confirm_followup_management',False)),
                 'cited_public_reads':bool(args.confirm_cited_reads),
                 'public_source_refinement':bool(getattr(args,'confirm_public_refinement',False)),
                 'additional_public_queries_per_cycle':1 if getattr(args,'confirm_public_refinement',False) else 0,

@@ -121,9 +121,16 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
             if due>now: expiry=min(expiry,due)
         if expiry<=now:
             return None
+        from .followup_intake import item_source_view
+        from .kernel_setup import KernelSetupStore
+        source_view=(item_source_view(KernelSetupStore(self.journal.path.parent,journal=self.journal),
+            row['item_id'],subject=subject,include_message=True)
+            if payload.get('authority')==AgendaAuthority.USER_DELEGATED.value else
+            {'original_source_available':False,'original_owner_message_included':False})
         return OpportunityEvidence(row['item_id'],event.event_id,expiry,event.sensitivity,
             _freeze_json(dict(source='user-admitted agenda commitment',title='Current commitment',url='',
                 summary=summary,published_at=None,origin_kind='commitment',
+                details_origin='agenda_description_not_verified_verbatim',**source_view,
                 original_proposal_authority=payload.get('authority'),
                 literal_owner_confirmation=payload.get('authority')==AgendaAuthority.USER_EXPLICIT.value,
                 authority_is_not_execution_permission=True)))

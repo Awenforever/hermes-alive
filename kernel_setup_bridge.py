@@ -143,6 +143,8 @@ def register_setup_command(context,binding):
                 if configured.options.get('accept_explicit_followups') is True else '')
             if configured.options.get('manage_explicit_followups') is True:
                 intake_summary+='也已授权理解明确的完成、取消、暂缓和恢复请求；不控制外部任务或已提交消息。'
+            if configured.options.get('retain_followup_source') is True:
+                intake_summary+='这些明确交办/管理请求的当前消息原文（每条最多6000字符）会与整理后的事项分别保留，按所选期限到期；不留存其他闲聊。'
             if configured.options.get('observe_core_tools') is True:
                 intake_summary+='已授权记录本会话的工具名称、时长和终止状态，不保存参数、结果正文或错误正文；诊断有效期按所选保留期，结构化账本保留至移除。这不授权执行工具，也不自动认定任务成功。'
             if configured.options.get('core_background_work') is True:

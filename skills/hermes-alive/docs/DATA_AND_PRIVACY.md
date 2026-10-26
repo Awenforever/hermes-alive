@@ -138,6 +138,17 @@ fallback coordinates.
 
 ### Kernel development: native work request retention
 
+New explicit follow-up intake/management guidance separately discloses retaining
+the exact current request (at most 6000 characters) in the existing encrypted
+vault for the chosen item lifetime. The signed journal holds its content reference
+and keyed fingerprints, not plaintext. Only admitted request/management turns are
+retained; this grants no casual-chat collection. Older grants without this source
+choice remain descriptions only. Inventory exposes availability; exact item
+lookup and authorized cognition may read the retained original as evidence,
+distinct from interpreted agenda text. Expiry or erasure makes that source
+unavailable; descriptions cannot reconstruct it. Full dependency-erasure and
+cross-store migration qualification remain release gates.
+
 Separately guided native background work uses Core's own model/profile context
 and task records. New guidance explicitly includes the current owner message
 for each handoff, at most 6000 characters, as exact source context alongside the

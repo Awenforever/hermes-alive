@@ -47,7 +47,8 @@ def provenance_metadata(content):
     if content.get('origin_kind')=='commitment':
         metadata.update(original_proposal_authority=content.get('original_proposal_authority'),
             literal_owner_confirmation=content.get('literal_owner_confirmation') is True,
-            original_user_message_preserved=False,authority_is_not_execution_permission=True)
+            original_user_message_preserved=content.get('original_owner_message_included') is True,
+            agenda_description_is_verbatim=False,authority_is_not_execution_permission=True)
         if 'core_work' in content:metadata['core_work']=dict(content['core_work'])
     return metadata
 
@@ -64,11 +65,14 @@ def source_prompt_excerpt(content, *, policy=None):
     """
     if policy not in (None, SOURCE_EXCERPT_POLICY):
         raise HostDiscoveryError('unknown source excerpt policy')
-    if 'core_work' in content:
+    if 'core_work' in content or content.get('original_owner_message_included') is True:
         # Preserve the same lifecycle qualifications for interpretation, factual
         # review and follow-on context. No output body or success claim is added.
-        return json.dumps({'assignment_context':content['summary'],
-            'core_work_lifecycle':dict(content['core_work'])},ensure_ascii=False)
+        return json.dumps({'interpreted_assignment_context':content['summary'],
+            **({'original_owner_message':content['original_owner_message'],
+                'source_recorded_at':content['source_recorded_at'],'source_timestamp_kind':content['source_timestamp_kind']}
+               if content.get('original_owner_message_included') is True else {}),
+            **({'core_work_lifecycle':dict(content['core_work'])} if 'core_work' in content else {})},ensure_ascii=False)
     depth = (policy == SOURCE_EXCERPT_POLICY
              and read_scope_metadata(content).get('reported_read_scope') == 'webpage_extract')
     return content['summary'][:8192 if depth else 1800]

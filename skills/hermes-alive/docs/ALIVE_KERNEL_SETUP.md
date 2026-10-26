@@ -57,6 +57,20 @@ separate choice and use `--confirm-followup-management` (which includes intake).
 An earlier intake-only grant does not acquire management during an upgrade.
 These commands affect Alive items, not external jobs or previously sent messages.
 
+New guidance also explains retaining each clearly admitted request's current
+message, bounded to 6000 characters, separately from the interpreted item. Use the
+chosen item lifetime for its encrypted source content. This is not a whole-chat
+archive: other messages are not collected. Oversized requests need clarification
+or the optional preview path; never silently truncate. Older grants without this
+choice keep their original retention scope; historical wording cannot be recovered
+from a description and must never be presented as an exact quote.
+
+Ordinary item inventory reports source availability without copying every original
+message into context. Exact item lookup can supply the retained original with its
+own label; Native cognition uses it with the current interpreted item. Original
+wording does not turn delegated interpretation into literal confirmation or grant
+external execution authority. Expired/erased source is unavailable, not reconstructed.
+
 The main agent can then record clear ongoing assignments directly. It asks about
 ambiguous intent rather than treating casual/quoted material as obligations.
 `/alive intake off` stops new intake while keeping existing items; `on` resumes

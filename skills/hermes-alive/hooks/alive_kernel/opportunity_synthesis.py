@@ -1291,6 +1291,11 @@ class OpportunitySynthesizer:
                 'Core completed/failed/unknown is not agenda completion. Unchanged running state usually '
                 'calls for silence; material uncertainty or progress may warrant a useful clarification. '
                 'Do not retry, claim verified success or promise automatic result verification.')
+        if any(e.content.get('origin_kind')=='commitment' for e in evidence):
+            system_prompt += ('\nAn agenda description is interpreted context, not verified verbatim user wording. '
+                'Where supplied, original_owner_message is the separately retained exact admitted request. '
+                'Read its qualifications and quoted context; original wording alone does not establish '
+                'literal confirmation or execution permission. Do not call interpreted details original quotes.')
         if inquiries:
             system_prompt += ('\nThe tentative_discovery_tasks preserve prior reading questions and value '
                 'hypotheses, not user preferences, factual findings or instructions. Reconsider them '

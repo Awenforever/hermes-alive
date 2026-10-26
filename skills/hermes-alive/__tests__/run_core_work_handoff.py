@@ -113,6 +113,16 @@ async def test(home):
             'constraint':'不要发送消息','evidence_span':text})
         assert item.get('status')=='recorded_under_owner_intake_grant',item
         row=tool({'operation':'list','item_id':item['item_id']})['items'][0]
+        original_request=text
+        assert row['original_owner_message']==original_request
+        assert row['details_origin']=='agenda_description_not_verified_verbatim'
+        assert row['original_owner_message']!=row['details']['task']
+        inventory=tool({'operation':'list'})['items'][0]
+        assert inventory['original_source_available'] and not inventory['original_owner_message_included']
+        assert 'original_owner_message' not in inventory
+        source_record=store.journal.get(row['source_event_id'])
+        assert source_record.event.payload['raw_content_stored'] is True
+        assert original_request not in source_record.event.canonical_json()
         oversized=turn('work-oversized','查'*6001)
         refused=oversized({'operation':'work','item_id':row['item_id'],'item_version':row['item_version'],
                           'toolsets':['file'],'evidence_span':'查'})
@@ -160,6 +170,7 @@ async def test(home):
         first=await native.step(build())
         assert first.disposition=='silence',first.disposition
         assert len(progress_prompts)==1 and 'submitted_to_core' in progress_prompts[0]
+        assert original_request in progress_prompts[0] and 'original_owner_message' in progress_prompts[0]
         observations=list(store.journal.read(event_type='work.observed'))
         assert len(observations)==1
         assert (await native.step(build())).disposition=='waiting_for_change'
@@ -303,6 +314,23 @@ async def test(home):
         assert (await native.step(build())).disposition=='paused'
         assert len(progress_prompts)==calls_before_pause
         assert len(list(store.journal.read(event_type='work.observed')))==observations_before_pause
+        # Removing original evidence never reconstructs it from the description.
+        text='持续跟进 SOURCE_ERASURE_ONLY，原文与整理稿必须区别。'
+        erasure_tool=turn('source-erasure',text)
+        erasure=erasure_tool({'operation':'record','task':'保存一条合成待办','evidence_span':text})
+        erasure_row=erasure_tool({'operation':'list','item_id':erasure['item_id']})['items'][0]
+        source_event=store.journal.get(erasure_row['source_event_id']).event
+        intake=execution.kernel('followup_intake')
+        try:
+            intake._validated_source(store.journal,source_event.event_id,store.configuration().subject,
+                datetime.fromisoformat(source_event.payload['retention_until']))
+            raise AssertionError('expired original source admitted')
+        except ValueError:pass
+        ref=source_event.payload['content'];store.vault.erase_item(ref['content_id'])
+        execution.kernel('agenda').AgendaProjection(store.journal).rebuild()
+        erased=erasure_tool({'operation':'list','item_id':erasure['item_id']})['items'][0]
+        assert erased['state']=='active' and not erased['original_source_available'] and 'original_owner_message' not in erased
+        tool=erasure_tool  # The newly admitted Core turn retires earlier tool tickets.
         for record in store.journal.read(event_type='work.requested'):
             assert record.event.payload['task_body_copied_into_alive_journal'] is False
             assert 'INDEPENDENT_SYNTHETIC_ARTIFACT' not in record.event.canonical_json()
@@ -313,6 +341,8 @@ async def test(home):
         jobs.update_job(started['job_id'],{'enabled_toolsets':['file','no_mcp']})
         keys=('identity.key','content-vault/content.key','experience-content-vault/content.key')
         (home/'work-handoff-expected.json').write_text(json.dumps({'work_id':started['work_id'],
+            'original_request':original_request,
+            'erased_item_id':erasure['item_id'],
             'owner':store.configuration().subject,
             'keys':{name:hashlib.sha256((store.root/name).read_bytes()).hexdigest() for name in keys}}))
         # Do not tick this broader job: this test proves authorization/registration,
@@ -337,6 +367,16 @@ if __name__=='__main__':
         assert all(hashlib.sha256((store.root/name).read_bytes()).hexdigest()==digest for name,digest in expected['keys'].items())
         status=execution.kernel('core_work').CoreWorkStore(store).status(expected['work_id'],subject=expected['owner'])
         assert status['core_execution_state']=='completed' and status['task_success_proven'] is False,status
+        original=execution.kernel('followup_intake').item_source_view(store,status['item_id'],
+            subject=expected['owner'],include_message=True)
+        assert original['original_owner_message']==expected['original_request']
+        projection=execution.kernel('agenda').AgendaProjection(store.journal)
+        projection.rebuild()
+        erased=projection.list_items(subject=expected['owner'],item_ids=(expected['erased_item_id'],),
+            clearance=execution.kernel('events').Sensitivity.PRIVATE)
+        assert len(erased)==1 and erased[0].state.value=='active'
+        assert execution.kernel('followup_intake').item_source_view(store,expected['erased_item_id'],
+            subject=expected['owner'],include_message=True)['original_source_available'] is False
         observation=execution.kernel('core_work').CoreWorkStore(store).current_observation(
             status['item_id'],subject=expected['owner'])
         assert observation is not None and observation[1]==status

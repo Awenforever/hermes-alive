@@ -1229,3 +1229,40 @@ draft. Old grants do not gain this retention silently. Alive's journal still
 keeps references/fingerprints only. This preserves execution-source evidence;
 initial agenda-source retention, semantic conflicts and actual task/deadline
 revision remain distinct unfinished work. No word-specific override rules.
+
+## 2026-10-26 — Separate admitted source from interpreted item
+
+The actual main response calling a derived constraint “original wording” exposed
+a representation gap, not merely an unfortunate phrase. New intake guidance
+discloses bounded exact current-request retention in the existing encrypted vault
+for the chosen item lifetime. Old grants remain descriptions-only. The signed
+source reference binds the original whole-message fingerprint, retention, owner
+and historical permission; a model-selected evidence substring cannot remove
+qualifications outside it. Item inventory labels the description and source
+availability, while exact lookup can return the original. Native evidence and
+downstream source excerpts preserve both distinct representations. Neither exact
+wording nor a model interpretation is itself execution permission.
+
+Do not reconstruct unavailable originals from descriptions or duplicate a chat
+archive. Expiry/deletion and cold-process tests must exercise the actual vault.
+The first r143 Core test reached the new checks but used a stale tool ticket
+after a newly admitted erasure-test turn; fix the fixture to use that current
+turn, preserve the failure evidence, and keep retirement checks intact. Full
+dependency erasure, semantic revision, real-model use and migration still need
+qualification; source retention alone is not that evidence.
+
+ADR0247 records the source/description contract and its rebuild counterexample.
+The first independent r145 red driver missed the test import path and failed
+before exercising the behavior; the corrected v2 driver reached actual source
+erasure/rebuild and lost the item. Separate historical signed admission/reference
+validation from current body retrieval. Source deletion must not silently delete
+the item's state on replay; nor may the description reconstruct the deleted raw
+message. Source-only deletion is not whole-item forgetting.
+
+The actual inherited-DeepSeek three-turn source test cleared conversation history
+before both queries. It retrieved and quoted the exact retained original, then
+truthfully reported only an interpreted description after erasure. Fifteen actual
+provider requests and zero channel sends; output review happened only after
+physical closure, credential audit and projection removal. Its replies are still
+verbose and tried an unsupported raw-event reference lookup. Do not claim broad
+semantic zero errors, modernized main-chat style or the fresh-sharing gate.

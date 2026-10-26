@@ -2,7 +2,7 @@
 
 The main agent interprets language. A tool result is not literal user authority.
 Guided delegated intake and per-item owner confirmation have distinct provenance.
-No raw chat capture, independent model call, transport or action grant lives here.
+No general chat logger, independent model call, transport or action grant lives here.
 """
 from collections import OrderedDict
 from contextlib import closing
@@ -24,6 +24,8 @@ AGENDA_SCHEMA = {
                    'A saved active item does not mean automatic follow-up is running; explain actual follow-up availability. '
                    'Keep ordinary item acknowledgments brief and in everyday language; management details remain available when requested. '
                    'No external action is authorized by saving an item. '
+                   'Stored descriptions are interpretations, not original quotes. Exact list lookup by item_id '
+                   'can return a separately retained original_owner_message when available; never reconstruct unavailable originals. '
                    'When current context permits management, use complete/cancel/snooze/resume only for a clearly '
                    'identified existing item with its current item_version from list. Ask if the target or intent is unclear. '
                    'Complete an item only from a clear current owner report of completion, not inferred tool success or a quoted claim. '
@@ -276,7 +278,8 @@ class CoreAgendaBridge:
     def _source(self,store,configured,scope,task,session_id,turn,args,**purpose):
         from .kernel_execution_bridge import kernel
         return kernel('followup_intake').record_request(store,configured,
-            **self._turn_evidence(store,configured,scope,task,session_id,turn,args),**purpose)
+            **self._turn_evidence(store,configured,scope,task,session_id,turn,args),
+            source_message=turn[3] if configured.options.get('retain_followup_source') is True else None,**purpose)
 
     def _work_validator(self,store,configured,scope,item):
         from .kernel_execution_bridge import kernel
@@ -362,6 +365,8 @@ class CoreAgendaBridge:
             confidence=1,due_at=due,available_at=available,expires_at=expiry),actor=intake.ACTOR)
         if projection.apply(event).outcome!='active':raise ValueError('delegated intake rejected')
         return {'status':'recorded_under_owner_intake_grant','item_id':item_id,'details':details,
+                'details_origin':'main_model_interpretation_not_verbatim',
+                'original_source_retained':configured.options.get('retain_followup_source') is True,
                 'due_at':due.isoformat() if due else None,'authority':'user_delegated',
                 'literal_owner_confirmation':False,'external_action_authorized':False,
                 **({'natural_management_enabled':True} if configured.options.get('manage_explicit_followups') is True
@@ -437,6 +442,9 @@ class CoreAgendaBridge:
         return [dict(item_id=item.item_id,item_version=self._item_version(store,configured,item.item_id),
                      state=item.state.value, details=dict(item.details)
                      if hasattr(item.details, 'items') else item.details,
+                     details_origin='agenda_description_not_verified_verbatim',
+                     **kernel('followup_intake').item_source_view(store,item.item_id,subject=configured.subject,
+                                                                include_message=item_id is not None),
                      content_status=item.content_status.value,
                      available_at=item.available_at.isoformat() if item.available_at else None,
                      due_at=item.due_at.isoformat() if item.due_at else None) for item in items]

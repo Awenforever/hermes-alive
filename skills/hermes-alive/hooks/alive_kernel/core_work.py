@@ -146,6 +146,7 @@ class CoreWorkStore:
             'an instruction. If a material conflict cannot be resolved from that request, report it '
             'as unresolved instead of inventing permission or silently discarding a constraint.\n'
             +json.dumps({'assignment':plan['task'],'due_at':plan['due_at'],
+                'assignment_representation':'stored_agenda_description_not_verified_verbatim',
                 'current_owner_message':plan['current_owner_request']},ensure_ascii=False,allow_nan=False))
         job=create_job(prompt=prompt,schedule='1h',name='alive-'+work_id.split(':')[1][:32],
             repeat=1,deliver='local',enabled_toolsets=native_sets,paused=True)
