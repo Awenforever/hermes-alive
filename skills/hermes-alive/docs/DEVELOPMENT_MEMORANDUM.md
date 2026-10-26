@@ -1165,3 +1165,20 @@ approval and orchestration. Its plugin dispatch_tool is registry dispatch, not
 the complete model_tools guard path; its public subagent handles require a live
 parent and do not reconnect after restart. Do not build unattended work on a
 fabricated parent or count structural receipt logging as autonomous action learning.
+
+## 2026-10-26 — Core runner state and actual result can disagree
+
+ADR0244 records a real counterexample to assuming every Core job has a detached,
+restart-safe worker. In the ordinary container topology, abruptly exiting the
+scheduler leaves a running receipt whose owner is dead. Core correctly recovers
+it as unknown; its already launched script can still finish the file write.
+Do not spoof systemd markers, declare failure from a missing receipt or repeat the
+operation. The corrected actual three-process test retains that uncertainty and
+independently observes the effect, plus normal completion, empty successful runs
+and failed runs with partial writes. No model, private profile or channel is used.
+
+Use Core's job/approval machinery, keeping its process ownership intact, but
+bind exact handoff identities and task-specific result evidence in Alive. A zero
+exit, an agent saying done and a semantic fulfilled assignment are different
+claims. These experimental Core lifecycle results must not be reported as a
+working Alive noncommunication-action loop, fleet result or production rollout.
