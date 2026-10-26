@@ -1056,3 +1056,28 @@ or grant permanent preference authority. Existing one-subject forgetting and
 source-dependency erasure checks remain mandatory. Before integrating feedback,
 prove actual owner/quote corroboration and obtain independent consent for its
 bounded body retention/model use. A reported-ID match alone cannot supply that.
+
+## 2026-10-26 — Scope correction must reach the executable product
+
+The recipient found the proactive sample too long and publication-like, and
+explicitly challenged whether Alive had become a content feed. Treat that as a
+scope audit, not another opportunity to add a writing template or split a long
+report into bubbles. The original continuous-agent objective remains intact.
+
+Inspection found a real entry dependency on public queries; ADR0239 removes it
+and separates optional discovery preparation from ordinary agenda execution.
+The installed source-free path now has controlled integrated proof: quiet idle,
+unchanged wait without spend, admitted agenda fixture, one reminder, completion
+without repetition, pause, and original-request context in Core's main collector.
+Typed request history belongs to its established agenda vault, not the web vault;
+missing keys are never recreated, and explicit source erasure invalidates derived
+history. Existing source/discovery and paged context suites also pass. Admission
+of the request is a synthetic fixture, models are controlled, and transport is
+in memory. Do not present those as real ordinary-intent intake or all actions.
+
+Evaluate the remaining memory/agenda/action/outcome/reflection and continuity
+paths together, including meaningful silence. Sharing-quality0/10 remains one
+required subgate, never the entire definition of Alive. Default unsolicited
+conversation should be brief and natural; requested depth and necessary
+qualifications remain available. The unfinished quoted-feedback prototype was
+saved in Git WIP rather than accidentally merged or dropped during this change.

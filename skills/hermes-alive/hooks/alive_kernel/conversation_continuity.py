@@ -180,7 +180,7 @@ class ShareContinuityStore:
         if (self.vault.digest_json(body) != reference.digest
                 or self._identity(body['scope'])[2] != fingerprint):
             raise ContinuityUnavailable('share protected content changed')
-        if any(self.vault.explicit_erasure_recorded(value) for value in body['dependencies']):
+        if self._dependencies_erased(body):
             # A separately consented outward record can outlive planning TTL,
             # but not an explicit forget request for its underlying material.
             self.vault.erase_item(reference.content_id)
@@ -260,7 +260,7 @@ class ShareContinuityStore:
             return None
         latest = self.outbox._utc(None) if now is None else current
         if (record.sequence <= self._erasure_cutoff(owner, latest) or record.event.expires_at <= latest
-                or any(self.vault.explicit_erasure_recorded(value) for value in body['dependencies'])):
+                or self._dependencies_erased(body)):
             return None
         return {'share_id': record.event.event_id, 'prepared_at': record.event.observed_at.isoformat(),
                 'text': body['text'], 'sources': sources, 'source_count': len(body['sources'])}
@@ -309,6 +309,27 @@ class ShareContinuityStore:
                 'canonical_quote_target_proven': False, 'external_delivery_proven': False,
                 'complete_bubble_inventory_proven': False, 'feedback_authority_granted': False}
 
+    def _commitment_vault(self):
+        """The typed agenda's established vault, never an adjacent-vault probe.
+
+        Missing storage is unavailable history, not permission to replace keys.
+        """
+        from .content_vault import ContentVault
+        root=self.journal.path.parent / (self.journal.path.stem+'-content-vault')
+        if not (root/'content.key').is_file() or not (root/'content.sqlite3').is_file():
+            return None
+        return ContentVault(root,backup_root=self.journal.path.parent / (self.journal.path.stem+'-content-backups'))
+
+    def _dependencies_erased(self, body):
+        if any(self.vault.explicit_erasure_recorded(value) for value in body['dependencies']):
+            return True
+        for source in body['sources']:
+            if source.get('reference_kind')=='admitted_commitment_v1':
+                vault=self._commitment_vault()
+                if vault is not None and vault.explicit_erasure_recorded(source['content']['content_id']):
+                    return True
+        return False
+
     def _sources(self, body, owner, clearance):
         from .discovery_opportunities import DiscoveryOpportunityIngestor
         from .host_discovery import source_prompt_excerpt, read_scope_metadata
@@ -321,6 +342,30 @@ class ShareContinuityStore:
                     or not _allowed(record.event.sensitivity, clearance)
                     or _thaw_json(record.event.payload.get('content')) != source['content']):
                 raise ContinuityUnavailable('source reference no longer matches its original owner')
+            if source.get('reference_kind')=='admitted_commitment_v1':
+                if (record.event.event_type!='agenda.proposed' or record.event.source!='alive.agenda'
+                        or record.event.payload.get('kind')!='commitment'
+                        or record.event.payload.get('subject')!=owner):
+                    raise ContinuityUnavailable('original commitment reference changed kind')
+                vault=self._commitment_vault()
+                try:
+                    if vault is None:
+                        raise ContentUnavailableError('original agenda storage unavailable')
+                    details=vault.resolve_json(reference.content_id,expected_subject=owner,
+                        expected_purpose='agenda.commitment',expected_sensitivity=record.event.sensitivity)
+                    if vault.digest_json(details)!=reference.digest:
+                        raise ContinuityUnavailable('original commitment content changed')
+                except ContentUnavailableError:
+                    result.append({'event_id':source['event_id'],'reading_status':'no_longer_retained',
+                        'reference_kind':'original_admitted_commitment'})
+                    continue
+                result.append({'event_id':source['event_id'],'title':'Original admitted commitment','url':'',
+                    'excerpt':json.dumps({'original_commitment':details,
+                        'original_due_at':record.event.payload.get('due_at')},ensure_ascii=False),
+                    'reading_status':'retained_original_commitment',
+                    'reference_kind':'original_admitted_commitment',
+                    'reference_role':'historical_request_not_current_status_or_execution_permission'})
+                continue
             try:
                 content = self.vault.resolve_json(reference.content_id, expected_subject=owner,
                     expected_purpose='discovery.observation', expected_sensitivity=record.event.sensitivity)
@@ -348,7 +393,8 @@ def _conversation_source(source):
     actual excerpt and reported representation, not that closed-world shortcut.
     """
     result = {key: source[key] for key in (
-        'title', 'url', 'excerpt', 'reading_status', 'published_at') if key in source}
+        'title', 'url', 'excerpt', 'reading_status', 'published_at',
+        'reference_kind', 'reference_role') if key in source}
     if source.get('reading_status') == 'retained_excerpt':
         reported = source.get('reading_scope') or {}
         result['reading_scope'] = {

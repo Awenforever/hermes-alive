@@ -8,7 +8,7 @@ The stable README must be aligned with the final engine before release.
 
 Use Hermes' existing profile, models, authentication and channels. Do not copy
 the developer's interests, provider names, addresses or schedule. Ask which
-authorized conversation should receive shares; the one-time `/alive confirm`
+authorized conversation should receive proactive contact; the one-time `/alive confirm`
 command must be used in that actual conversation. Configuration does not enable
 sending. Installation, guided configuration and `/alive enable` are distinct.
 
@@ -22,6 +22,21 @@ history. No developer research topic is a recommended default. Public search
 topics are a separate choice: explain that those strings will be disclosed to
 Hermes' configured search service. Private profile and chat text do not become
 public queries automatically.
+
+## Enable without a content feed
+
+Public queries are optional. An owner may configure and confirm the native
+kernel without `--public-query` or public-read consent. It uses the same agenda,
+policy, decision and authorized channel path; an empty agenda remains quiet.
+Existing admitted commitments do not need public search to become eligible.
+This does not imply that ordinary chat has already been admitted as commitments,
+or that all tool-action and long-term-memory integrations are complete.
+
+Alive's role is continuous attentive assistance: remember the reason for pending
+work, respond to changes and outcomes, make useful contact or stay quiet, and
+carry context into subsequent conversation. Content discovery is an optional
+input to that loop. Proactive contact should be a short natural contribution;
+requested reports or detailed work may need a different level of detail.
 
 ## Explain the public reading choices
 

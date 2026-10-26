@@ -55,3 +55,12 @@ sentiment from one reply. Do not enable raw private-history collection or weaken
 legacy outcome/delivery evidence to make this slice pass. Split/media IDs that
 are absent from the adapter report require their actual owning transport's
 receipts; never guess an ID or require Enhance to be installed everywhere.
+
+## Prior component qualification, 2026-10-26
+
+The r106 locator implementation passes the three actual-Core focuses and full99
+portable suite (terminal0). This supersedes the initial unqualified-component
+status only; no automatic quoted-feedback capture or permanent learning was
+activated. Later scope restoration and typed commitment continuation have their
+own current qualification in ADR0239. Older Git consumer lifecycle evidence does
+not qualify later running code or all account/association migration.

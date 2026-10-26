@@ -113,7 +113,7 @@ def register_setup_command(context,binding):
                 {'activation_event_id':configured.event_id,'status':'configured','enabled':False})
             attach_configured_continuity(binding,configured)
             return ('目标会话和所选权限已确认，分享接续读取已接入。'
-                    '当前仍未启用模型调用和主动发送。配置公开检索主题后，可发送 /alive enable，'
+                    '当前仍未启用模型调用和主动发送。可发送 /alive enable 启用；公开检索是可选能力，'
                     '授权持续有效直到暂停或撤销，最多每日3次且间隔至少1小时；'
                     '/alive pause 可暂停。资料保留期限单独管理。旧身份不会自动迁移。')
         except Exception as exc:

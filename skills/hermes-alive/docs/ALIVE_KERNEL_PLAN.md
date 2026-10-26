@@ -8,16 +8,19 @@ Last reviewed: 2026-10-26 (Asia/Shanghai).
 The objective remains a useful, continuous proactive assistant with durable
 experience, layered memory, an agenda, attributable learning, natural followup,
 and safe portable operation. Component counts are not the completion metric.
-**Useful full-chain acceptance: 0/10 consecutive new rounds.**
+**Sharing-quality subgate: 0/10 consecutive fresh complete rounds.**
+Whole-kernel acceptance also requires non-discovery behavior; this counter is
+not a completion measure for the entire agent.
 
 | Area | Current evidence | Still required |
 |---|---|---|
 | Experience and privacy | Protected journal/vault, provenance, deletion and replay checks | Real lifetime/migration/restore with all external associations preserved |
 | Personalization | Owner-confirmed preferences and current Core USER advice; real main turns automatically curate a synthetic profile, Native interpretation consumes its exact current value and two real followups complete | External-provider recall, noise-aware daily learning and attributed feedback |
-| Agenda and initiative | Native discovery/commitment decisions, bounded rejection recovery, waits invalidated by actual admitted input | Sustained useful initiative and changing interests over time; no reward for empty repeated ticks |
+| Agenda and initiative | Installed source-free controlled reminder, quiet idle, unchanged wait and completed-item suppression; owner-admitted agenda is a fixture | Natural owner-intent admission, changing real priorities, cancellation/snooze and sustained useful initiative |
 | Content and judgment | Source-led composition, final wording review, real main-model examples | Samples remain too much like cautious paper digests; factual review is not a usefulness verdict |
 | Conversation continuity | Exact share/source excerpts reach actual Core main requests; real replies after context reduction no longer recite transport status | Missing evidence still becomes global negative claims in real followup; qualify ADR0230, plus natural old-quote/compaction/restart behavior |
 | Sources | Actual Core free search and substantive extraction demonstrated in isolated profiles | More useful live selection across Chinese and other sources, currentness, provenance and inaccessible/full-read boundaries |
+| Actions and reflection | Typed tool/commitment/action/outcome/reflection components; installed default grants communication and leaves feedback interpretation off | Actual authorized non-communication work, observable outcomes and subsequent behavior change; component enums do not establish live capability |
 | Authority and transport | Original delegation/policy/source checks and short physical permits preserved, including delayed-composition regression | Real daemon and channel outcomes under a separately approved production window; Enhance remains sole physical FIFO/token/retry owner |
 | Portability and migration | Managed supported-Core component integration | Independent Git consumer install/configure/run/upgrade/uninstall-preserve/reinstall across four agreed targets, plus legacy-state migration and rollback |
 
@@ -25,6 +28,16 @@ Confirmed interests are soft preferences, not exclusive filters or public search
 authority. Missing/private history is not a dislike. Models and fallback belong
 to Hermes; channel delivery belongs to Hermes/Enhance. No production, Core, wmw,
 model/provider or network changes are authorized by this development plan.
+
+## Product scope correction — 2026-10-26
+
+The goal is a continuous attentive agent, not a content feed. Recent live
+qualification over-weighted publication-style discovery examples. Inspection
+also found a real activation constraint: public queries were mandatory and the
+installed runtime always assembled public discovery, despite existing agenda,
+commitment, action and reflection components. ADR0239 corrects the execution
+entry and restores behavior-wide qualification. Those other components are not
+claimed to be fully integrated simply because their code exists.
 
 ## Latest qualified slices
 
@@ -189,39 +202,33 @@ competing active plans. ADRs remain the record of architectural decisions.
 
 ## Next work in order
 
-1. Improve actual fresh content beyond the qualified automatic-profile Native
-   integration. Real Core main turns, exact current advice in interpretation,
-   source-only public planning, a local share and two actual main followups now
-   have joint evidence. Do not repeat that structural control as a fresh quality
-   round. Inspect what source-led writing actually conveys and separate limited
-   study findings from broad causal or capability claims in main followup.
-2. Complete attributed feedback through admitted native interfaces. ADR0238 adds
-   an exact read-only adapter-ID lookup candidate; it is not quote confirmation,
-   delivery proof or inbound retention authority. Then test ordinary behavior:
-   transient work topics, third-party quotations, later owner corrections, soft
-   interests and outside exploration. Attribute feedback to the actual retained
-   share and authenticated owner; ambiguity must not become a durable preference.
-   Reuse Core memory ownership, not another chat logger. External-provider recall
-   and old quoted/cross-session continuation remain distinct open slices.
-3. Improve fresh selection and sharing only where the original evidence exposes
-   a general failure. A readable unfamiliar-topic explanation can still be a weak
-   proactive choice; evaluate what the person can understand from it without
-   demanding an opinion, utility paragraph or permanent interest tag. Keep useful
-   domestic and outside-interest discovery alongside familiar material. No topic
-   word patches, phrase blacklist, fixed exploration quota or extra judge chain.
-   Inspect source and actual main followup separately: a correct context handoff
-   does not establish arbitrary main-response accuracy.
-4. Earn ten consecutive fresh useful complete rounds, retaining original inputs,
-   source evidence, actual outputs, continuation and explicit failure reasons.
-   Existing-topic regressions, safe silence and successful model calls do not
-   advance that counter. Keep the current source/value versus required-boundary
-   split; original authorization and forgetting checks remain mandatory.
-5. Preserve the current public Git consumer lifecycle qualification; finish legacy migration/rollback,
-   four agreed device targets (WSL thin layer), onboarding/default-engine and
-   release consistency. Existing synthetic state-preservation evidence does not
-   prove real-account migration or all features. Requalify if runtime changes;
-   obtain a fresh concrete production window only when ready. Never overlay wmw
-   with maintainer repairs to manufacture a distribution pass.
+1. Restore the complete-agent execution path (ADR0239). Public discovery must be
+   optional. Qualify installed Core activation without public queries, quiet idle
+   behavior without repeated spend, and an admitted commitment entering the same
+   native decision/action/outcome loop. A seeded agenda fixture is not proof of
+   natural-language admission. Do not call all seven ActionKind variants live
+   because their enum or component tests exist.
+2. Close natural owner-intent and evidence intake through Core, including the
+   distinction between requests, tentative thoughts, third-party material,
+   superseded work and completed work. Preserve actual source/owner/authority;
+   a wake fingerprint is not a retained request or admitted obligation. Advance
+   authorized work or ask a useful question; never fabricate action completion.
+3. Verify continuity and adaptation across days and restart: recall why an item
+   exists, inspect actual outcomes, cancel/snooze/complete correctly, respect
+   forgetting and use attributed feedback without permanent-interest shortcuts.
+   The unfinished quoted-feedback work is isolated in Git WIP, not qualified or
+   enabled. Its target locator is a prerequisite, not the whole memory system.
+4. Complete balanced fresh useful end-to-end acceptance across these behaviors,
+   alongside worthwhile exploratory conversation. Preserve the ten consecutive
+   fresh share-quality requirement as one subgate; ten news examples cannot
+   substitute for the full kernel. Proactive sharing should feel like a short
+   natural contribution, with deeper explanation available when wanted. Splitting
+   a long report across bubbles does not meet that requirement. Owner-requested
+   reports/reminders keep the detail and qualifications their task needs.
+5. Finish migration/rollback, final public Git consumer lifecycle and the four
+   agreed targets (WSL thin layer), onboarding/default-engine/release consistency.
+   Production deployment needs a new concrete qualified window. Keep all data,
+   memory, credentials and external associations; no maintainer overlays on wmw.
 
 Do not append execution diaries above this plan. Update this state and priorities
 when evidence changes; put detailed runs in the shared status or history. The

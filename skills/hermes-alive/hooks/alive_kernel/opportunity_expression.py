@@ -140,6 +140,8 @@ class OpportunityExpressionStore(SemanticReviewStore):
                 record = self.journal.get(evidence.observation_event_id)
                 references.append({'event_id': record.event.event_id,
                     'content': _thaw_json(record.event.payload['content']),
+                    **({'reference_kind':'admitted_commitment_v1'}
+                       if evidence.content.get('origin_kind')=='commitment' else {}),
                     'excerpt_policy': start.event.payload.get('interpreter_method',{}).get('source_excerpt_policy')})
         return references
 

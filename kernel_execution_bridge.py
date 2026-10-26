@@ -87,8 +87,6 @@ def enable(binding,scope):
     store,configured=configured_owner(binding,scope)
     if runtime_engine(binding)!='kernel':raise ValueError('explicit native kernel installation required')
     _retired(binding)
-    if not configured.options['public_queries']:
-        raise ValueError('configure approved public search topics before enabling')
     router=binding.session_router(scope.platform)
     attach_configured_continuity(binding,configured)
     Sensitivity=kernel('events').Sensitivity
@@ -175,19 +173,26 @@ def assemble(binding):
         subject=configured.subject,approved_queries=tuple(configured.options['public_queries']),
         follow_citations=configured.options['cited_reads'],record_reading_assessment=True,
         refine_public_sources=configured.options.get('refine_public_sources',False),
-        validate_consent=validate)
-    class Preparation:
-        supports_bounded_retry=discovery.supports_bounded_retry
-        @property
-        def pending(self):return discovery.pending
+        validate_consent=validate) if configured.options['public_queries'] else None
+    class AgendaPreparation:
+        supports_bounded_retry=False
+        pending=()
         async def reap_pending(self,*,timeout_seconds=0):
-            return await discovery.reap_pending(timeout_seconds=timeout_seconds)
+            return {'closed':0,'remaining':0}
         async def bind_parameters(self,*,cycle,parameters,read_binding):
             validate()
             authorization={'authorization_operation_id':'core-auth:'+store.vault.digest_json(
                 {'cycle':cycle.operation_id,'activation':active['activation_event_id']})[:40],
                 'route_binding_id':active['route_binding_id'],'delegation_event_id':active['delegation_event_id']}
             return {**parameters,'authorization_parameters':authorization,'defer_until_eligible':True}
+        async def __call__(self,*,cycle,parameters,call,read_binding):
+            return await self.bind_parameters(cycle=cycle,parameters=parameters,read_binding=read_binding)
+    class Preparation(AgendaPreparation):
+        supports_bounded_retry=getattr(discovery,'supports_bounded_retry',False)
+        @property
+        def pending(self):return discovery.pending
+        async def reap_pending(self,*,timeout_seconds=0):
+            return await discovery.reap_pending(timeout_seconds=timeout_seconds)
         async def observe(self,**kwargs):
             validate()
             return await discovery.observe(**kwargs)
@@ -209,7 +214,8 @@ def assemble(binding):
     context_reads=(kernel('core_context_read').CoreContextRead(binding.context)
         if configured.options.get('use_hermes_user_profile') is True else None)
     native=kernel('core_shadow_assembly').native_for_host(binding.context,host,home=binding.home,
-        preparation=Preparation(),validate_consent=validate,context_reads=context_reads)
+        preparation=Preparation() if discovery is not None else AgendaPreparation(),
+        validate_consent=validate,context_reads=context_reads)
     def parameters():
         if not runtime.reconciliation._owner_policy(configured.subject).enabled:
             # A cross-process operator pause must enter the existing paused
