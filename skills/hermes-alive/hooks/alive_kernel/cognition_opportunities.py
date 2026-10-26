@@ -181,6 +181,9 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
         for row in rows:
             if observation_event_ids is not None and row['proposal_event_id'] not in observation_event_ids:
                 continue
+            from .core_work import owns_commitment
+            if owns_commitment(self.journal,subject=subject,item_id=row['item_id']):
+                continue
             value=self._commitment(row,subject=subject,now=now)
             if value is not None:
                 commitments.append(value)

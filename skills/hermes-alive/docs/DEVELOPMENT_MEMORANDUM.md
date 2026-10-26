@@ -1182,3 +1182,21 @@ bind exact handoff identities and task-specific result evidence in Alive. A zero
 exit, an agent saying done and a semantic fulfilled assignment are different
 claims. These experimental Core lifecycle results must not be reported as a
 working Alive noncommunication-action loop, fleet result or production rollout.
+
+## 2026-10-26 — Actual main-turn handoff is a bridge, not the full agent
+
+ADR0245 connects the existing Core-scoped agenda tool to native paused Core jobs,
+with separately guided context/toolset scope and outside-scope confirmation.
+Core's actual child Gateway cannot be tested with a parent-process-only HTTP
+patch. Establish the real isolated profile before imports and serve the synthetic
+provider on container loopback; test actual Core Agent/tool effects, then stop
+that isolated Gateway. Do not redirect or patch a host production service.
+
+Keep item/version/grant checks at handoff boundaries, bind the Core job ID before
+activation, preserve uncertain states and avoid replacement jobs. Core's implicit
+MCP merge would widen a nonempty native-toolset scope; use and verify its sentinel
+contract. Keep original task/constraint/deadline material in the existing agenda
+and Core record, with protected causal references instead of another Alive copy.
+Status lookup by exact item ID supports recovery when chat history lost work IDs.
+Current tests control model meaning/replies and verify real mechanics; no actual
+main-model use, autonomous work choice or learned later decision is proven yet.

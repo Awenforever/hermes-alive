@@ -29,9 +29,20 @@ AGENDA_SCHEMA = {
                    'Complete an item only from a clear current owner report of completion, not inferred tool success or a quoted claim. '
                    'These update only Alive agenda, not external jobs or already submitted messages. '
                    'Snooze changes follow-up availability, not the task deadline or description. '
+                   'With a guided Core background-work grant, work hands a clearly requested existing item '
+                   'to native Hermes jobs, using Core context/model/permissions and the specified toolsets. '
+                   'Use exact item_version plus current evidence_span. Do not do this for reminder-only requests. '
+                   'Toolsets outside the automatic scope require showing the complete preview and owner confirmation command. '
+                   'work_status reads an exact work_id or finds prior work by an exact known item_id after history reduction; '
+                   'it never submits a job. Core completed/failed/unknown does not prove task success or no effects. '
+                   'Submitting work does not enable result monitoring. Do not promise automatic checking or notification '
+                   'unless the returned actual result-followup capability is enabled. '
                    'Do not turn quoted text, inferred interests or casual remarks into obligations.',
     'parameters': {'type': 'object', 'properties': {
-        'operation': {'type': 'string', 'enum': ['propose', 'record', 'list','complete','cancel','snooze','resume']},
+        'operation': {'type': 'string', 'enum': ['propose', 'record', 'list','complete','cancel','snooze','resume','work','work_status']},
+        'toolsets': {'type':'array','items':{'type':'string'},'maxItems':8,
+                    'description':'Explicit Core toolsets requested for background work. Empty permits model-only work, not a default all-tools job.'},
+        'work_id': {'type':'string','description':'Exact previously returned Core work identifier for work_status; alternatively use exact item_id, never both.'},
         'item_id': {'type':'string','description':'An exact existing item from current list or known conversation; optional exact lookup for list.'},
         'item_version': {'type':'string','description':'Current opaque version from list; required for state changes. Refresh if stale.'},
         'evidence_span': {'type':'string','maxLength':1500,
@@ -50,6 +61,8 @@ class CoreAgendaBridge:
         self.binding = binding
         self.turns = OrderedDict()
         self.drafts = OrderedDict()
+        self.work_drafts = OrderedDict()
+        self.work_receipts = OrderedDict()
         self.latest_turn = OrderedDict()
         self.observed_inputs = OrderedDict()
         self.lock = threading.RLock()
@@ -58,6 +71,8 @@ class CoreAgendaBridge:
         with self.lock:
             self.turns.clear()
             self.drafts.clear()
+            self.work_drafts.clear()
+            self.work_receipts.clear()
             self.latest_turn.clear()
             self.observed_inputs.clear()
 
@@ -117,8 +132,13 @@ class CoreAgendaBridge:
             'Ask for clarification for ambiguous targets or intentions; report success only after the tool succeeds. '
             if eligible and configured.options.get('manage_explicit_followups') is True else
             'Natural-language item state changes are not authorized in this setup. ')
+        work=('Core background work is separately authorized, including Core profile context and Core job retention. '
+            'For a clear current request to perform an existing ongoing item, use work with its exact version. '
+            'Automatic toolsets: '+json.dumps(configured.options.get('automatic_core_toolsets',[]))+'. '
+            'Outside that scope, show the complete returned preview and confirmation command. '
+            if configured.options.get('core_background_work') is True else 'Core background-work handoff is not configured. ')
         return {'context': 'Alive continuing items: alive_agenda can propose, record authorized explicit follow-ups or inspect current items. '
-                           +intake+management+'A proposal is temporary until the user confirms its exact command. '
+                           +intake+management+work+'A proposal is temporary until the user confirms its exact command. '
                            'Remembering an item does not authorize tools or an external action, and does not enable '
                            'the proactive runtime. Distinguish a saved active item from running reminders. '
                            'For Alive item acknowledgments, explain what was saved and whether automatic follow-up is '
@@ -152,7 +172,7 @@ class CoreAgendaBridge:
             if (turn is None or turn[0] != configured.event_id
                     or time.monotonic() - turn[1] > self.DRAFT_TTL):
                 raise ValueError('current main task required')
-            if not isinstance(args, dict) or args.get('operation') not in ('propose', 'record', 'list','complete','cancel','snooze','resume'):
+            if not isinstance(args, dict) or args.get('operation') not in ('propose', 'record', 'list','complete','cancel','snooze','resume','work','work_status'):
                 raise ValueError('bounded agenda operation required')
             if args['operation'] == 'list':
                 if set(args)-{'operation','item_id'}:
@@ -162,6 +182,18 @@ class CoreAgendaBridge:
                 result = {'items': self._items(store, configured,args.get('item_id')),
                           'view_limit': 8, 'complete_inventory_proven': False,
                           'external_action_authorized': False,**self._runtime()}
+            elif args['operation']=='work_status':
+                from .kernel_execution_bridge import kernel
+                work=kernel('core_work').CoreWorkStore(store)
+                if set(args)=={'operation','work_id'}:
+                    result=work.status(args['work_id'],subject=configured.subject)
+                elif (set(args)=={'operation','item_id'} and isinstance(args['item_id'],str) and args['item_id']):
+                    result=work.previous(args['item_id'],subject=configured.subject) or {'status':'no_work_registered_for_this_item'}
+                else:raise ValueError('one exact work or item identifier required')
+            elif args['operation']=='work':
+                if set(args)-{'operation','item_id','item_version','evidence_span','toolsets'}:
+                    raise ValueError('unexpected work fields')
+                result=self._work(store,configured,scope,task_id,session_id,turn,args)
             elif args['operation'] in ('complete','cancel','snooze','resume'):
                 if set(args)-{'operation','item_id','item_version','evidence_span','available_at'}:
                     raise ValueError('unexpected state-change fields')
@@ -218,7 +250,7 @@ class CoreAgendaBridge:
                 'hint': 'Use the configured owner conversation and an explicit future time with timezone. '
                         'Direct intake needs its current guided grant and a proven current Core turn; otherwise propose or ask.'})
 
-    def _source(self,store,configured,scope,task,session_id,turn,args,**purpose):
+    def _turn_evidence(self,store,configured,scope,task,session_id,turn,args):
         from .kernel_execution_bridge import kernel
         # Correlation from Core's dispatcher context, NOT an approval grant and
         # never an argument supplied by the model. Deferred tool_call keeps it.
@@ -235,9 +267,70 @@ class CoreAgendaBridge:
         if intake.permission(store,configured)!=(True,turn[4]):raise ValueError('intake grant changed')
         identity=store.protector.authenticate_json('alive.intake.turn.v1',{
             'scope':scope.binding_document(),'task':task,'turn':turn[2]})
-        return intake.record_request(store,configured,turn_identity=identity,permission_id=turn[4],
+        return dict(turn_identity=identity,permission_id=turn[4],
             request_fingerprint=store.protector.authenticate_json('alive.intake.request.v1',turn[3]),
-            evidence_fingerprint=store.protector.authenticate_json('alive.intake.evidence.v1',span),**purpose)
+            evidence_fingerprint=store.protector.authenticate_json('alive.intake.evidence.v1',span))
+
+    def _source(self,store,configured,scope,task,session_id,turn,args,**purpose):
+        from .kernel_execution_bridge import kernel
+        return kernel('followup_intake').record_request(store,configured,
+            **self._turn_evidence(store,configured,scope,task,session_id,turn,args),**purpose)
+
+    def _work_validator(self,store,configured,scope,item):
+        from .kernel_execution_bridge import kernel
+        def validate():
+            _current_store,current=self._owner(scope)
+            if current.event_id!=configured.event_id or current.options.get('core_background_work') is not True:
+                raise ValueError('background grant changed')
+            policy=kernel('autonomy_policy').AutonomyPolicyProjection(store.journal).current(configured.subject)
+            if policy is None or not policy.enabled:raise ValueError('Alive is paused')
+            latest=self._items(store,configured,item['item_id'])
+            if (not latest or latest[0]['state']!='active' or latest[0]['content_status']!='available'
+                    or latest[0]['item_version']!=item['item_version']):
+                raise ValueError('ongoing item changed')
+            available=self._date(latest[0].get('available_at'))
+            if available is not None and available>datetime.now(timezone.utc):
+                raise ValueError('ongoing item is not available for work yet')
+        return validate
+
+    def _work(self,store,configured,scope,task,session_id,turn,args):
+        from .kernel_execution_bridge import kernel
+        if configured.options.get('core_background_work') is not True:
+            return {'error':'guided_background_work_setup_required','job_created':False}
+        if not isinstance(args.get('item_id'),str) or not args['item_id']:
+            raise ValueError('exact work item required')
+        items=self._items(store,configured,args['item_id'])
+        if (not items or items[0]['state']!='active' or items[0]['content_status']!='available'
+                or items[0]['item_version']!=args.get('item_version')):
+            return {'error':'work_item_changed','job_created':False}
+        item=items[0];module=kernel('core_work')
+        available=self._date(item.get('available_at'))
+        if available is not None and available>datetime.now(timezone.utc):
+            return {'error':'work_not_available_yet','available_at':item['available_at'],'job_created':False}
+        work_store=module.CoreWorkStore(store)
+        sets=module.CoreWorkStore.toolsets(args.get('toolsets',[]))
+        evidence=self._turn_evidence(store,configured,scope,task,session_id,turn,args)
+        validate=self._work_validator(store,configured,scope,item);validate()
+        previous=work_store.previous(item['item_id'],subject=configured.subject)
+        if previous and previous['work_id']==work_store.identifier(configured,item=item,turn_evidence=evidence,toolsets=sets):
+            return previous
+        if previous or not set(sets)<=set(configured.options.get('automatic_core_toolsets',[])):
+            handle=uuid4().hex
+            with self.lock:
+                self.work_drafts[handle]=dict(item=item,toolsets=sets,evidence=evidence,
+                    scope=scope,configuration=configured.event_id,created=time.monotonic())
+                while len(self.work_drafts)>16:self.work_drafts.popitem(last=False)
+            return {'status':'work_confirmation_required','job_created':False,
+                'preview':{'item':item,'toolsets':sets,'uses_core_profile_context':True,
+                           'job_record_retention_owned_by_core':True,'filesystem_sandbox':False,
+                           'previous_work':previous,
+                           'new_attempt_may_repeat_existing_effects':previous is not None},
+                'confirmation_command':'/alive agenda work-confirm '+handle,
+                'expires_in_seconds':self.DRAFT_TTL}
+        def current():
+            validate();self._turn_evidence(store,configured,scope,task,session_id,turn,args)
+        return work_store.launch(configured,item=item,turn_evidence=evidence,
+            toolsets=sets,validate=current)
 
     def _record(self,store,configured,scope,task,session_id,turn,args,details,due,available):
         from .kernel_execution_bridge import kernel
@@ -364,6 +457,24 @@ class CoreAgendaBridge:
         """Caller must already have checked the admitted Core command source."""
         from .kernel_execution_bridge import kernel
         store, configured = self._owner(scope)
+        if len(parts)==2 and parts[0]=='work-confirm':
+            with self.lock:
+                receipt=self.work_receipts.get(parts[1])
+                if receipt and receipt['scope']==scope:
+                    result=kernel('core_work').CoreWorkStore(store).status(receipt['work_id'],subject=configured.subject)
+                    return json.dumps({**result,'confirmation_already_handled':True,'new_job_created':False},ensure_ascii=False)
+                draft=self.work_drafts.get(parts[1])
+                if (draft is None or draft['scope']!=scope or draft['configuration']!=configured.event_id
+                        or time.monotonic()-draft['created']>self.DRAFT_TTL):
+                    return '该确认码已失效或已处理。请查询原事项的工作状态；本次没有创建新任务。'
+                validate=self._work_validator(store,configured,scope,draft['item'])
+                result=kernel('core_work').CoreWorkStore(store).launch(configured,item=draft['item'],
+                    turn_evidence=draft['evidence'],toolsets=draft['toolsets'],
+                    validate=validate,explicit_confirmation=True)
+                del self.work_drafts[parts[1]]
+                self.work_receipts[parts[1]]={'scope':scope,'work_id':result['work_id']}
+                while len(self.work_receipts)>32:self.work_receipts.popitem(last=False)
+                return json.dumps(result,ensure_ascii=False)
         if parts == ['list']:
             return json.dumps({'items': self._items(store, configured),
                                'view_limit': 8, 'complete_inventory_proven': False}, ensure_ascii=False)

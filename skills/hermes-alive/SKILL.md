@@ -30,6 +30,11 @@ the developer's interests or infer externally disclosed searches from private ch
 Model selection defaults to Hermes; only request an optional existing Core alias,
 never credentials. Translate ordinary choices into flags for the user.
 
+Before presenting kernel choices, read [the kernel setup guide](docs/ALIVE_KERNEL_SETUP.md).
+It owns the distinct ongoing-item, item-management, structural-observation and
+native-background-work choices. Do not infer one from another, enable new grants
+on upgrade or promise autonomous result followup from a submitted Core task.
+
 Ask whether the recipient wants a particular conversation language or has an
 explicit communication preference; "no customization" is valid. Optional
 `--language <language-tag>` overrides only Alive's output language; otherwise

@@ -92,9 +92,35 @@ success and that this choice grants neither tool execution nor automatic learnin
 Reconfigure without the flag to stop new observations. No background activation is
 needed to observe explicitly authorized tool activity in the configured conversation.
 
-For future automatic actions, guide the owner's permitted scope first and require
-per-operation confirmation outside it. This is the agreed product contract, not
-an assertion that automatic tool execution is already implemented.
+Guide the owner's permitted scope first and require per-operation confirmation
+outside it. The current main-turn handoff is described below; autonomous Native
+work selection and automatic result followup remain under development.
+
+## Native background work — development qualification
+
+The current main-turn handoff can send a clear request to perform an existing
+item to native Hermes jobs. It is independently off for existing configurations.
+Only after guidance add `--confirm-core-background-work`, alongside explicit
+follow-up intake. This authorizes Core's normal model/profile-memory context and
+Core's separately retained task records, not just Alive's optional profile advice.
+Explain that these are the profile's normal Core capabilities and context; do not
+silently enable this on an upgrade or shared installation.
+
+Guide which Core toolsets may run automatically and repeat
+`--automatic-core-toolset <approved-core-toolset>` for those choices. None means
+model-only work. Explain the actual capabilities in the user's language. File
+tools use Hermes' existing access; this choice does not restrict them to one
+directory or create an OS sandbox. No developer-specific toolset is a default.
+Requests outside the set show their exact item and toolset preview and require
+the owner's one-time `/alive agenda work-confirm ...` command before submission.
+
+Core owns execution and saves the result locally. Submitting the job is not
+proof that it ran or met the goal. `alive_agenda work_status` can query an exact
+work ID or recover its association from the known item ID, without resubmission.
+Automatic result followup and autonomous Native work selection are not connected
+yet; do not promise them. Pause stops new Alive handoffs; already accepted Core
+tasks require Core's own task management. This experimental slice still needs
+project-context, cancellation, lifecycle, migration and fleet qualification.
 
 ## Explain the public reading choices
 

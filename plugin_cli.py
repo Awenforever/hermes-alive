@@ -62,6 +62,10 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
         help='Guide and authorize explicit follow-up creation and completion/cancellation/snooze/resume, with the chosen item retention period; no external job control')
     setup.add_argument('--confirm-core-tool-observation',action='store_true',
         help='Observe tool names, durations and terminal status only in the configured owner conversation; diagnostic validity follows retention days, structural ledger remains until removed; no arguments/results/error bodies or execution authority')
+    setup.add_argument('--confirm-core-background-work',action='store_true',
+        help='Allow handing ongoing work to native Hermes jobs: they use Core models/profile memory and keep their own job records; requires explicit follow-up intake')
+    setup.add_argument('--automatic-core-toolset',action='append',default=[],
+        help='Core toolset allowed for automatic background work; repeat after guidance. Empty means model-only work; other requested toolsets require per-operation confirmation. This is not a filesystem sandbox')
     setup.add_argument('--model',default=None,help='Optional Core-configured alias; default inherits Hermes')
     setup.add_argument('--language',help='Optional conversation language tag; otherwise follows Hermes locale')
     setup.add_argument('--communication-preference',help='Explicit communication preference, stored privately after owner confirmation')
@@ -231,6 +235,7 @@ def alive_command(args: argparse.Namespace) -> int:
         if (not args.confirm_model_calls or not args.confirm_delivery or not args.confirm_outbound_retention
                 or bool(args.public_query) != args.confirm_public_reads
                 or args.confirm_cited_reads and not args.public_query
+                or args.automatic_core_toolset and not args.confirm_core_background_work
                 or getattr(args,'confirm_public_refinement',False) and not args.confirm_cited_reads):
             print(json.dumps({'ok':False,'confirmation_required':True,'delivery_enabled':False}))
             return 2
@@ -257,6 +262,8 @@ def alive_command(args: argparse.Namespace) -> int:
                 or getattr(args,'confirm_followup_management',False) else {}),
             **({'manage_explicit_followups':True} if getattr(args,'confirm_followup_management',False) else {}),
             **({'observe_core_tools':True} if getattr(args,'confirm_core_tool_observation',False) else {}),
+            **({'core_background_work':True,'automatic_core_toolsets':args.automatic_core_toolset}
+               if getattr(args,'confirm_core_background_work',False) else {}),
             **({'refine_public_sources':True} if getattr(args,'confirm_public_refinement',False) else {}),
             **({'language':args.language} if getattr(args,'language',None) else {}),
             **({'communication_preference':args.communication_preference}
@@ -275,6 +282,10 @@ def alive_command(args: argparse.Namespace) -> int:
                 'explicit_followup_management':bool(getattr(args,'confirm_followup_management',False)),
                 'core_tool_structural_observation':bool(getattr(args,'confirm_core_tool_observation',False)),
                 'core_tool_arguments_or_results_retained':False,
+                'native_core_background_work':bool(getattr(args,'confirm_core_background_work',False)),
+                'automatic_core_toolsets':args.automatic_core_toolset,
+                'background_jobs_use_core_profile_context':bool(getattr(args,'confirm_core_background_work',False)),
+                'background_job_record_retention_owned_by_core':bool(getattr(args,'confirm_core_background_work',False)),
                 'core_tool_structural_ledger_until_removed':bool(getattr(args,'confirm_core_tool_observation',False)),
                 'followup_item_retention_days':args.retention_days if getattr(args,'confirm_explicit_followup_intake',False) or getattr(args,'confirm_followup_management',False) else None,
                 'cited_public_reads':bool(args.confirm_cited_reads),

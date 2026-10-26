@@ -138,3 +138,21 @@ are not repaired with broad recursive permission changes.
 A changed active hook can require a gateway restart. Production source/config
 changes, restart, and real message delivery are separate explicit actions and
 must not be hidden inside installation, documentation, or acceptance steps.
+
+## Development Core-work association gate
+
+ADR0245's main-turn handoff records protected work/job associations in the existing
+kernel journal. Core owns the corresponding profile's `cron/jobs.json`,
+`cron/executions.db`, outputs and session data. Backing up only Alive's runtime
+directory does not preserve that whole association; preserve the served profile
+consistently, including its original identity/content keys and Core task records.
+
+Core context and task-record retention need the separate guided background-work
+choice. Removing an Alive hook or pausing new initiative is not proof that an
+already accepted Core worker stopped. Purging Alive data also cannot silently
+claim to erase Core's separately owned history or undo an external effect.
+
+Core-work uninstall/reinstall, active-task cancellation, purge/record-cleanup and
+whole-profile migration/rollback are not yet qualified. Keep this development
+capability in isolation until those gates pass; do not enable it in production
+on the strength of the file-effect or cold-association test alone.
