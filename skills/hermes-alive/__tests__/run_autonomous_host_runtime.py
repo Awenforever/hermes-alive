@@ -18,6 +18,7 @@ class Driver:
         self.outbox = DispatchOutbox(journal)
         self.operations = []
         self.fail = False
+        self.change = False
         self.block = False
         self.entered = asyncio.Event()
         self.cleaned = False
@@ -25,6 +26,10 @@ class Driver:
         self.operations.append(kwargs['operation_id'])
         self.entered.set()
         if self.fail: raise RuntimeError('synthetic private failure')
+        if self.change:
+            self.change=False
+            from alive_kernel.opportunity_synthesis import OpportunityEvidenceChanged
+            raise OpportunityEvidenceChanged('synthetic evidence changed during inference')
         if self.block:
             try: await asyncio.Event().wait()
             finally: self.cleaned = True
@@ -86,6 +91,18 @@ async def test(root):
         continuous=True,interval_seconds=.001,cycle_step=continuous_step)
     assert result['completed_cycles']==2 and result['exit_reason']=='stopped'
     assert len(set(continuous_driver.operations))==2 and not continuous_host.running
+    continuous_driver.change=True
+    changed_stop=asyncio.Event();prior_count=len(continuous_driver.operations)
+    async def changed_step(parameters):
+        result=await continuous_host.step(parameters)
+        if len(continuous_driver.operations)==prior_count+2:changed_stop.set()
+        return result
+    result=await continuous_host.run(build_parameters=lambda:{},stop=changed_stop,
+        continuous=True,interval_seconds=.001,cycle_step=changed_step)
+    assert result['completed_cycles']==2 and result['exit_reason']=='stopped'
+    assert continuous_driver.operations[-2]!=continuous_driver.operations[-1]
+    closed=journal.read(event_type='autonomous.host.closed')
+    assert [r.event.payload['disposition'] for r in closed][-2:]==['evidence_changed','silence']
     async def paused_step(parameters):return SimpleNamespace(disposition='paused')
     result=await continuous_host.run(build_parameters=lambda:{},stop=asyncio.Event(),
         continuous=True,interval_seconds=.001,cycle_step=paused_step)

@@ -39,6 +39,8 @@ from run_core_guided_setup import cli
 
 
 async def test(home):
+    concurrent_inspection=os.environ.get('ALIVE_WORK_INSPECTION_CONCURRENT_TEST')=='1'
+    concurrent_fired=[]
     revoked_inspection=os.environ.get('ALIVE_WORK_INSPECTION_REVOKE_TEST')=='1'
     inspection_mode=os.environ.get('ALIVE_WORK_INSPECTION_TEST')=='1' or revoked_inspection
     review_records=os.environ.get('ALIVE_WORK_REVIEW_TEST')=='1' or inspection_mode
@@ -184,6 +186,10 @@ async def test(home):
                             'reconsider_after_seconds':None})))])
                 assert kw['task']=='alive_opportunity_candidates',kw['task']
                 progress_prompts.append(json.dumps(kw['messages'],ensure_ascii=False))
+                if concurrent_inspection and not concurrent_fired and 'separate_result_inspection' in progress_prompts[-1]:
+                    concurrent_fired.append(True)
+                    assert await asyncio.to_thread(tick,verbose=False,sync=True,headless=False)==1
+
                 if isinstance(kw.get('route_info'),dict):kw['route_info']['provider']='synthetic-provider'
                 document={'candidates':[]}
                 if review_records:
@@ -368,8 +374,18 @@ async def test(home):
                     'model':'configured-primary','choices':[{'index':0,'message':message,'finish_reason':finish}],
                     'usage':{'prompt_tokens':10,'completion_tokens':10,'total_tokens':20}})
             responses['handler']=inspect_respond
-            after=await native.step(build())
-            assert after.disposition=='silence'
+            if concurrent_inspection:
+                before_completed=len(list(store.journal.read(event_type='opportunity.synthesis_completed')))
+                changed=await native.step(build())
+                assert changed.disposition=='evidence_changed'
+                assert len(list(store.journal.read(event_type='opportunity.synthesis_completed')))==before_completed
+                failed=list(store.journal.read(event_type='opportunity.synthesis_failed'))[-1].event
+                assert failed.payload['error_class']=='OpportunityEvidenceChanged'
+                closed=list(store.journal.read(event_type='autonomous.host.closed'))[-1].event
+                assert closed.payload['disposition']=='evidence_changed'
+            else:
+                after=await native.step(build())
+                assert after.disposition=='silence'
             leaf=inspector.latest(started['work_id'],subject=configured.subject)
             assert leaf is not None and len(jobs.list_jobs(include_disabled=True))==2
             assert work_store.previous(row['item_id'],subject=configured.subject)['work_id']==started['work_id']
@@ -381,7 +397,8 @@ async def test(home):
                 # pause must still block the actual Core pre-tool call.
                 with closing(store.journal._connect()) as c:
                     c.execute('UPDATE autonomy_policies_v1 SET enabled=1 WHERE subject=?',(configured.subject,))
-            assert tick(verbose=False,sync=True,headless=False)==1
+            if not concurrent_inspection:
+                assert tick(verbose=False,sync=True,headless=False)==1
             assert work_store.status(leaf[0],subject=configured.subject)['core_execution_state']=='completed'
             if revoked_inspection:
                 assert len(inspection_requests)==2

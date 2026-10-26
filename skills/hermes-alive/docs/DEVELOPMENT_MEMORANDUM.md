@@ -1402,3 +1402,17 @@ must not enable background reads after a signed pause. Fresh observations remain
 bounded at their recorded time; no runner status can complete the agenda.
 This implementation is a candidate until actual Core/hook/cold tests and semantic
 review finish, and is not general autonomous work or production acceptance.
+
+
+Qualification r161 connects actual Native decisions to actual Core inspection and
+a subsequent changed-file judgment; r163 adds pause-before-use with a tampered
+enabled cache and cold denial. Real-model r161/r163 interpretation failures are
+preserved, not credited. r164 uses the same runtime with diagnostic observation:
+DeepSeek chooses wait and silence; it does not prove a real fresh inspection.
+
+r165 completes the actual Core inspector during the candidate-model wait. The
+old snapshot is correctly rejected, but the next wake reuses its failed synthesis
+identity. ADR0252 distinguishes this expected evidence change from authorization,
+provider and unknown-effect failures. Close the stale judgment without admitting
+it, then let the existing loop reconsider current evidence on its normal interval.
+Never turn all exceptions into retries or create a replacement job to get green.

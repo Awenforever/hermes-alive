@@ -9,6 +9,7 @@ from datetime import datetime,timedelta,timezone
 import re
 
 from .events import EventEnvelope,Sensitivity,_thaw_json
+from .opportunity_synthesis import OpportunityEvidenceChanged
 
 
 @dataclass(frozen=True,slots=True)
@@ -88,7 +89,7 @@ class AutonomousHostRuntime:
         cursor = result.reconciliation['next_after_sequence']
         if (type(cursor) is not int or cursor<0 or result.external_delivery_proven is not False
                 or result.disposition not in ('paused','reconciliation_attention','silence','shadow_selected',
-                    'not_authorized','attempt_unavailable','submitted','content_review_attention','waiting_for_change','content_deferred')):
+                    'not_authorized','attempt_unavailable','submitted','content_review_attention','waiting_for_change','content_deferred','evidence_changed')):
             raise ValueError('cycle completion exceeds qualified contract')
         payload = {'subject':self.subject,'lane':self.lane,'operation_id':cycle.operation_id,'disposition':result.disposition,
             'next_reconciliation_cursor':cursor,'external_delivery_proven':False,'authority_granted':False}
@@ -147,6 +148,16 @@ class AutonomousHostRuntime:
                 result = await self.runtime.cycle(**parameters,subject=self.subject,operation_id=cycle.operation_id,
                     execute=self.execute,reconciliation_cursor=cycle.reconciliation_cursor)
                 phase='completion'
+                self.close_cycle(cycle,result)
+                return result
+            except OpportunityEvidenceChanged:
+                # No draft/send was admitted: a current evidence comparison
+                # rejected the spent model result. Close this operation instead
+                # of replaying its failed synthesis forever. The old read-only
+                # receipt cursor is safe to observe again; jobs/effects retain IDs.
+                from .autonomous_cycle_runtime import AutonomousCycleResult
+                result=AutonomousCycleResult('evidence_changed',
+                    {'next_after_sequence':cycle.reconciliation_cursor})
                 self.close_cycle(cycle,result)
                 return result
             except BaseException as error:
@@ -209,7 +220,7 @@ class AutonomousHostRuntime:
                         review=self.journal.get(witness.review_event_id)
                         qualified_retry=review is not None and min(witness.valid_until,
                             review.event.observed_at+timedelta(seconds=window))>datetime.now(timezone.utc)
-                    if continuous and disposition not in ('submitted','silence','waiting_for_change','content_deferred') and not qualified_retry:
+                    if continuous and disposition not in ('submitted','silence','waiting_for_change','content_deferred','evidence_changed') and not qualified_retry:
                         reason=disposition if disposition in ('paused','not_authorized','attempt_unavailable',
                             'reconciliation_attention','content_review_attention') else 'unexpected_disposition'
                         return {'completed_cycles':completed,'exit_reason':reason,

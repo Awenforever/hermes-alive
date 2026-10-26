@@ -655,3 +655,21 @@ the fresh useful-round counter. See the memorandum for the primary-source check.
 Unfamiliar topics can be worthwhile exploration without becoming lasting interests.
 Sample feedback must remain attributable and reversible; do not infer a permanent
 dislike from unfamiliarity, or equate clear exposition with proactive usefulness.
+
+## 2026-10-27 — Work inspection is a slice of the agent loop
+
+The guided owned-work chain can now use a separate read-only Core inspection and
+feed its observations into a later judgment. Controlled actual-Core qualification
+covers an independently changed file, rejection of another path, preserved
+producer identity, no duplicate jobs, cold recovery and a signed pause despite
+a tampered enabled cache. This does not finish general autonomous work, appropriate
+closure, project context, task revision, memory learning or distribution.
+
+Real inherited-model runs have exercised both inspect and wait choices; the wait
+path honors the no-message restriction. Inspect-path interpretation failures are
+still failures. A concurrent actual-Core counterexample identified a durable
+cycle recovery defect: rejected stale evidence could strand later judgments.
+ADR0252 addresses that class without accepting the stale answer or repeating work.
+Its qualification and new real-model inspection remain open. Sharing is still
+0/10, a subgate only. Disable/unload with pending or in-flight Core work remains
+an explicit lifecycle gate, alongside the final four-target consumer matrix.

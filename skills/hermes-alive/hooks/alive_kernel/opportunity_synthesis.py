@@ -42,6 +42,10 @@ class OpportunitySynthesisError(ValueError):
     """Opportunity interpretation failed without granting action authority."""
 
 
+class OpportunityEvidenceChanged(OpportunitySynthesisError):
+    """A pre-effect evidence snapshot became stale; its model result is unusable."""
+
+
 class OpportunityStructureError(OpportunitySynthesisError):
     """Model output failed pure proposal admission, never a host/provider error."""
 
@@ -1387,9 +1391,9 @@ class OpportunitySynthesizer:
             if (self.reader.active_evidence(subject=subject,clearance=clearance,limit=32,
                     observation_event_ids=tuple(e.observation_event_id for e in evidence)) if evidence else
                     () if deferred else self.reader.active_evidence(subject=subject,clearance=clearance,limit=32)) != evidence:
-                raise OpportunitySynthesisError("opportunity evidence changed during model wait")
+                raise OpportunityEvidenceChanged("opportunity evidence changed during model wait")
             if self._commitment_digest(subject,clearance)!=commitment_digest:
-                raise OpportunitySynthesisError('current commitments changed during model wait')
+                raise OpportunityEvidenceChanged('current commitments changed during model wait')
             if self.context_reader.read(subject=subject, clearance=clearance) != context:
                 raise OpportunitySynthesisError("user context changed during model wait")
             if self.feedback_for_start(start,subject=subject,clearance=clearance) != feedback:
@@ -1528,6 +1532,6 @@ class OpportunitySynthesizer:
                 causation_id=start.event.event_id,
                 payload={"error_class": type(exc).__name__, "raw_response_stored": False},
             ))
-            if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt, SystemExit)):
+            if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt, SystemExit, OpportunityEvidenceChanged)):
                 raise
             raise OpportunitySynthesisError("opportunity interpretation failed; inspect its receipt") from None
