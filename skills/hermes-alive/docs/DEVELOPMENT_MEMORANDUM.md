@@ -1314,3 +1314,17 @@ unlike Core's multiple-hook API, and expected the pre-session-observer hook list
 Fix the fake to retain and invoke both post-tool observers and the pre-API hook;
 retain the original opt-out/no-body/privacy assertions. Do not remove the observer
 or skip the failed test. The old full run is a failure, not a 99-suite pass.
+
+
+Actual-model r151 completed three main turns and one real inherited Core worker:
+registration without effects, explicit execution with actual file write/read,
+then conversation-history reset and bound request/result retrieval without a new
+job. The independent test OS read matched the exact marker plus newline. This is
+integration evidence, not autonomous Native result assessment or sharing credit.
+Replies remain verbose and describe a paraphrase as request original; a recorded
+read_file view is not independent current byte verification. The model also tried
+message pages without work_id because its description only mentioned work_status.
+Make the required-per-operation contract and missing-field response explicit,
+including work_id on every evidence page. Test rejection before Core DB access,
+then the corrected page against the actual owned segment. Do not guess work_id
+from arbitrary references, relax ownership, force tools or rewrite test answers.

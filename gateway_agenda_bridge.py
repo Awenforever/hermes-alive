@@ -24,6 +24,13 @@ _OPERATION_FIELDS = {
     'work':frozenset(('operation','item_id','item_version','evidence_span','toolsets')),
     **{name:_CHANGE_FIELDS for name in ('complete','cancel','snooze','resume')},
 }
+_OPERATION_REQUIRED = {
+    'propose':frozenset(('task',)), 'record':frozenset(('task','evidence_span')),
+    'work_evidence':frozenset(('work_id',)),
+    **{name:frozenset(('item_id','item_version','evidence_span'))
+       for name in ('work','complete','cancel','resume')},
+    'snooze':frozenset(('item_id','item_version','evidence_span','available_at')),
+}
 
 
 AGENDA_SCHEMA = {
@@ -72,7 +79,7 @@ AGENDA_SCHEMA = {
         'fingerprint':{'type':'string','maxLength':64,'description':'Returned content fingerprint, required for continuation pages.'},
         'toolsets': {'type':'array','items':{'type':'string'},'maxItems':8,
                     'description':'Explicit Core toolsets requested for background work. Empty permits model-only work, not a default all-tools job.'},
-        'work_id': {'type':'string','description':'Exact previously returned Core work identifier for work_status; alternatively use exact item_id, never both.'},
+        'work_id': {'type':'string','description':'Required for EVERY work_evidence call, including message pages with an evidence_reference. For work_status use work_id or item_id, never both.'},
         'item_id': {'type':'string','description':'An exact existing item from current list or known conversation; optional exact lookup for list.'},
         'item_version': {'type':'string','description':'Current opaque version from list; required for state changes. Refresh if stale.'},
         'evidence_span': {'type':'string','maxLength':1500,
@@ -206,14 +213,19 @@ class CoreAgendaBridge:
             if not isinstance(args, dict) or args.get('operation') not in ('propose', 'record', 'list','complete','cancel','snooze','resume','work','work_status','work_evidence'):
                 raise ValueError('bounded agenda operation required')
             allowed=_OPERATION_FIELDS[args['operation']]
-            if set(args)-allowed:
+            required=_OPERATION_REQUIRED.get(args['operation'],frozenset())
+            invalid_selector=(args['operation']=='work_status' and len(set(args)&{'work_id','item_id'})!=1)
+            if set(args)-allowed or required-set(args) or invalid_selector:
                 # Validate before any source recording or Core IO. Do not turn
                 # a correctable call-shape error into an authority diagnosis,
                 # echo unknown argument names/values, or silently discard them.
                 return json.dumps({'error':'alive_agenda_arguments_invalid','operation':args['operation'],
-                    'allowed_fields':sorted(allowed),'request_processed':False,'new_job_created':False,
+                    'allowed_fields':sorted(allowed),'required_fields':sorted(required),
+                    **({'exactly_one_of':['work_id','item_id']} if args['operation']=='work_status' else {}),
+                    'request_processed':False,'new_job_created':False,
                     'hint':'Retry this operation using only its allowed fields. For work, omit task/constraint: '
                            'the host retains the existing assignment and exact current owner message. '
+                           'For every work_evidence call include its work_id, including message pages. '
                            'This argument error does not establish a missing tool or permission.'})
             if args['operation'] == 'list':
                 if 'item_id' in args and (not isinstance(args['item_id'],str) or not args['item_id']):

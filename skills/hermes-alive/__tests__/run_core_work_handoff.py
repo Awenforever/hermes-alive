@@ -248,6 +248,13 @@ async def test(home):
         assert 'INDEPENDENT_SYNTHETIC_ARTIFACT' in witness['content']
         read_request=next(e for e in evidence['entries'] if any(c['name']=='read_file' for c in e['tool_requests']))
         assert read_request['arguments_omitted_from_default_window'] and not read_request['content']
+        before_page=store.journal.last_sequence()
+        with patch('hermes_state.SessionDB',side_effect=AssertionError('malformed page opened Core bodies')):
+            missing_work=tool({'operation':'work_evidence','evidence_reference':evidence['evidence_reference'],
+                              'message_id':read_request['message_id']})
+        assert missing_work['error']=='alive_agenda_arguments_invalid'
+        assert missing_work['required_fields']==['work_id'] and not missing_work['request_processed']
+        assert store.journal.last_sequence()==before_page and len(jobs.list_jobs(include_disabled=True))==1
         request_page=tool({'operation':'work_evidence','work_id':started['work_id'],
             'evidence_reference':evidence['evidence_reference'],'message_id':read_request['message_id'],
             'fingerprint':read_request['fingerprint']})
