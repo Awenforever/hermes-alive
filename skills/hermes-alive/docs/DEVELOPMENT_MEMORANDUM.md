@@ -1355,3 +1355,38 @@ unchanged records stay quiet. The controlled reply changes its attributed
 abstention reason, not agenda state or tools. Cold paused review and old grants
 refuse background body reads before SessionDB, with original keys preserved.
 This is not a real-model semantic verdict or fresh independent task inspection.
+
+
+ADR0250 prepares a public Core read_file-only composition for fresh inspection.
+It is not a new tool handler or raw-registry wrapper, and no inspection job is
+started by registration. Prove ordinary Core global disabled-tool subtraction,
+forbidden-write rejection, actual fresh read and cold plugin registration before
+using it for autonomous work. Process-local composition metadata is not a durable
+handle or execution grant. Do not confuse that foundation with Native choosing,
+authorizing, executing and assessing an independent inspection.
+
+
+Inspection qualification r155/r156/r157 exposed fixture failures: the local
+provider asserted/dropped connections and Core retried until the test deadline;
+failed isolated Gateway stop is retained as failure, with container destruction
+separately confirmed. r158's explicit error/log response revealed eight ordinary
+model probes with no tools before the actual cron request with only read_file.
+Do not count auxiliary metadata probes as work-agent steps, or weaken the actual
+job's tool allowlist to get a green check. Use a synthetic task marker only in the
+test driver to route probe replies separately, honor requested streaming/nonstream
+response shape, and retain strict actual-agent tool/fresh-read/effect assertions.
+No production/provider configuration or Core source changes are warranted by this
+fixture failure. Preserve all failed operation IDs and physical cleanup evidence.
+
+
+r159 actual-Core inspection-scope qualification passes after the provider fixture
+separates metadata probes from its synthetic work marker. Only read_file is
+advertised to the actual job. Its deliberately requested write_file is rejected;
+actual read output contains the independently changed fresh marker, and disk
+contents remain unchanged. Core file/composition disablement removes the scope,
+and a fresh process loading the installed plugin registers it again. One local
+Core job, no real models/channels, isolated Gateway stop and container closure.
+This is a capability foundation, not autonomous inspection or goal verification.
+The next step must bind inspection selection/authorization to exact owned work,
+assignment and source versions, then carry current observations into Native's
+next decision without a second executor or physical queue.

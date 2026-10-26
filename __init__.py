@@ -42,6 +42,8 @@ async def kernel_gateway_startup():
 
 def register(ctx) -> None:
     global _gateway_host_binding
+    from .core_work_inspection_scope import register as register_inspection_scope
+    register_inspection_scope(ctx)
     _gateway_host_binding=GatewayHostBinding(ctx)
     register_setup_command(ctx,_gateway_host_binding)
     register_tool_receipt_hook(ctx,_gateway_host_binding)
