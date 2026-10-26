@@ -531,7 +531,7 @@ f235a77236630cced023e5c4c2738024beb435a9172f971cd4929108c6855ab1  ./docs/adr/023
 028a501d358e429f925abf90bcc678984c433e60502a68d208a9b57875310e0d  ./docs/adr/0238-reported-message-reference-lookup.md
 14c1ffac433c963e3321b73784fdc5a2cb44c9388673929a3433bf5448420e86  ./docs/adr/0239-continuous-agent-entry-with-optional-discovery.md
 1e0c376dd9d6d20b797aa7b01b64ba890e78da215ce20fd1a601bc20d5e6a65f  ./docs/adr/0240-core-conversational-agenda-confirmation.md
-de7eec85a63e90959677fdf3100f8234282a2452fc50f6bd2d7b5e8670271003  ./docs/adr/0241-first-grant-explicit-followup-intake.md
+d5f0ecc5deddf608fcc32f16fecf7d594c08860002768771c240f868b26a823c  ./docs/adr/0241-first-grant-explicit-followup-intake.md
 4d6108e5f522390a4f9008265a2681771192c500c4c34a02179e24a238b55332  ./docs/evidence/deepseek-seed-20261012.json
 40941e141314d626c51ad4d22ccc19c76dcf4b770a85daa0881d135089fb75ea  ./docs/evidence/qwen-route-20261012.json
 460cffae94c5494e13515ab9c2dc42331e9fd14260bf4182086d5f3bd9e19114  ./hooks/HOOK.yaml

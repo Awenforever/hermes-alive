@@ -12,14 +12,14 @@ b3b70e9bc5c17571255896fa91b9b6e91d2c38648f58ec4d4307aa15e4a7473b  ./admitted_inb
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./ci/fakes/agent/__init__.py
 9ad885f59b90418d1d95092668742c0607ca1352274c3b1310eba9fc084f84a0  ./ci/fakes/agent/auxiliary_client.py
 2c8c585ae43c567b9b45c5b36eb2661186b099acd260189109b99a47ecf2dfa6  ./ci/requirements.txt
-295d2d9463875ac08d41c6137bd14366675ce876bd72f30ef32dfba668398ea1  ./gateway_agenda_bridge.py
+e9c31c86fefbd92355de38b69903ea409bb8a3d9cea1cf9c951b8e003b5ada0c  ./gateway_agenda_bridge.py
 8a29dacfe70c2839716462a31be8aa2748dd8f80ed2191cff3f1795569da9d1a  ./gateway_channel_bridge.py
 a9b48788c7c984445e83909aaa324b24aa6e55fc3e1e45e45d42202dba404228  ./gateway_conversation_bridge.py
 994339f7af7ad06af8d0c143281552cfd278e1f1df0c7e621d8f066a17e2aef6  ./gateway_host_bridge.py
 53dfb7811d82d4622018d4b462753412b139fc6f5deef7a5129c2d92930f3035  ./gateway_session_bridge.py
 7397021158629ac80c758a9a5f2fd8a0c062999ad1051be2c562269b60266bbf  ./kernel_execution_bridge.py
 2cb366f7a191110cbe36d5dbf97a921db908e0055ef95a11ae75d8c565da78b6  ./kernel_setup_bridge.py
-7dd885d985e6a33bf0aa4564be366c12182f3792598de86d3d1e594a22cfaf0d  ./metadata/hermes-alive-source.sha256
+e6a7cde2bad3e771262e5111a9702f284c93c6aad34e2e61a47c01a0f67ecaf8  ./metadata/hermes-alive-source.sha256
 5cba4486635fe54faef4cbb05cfb645c315d9ad4dd3316817f12bc81c44b220e  ./metadata/hermes-alive.json
 8a8d72e18f017d562eb34248fad6ec9da130dd663972d6a161845ee16e89f023  ./plugin.yaml
 766a03f84dfe993ee846ffced3345bd722e28254035371f3e69cdfc3e8129e8e  ./plugin_cli.py
@@ -560,7 +560,7 @@ f235a77236630cced023e5c4c2738024beb435a9172f971cd4929108c6855ab1  ./skills/herme
 028a501d358e429f925abf90bcc678984c433e60502a68d208a9b57875310e0d  ./skills/hermes-alive/docs/adr/0238-reported-message-reference-lookup.md
 14c1ffac433c963e3321b73784fdc5a2cb44c9388673929a3433bf5448420e86  ./skills/hermes-alive/docs/adr/0239-continuous-agent-entry-with-optional-discovery.md
 1e0c376dd9d6d20b797aa7b01b64ba890e78da215ce20fd1a601bc20d5e6a65f  ./skills/hermes-alive/docs/adr/0240-core-conversational-agenda-confirmation.md
-de7eec85a63e90959677fdf3100f8234282a2452fc50f6bd2d7b5e8670271003  ./skills/hermes-alive/docs/adr/0241-first-grant-explicit-followup-intake.md
+d5f0ecc5deddf608fcc32f16fecf7d594c08860002768771c240f868b26a823c  ./skills/hermes-alive/docs/adr/0241-first-grant-explicit-followup-intake.md
 4d6108e5f522390a4f9008265a2681771192c500c4c34a02179e24a238b55332  ./skills/hermes-alive/docs/evidence/deepseek-seed-20261012.json
 40941e141314d626c51ad4d22ccc19c76dcf4b770a85daa0881d135089fb75ea  ./skills/hermes-alive/docs/evidence/qwen-route-20261012.json
 460cffae94c5494e13515ab9c2dc42331e9fd14260bf4182086d5f3bd9e19114  ./skills/hermes-alive/hooks/HOOK.yaml

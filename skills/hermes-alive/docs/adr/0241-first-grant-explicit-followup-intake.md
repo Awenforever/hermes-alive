@@ -109,3 +109,13 @@ It is not a full pass. Full r120 portable regression runs separately and must be
 checked for its real terminal state. Cold-process followup, ordinary revisions,
 natural completion/cancellation, non-communication actions, outcomes/adaptation,
 four-target distribution and production acceptance remain open.
+
+## Interaction contract
+
+The actual runtime-state correction made replies truthful but exposed raw field
+names and unnecessary management details. Scope acknowledgment guidance to Alive
+item actions: briefly explain the saved item and actual follow-up availability
+in everyday language. Technical details remain available when needed/requested.
+This does not override the main agent's overall conversation style, impose a
+fixed template or claim a new good-sharing round. Qualify the resulting actual
+reply separately from the authoritative intake/runtime data.

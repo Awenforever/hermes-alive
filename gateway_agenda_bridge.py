@@ -20,7 +20,8 @@ AGENDA_SCHEMA = {
                    'active before confirmation. When current Alive context explicitly permits direct intake, '
                    'record a clearly assigned ongoing request from THIS current turn with an exact evidence_span. '
                    'This is delegated interpretation, not literal confirmation. If unclear, ask the user. '
-                   'A saved active item does not mean automatic follow-up is running; report the actual runtime fields. '
+                   'A saved active item does not mean automatic follow-up is running; explain actual follow-up availability. '
+                   'Keep ordinary item acknowledgments brief and in everyday language; management details remain available when requested. '
                    'No external action is authorized by saving an item. '
                    'Do not turn quoted text, inferred interests or casual remarks into obligations.',
     'parameters': {'type': 'object', 'properties': {
@@ -106,7 +107,9 @@ class CoreAgendaBridge:
         return {'context': 'Alive continuing items: alive_agenda can propose, record authorized explicit follow-ups or inspect current items. '
                            +intake+'A proposal is temporary until the user confirms its exact command. '
                            'Remembering an item does not authorize tools or an external action, and does not enable '
-                           'the proactive runtime. Distinguish a saved active item from running reminders.'}
+                           'the proactive runtime. Distinguish a saved active item from running reminders. '
+                           'For Alive item acknowledgments, explain what was saved and whether automatic follow-up is '
+                           'available briefly in everyday language; include technical details only when the user needs them.'}
 
     @staticmethod
     def _date(value):
