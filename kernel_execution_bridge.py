@@ -194,6 +194,12 @@ def assemble(binding):
                 current_work_authority()
                 kernel('core_work').CoreWorkStore(store).refresh_observations(
                     configured,validate=current_work_authority)
+                if configured.options.get('inspect_core_work_files') is True:
+                    from .core_work_inspection_scope import NAME,effective_tools
+                    inspector=kernel('core_file_inspection').CoreFileInspection(store,scope_name=NAME,read_tools=effective_tools)
+                    await inspector.run(configured,call=parameters['expression_parameters']['call'],
+                        validate=current_work_authority,operation_id=cycle.operation_id)
+                    kernel('core_work').CoreWorkStore(store).refresh_observations(configured,validate=current_work_authority)
             authorization={'authorization_operation_id':'core-auth:'+store.vault.digest_json(
                 {'cycle':cycle.operation_id,'activation':active['activation_event_id']})[:40],
                 'route_binding_id':active['route_binding_id'],'delegation_event_id':active['delegation_event_id']}

@@ -88,7 +88,7 @@ def main() -> int:
             plugin = _load_plugin()
             context = FakePluginContext()
             plugin.register(context)
-            assert set(context.hooks) == {"pre_api_request", "post_tool_call", "post_gateway_admission"}
+            assert set(context.hooks) == {"pre_api_request", "pre_tool_call", "post_tool_call", "post_gateway_admission"}
             assert len(context._observers['post_tool_call']) == 2
             assert set(context.cli) == {"alive"}
             assert set(context.commands)=={'alive'}

@@ -66,6 +66,8 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
         help='Allow native Hermes work with Core models/profile memory and task-record retention, including the exact current owner message (at most 6000 characters); requires explicit follow-up intake')
     setup.add_argument('--confirm-core-work-result-review',action='store_true',
         help='Allow Alive cognition to read bounded retained request/results of its own terminal Core work; derived assessments follow Alive retention. Records are historical evidence, not independent current-world proof; no new execution authority')
+    setup.add_argument('--confirm-core-file-inspection',action='store_true',
+        help='Authorize automatic Core read_file-only inspection of retained file targets from owned work; requires result review, inherits Core permissions, retains inspection task records in Core; no writing, unrelated scan or automatic completion')
     setup.add_argument('--automatic-core-toolset',action='append',default=[],
         help='Core toolset allowed for automatic background work; repeat after guidance. Empty means model-only work; other requested toolsets require per-operation confirmation. This is not a filesystem sandbox')
     setup.add_argument('--model',default=None,help='Optional Core-configured alias; default inherits Hermes')
@@ -237,6 +239,7 @@ def alive_command(args: argparse.Namespace) -> int:
         if (not args.confirm_model_calls or not args.confirm_delivery or not args.confirm_outbound_retention
                 or bool(args.public_query) != args.confirm_public_reads
                 or args.confirm_cited_reads and not args.public_query
+                or getattr(args,'confirm_core_file_inspection',False) and not getattr(args,'confirm_core_work_result_review',False)
                 or args.automatic_core_toolset and not args.confirm_core_background_work
                 or getattr(args,'confirm_core_work_result_review',False) and not args.confirm_core_background_work
                 or getattr(args,'confirm_public_refinement',False) and not args.confirm_cited_reads):
@@ -268,6 +271,7 @@ def alive_command(args: argparse.Namespace) -> int:
             **({'core_background_work':True,'core_work_request_retention':True,'automatic_core_toolsets':args.automatic_core_toolset}
                if getattr(args,'confirm_core_background_work',False) else {}),
             **({'review_core_work_results':True} if getattr(args,'confirm_core_work_result_review',False) else {}),
+            **({'inspect_core_work_files':True} if getattr(args,'confirm_core_file_inspection',False) else {}),
             **({'refine_public_sources':True} if getattr(args,'confirm_public_refinement',False) else {}),
             **({'language':args.language} if getattr(args,'language',None) else {}),
             **({'communication_preference':args.communication_preference}
@@ -288,6 +292,7 @@ def alive_command(args: argparse.Namespace) -> int:
                 'core_tool_arguments_or_results_retained':False,
                 'native_core_background_work':bool(getattr(args,'confirm_core_background_work',False)),
                 'bounded_owned_core_result_review':bool(getattr(args,'confirm_core_work_result_review',False)),
+                'automatic_owned_file_inspection':bool(getattr(args,'confirm_core_file_inspection',False)),
                 'exact_current_work_message_retained_by_core':bool(getattr(args,'confirm_core_background_work',False)),
                 'current_work_message_limit_chars':6000,
                 'automatic_core_toolsets':args.automatic_core_toolset,

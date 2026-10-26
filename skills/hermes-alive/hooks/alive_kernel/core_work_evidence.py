@@ -30,7 +30,8 @@ class CoreWorkEvidence:
                 or any(state.get(k)!=v for k,v in actual.items())):return None
         from .autonomy_policy import AutonomyPolicyProjection
         policies=AutonomyPolicyProjection(work.journal);policies.project_new()
-        policy=policies.current(subject)
+        from .transport_reconciliation_runtime import TransportReconciliationRuntime
+        policy=TransportReconciliationRuntime.canonical_owner_policy(policies,work.journal,subject)
         if policy is None or not policy.enabled:return None
         try:
             definition=self.read(work_id,subject=subject,part='request',max_chars=2048)
@@ -41,7 +42,7 @@ class CoreWorkEvidence:
             # never copy the exception text, guess a store or scan alternatives.
             view={'status':'core_records_unavailable','error_class':type(error).__name__}
         work._home();policies.project_new()
-        if (work.store.configuration()!=configured or policies.current(subject)!=policy
+        if (work.store.configuration()!=configured or TransportReconciliationRuntime.canonical_owner_policy(policies,work.journal,subject)!=policy
                 or work.status(work_id,subject=subject)!=actual):
             raise ValueError('background record review authority changed')
         view.update(evidence_kind='bounded_historical_core_records',

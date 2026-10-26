@@ -191,3 +191,17 @@ stops background body reads. Native changes in judgment remain source-linked;
 forgetting all dependent derived material and profile migration still require
 the complete release matrix. This option grants no tools, sends, retries or
 agenda-completion authority. See ADR0249.
+
+
+### Guided fresh file inspection
+
+The optional inspection choice can create a separate Core read-only job from an
+exact owned recorded target. This adds Core model/profile-context use and a Core
+inspection task/result record; it does not collect unrelated chats or scan paths.
+Target/reason and decision references use the existing private vault for at most
+seven days or the earlier item expiry. Alive's structural journal stores only
+protected references/fingerprints and metadata. Core owns its separate retention.
+The signed owner policy, not a cached enabled row, controls background access.
+Source erasure/expiry, pause and changed authority are checked again at use.
+Coordinated dependent-data erasure, in-flight uninstall and migration remain
+release gates; see ADR0251. No new physical queue or transport is introduced.

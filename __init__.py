@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from .plugin_cli import alive_command, register_cli
-from .tool_receipt_bridge import register_tool_receipt_hook,register_core_work_hook
+from .tool_receipt_bridge import register_tool_receipt_hook,register_core_work_hook,register_inspection_guard
 from .admitted_inbound_bridge import register_admitted_inbound_hook
 from .gateway_host_bridge import GatewayHostBinding
 from .kernel_setup_bridge import register_setup_command,attach_configured_continuity
@@ -48,6 +48,7 @@ def register(ctx) -> None:
     register_setup_command(ctx,_gateway_host_binding)
     register_tool_receipt_hook(ctx,_gateway_host_binding)
     register_core_work_hook(ctx,_gateway_host_binding)
+    register_inspection_guard(ctx,_gateway_host_binding)
     register_admitted_inbound_hook(ctx,_gateway_host_binding)
     ctx.register_cli_command(
         name="alive",

@@ -1390,3 +1390,15 @@ This is a capability foundation, not autonomous inspection or goal verification.
 The next step must bind inspection selection/authorization to exact owned work,
 assignment and source versions, then carry current observations into Native's
 next decision without a second executor or physical queue.
+
+
+ADR0251 connects a separately guided Native inspection choice to a distinct Core
+leaf and a later cognitive view, without fabricating a new user turn. Producer
+lookup excludes inspection leaves, preventing recursive inspection loops. Scope,
+source/version, policy and approved path must be checked before activation/use.
+Keep private intent/decision material in the existing vault and Core records in
+Core. Share the canonical signed policy verifier: a mutable projection cache
+must not enable background reads after a signed pause. Fresh observations remain
+bounded at their recorded time; no runner status can complete the agenda.
+This implementation is a candidate until actual Core/hook/cold tests and semantic
+review finish, and is not general autonomous work or production acceptance.

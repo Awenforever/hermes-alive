@@ -20,17 +20,21 @@ class TransportReconciliationRuntime:
         self.bridge = self.consumer.bridge
 
     def _owner_policy(self,subject):
-        policy = self.outbox.autonomy.current(subject)
-        record = self.journal.get(policy.event_id) if policy else None
+        return self.canonical_owner_policy(self.outbox.autonomy,self.journal,subject)
+
+    @staticmethod
+    def canonical_owner_policy(autonomy,journal,subject):
+        policy = autonomy.current(subject)
+        record = journal.get(policy.event_id) if policy else None
         payload = _thaw_json(record.event.payload) if record else {}
         signature = payload.pop('integrity_authenticator',None)
         if (policy is None or record is None or record.event.event_type != 'autonomy.policy_changed'
                 or record.event.source != 'hermes.command.alive' or record.event.actor != subject
                 or record.event.subject != subject or record.event.sensitivity.value != 'private'
                 or payload.get('enabled') is not policy.enabled or payload.get('revision') != policy.revision
-                or not self.outbox.autonomy.protector.verify_json('autonomy.policy.v1',payload,signature)):
+                or not autonomy.protector.verify_json('autonomy.policy.v1',payload,signature)):
             raise DispatchOutboxError('canonical owner policy unavailable')
-        for candidate in self.journal.iter_reverse(event_types=('autonomy.policy_changed',),subject=subject,max_records=1000):
+        for candidate in journal.iter_reverse(event_types=('autonomy.policy_changed',),subject=subject,max_records=1000):
             if candidate.event.event_id == policy.event_id:
                 return policy
             later = _thaw_json(candidate.event.payload)
@@ -38,7 +42,7 @@ class TransportReconciliationRuntime:
             if (candidate.event.actor == subject and candidate.event.subject == subject
                     and candidate.event.source == 'hermes.command.alive'
                     and candidate.event.sensitivity.value == 'private'
-                    and self.outbox.autonomy.protector.verify_json('autonomy.policy.v1',later,signature)):
+                    and autonomy.protector.verify_json('autonomy.policy.v1',later,signature)):
                 raise DispatchOutboxError('newer owner command needs policy reconciliation')
         raise DispatchOutboxError('bounded owner policy history unavailable')
 

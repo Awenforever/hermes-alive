@@ -38,17 +38,19 @@ def validate_options(options):
     if (not isinstance(options, dict) or not required<=set(options)
             or set(options)-required-{'language','communication_preference','interest_preferences','use_hermes_user_profile',
                                      'refine_public_sources','accept_explicit_followups','manage_explicit_followups','observe_core_tools',
-                                     'core_background_work','core_work_request_retention','automatic_core_toolsets','retain_followup_source','review_core_work_results'}
+                                     'core_background_work','core_work_request_retention','automatic_core_toolsets','retain_followup_source','review_core_work_results','inspect_core_work_files'}
             or options['model_calls'] is not True or options['delivery'] is not True
             or options['outbound_retention_confirmed'] is not True
             or type(options['outbound_retention_days']) is not int
             or not 1 <= options['outbound_retention_days'] <= 365
             or type(options['cited_reads']) is not bool
             or any(key in options and type(options[key]) is not bool
-                   for key in ('use_hermes_user_profile','refine_public_sources','accept_explicit_followups','manage_explicit_followups','observe_core_tools','core_background_work','core_work_request_retention','retain_followup_source','review_core_work_results'))
+                   for key in ('use_hermes_user_profile','refine_public_sources','accept_explicit_followups','manage_explicit_followups','observe_core_tools','core_background_work','core_work_request_retention','retain_followup_source','review_core_work_results','inspect_core_work_files'))
             or (options.get('manage_explicit_followups') is True or options.get('retain_followup_source') is True)
                 and options.get('accept_explicit_followups') is not True):
         raise KernelSetupError('explicit model/delivery/retention choices required')
+    if options.get('inspect_core_work_files') is True and options.get('review_core_work_results') is not True:
+        raise KernelSetupError('guided owned-record review is required before automatic file inspection')
     worksets=options.get('automatic_core_toolsets',[])
     from .core_work import CoreWorkStore
     try:CoreWorkStore.toolsets(worksets)

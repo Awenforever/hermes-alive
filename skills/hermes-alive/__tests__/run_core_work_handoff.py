@@ -6,6 +6,7 @@ Native autonomous decision branch. No channel, real provider or private history.
 """
 import asyncio,hashlib,importlib,json,os,shutil,subprocess,sys,tempfile,threading
 from dataclasses import replace
+from contextlib import closing
 from datetime import datetime,timedelta,timezone
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from pathlib import Path
@@ -38,7 +39,9 @@ from run_core_guided_setup import cli
 
 
 async def test(home):
-    review_records=os.environ.get('ALIVE_WORK_REVIEW_TEST')=='1'
+    revoked_inspection=os.environ.get('ALIVE_WORK_INSPECTION_REVOKE_TEST')=='1'
+    inspection_mode=os.environ.get('ALIVE_WORK_INSPECTION_TEST')=='1' or revoked_inspection
+    review_records=os.environ.get('ALIVE_WORK_REVIEW_TEST')=='1' or inspection_mode
     home.mkdir(exist_ok=True);shutil.copytree(core.repo,home/'plugins/hermes-alive')
     responses={}
     class Handler(BaseHTTPRequestHandler):
@@ -62,7 +65,8 @@ async def test(home):
     (home/'.env').write_text('OWNER_MAIN_KEY=SYNTHETIC_OWNER_KEY\n')
     rc,staged=cli(home,'setup','--confirm-model-calls','--confirm-delivery','--confirm-outbound-retention',
         '--confirm-followup-management','--confirm-core-background-work','--automatic-core-toolset','file',
-        *(['--confirm-core-work-result-review'] if review_records else []))
+        *(['--confirm-core-work-result-review'] if review_records else []),
+        *(['--confirm-core-file-inspection'] if inspection_mode else []))
     assert rc==0 and staged['confirmation_summary']['native_core_background_work']
     assert staged['confirmation_summary']['exact_current_work_message_retained_by_core'] is True
     assert staged['confirmation_summary']['automatic_core_toolsets']==['file']
@@ -170,6 +174,14 @@ async def test(home):
             async def reap_pending(self,**kw):return {'closed':0,'remaining':0}
             async def __call__(self,**kw):
                 self.read_binding();self.calls+=1
+                if kw['task']=='alive_core_file_inspection':
+                    assert inspection_mode
+                    source=json.loads(kw['messages'][-1]['content'])
+                    target=source['targets'][0]
+                    return SimpleNamespace(model='synthetic-model',choices=[SimpleNamespace(message=SimpleNamespace(
+                        content=json.dumps({'decision':'inspect','target_id':target['target_id'],
+                            'reason':'Read the current artifact independently before judging the producer result.',
+                            'reconsider_after_seconds':None})))])
                 assert kw['task']=='alive_opportunity_candidates',kw['task']
                 progress_prompts.append(json.dumps(kw['messages'],ensure_ascii=False))
                 if isinstance(kw.get('route_info'),dict):kw['route_info']['provider']='synthetic-provider'
@@ -181,6 +193,8 @@ async def test(home):
                         'Recorded write/read is available; fresh verification is still missing.'
                         if 'core_work_record_review' in current.get('summary_excerpt','') else
                         'Wait for attributable execution evidence.')
+                    if inspection_mode and 'FRESH_EXTERNAL_STATE_AFTER_PRODUCER' in progress_prompts[-1]:
+                        reason='Fresh inspection shows changed content; keep this work unresolved.'
                     document['abstentions']=[{'agenda_item_id':current['agenda_item_id'],'reason':reason}]
                 return SimpleNamespace(model='synthetic-model',choices=[SimpleNamespace(
                     message=SimpleNamespace(content=json.dumps(document)))])
@@ -309,6 +323,106 @@ async def test(home):
         # observation; it must never reappear as a reminder to perform the task.
         assert reader.commitments(subject=store.configuration().subject,
             clearance=execution.kernel('events').Sensitivity.PRIVATE)==()
+        if inspection_mode:
+            inspector_module=execution.kernel('core_file_inspection')
+            inspector=inspector_module.CoreFileInspection(store)
+            fresh='FRESH_EXTERNAL_STATE_AFTER_PRODUCER'
+            artifact.write_text(fresh)
+            unapproved=home/'unapproved.txt';unapproved.write_text('MUST_NOT_BE_READ')
+            inspection_requests=[]
+            original_handler=responses['handler']
+            def inspect_respond(client,request,*args,**kwargs):
+                data=json.loads(request.content)
+                if not any('Inspect ONLY the file named inspection_target' in str(m.get('content')) for m in data['messages']):
+                    return original_handler(client,request,*args,**kwargs)
+                inspection_requests.append(data)
+                names={t.get('function',t)['name'] for t in data.get('tools',[])}
+                assert names=={'read_file'},names
+                rendered=json.dumps(data['messages'])
+                assert 'MUST_NOT_BE_READ' not in rendered
+                if revoked_inspection:
+                    if len(inspection_requests)==1:
+                        message={'role':'assistant','content':None,'tool_calls':[{'id':'revoked-inspection-file','type':'function',
+                            'function':{'name':'read_file','arguments':json.dumps({'path':str(artifact)})}}]};finish='tool_calls'
+                    else:
+                        assert fresh not in rendered
+                        assert any(m.get('role')=='tool' and 'authorization' in str(m.get('content')) for m in data['messages'])
+                        message={'role':'assistant','content':'The owner paused inspection; no file result was available.'};finish='stop'
+                elif len(inspection_requests)==1:
+                    message={'role':'assistant','content':None,'tool_calls':[{'id':'wrong-inspection-file','type':'function',
+                        'function':{'name':'read_file','arguments':json.dumps({'path':str(unapproved)})}}]};finish='tool_calls'
+                elif len(inspection_requests)==2:
+                    message={'role':'assistant','content':None,'tool_calls':[{'id':'approved-inspection-file','type':'function',
+                        'function':{'name':'read_file','arguments':json.dumps({'path':str(artifact)})}}]};finish='tool_calls'
+                else:
+                    assert any(m.get('role')=='tool' and fresh in str(m.get('content')) for m in data['messages'])
+                    message={'role':'assistant','content':'Current inspection returned a changed artifact; no completion inferred.'};finish='stop'
+                if data.get('stream'):
+                    delta={k:v for k,v in message.items() if k!='role'}
+                    if 'tool_calls' in delta:delta['tool_calls'][0]['index']=0
+                    chunk={'id':'synthetic-inspector','object':'chat.completion.chunk','created':0,'model':'configured-primary',
+                        'choices':[{'index':0,'delta':delta,'finish_reason':finish}]}
+                    return httpx.Response(200,request=request,headers={'content-type':'text/event-stream'},
+                        content='data: '+json.dumps(chunk)+'\n\ndata: [DONE]\n\n')
+                return httpx.Response(200,request=request,json={'id':'synthetic-inspector','object':'chat.completion','created':0,
+                    'model':'configured-primary','choices':[{'index':0,'message':message,'finish_reason':finish}],
+                    'usage':{'prompt_tokens':10,'completion_tokens':10,'total_tokens':20}})
+            responses['handler']=inspect_respond
+            after=await native.step(build())
+            assert after.disposition=='silence'
+            leaf=inspector.latest(started['work_id'],subject=configured.subject)
+            assert leaf is not None and len(jobs.list_jobs(include_disabled=True))==2
+            assert work_store.previous(row['item_id'],subject=configured.subject)['work_id']==started['work_id']
+            if revoked_inspection:
+                scope=binding._continuity.router.capture_target(session_key=entry.session_key,
+                    user_id=source.user_id,platform='telegram')
+                execution.pause(binding,scope)
+                # Attempt to re-enable only the derived cache. The signed owner
+                # pause must still block the actual Core pre-tool call.
+                with closing(store.journal._connect()) as c:
+                    c.execute('UPDATE autonomy_policies_v1 SET enabled=1 WHERE subject=?',(configured.subject,))
+            assert tick(verbose=False,sync=True,headless=False)==1
+            assert work_store.status(leaf[0],subject=configured.subject)['core_execution_state']=='completed'
+            if revoked_inspection:
+                assert len(inspection_requests)==2
+                assert artifact.read_text()==fresh and unapproved.read_text()=='MUST_NOT_BE_READ'
+                try:
+                    inspector.snapshot(started['work_id'],subject=configured.subject)
+                    raise AssertionError('paused inspection results were made available')
+                except ValueError:pass
+                with closing(store.journal._connect()) as c:
+                    c.execute('UPDATE autonomy_policies_v1 SET enabled=0 WHERE subject=?',(configured.subject,))
+                assert (await native.step(build())).disposition=='paused'
+                assert len(jobs.list_jobs(include_disabled=True))==2
+                keys=('identity.key','content-vault/content.key','experience-content-vault/content.key')
+                (home/'inspection-expected.json').write_text(json.dumps({'parent':started['work_id'],'child':leaf[0],
+                    'owner':configured.subject,'paused':True,'keys':{n:hashlib.sha256((store.root/n).read_bytes()).hexdigest() for n in keys}}))
+                print('HERMES_ALIVE_CORE_WORK_HANDOFF_OK')
+                return
+            assert artifact.read_text()==fresh and unapproved.read_text()=='MUST_NOT_BE_READ'
+            assert len(inspection_requests)==3
+            after_inspection=await native.step(build())
+            assert after_inspection.disposition=='silence'
+            assert 'separate_result_inspection' in progress_prompts[-1] and fresh in progress_prompts[-1]
+            latest=list(store.journal.read(event_type='opportunity.synthesis_completed'))[-1].event
+            assessed=store.vault.resolve_json(latest.payload['content']['content_id'],expected_subject=configured.subject,
+                expected_purpose='opportunity.candidates',expected_sensitivity=execution.kernel('events').Sensitivity.PRIVATE)
+            assert assessed['abstentions'][0]['reason']=='Fresh inspection shows changed content; keep this work unresolved.'
+
+            snapshot=inspector.snapshot(started['work_id'],subject=configured.subject)
+            assert snapshot['work_id']==leaf[0] and snapshot['task_success_proven'] is False
+            assert snapshot['target_path']==str(artifact)
+            before_calls=len(progress_prompts)
+            assert (await native.step(build())).disposition=='waiting_for_change'
+            assert len(progress_prompts)==before_calls and len(jobs.list_jobs(include_disabled=True))==2
+            assert tool({'operation':'list','item_id':row['item_id']})['items'][0]['state']=='active'
+            raw='\n'.join(r.event.canonical_json() for r in store.journal.read())
+            assert fresh not in raw and str(artifact) not in raw and 'MUST_NOT_BE_READ' not in raw
+            keys=('identity.key','content-vault/content.key','experience-content-vault/content.key')
+            (home/'inspection-expected.json').write_text(json.dumps({'parent':started['work_id'],'child':leaf[0],
+                'owner':configured.subject,'fresh':fresh,'keys':{n:hashlib.sha256((store.root/n).read_bytes()).hexdigest() for n in keys}}))
+            print('HERMES_ALIVE_CORE_WORK_HANDOFF_OK')
+            return
         after=await native.step(build())
         assert after.disposition=='silence' and len(progress_prompts)==2,after.disposition
         assert 'core_completed_result_unverified' in progress_prompts[-1]
@@ -442,6 +556,19 @@ async def test(home):
         assert latest_execution(prepared[0]['id']) is None
         held=tool({'operation':'work_status','item_id':fourth_row['item_id']})
         assert held['status']=='prepared_not_activated_by_alive' and held['automatic_result_followup_enabled'] is False
+        if review_records:
+            with closing(store.journal._connect()) as c:
+                c.execute('UPDATE autonomy_policies_v1 SET enabled=1 WHERE subject=?',(configured.subject,))
+            try:
+                with patch('hermes_state.SessionDB',side_effect=AssertionError('tampered paused cache opened Core bodies')):
+                    try:
+                        execution.kernel('core_work_evidence').CoreWorkEvidence(work_store).for_review(
+                            started['work_id'],subject=configured.subject,state=status)
+                        raise AssertionError('tampered policy projection was trusted')
+                    except ValueError:pass
+            finally:
+                with closing(store.journal._connect()) as c:
+                    c.execute('UPDATE autonomy_policies_v1 SET enabled=0 WHERE subject=?',(configured.subject,))
         observations_before_pause=len(list(store.journal.read(event_type='work.observed')))
         calls_before_pause=len(progress_prompts)
         assert (await native.step(build())).disposition=='paused'
@@ -497,6 +624,34 @@ async def test(home):
 if __name__=='__main__':
     if os.environ.get('ALIVE_WORK_CHECK')=='1':
         home=Path(os.environ['HERMES_HOME'])
+        if os.environ.get('ALIVE_WORK_INSPECTION_TEST')=='1' or os.environ.get('ALIVE_WORK_INSPECTION_REVOKE_TEST')=='1':
+            expected=json.loads((home/'inspection-expected.json').read_text())
+            execution=importlib.import_module('alive_session_fixture.kernel_execution_bridge')
+            store=execution.kernel('kernel_setup').KernelSetupStore(home/'plugin-data/hermes-alive/runtime/kernel')
+            assert all(hashlib.sha256((store.root/n).read_bytes()).hexdigest()==v for n,v in expected['keys'].items())
+            work=execution.kernel('core_work').CoreWorkStore(store)
+            inspection=execution.kernel('core_file_inspection').CoreFileInspection(store)
+            if expected.get('paused'):
+                with patch('hermes_state.SessionDB',side_effect=AssertionError('cold paused inspection opened Core bodies')):
+                    try:
+                        inspection.snapshot(expected['parent'],subject=expected['owner'])
+                        raise AssertionError('cold paused inspection was readable')
+                    except ValueError:pass
+                assert work.previous(inspection.work._read(expected['parent'],'requested',expected['owner'])['item_id'],subject=expected['owner'])['work_id']==expected['parent']
+                from cron.jobs import list_jobs
+                assert len(list_jobs(include_disabled=True))==2
+                print('HERMES_ALIVE_CORE_WORK_COLD_ASSOCIATION_OK')
+                raise SystemExit(0)
+            with patch('model_tools.handle_function_call',side_effect=AssertionError('cold inspection replayed a tool')):
+                result=inspection.snapshot(expected['parent'],subject=expected['owner'])
+            assert result['work_id']==expected['child']
+            assert expected['fresh'] in json.dumps(result) and result['task_success_proven'] is False
+            assert work.previous(work.status(expected['parent'],subject=expected['owner'])['item_id'],
+                subject=expected['owner'])['work_id']==expected['parent']
+            from cron.jobs import list_jobs
+            assert len(list_jobs(include_disabled=True))==2
+            print('HERMES_ALIVE_CORE_WORK_COLD_ASSOCIATION_OK')
+            raise SystemExit(0)
         expected=json.loads((home/'work-handoff-expected.json').read_text())
         execution=importlib.import_module('alive_session_fixture.kernel_execution_bridge')
         store=execution.kernel('kernel_setup').KernelSetupStore(home/'plugin-data/hermes-alive/runtime/kernel')

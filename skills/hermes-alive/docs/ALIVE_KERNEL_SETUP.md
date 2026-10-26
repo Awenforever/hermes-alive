@@ -215,3 +215,21 @@ window can wake the existing cognition cycle without a new scheduler; unchanged
 records do not cause another inference. Historical records are not fresh
 independent inspection, task completion, retry permission or a new action grant.
 Do not promise autonomous verification or work selection from this option.
+
+
+### Optional automatic file inspection — development qualification
+
+Only after a separate explanation offer `--confirm-core-file-inspection` together
+with owned-record review. It permits a new Core read_file-only job on a file target
+already recorded in that owner's work; Core's permissions/model/profile context
+and task-record retention apply. It is a limited automatic scope independent of
+whether broader file-writing work was approved automatically. No unrelated path
+scan, writes, messages, work repetition or item completion is included. Existing
+grants remain off. Pausing or changed current authority stops new inspections.
+
+The model may inspect one supplied target or wait with a revisit time. A prior
+inspection is not automatically retried, including uncertain handoffs. Its target,
+reason and binding are retained privately for at most seven days or the earlier
+item expiry; the original Core task record follows Core retention. Historical
+producer output and the later inspection readback remain different evidence.
+General autonomous work and automatic goal closure are still under development.

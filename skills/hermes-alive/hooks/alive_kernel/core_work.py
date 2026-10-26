@@ -17,7 +17,8 @@ def owns_commitment(journal,*,subject,item_id):
     """Verify a handoff without turning the task into a user-to-do reminder."""
     with closing(journal._connect()) as connection:
         row=connection.execute("SELECT event_id FROM experience_events WHERE subject=? AND event_type=? "
-            "AND json_extract(canonical_json,'$.payload.item_id')=? ORDER BY sequence DESC LIMIT 1",
+            "AND json_extract(canonical_json,'$.payload.item_id')=? "
+                "AND COALESCE(json_extract(canonical_json,'$.payload.work_kind'),'perform')='perform' ORDER BY sequence DESC LIMIT 1",
             (subject,'work.requested',item_id)).fetchone()
     if row is None:return False
     from .kernel_setup import KernelSetupStore
@@ -149,7 +150,12 @@ class CoreWorkStore:
             +json.dumps({'assignment':plan['task'],'due_at':plan['due_at'],
                 'assignment_representation':'stored_agenda_description_not_verified_verbatim',
                 'current_owner_message':plan['current_owner_request']},ensure_ascii=False,allow_nan=False))
-        job=create_job(prompt=prompt,schedule='1h',name='alive-'+work_id.split(':')[1][:32],
+        return self.dispatch_prepared(work_id,configured,prompt,native_sets,validate)
+
+    def dispatch_prepared(self,work_id,configured,prompt,native_sets,validate,*,inspection=False):
+        from cron.jobs import create_job,get_job,trigger_job
+        validate();self._home()
+        job=create_job(prompt=prompt,schedule='1h',name=('alive-inspect-' if inspection else 'alive-')+work_id.split(':')[1][:32],
             repeat=1,deliver='local',enabled_toolsets=native_sets,paused=True)
         if (job.get('state')!='paused' or job.get('enabled_toolsets')!=native_sets
                 or job.get('deliver')!='local' or job.get('script') or job.get('no_agent')
@@ -183,7 +189,8 @@ class CoreWorkStore:
             raise ValueError('exact bounded agenda identifier required')
         with closing(self.journal._connect()) as connection:
             row=connection.execute("SELECT event_id FROM experience_events WHERE subject=? AND event_type=? "
-                "AND json_extract(canonical_json,'$.payload.item_id')=? ORDER BY sequence DESC LIMIT 1",
+                "AND json_extract(canonical_json,'$.payload.item_id')=? "
+                "AND COALESCE(json_extract(canonical_json,'$.payload.work_kind'),'perform')='perform' ORDER BY sequence DESC LIMIT 1",
                 (subject,'work.requested',item_id)).fetchone()
         return self.status(row['event_id'].removesuffix(':requested'),subject=subject) if row else None
 
@@ -200,7 +207,8 @@ class CoreWorkStore:
             rows=connection.execute("SELECT e.event_id FROM experience_events e "
                 "JOIN agenda_items_v1 a ON a.item_id=json_extract(e.canonical_json,'$.payload.item_id') "
                 "AND a.subject=e.subject WHERE e.subject=? AND e.event_type='work.requested' "
-                "AND a.state IN ('active','snoozed') ORDER BY e.sequence DESC LIMIT 128",
+                "AND a.state IN ('active','snoozed') "
+                "AND COALESCE(json_extract(e.canonical_json,'$.payload.work_kind'),'perform')='perform' ORDER BY e.sequence DESC LIMIT 128",
                 (configured.subject,)).fetchall()
         observed=[];seen=set()
         for row in rows:
@@ -236,8 +244,7 @@ class CoreWorkStore:
 
     def observation_state(self,work_id,*,subject):
         state=self.status(work_id,subject=subject)
-        from .core_work_evidence import CoreWorkEvidence
-        view=CoreWorkEvidence(self).for_review(work_id,subject=subject,state=state)
+        view=self.record_review(state,subject=subject)
         if view is not None:
             state={**state,'record_review':{
                 'fingerprint':self.protector.authenticate_json('alive.core-work.record-review.v1',view),
@@ -248,10 +255,21 @@ class CoreWorkStore:
     def review_evidence(self,state,*,subject):
         """Read only the exact current signed observation's unchanged window."""
         if not isinstance(state.get('record_review'),Mapping):return None
-        from .core_work_evidence import CoreWorkEvidence
-        view=CoreWorkEvidence(self).for_review(state['work_id'],subject=subject,state=state)
+        view=self.record_review(state,subject=subject)
         if (view is None or self.protector.authenticate_json('alive.core-work.record-review.v1',view)
                 !=state['record_review'].get('fingerprint')):return None
+        return view
+
+    def record_review(self,state,*,subject):
+        from .core_work_evidence import CoreWorkEvidence
+        view=CoreWorkEvidence(self).for_review(state['work_id'],subject=subject,state=state)
+        configured=self.store.configuration()
+        request=self._read(state['work_id'],'requested',subject)
+        if (view is not None and request.get('work_kind','perform')=='perform' and configured is not None
+                and configured.options.get('inspect_core_work_files') is True):
+            from .core_file_inspection import CoreFileInspection
+            inspection=CoreFileInspection(self.store).snapshot(state['work_id'],subject=subject)
+            if inspection is not None:view={**view,'separate_result_inspection':inspection}
         return view
 
     def observe_session(self,configured,*,execution,session_id):

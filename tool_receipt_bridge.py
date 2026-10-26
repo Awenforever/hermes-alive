@@ -135,3 +135,29 @@ def register_core_work_hook(ctx,binding):
             logger.warning('Alive Core work session observation unavailable: %s',type(exc).__name__)
     ctx.register_hook('pre_api_request',observe)
     ctx.register_hook('post_tool_call',observe)
+
+
+
+def register_inspection_guard(ctx,binding):
+    def guard(tool_name=None,args=None,**values):
+        current=getattr(ctx,'current_cron_execution',None)
+        if not callable(current):return
+        execution=current()
+        if execution is None:return
+        reserved=execution.job_name.startswith('alive-inspect-')
+        try:
+            if binding.closed:raise ValueError('inspection binding closed')
+            binding._require_home()
+            root=binding.home/'plugin-data/hermes-alive/runtime/kernel'
+            if not (root/'experience.sqlite3').is_file():
+                if reserved:raise ValueError('inspection authorization unavailable')
+                return
+            module=_kernel_module('kernel_setup');store=module.KernelSetupStore(root)
+            from .core_work_inspection_scope import NAME,effective_tools
+            inspector=importlib.import_module(module.__package__+'.core_file_inspection').CoreFileInspection(
+                store,scope_name=NAME,read_tools=effective_tools)
+            owned=inspector.guard(execution,tool_name,args)
+            if owned is None and reserved:raise ValueError('inspection authorization unavailable')
+        except Exception as error:
+            if reserved or getattr(error,'inspection_owned',False):return {'action':'block','message':'This inspection no longer has a valid authorization for its approved file.'}
+    ctx.register_hook('pre_tool_call',guard)

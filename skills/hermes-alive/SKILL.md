@@ -36,7 +36,10 @@ native-background-work choices. Do not infer one from another, enable new grants
 on upgrade or promise autonomous result followup from a submitted Core task. Separately offer owned-work
 record review only after explaining its bounded historical reads, derived-data
 retention and pause behavior; use `--confirm-core-work-result-review` only for
-that explicit choice. It does not grant fresh inspection or autonomous work.
+that explicit choice. It does not grant fresh inspection or autonomous work. Separately
+explain optional `--confirm-core-file-inspection` only for approved automatic
+read-only checks of retained owned file targets and Core task retention. Older
+grants stay off; do not promise generic autonomous work or goal completion.
 
 Ask whether the recipient wants a particular conversation language or has an
 explicit communication preference; "no customization" is valid. Optional
