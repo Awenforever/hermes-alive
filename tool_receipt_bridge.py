@@ -81,5 +81,33 @@ def on_post_tool_call(**values: Any) -> None:
         )
 
 
-def register_tool_receipt_hook(ctx: Any) -> None:
-    ctx.register_hook("post_tool_call", on_post_tool_call)
+def register_tool_receipt_hook(ctx: Any, binding=None) -> None:
+    if binding is None:
+        ctx.register_hook('post_tool_call',on_post_tool_call)
+        return
+
+    def observe(**values):
+        if binding.closed:return
+        try:
+            from .gateway_session_bridge import SessionScopeUnavailable
+            from .kernel_execution_bridge import runtime_engine,configured_owner,ConfiguredOwnerMismatch
+            if runtime_engine(binding)!='kernel':
+                return on_post_tool_call(**values)
+            binding._require_home()
+            continuity=binding._continuity
+            if continuity is None:return
+            from gateway.session_context import get_session_env
+            scope=continuity.router.scope_for_hook(dict(session_id=values.get('session_id'),
+                sender_id=get_session_env('HERMES_SESSION_USER_ID'),
+                platform=get_session_env('HERMES_SESSION_PLATFORM')))
+            if scope is None:return
+            try:store,configured=configured_owner(binding,scope)
+            except ConfiguredOwnerMismatch:return
+            if configured.options.get('observe_core_tools') is not True:return
+            _kernel_module().ToolReceiptRecorder.for_configured_owner(store,configured).record(values)
+        except SessionScopeUnavailable:
+            return
+        except Exception as exc:
+            logger.warning('Alive configured tool observation unavailable: %s',type(exc).__name__)
+        # Observability never consumes input, changes tool results or grants IO.
+    ctx.register_hook('post_tool_call',observe)

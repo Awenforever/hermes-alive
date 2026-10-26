@@ -60,6 +60,8 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
         help='Authorize main-model interpretation of clearly assigned ongoing items and retain those items for the chosen retention period; not whole-chat collection or external-tool authority')
     setup.add_argument('--confirm-followup-management',action='store_true',
         help='Guide and authorize explicit follow-up creation and completion/cancellation/snooze/resume, with the chosen item retention period; no external job control')
+    setup.add_argument('--confirm-core-tool-observation',action='store_true',
+        help='Observe tool names, durations and terminal status only in the configured owner conversation; diagnostic validity follows retention days, structural ledger remains until removed; no arguments/results/error bodies or execution authority')
     setup.add_argument('--model',default=None,help='Optional Core-configured alias; default inherits Hermes')
     setup.add_argument('--language',help='Optional conversation language tag; otherwise follows Hermes locale')
     setup.add_argument('--communication-preference',help='Explicit communication preference, stored privately after owner confirmation')
@@ -254,6 +256,7 @@ def alive_command(args: argparse.Namespace) -> int:
             **({'accept_explicit_followups':True} if getattr(args,'confirm_explicit_followup_intake',False)
                 or getattr(args,'confirm_followup_management',False) else {}),
             **({'manage_explicit_followups':True} if getattr(args,'confirm_followup_management',False) else {}),
+            **({'observe_core_tools':True} if getattr(args,'confirm_core_tool_observation',False) else {}),
             **({'refine_public_sources':True} if getattr(args,'confirm_public_refinement',False) else {}),
             **({'language':args.language} if getattr(args,'language',None) else {}),
             **({'communication_preference':args.communication_preference}
@@ -270,6 +273,9 @@ def alive_command(args: argparse.Namespace) -> int:
                 'inbound_history':False,'automatic_profile_learning':False,'public_queries':args.public_query,
                 'explicit_followup_intake':bool(getattr(args,'confirm_explicit_followup_intake',False) or getattr(args,'confirm_followup_management',False)),
                 'explicit_followup_management':bool(getattr(args,'confirm_followup_management',False)),
+                'core_tool_structural_observation':bool(getattr(args,'confirm_core_tool_observation',False)),
+                'core_tool_arguments_or_results_retained':False,
+                'core_tool_structural_ledger_until_removed':bool(getattr(args,'confirm_core_tool_observation',False)),
                 'followup_item_retention_days':args.retention_days if getattr(args,'confirm_explicit_followup_intake',False) or getattr(args,'confirm_followup_management',False) else None,
                 'cited_public_reads':bool(args.confirm_cited_reads),
                 'public_source_refinement':bool(getattr(args,'confirm_public_refinement',False)),

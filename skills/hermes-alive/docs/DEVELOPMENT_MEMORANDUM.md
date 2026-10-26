@@ -1148,3 +1148,20 @@ do not loosen production checks to accommodate an incorrectly ordered fixture.
 Management list is still bounded to eight, so do not infer global absence from it.
 Real-model acknowledgments remain too verbose. These tests are not new useful
 sharing rounds, post-restart autonomous outcomes or production acceptance.
+
+## 2026-10-26 — Real work observation is not a success verdict
+
+ADR0243 replaces shadow-only observation for an independently opted-in configured
+owner with actual Core post-tool integration. Raw result bodies, tool arguments
+and error prose stay out of Alive. Native Core file operations and a pre-tool veto
+are checked against an independent OS artifact read. Ordinary returned ok remains
+unknown; a blocked write is a blocked write, not a completed assignment. Missing
+keys must not be recreated from a passive hook, and cron/foreign sessions must not
+inherit the configured conversation's observation permission.
+
+Keep the upcoming execution design within the user's chosen contract: guide
+automatic-action scope once, confirm operations outside it. Core owns execution
+approval and orchestration. Its plugin dispatch_tool is registry dispatch, not
+the complete model_tools guard path; its public subagent handles require a live
+parent and do not reconnect after restart. Do not build unattended work on a
+fabricated parent or count structural receipt logging as autonomous action learning.

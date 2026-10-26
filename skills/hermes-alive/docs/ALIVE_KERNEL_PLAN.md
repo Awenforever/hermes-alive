@@ -25,6 +25,12 @@ Do not confuse long-lived proactive-contact consent with this distinct intake
 and item-retention choice. Record delegated interpretation honestly instead of
 relabeling a model inference as a literal owner-confirmed item.
 
+For actual operations, the owner chose first-guidance selection of automatically
+permitted scope, with per-operation confirmation outside it. Accepting an ongoing
+item, proactive-contact consent and structural experience observation are separate
+from that execution grant. Tool/action integration must use Core's real approval
+and dispatch path, not bypass it through raw registry dispatch.
+
 | Area | Current evidence | Still required |
 |---|---|---|
 | Experience and privacy | Protected journal/vault, provenance, deletion and replay checks | Real lifetime/migration/restore with all external associations preserved |
@@ -33,7 +39,7 @@ relabeling a model inference as a literal owner-confirmed item.
 | Content and judgment | Source-led composition, final wording review, real main-model examples | Samples remain too much like cautious paper digests; factual review is not a usefulness verdict |
 | Conversation continuity | Exact share/source excerpts reach actual Core main requests; real replies after context reduction no longer recite transport status | Missing evidence still becomes global negative claims in real followup; qualify ADR0230, plus natural old-quote/compaction/restart behavior |
 | Sources | Actual Core free search and substantive extraction demonstrated in isolated profiles | More useful live selection across Chinese and other sources, currentness, provenance and inaccessible/full-read boundaries |
-| Actions and reflection | Typed tool/commitment/action/outcome/reflection components; installed default grants communication and leaves feedback interpretation off | Actual authorized non-communication work, observable outcomes and subsequent behavior change; component enums do not establish live capability |
+| Actions and reflection | Typed components; separately guided owner-scoped real Core tool observation, no body capture or inferred success; default execution still communication-only and feedback interpretation off (ADR0243) | Alive-selected authorized noncommunication work, independent semantic outcomes and subsequent behavior change; observation and component enums do not establish live action capability |
 | Authority and transport | Original delegation/policy/source checks and short physical permits preserved, including delayed-composition regression | Real daemon and channel outcomes under a separately approved production window; Enhance remains sole physical FIFO/token/retry owner |
 | Portability and migration | Managed supported-Core component integration | Independent Git consumer install/configure/run/upgrade/uninstall-preserve/reinstall across four agreed targets, plus legacy-state migration and rollback |
 

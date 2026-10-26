@@ -17,6 +17,10 @@ def kernel(name):
     return import_module(_kernel_module('kernel_setup').__package__+'.'+name)
 
 
+class ConfiguredOwnerMismatch(ValueError):
+    """A valid Core scope is outside the configured Alive owner conversation."""
+
+
 def configured_owner(binding,scope):
     store=setup_store(binding)
     configured=store.configuration()
@@ -24,7 +28,7 @@ def configured_owner(binding,scope):
     saved=dict(configured.scope);current=scope.binding_document()
     saved.pop('session_id');current.pop('session_id')
     if saved!=current or scope.principal(store.protector)!=configured.subject:
-        raise ValueError('current configured owner conversation required')
+        raise ConfiguredOwnerMismatch('current configured owner conversation required')
     return store,configured
 
 

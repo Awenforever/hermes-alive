@@ -52,6 +52,11 @@ During initial guidance, explain this choice and the item retention period. Add
 context. The actual target conversation confirmation protects these choices.
 Existing configurations stay off unless the owner explicitly updates them.
 
+If the owner also wants natural completion/cancel/snooze/resume, guide that
+separate choice and use `--confirm-followup-management` (which includes intake).
+An earlier intake-only grant does not acquire management during an upgrade.
+These commands affect Alive items, not external jobs or previously sent messages.
+
 The main agent can then record clear ongoing assignments directly. It asks about
 ambiguous intent rather than treating casual/quoted material as obligations.
 `/alive intake off` stops new intake while keeping existing items; `on` resumes
@@ -75,6 +80,21 @@ execution or sending authority. It also does not enable Alive: the separate
 chat is retained by creating a temporary proposal. Interpretation remains the
 main agent's responsibility; long-term adaptation and all action kinds have not
 been qualified merely by installing these commands.
+
+## Optional experience from Core tool activity
+
+Offer `--confirm-core-tool-observation` only as a separate, default-off choice.
+It records tool names, durations and terminal classifications in this exact owner
+conversation, not arguments, result/error bodies or whole chats. Diagnostic validity
+uses the selected retention period; structural journal entries remain until removed.
+Explain that ordinary tool success labels are not independently verified task
+success and that this choice grants neither tool execution nor automatic learning.
+Reconfigure without the flag to stop new observations. No background activation is
+needed to observe explicitly authorized tool activity in the configured conversation.
+
+For future automatic actions, guide the owner's permitted scope first and require
+per-operation confirmation outside it. This is the agreed product contract, not
+an assertion that automatic tool execution is already implemented.
 
 ## Explain the public reading choices
 

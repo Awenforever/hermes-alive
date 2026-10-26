@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime,timedelta,timezone
 from enum import StrEnum
 from pathlib import Path
 import re
@@ -74,6 +75,20 @@ class ToolReceiptRecorder:
         self.kernel_dir = Path(shared_dir).expanduser().resolve() / "kernel"
         self.protector = LocalIdentityProtector(self.kernel_dir / "identity.key")
         self.journal = ExperienceJournal(self.kernel_dir / "experience.sqlite3")
+        self.configured_store = self.configured = None
+
+    @classmethod
+    def for_configured_owner(cls,store,configured):
+        """Reuse protected storage, never initialize replacement keys on a hook."""
+        current=store.configuration()
+        if (current is None or current.event_id!=configured.event_id
+                or current.subject!=configured.subject or current.options.get('observe_core_tools') is not True):
+            raise ValueError('current guided owner observation permission required')
+        result=object.__new__(cls)
+        result.kernel_dir=store.root
+        result.protector,result.journal=store.protector,store.journal
+        result.configured_store,result.configured=store,configured
+        return result
 
     def _identities(self, values: Mapping[str, Any]) -> dict[str, str]:
         identities: dict[str, str] = {}
@@ -97,6 +112,8 @@ class ToolReceiptRecorder:
             )
         ]
         if coordinates[-1] and any(coordinates[:-1]):
+            if self.configured is not None:
+                coordinates.extend((self.configured.subject,self.configured.event_id))
             pseudonym = self.protector.pseudonym(
                 "tool_receipt", "\x1f".join(coordinates)
             )
@@ -135,17 +152,30 @@ class ToolReceiptRecorder:
             "error_message_stored": False,
             "source_contract": "hermes-plugin-post-tool-call-v1",
         }
+        configured=self.configured
+        if configured is not None:
+            payload.update(configuration_event_id=configured.event_id,owner_bound=True,
+                task_success_proven=False,automatic_learning_authority=False,
+                structural_ledger_retained_until_removed=True)
         assert_no_obvious_secret(payload)
         event = EventEnvelope(
             event_id=event_id,
             event_type="tool.execution_observed",
             source="hermes.plugin.post_tool_call",
             actor="system:hermes",
+            subject=configured.subject if configured else None,
             correlation_id=identities.get("session_id"),
             sensitivity=Sensitivity.PRIVATE,
             payload=payload,
+            expires_at=(datetime.now(timezone.utc)+timedelta(days=configured.options['outbound_retention_days'])) if configured else None,
         )
-        return self.journal.append(event)
+        def current_permission(_connection):
+            if configured is not None:
+                current=self.configured_store.configuration()
+                if (current is None or current.event_id!=configured.event_id
+                        or current.options.get('observe_core_tools') is not True):
+                    raise ValueError('owner observation permission changed')
+        return self.journal.append(event,precondition=current_permission)
 
 
 def record_post_tool_call(

@@ -44,7 +44,7 @@ def register(ctx) -> None:
     global _gateway_host_binding
     _gateway_host_binding=GatewayHostBinding(ctx)
     register_setup_command(ctx,_gateway_host_binding)
-    register_tool_receipt_hook(ctx)
+    register_tool_receipt_hook(ctx,_gateway_host_binding)
     register_admitted_inbound_hook(ctx,_gateway_host_binding)
     ctx.register_cli_command(
         name="alive",
