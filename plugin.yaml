@@ -9,6 +9,7 @@ homepage: https://github.com/Awenforever/hermes-alive
 tags: [gateway, proactive, messaging, lifecycle]
 requires_hermes: ">=0.22.5,<0.23"
 provides_hooks:
+  - pre_api_request
   - post_tool_call
   - post_gateway_admission
 python_dependencies:

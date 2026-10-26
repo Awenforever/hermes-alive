@@ -111,3 +111,27 @@ def register_tool_receipt_hook(ctx: Any, binding=None) -> None:
             logger.warning('Alive configured tool observation unavailable: %s',type(exc).__name__)
         # Observability never consumes input, changes tool results or grants IO.
     ctx.register_hook('post_tool_call',observe)
+
+
+def register_core_work_hook(ctx,binding):
+    """Associate only owned Core work with its actual session; no body capture."""
+    def observe(**values):
+        if binding.closed:return
+        try:
+            current=getattr(ctx,'current_cron_execution',None)
+            execution=current() if callable(current) else None
+            if execution is None:return
+            from .kernel_execution_bridge import runtime_engine
+            if runtime_engine(binding)!='kernel':return
+            binding._require_home()
+            root=binding.home/'plugin-data/hermes-alive/runtime/kernel'
+            if not (root/'experience.sqlite3').is_file():return
+            module=_kernel_module('kernel_setup')
+            store=module.KernelSetupStore(root);configured=store.configuration()
+            if configured is None or configured.options.get('core_background_work') is not True:return
+            work=importlib.import_module(module.__package__+'.core_work').CoreWorkStore(store)
+            work.observe_session(configured,execution=execution,session_id=values.get('session_id'))
+        except Exception as exc:
+            logger.warning('Alive Core work session observation unavailable: %s',type(exc).__name__)
+    ctx.register_hook('pre_api_request',observe)
+    ctx.register_hook('post_tool_call',observe)

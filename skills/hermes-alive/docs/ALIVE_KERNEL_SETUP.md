@@ -140,7 +140,13 @@ While Alive is active, its existing owner cycle observes changed Core lifecycle
 facts and brings them into cognitive decisions. Unchanged state may stay quiet.
 This does not inspect output bodies or verify that the assigned goal was met.
 Independent automatic result followup and autonomous Native work selection remain
-unfinished; do not promise them. Pause stops new observation and handoffs; accepted Core
+unfinished; do not promise them. The current owner can inspect an exact known
+work with `work_evidence`: its bound request or bounded execution evidence.
+Statements, requests and tool results are distinct; history is not a fresh
+inspection. Large bodies have explicit pages. The reader retains no body;
+small encrypted session links persist until removed for restart continuity.
+Pause stops new cognitive cycles and handoffs; minimal association bookkeeping
+for already-accepted Core work may continue. Accepted Core
 tasks require Core's own task management. This experimental slice still needs
 project-context, cancellation, lifecycle, migration and fleet qualification.
 

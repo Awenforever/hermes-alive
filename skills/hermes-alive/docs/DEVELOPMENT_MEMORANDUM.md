@@ -1266,3 +1266,22 @@ provider requests and zero channel sends; output review happened only after
 physical closure, credential audit and projection removal. Its replies are still
 verbose and tried an unsupported raw-event reference lookup. Do not claim broad
 semantic zero errors, modernized main-chat style or the fresh-sharing gate.
+
+## 2026-10-26 — Read actual work evidence, without guessing sessions
+
+The initial actual-Core result probe found no session under execution_id even
+after a real file write/read. Core canonical admission has a separate session ID.
+Do not hide this behind a recent-session scan. Its native current_cron_execution
+and pre-API/tool metadata provide the live association for signed owned work.
+Keep the private identifier encrypted, not in the structural journal. This is
+minimal accepted-work bookkeeping, separate from ordinary optional tool receipts.
+
+ADR0248 scopes on-demand work_evidence to an exact owned work and observed session.
+It recovers the bound request after context reduction, labels worker statements,
+issued tool requests and recorded results separately, and preserves page/role/time
+fingerprints. Arguments are indexed but not inlined by default. Wrong owners,
+foreign messages and changed pages must fail before returning data. No transcript
+body persistence or new executor/queue/model router. Historical evidence is not
+a current-state check; goal completion, automatic retries and automatic result
+followup remain false. Follow this with actual independent inspection and changed
+Native decisions, rather than treating another evidence API as the finished agent.

@@ -163,5 +163,15 @@ remains a development release gate; see LIFECYCLE_AND_PERSISTENCE.md.
 
 ### Legacy shared-state removal
 
+Guided Core work also keeps a small encrypted execution/session association until
+removed; the structural journal has its protected reference, not a private session
+identifier. Actual accepted-work bookkeeping can continue while cognition is
+paused. It collects no transcript body. The current owner may explicitly read
+bounded work statements/results and request a particular tool-request page via
+`work_evidence`. This reader neither persists bodies nor reads unrelated sessions;
+Core retains normal foreground tool results under its own conversation policy.
+These historical records are not fresh world verification. See ADR0248 for the
+scope and remaining deletion/migration gates.
+
 Default uninstall preserves shared user/runtime state. `purge` removes all Hermes
 Alive-owned shared state and is destructive.

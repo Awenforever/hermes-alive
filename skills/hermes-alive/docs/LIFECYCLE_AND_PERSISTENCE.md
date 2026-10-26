@@ -143,9 +143,16 @@ must not be hidden inside installation, documentation, or acceptance steps.
 
 ADR0245's main-turn handoff records protected work/job associations in the existing
 kernel journal. Core owns the corresponding profile's `cron/jobs.json`,
-`cron/executions.db`, outputs and session data. Backing up only Alive's runtime
+`cron/executions.db`, outputs and the corresponding profile's `state.db` session
+and admission data. Use consistent SQLite online backups for live databases,
+including their active WAL contents. Backing up only Alive's runtime
 directory does not preserve that whole association; preserve the served profile
 consistently, including its original identity/content keys and Core task records.
+
+ADR0248's private session links use the existing encrypted vault/key inventory.
+Preserve it with the Core state store, not merely the plaintext structural journal.
+An absent link is unavailable evidence, never a reason to guess a session or scan
+history. On-demand reads do not mark goals complete or replay Core work.
 
 Core context and task-record retention need the separate guided background-work
 choice. Removing an Alive hook or pausing new initiative is not proof that an

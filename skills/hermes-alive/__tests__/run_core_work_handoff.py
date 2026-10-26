@@ -185,8 +185,11 @@ async def test(home):
             assert str(artifact) in rendered and '不要发送消息' in rendered
             assert 'INDEPENDENT_SYNTHETIC_ARTIFACT' in rendered
             assert 'current_owner_message' in rendered and '写入指定结果文件' in rendered
-            if any(m['role']=='tool' for m in data['messages']):
+            if any(c.get('function',{}).get('name')=='read_file' for m in data['messages'] for c in m.get('tool_calls',[])):
                 message={'role':'assistant','content':'The requested test artifact was created.'};finish='stop'
+            elif any(m['role']=='tool' for m in data['messages']):
+                message={'role':'assistant','content':None,'tool_calls':[{'id':'read-owned-result','type':'function',
+                    'function':{'name':'read_file','arguments':json.dumps({'path':str(artifact)})}}]};finish='tool_calls'
             else:
                 names=[t.get('function',{}).get('name') for t in data.get('tools',[])]
                 assert 'write_file' in names,names
@@ -207,6 +210,71 @@ async def test(home):
         status=tool({'operation':'work_status','work_id':started['work_id']})
         assert status.get('core_execution_state')=='completed',(status,jobs.get_job(started['job_id']).get('last_error'))
         assert artifact.read_text()==body and requests
+        sessions=list(store.journal.read(event_type='work.session_observed'))
+        assert len(sessions)==1,sessions
+        observed=work_store.session_binding(started['work_id'],
+            sessions[0].event.event_id.removeprefix(started['work_id']+':'),subject=configured.subject)
+        assert observed['work_id']==started['work_id'] and observed['execution_id']==status['execution_id']
+        assert observed['session_body_copied'] is False and observed['task_success_proven'] is False
+        assert observed['private_session_id_encrypted'] is True
+        assert observed['session_id'] not in sessions[0].event.canonical_json()
+        assert work_store.observe_session(configured,execution=SimpleNamespace(job_id=started['job_id'],
+            execution_id=status['execution_id']),session_id=observed['session_id']) is False
+        from hermes_state import SessionDB
+        db=SessionDB()
+        try:
+            actual_session=db.get_session(observed['session_id'])
+            actual_messages=db.get_messages(observed['session_id'],limit=64)
+            assert actual_session is not None and actual_session['source']=='cron',actual_session
+            names={c['id']:c.get('function',{}).get('name') for m in actual_messages for c in (m.get('tool_calls') or [])}
+            assert any(m['role']=='tool' and (m.get('tool_name') or names.get(m.get('tool_call_id')))=='read_file'
+                and 'INDEPENDENT_SYNTHETIC_ARTIFACT' in str(m.get('content')) for m in actual_messages)
+        finally:db.close()
+        assert 'INDEPENDENT_SYNTHETIC_ARTIFACT' not in sessions[0].event.canonical_json()
+        evidence=tool({'operation':'work_evidence','work_id':started['work_id']})
+        definition=tool({'operation':'work_evidence','work_id':started['work_id'],'part':'request'})
+        assert definition['status']=='core_work_request_evidence' and definition['contains_exact_current_owner_message']
+        assert definition['assignment_item_version']==row['item_version'] and str(artifact) in definition['content']
+        assert definition['content_complete'] and 'current_owner_message' in definition['content']
+        assert evidence['status']=='core_execution_evidence' and evidence['core_execution_state']=='completed',evidence
+        assert evidence['task_success_proven'] is False and evidence['content_persisted_by_alive'] is False
+        witness=next(e for e in evidence['entries'] if e['tool_name']=='read_file' and e['kind']=='recorded_tool_result')
+        assert 'INDEPENDENT_SYNTHETIC_ARTIFACT' in witness['content']
+        read_request=next(e for e in evidence['entries'] if any(c['name']=='read_file' for c in e['tool_requests']))
+        assert read_request['arguments_omitted_from_default_window'] and not read_request['content']
+        request_page=tool({'operation':'work_evidence','work_id':started['work_id'],
+            'evidence_reference':evidence['evidence_reference'],'message_id':read_request['message_id'],
+            'fingerprint':read_request['fingerprint']})
+        actual_call=json.loads(request_page['entries'][0]['content'])['tool_calls'][0]
+        assert json.loads(actual_call['function']['arguments'])['path']==str(artifact)
+        assert actual_call['id']==witness['tool_call_id']
+        page=tool({'operation':'work_evidence','work_id':started['work_id'],
+            'evidence_reference':evidence['evidence_reference'],'message_id':witness['message_id'],
+            'fingerprint':witness['fingerprint'],'max_chars':256})
+        assert page['entries'][0]['fingerprint']==witness['fingerprint']
+        continuation=tool({'operation':'work_evidence','work_id':started['work_id'],
+            'evidence_reference':evidence['evidence_reference'],'message_id':witness['message_id'],
+            'fingerprint':witness['fingerprint'],'offset':1,'max_chars':256})
+        assert continuation['entries'][0]['content']==witness['content'][1:257]
+        bad=tool({'operation':'work_evidence','work_id':started['work_id'],
+            'evidence_reference':evidence['evidence_reference'],'message_id':witness['message_id'],
+            'fingerprint':'0'*64,'offset':1})
+        assert 'error' in bad and 'entries' not in bad,bad
+        reader_module=execution.kernel('core_work_evidence')
+        with patch('hermes_state.SessionDB',side_effect=AssertionError('foreign owner opened Core bodies')):
+            try:
+                reader_module.CoreWorkEvidence(work_store).read(started['work_id'],subject='foreign-owner')
+                raise AssertionError('foreign owner was accepted')
+            except ValueError:pass
+        db=SessionDB()
+        try:
+            db.create_session('foreign-evidence-session',source='cli')
+            db.append_message('foreign-evidence-session','assistant','FOREIGN_BODY_MUST_NOT_BE_READ')
+            foreign_id=db.get_messages('foreign-evidence-session',limit=1)[0]['id']
+        finally:db.close()
+        foreign=tool({'operation':'work_evidence','work_id':started['work_id'],
+            'evidence_reference':evidence['evidence_reference'],'message_id':foreign_id})
+        assert 'error' in foreign and 'FOREIGN_BODY_MUST_NOT_BE_READ' not in json.dumps(foreign)
         assert status['task_success_proven'] is False and status['agenda_completed'] is False
         by_item=tool({'operation':'work_status','item_id':row['item_id']})
         assert by_item['work_id']==started['work_id'] and len(jobs.list_jobs(include_disabled=True))==1
@@ -370,6 +438,14 @@ if __name__=='__main__':
         original=execution.kernel('followup_intake').item_source_view(store,status['item_id'],
             subject=expected['owner'],include_message=True)
         assert original['original_owner_message']==expected['original_request']
+        recovered=execution.kernel('core_work_evidence').CoreWorkEvidence(
+            execution.kernel('core_work').CoreWorkStore(store)).read(expected['work_id'],subject=expected['owner'])
+        assert recovered['status']=='core_execution_evidence'
+        assert any(e['kind']=='recorded_tool_result' and e['tool_name']=='read_file'
+            and 'INDEPENDENT_SYNTHETIC_ARTIFACT' in e['content'] for e in recovered['entries'])
+        definition=execution.kernel('core_work_evidence').CoreWorkEvidence(
+            execution.kernel('core_work').CoreWorkStore(store)).read(expected['work_id'],subject=expected['owner'],part='request')
+        assert definition['contains_exact_current_owner_message'] and definition['content_complete']
         projection=execution.kernel('agenda').AgendaProjection(store.journal)
         projection.rebuild()
         erased=projection.list_items(subject=expected['owner'],item_ids=(expected['erased_item_id'],),

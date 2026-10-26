@@ -232,11 +232,72 @@ class CoreWorkStore:
         saved=self._read(work_id,suffix,subject,event_type='work.observed')
         return (work_id+':'+suffix,saved) if saved==current else None
 
+    def observe_session(self,configured,*,execution,session_id):
+        """Core-only identity observation; never infer a session from a job ID."""
+        from cron.execution_identity import current_cron_execution
+        from cron.executions import get_execution
+        from cron.jobs import get_job
+        if (execution is None or current_cron_execution() is not execution
+                or configured.options.get('core_background_work') is not True
+                or not isinstance(session_id,str)
+                or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:@/-]{0,254}',session_id)):
+            return False
+        self._home()
+        if self.store.configuration()!=configured:return False
+        ledger=get_execution(execution.execution_id)
+        if (ledger is None or ledger['job_id']!=execution.job_id
+                or ledger['status'] not in ('claimed','running')):return False
+        with file_lock(self.store.root/'core-work-session.lock',timeout=0):
+            with closing(self.journal._connect()) as connection:
+                rows=connection.execute("SELECT event_id FROM experience_events WHERE subject=? "
+                    "AND event_type='work.core_bound' AND json_extract(canonical_json,'$.payload.job_id')=? "
+                    "ORDER BY sequence DESC LIMIT 2",(configured.subject,execution.job_id)).fetchall()
+            if len(rows)!=1:return False
+            work_id=rows[0]['event_id'].removesuffix(':core_bound')
+            request=self._read(work_id,'requested',configured.subject)
+            bound=self._read(work_id,'core_bound',configured.subject)
+            if request is None or request['configuration_event_id']!=configured.event_id:return False
+            job=get_job(execution.job_id)
+            if job is None or self._definition(job)!=bound['definition_fingerprint']:return False
+            identity={'execution_id':execution.execution_id,'session_id':session_id}
+            suffix='session:'+self.protector.authenticate_json('alive.core-work.session.v1',identity)
+            if self._read(work_id,suffix,configured.subject,event_type='work.session_observed') is not None:
+                return False
+            self._home()
+            if self.store.configuration()!=configured:return False
+            reference=self.store.vault.put_json({'session_id':session_id},subject=configured.subject,
+                purpose='core-work.session-association',sensitivity=Sensitivity.PRIVATE,
+                content_id=work_id+':'+suffix)
+            self._append(work_id,suffix,configured.subject,{
+                'execution_id':execution.execution_id,'session_reference':reference.to_event_payload(),
+                'job_id':execution.job_id,'work_id':work_id,'item_id':request['item_id'],
+                'configuration_event_id':configured.event_id,'session_body_copied':False,
+                'private_session_id_encrypted':True,
+                'task_success_proven':False},causation=work_id+':core_bound',event_type='work.session_observed')
+            return True
+
+    def session_binding(self,work_id,suffix,*,subject):
+        from .content_vault import ContentReference
+        saved=self._read(work_id,suffix,subject,event_type='work.session_observed')
+        if saved is None:return None
+        ref=ContentReference.from_event_payload(saved['session_reference'])
+        if ref.content_id!=work_id+':'+suffix or ref.sensitivity is not Sensitivity.PRIVATE or ref.retention_until is not None:
+            raise ValueError('Core session association reference changed')
+        document=self.store.vault.resolve_json(ref.content_id,expected_subject=subject,
+            expected_purpose='core-work.session-association',expected_sensitivity=Sensitivity.PRIVATE)
+        if (not isinstance(document,dict) or set(document)!={'session_id'}
+                or self.store.vault.digest_json(document)!=ref.digest
+                or suffix!='session:'+self.protector.authenticate_json('alive.core-work.session.v1',
+                    {'execution_id':saved['execution_id'],'session_id':document['session_id']})):
+            raise ValueError('Core session association contents changed')
+        return {**saved,'session_id':document['session_id']}
+
     def status(self,work_id,*,subject):
         self._home()
         request=self._read(work_id,'requested',subject)
         if request is None:raise ValueError('owned Core work unavailable')
         result={'work_id':work_id,'item_id':request['item_id'],'task_success_proven':False,
+                'execution_evidence_query_supported':True,
                 'exact_current_work_message_retained_by_core':request.get('exact_current_work_message_retained_by_core') is True,
                 'agenda_completed':False,'automatic_retry_allowed':False,
                 'automatic_result_followup_enabled':False,
