@@ -66,7 +66,9 @@ class CoreWorkEvidence:
                     reference=row['event_id']
                     association=work.session_binding(work_id,reference.removeprefix(work_id+':'),subject=subject)
         if association is None or execution is None:
-            return {**result,'status':'execution_session_not_observed','entries':[]}
+            return {**result,'status':'execution_session_not_observed','entries':[],
+                    'core_execution_state':execution.get('status') if execution else None,
+                    'caller_action':'report_evidence_unavailable_without_polling_or_resubmission'}
         if (association['work_id']!=work_id or association['job_id']!=bound['job_id']
                 or execution['job_id']!=bound['job_id'] or association['execution_id']!=execution['id']):
             raise ValueError('Core execution/session association changed')

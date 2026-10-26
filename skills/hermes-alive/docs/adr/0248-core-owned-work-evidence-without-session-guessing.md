@@ -53,6 +53,12 @@ compaction, delegated work and older records may be absent. `task_success_proven
 and automatic result-followup remain false. Original assignment versions
 accompany evidence; no agenda completion or retry occurs.
 
+Submission must also communicate asynchronous ownership: scheduled/running work
+belongs to Core, not repeated foreground polling or another user message. Return
+the observed state and yield; automatic notification is a separate unfinished
+capability. A test driver must advance Core scheduling independently of the main
+reply, or it manufactures a queue wait while the model exhausts its turn budget.
+
 Actual file-tool execution/readback, real association, foreign-owner and
 foreign-message refusal, fingerprinting and cold retrieval are integration
 requirements. Fresh independent inspection and semantic goal assessment must

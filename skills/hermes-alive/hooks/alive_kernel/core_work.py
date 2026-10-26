@@ -302,6 +302,7 @@ class CoreWorkStore:
                 'agenda_completed':False,'automatic_retry_allowed':False,
                 'automatic_result_followup_enabled':False,
                 'core_profile_context_authorized':True,'physical_channel_send_requested':False}
+        result['another_user_message_is_not_a_scheduling_requirement']=True
         bound=self._read(work_id,'core_bound',subject)
         if bound is None:return {**result,'status':'handoff_uncertain','needs_attention':True}
         from cron.jobs import get_job
@@ -315,10 +316,12 @@ class CoreWorkStore:
             state=execution['status']
             return {**result,'job_id':bound['job_id'],'execution_id':execution['id'],
                     'status':'core_'+state+'_result_unverified','core_execution_state':state,
+                    'caller_action':'return_observed_progress' if state in ('claimed','running') else 'assess_available_evidence',
                     'needs_attention':state in ('unknown','failed')}
         activated=self._read(work_id,'activated',subject)
         attempted=self._read(work_id,'activation_started',subject)
         return {**result,'job_id':bound['job_id'],
+                'caller_action':'yield_to_core_scheduler' if activated else 'report_handoff_attention',
                 'status':'submitted_to_core' if activated else
                          ('activation_unconfirmed' if attempted else 'prepared_not_activated_by_alive'),
                 'core_job_state':job.get('state'),'needs_attention':activated is None}

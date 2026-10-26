@@ -1285,3 +1285,13 @@ body persistence or new executor/queue/model router. Historical evidence is not
 a current-state check; goal completion, automatic retries and automatic result
 followup remain false. Follow this with actual independent inspection and changed
 Native decisions, rather than treating another evidence API as the finished agent.
+
+The first actual-main/real-worker attempt (r149) submitted exactly one work but
+spent its eight foreground iterations querying the still-scheduled job. Its test
+driver only advanced the scheduler after that turn, so no worker execution was
+qualified. Preserve the failure, including the model's misleading suggestion that
+another user message was needed. Explicit asynchronous caller guidance and Core
+state advice should make the model yield; the revised isolated driver advances
+Core's own tick concurrently, rather than making scheduling depend on the reply.
+Do not merely increase the iteration limit, force a tool choice or count the
+failed submission-only attempt as real-main-to-worker success.

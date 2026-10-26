@@ -283,7 +283,7 @@ bb1240b8645d5bde807e126c36ee12164e2ad602609064402df28740e0e3b315  ./docs/ALIVE_K
 7fa0c75bc1860aee61c13ce1803830ecf3bd6aaa806b71fea025046686cbd901  ./docs/ALIVE_KERNEL_SETUP.md
 97ab9e52cbfbc23d98822e39ecd598be1bb7ccd78395cf59aca7929a3ed98d5d  ./docs/ARCHITECTURE.md
 c4560461911a538212b197cfc43ec56f464c530c839f3ad96fcb30d58176bc3d  ./docs/DATA_AND_PRIVACY.md
-9f175d44a82f1e3a1fcf4f95ab34f7b61a1ffe46e82958f7424052b7b4967a7b  ./docs/DEVELOPMENT_MEMORANDUM.md
+b65029e0aab5493eef3411ce2b4693e19ddc0d3fde439d01b70450040520cd6b  ./docs/DEVELOPMENT_MEMORANDUM.md
 a97d3464d662e752ddf0a312b4a46530f3d1fe3bb5aa0b642a0243edaf24c77d  ./docs/DISCOVERY_DEVELOPMENT.md
 b65725372ab94e17a6e95051d39980fce984da533d2d7abef3f9aa819977e0e3  ./docs/HOST_TRANSPORT_LOCAL_20261012.md
 2ccae262cc9cf2044e477286a02f82ded8711394d601d1f72052fe4bc76fb4f7  ./docs/INSTALL_ADMISSION_20261012.md
@@ -542,7 +542,7 @@ d5f0ecc5deddf608fcc32f16fecf7d594c08860002768771c240f868b26a823c  ./docs/adr/024
 72d5c69f0edae0364ba4f641acad460fdb756e3a1180ea9c147c7f377f3d3dbd  ./docs/adr/0245-guided-main-turn-core-work-handoff.md
 b058aaf29eb5076617084f3d540cc51e01c854b5558309e7a47b3df3f132e062  ./docs/adr/0246-core-work-progress-in-existing-native-cognition.md
 26a9df932a0325dfb18431491186d51eefbcb29b4b4329dae237f19a8e5607cc  ./docs/adr/0247-admitted-source-and-description-have-distinct-lifecycles.md
-866d17e4e06c55539b8988dd1a9c7c5743c31c400fe1eda9416933c090f094fb  ./docs/adr/0248-core-owned-work-evidence-without-session-guessing.md
+efa482eaca169a439d85c04404d8dfa3d3029dc3b314b0bf2cdaf9674aa12e72  ./docs/adr/0248-core-owned-work-evidence-without-session-guessing.md
 4d6108e5f522390a4f9008265a2681771192c500c4c34a02179e24a238b55332  ./docs/evidence/deepseek-seed-20261012.json
 40941e141314d626c51ad4d22ccc19c76dcf4b770a85daa0881d135089fb75ea  ./docs/evidence/qwen-route-20261012.json
 460cffae94c5494e13515ab9c2dc42331e9fd14260bf4182086d5f3bd9e19114  ./hooks/HOOK.yaml
@@ -582,8 +582,8 @@ cc2566240a433678ea7665ae6402c8a8492da822fc04a3dff008a701372d8c50  ./hooks/alive_
 f8983ec0784fd4ac41151410e6b9261cb0a0ca7919b78365334870cf7c83e9f2  ./hooks/alive_kernel/core_plugin_model_call.py
 a4b84f6a02be4df7d2fa50d0cff38192c6a5f35c22737434bb65599cdb1cc3e5  ./hooks/alive_kernel/core_profile_context.py
 638dc2eb9d7cfcf9ab928b509acffff615b3833a4fcae99e3573043fdaff0c6c  ./hooks/alive_kernel/core_shadow_assembly.py
-bc7d1839454b24cadc8ef3f0739bb4b1985a82e9f018d1cc7a4e1d0926387691  ./hooks/alive_kernel/core_work.py
-4663ed92b36942a972dcee0bd57b940cbb0c9f29f86763f25b96773ee8224a3f  ./hooks/alive_kernel/core_work_evidence.py
+bf9b59a013b7557b323b7511ad9c3ce1d8fdff2f7e443592261a6559e4a2fb21  ./hooks/alive_kernel/core_work.py
+40f5bc7eab5fe8836877a0486cd61b8e03927b360e190da12dee3cf50874fa7b  ./hooks/alive_kernel/core_work_evidence.py
 23e660677eaad55ba265a441fc07bb718d81c7282c6a2990f71de0e43a20b5a2  ./hooks/alive_kernel/deliberation.py
 e6905659950ff3ad2fc22ea795fd3ade2f996ee40f90d0522668bc5d2da4aeb4  ./hooks/alive_kernel/deliberation_store.py
 6b8c6c34ed18be46e6b9511e0bc0f2a472fa63a7ca05e1528995f9a09ac1f961  ./hooks/alive_kernel/deliberation_synthesis.py
