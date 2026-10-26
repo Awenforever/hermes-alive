@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from .action_contract import parse_action_contract
 from .content_vault import ContentReference
 from .communication_plan import validate_communication_plan, plan_atoms, expression_context, validate_recipient_intent
-from .host_discovery import source_prompt_excerpt, read_scope_metadata
+from .host_discovery import source_prompt_excerpt, read_scope_metadata, provenance_metadata
 from .deliberation import ActionKind, SideEffect
 from .deliberation_synthesis import DeliberationSynthesizer
 from .events import _thaw_json
@@ -181,7 +181,7 @@ class OpportunityExpressionStore(SemanticReviewStore):
                 item_ids=tuple(start.event.payload.get('discovery_inquiry_item_ids',()))),
             source_evidence=[dict(event_id=e.observation_event_id,title=e.content['title'],
                 url=e.content['url'],excerpt=source_prompt_excerpt(e.content,policy=policy),
-                provenance_metadata={'collector':e.content['source'],**read_scope_metadata(e.content)},
+                provenance_metadata=provenance_metadata(e.content),
                 published_at=e.content.get('published_at')) for e in original
                 if e.content['url']==url or e.observation_event_id in focus_ids])
         if mode in ('source-led-v2','source-led-v3'):

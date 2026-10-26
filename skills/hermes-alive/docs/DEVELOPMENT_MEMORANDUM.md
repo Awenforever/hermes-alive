@@ -1110,3 +1110,21 @@ implemented or enabled. Its permission must explicitly cover intake and bounded
 item retention, with delegated semantic interpretation distinguished from literal
 owner confirmation. Existing long-lived proactive-contact consent alone does not
 silently provide it, and saved tasks still do not grant unrelated external action.
+
+## 2026-10-26 — First-grant intake must preserve semantic authority and runtime truth
+
+ADR0241 implements guided intake/item-retention consent, separate user_delegated
+agenda authority, actual Core turn/session correlation and signed historical
+permission verification. No whole-chat store, interpretation regex or extra
+intent model. New admitted input invalidates old model tickets without consuming
+the message or taking over Enhance FIFO. Turning intake off keeps existing items.
+Optional exact preview confirmation remains supported.
+
+Actual r116 integration exposed a nested schema writer under the agenda's own
+transaction. Reuse the existing exact journal during grant validation; do not
+skip validation or swallow database-lock errors. The five-case real main-model
+probe records one clear assignment and no new items for four negative cases,
+but its response incorrectly conflated an active saved item with automatic
+reminder readiness. Expose and qualify actual runtime state in tool results;
+successful intake never proves an enabled host, sending or remote delivery.
+Derived source context must retain delegated-versus-literal confirmation labels.

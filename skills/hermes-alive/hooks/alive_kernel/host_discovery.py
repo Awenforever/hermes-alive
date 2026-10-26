@@ -40,6 +40,16 @@ def read_scope_metadata(content):
     return metadata
 
 
+def provenance_metadata(content):
+    metadata={'collector':content['source'],**read_scope_metadata(content)}
+    if 'origin_kind' in content:metadata['origin_kind']=content['origin_kind']
+    if content.get('origin_kind')=='commitment':
+        metadata.update(original_proposal_authority=content.get('original_proposal_authority'),
+            literal_owner_confirmation=content.get('literal_owner_confirmation') is True,
+            original_user_message_preserved=False,authority_is_not_execution_permission=True)
+    return metadata
+
+
 SOURCE_EXCERPT_POLICY = 'retained-web-extract-v1'
 
 

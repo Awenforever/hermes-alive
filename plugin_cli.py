@@ -55,7 +55,9 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
     setup.add_argument('--confirm-model-calls',action='store_true')
     setup.add_argument('--confirm-delivery',action='store_true')
     setup.add_argument('--confirm-outbound-retention',action='store_true',help='Separately approve saving shares for conversation continuation')
-    setup.add_argument('--retention-days',type=int,default=30,help='Explicitly approved outbound discussion history retention')
+    setup.add_argument('--retention-days',type=int,default=30,help='Approved outbound context and, if separately authorized, follow-up item retention')
+    setup.add_argument('--confirm-explicit-followup-intake',action='store_true',
+        help='Authorize main-model interpretation of clearly assigned ongoing items and retain those items for the chosen retention period; not whole-chat collection or external-tool authority')
     setup.add_argument('--model',default=None,help='Optional Core-configured alias; default inherits Hermes')
     setup.add_argument('--language',help='Optional conversation language tag; otherwise follows Hermes locale')
     setup.add_argument('--communication-preference',help='Explicit communication preference, stored privately after owner confirmation')
@@ -247,6 +249,7 @@ def alive_command(args: argparse.Namespace) -> int:
         intent,code=setup.stage({'model_calls':True,'delivery':True,
             'outbound_retention_days':args.retention_days,'outbound_retention_confirmed':True,'model':args.model,
             'public_queries':args.public_query,'cited_reads':args.confirm_cited_reads,
+            **({'accept_explicit_followups':True} if getattr(args,'confirm_explicit_followup_intake',False) else {}),
             **({'refine_public_sources':True} if getattr(args,'confirm_public_refinement',False) else {}),
             **({'language':args.language} if getattr(args,'language',None) else {}),
             **({'communication_preference':args.communication_preference}
@@ -261,6 +264,8 @@ def alive_command(args: argparse.Namespace) -> int:
             'expires_in_seconds':900,'restart_required':True,'delivery_enabled':False,'model_calls_started':False,
             'confirmation_summary':{'model':args.model or 'inherit_hermes','outbound_history_days':args.retention_days,
                 'inbound_history':False,'automatic_profile_learning':False,'public_queries':args.public_query,
+                'explicit_followup_intake':bool(getattr(args,'confirm_explicit_followup_intake',False)),
+                'followup_item_retention_days':args.retention_days if getattr(args,'confirm_explicit_followup_intake',False) else None,
                 'cited_public_reads':bool(args.confirm_cited_reads),
                 'public_source_refinement':bool(getattr(args,'confirm_public_refinement',False)),
                 'additional_public_queries_per_cycle':1 if getattr(args,'confirm_public_refinement',False) else 0,

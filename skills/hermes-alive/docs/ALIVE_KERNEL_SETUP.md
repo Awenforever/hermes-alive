@@ -42,11 +42,25 @@ requested reports or detailed work may need a different level of detail.
 
 The target normal experience is one guided authorization, followed by direct
 acceptance of clearly assigned follow-up work; ask only for unclear intentions.
-An optional per-item confirmation mode remains available. As of 2026-10-26 the
-implementation below is the conservative confirmation foundation; the first-grant
-intake mode is still development work. Do not tell an owner it is already active.
+An optional per-item confirmation mode remains available. As of 2026-10-26 both
+paths are implemented under isolated qualification (ADR0241), not deployed or
+production-accepted.
 
-After confirmed kernel setup, Hermes can use `alive_agenda` to propose an ongoing
+During initial guidance, explain this choice and the item retention period. Add
+`--confirm-explicit-followup-intake` to the staged setup only after consent;
+`--retention-days` is the disclosed period for accepted items as well as outbound
+context. The actual target conversation confirmation protects these choices.
+Existing configurations stay off unless the owner explicitly updates them.
+
+The main agent can then record clear ongoing assignments directly. It asks about
+ambiguous intent rather than treating casual/quoted material as obligations.
+`/alive intake off` stops new intake while keeping existing items; `on` resumes
+only a previously guided grant, and `status` reports the actual choice. This
+does not start the proactive host or authorize unrelated external tools. Check
+`/alive status` and separately enable the host when appropriate. A saved active
+item is not evidence that a reminder is running or has been delivered.
+
+For optional per-item confirmation, Hermes can use `alive_agenda` to propose an ongoing
 item in the configured conversation. It shows the task, constraints, any explicit
 dates, retention period and a `/alive agenda accept <handle>` command. The
 proposal is temporary and not yet a saved obligation; use the exact command to

@@ -27,7 +27,7 @@ from .model_json import ModelJSONError, parse_model_json
 from .events import EventEnvelope, Sensitivity, _thaw_json
 from .expression_history import ExpressionHistoryReader
 from .action_history import ActionHistoryReader
-from .host_discovery import read_scope_metadata, source_prompt_excerpt, SOURCE_EXCERPT_POLICY
+from .host_discovery import read_scope_metadata, source_prompt_excerpt, SOURCE_EXCERPT_POLICY, provenance_metadata
 from .model_timeouts import MAX_STAGE_SECONDS
 from .core_context_read import context_value
 from . import reading_assessment
@@ -1238,7 +1238,7 @@ class OpportunitySynthesizer:
             prompt_data['opportunities'].append({
             "agenda_item_id": item.agenda_item_id,
             "observation_event_id": item.observation_event_id,
-            "provenance_metadata":{"collector":item.content["source"],**read_scope_metadata(item.content)}, "title": item.content["title"],
+            "provenance_metadata":provenance_metadata(item.content), "title": item.content["title"],
             "origin_kind":item.content.get('origin_kind','discovery'),
             **({'communication_situation':communication_situation(item.content.get('origin_kind','discovery'))}
                if recipient_meaning else {}),

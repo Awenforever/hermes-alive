@@ -19,7 +19,8 @@ guided authorization. Casual remarks, quotations and ambiguous intentions requir
 semantic distinction; ask when uncertain. Per-item preview/confirmation is an
 optional mode, not the required everyday experience. The new ADR0240 temporary
 proposal/confirmation path is a qualified foundation and conservative fallback;
-the requested first-grant intake mode has **not** yet been implemented or deployed.
+the requested first-grant intake mode is now implemented under isolated
+qualification (ADR0241), and has **not** been deployed or production-accepted.
 Do not confuse long-lived proactive-contact consent with this distinct intake
 and item-retention choice. Record delegated interpretation honestly instead of
 relabeling a model inference as a literal owner-confirmed item.
@@ -28,7 +29,7 @@ relabeling a model inference as a literal owner-confirmed item.
 |---|---|---|
 | Experience and privacy | Protected journal/vault, provenance, deletion and replay checks | Real lifetime/migration/restore with all external associations preserved |
 | Personalization | Owner-confirmed preferences and current Core USER advice; real main turns automatically curate a synthetic profile, Native interpretation consumes its exact current value and two real followups complete | External-provider recall, noise-aware daily learning and attributed feedback |
-| Agenda and initiative | Source-free controlled reminder, quiet idle/wait, completion suppression; real main model discovers the tool, proposes one synthetic item and avoids saving explicit casual chat; actual owner commands confirm/complete it (ADR0240) | Wider intent/quotation/revision cases, changing priorities, snooze, process-restart continuity and sustained useful initiative |
+| Agenda and initiative | Guided first-grant intake plus optional preview mode; five actual main cases distinguish assignment from four negative cases, two further turns verify ordinary-request intake and inactive-host truth; actual Core controlled Native reminder/context/command completion pass (ADR0241) | Wider revisions, natural completion/cancellation, changing priorities, snooze, process restart and sustained useful initiative; acknowledgments remain too technical |
 | Content and judgment | Source-led composition, final wording review, real main-model examples | Samples remain too much like cautious paper digests; factual review is not a usefulness verdict |
 | Conversation continuity | Exact share/source excerpts reach actual Core main requests; real replies after context reduction no longer recite transport status | Missing evidence still becomes global negative claims in real followup; qualify ADR0230, plus natural old-quote/compaction/restart behavior |
 | Sources | Actual Core free search and substantive extraction demonstrated in isolated profiles | More useful live selection across Chinese and other sources, currentness, provenance and inaccessible/full-read boundaries |
@@ -235,7 +236,11 @@ competing active plans. ADRs remain the record of architectural decisions.
    scope/retention once, retain only the interpreted item, distinguish current
    direct assignment from quotation/tentative/negated/revised work, and ask when
    uncertain. Qualify those distinctions with real Core/main-model cases before
-   replacing the current conservative confirmation mode. The initial consent
+   making it the normal configured experience. ADR0241 implements guided consent,
+   delegated authority, current-turn evidence and revocation. Five real main
+   cases distinguish clear assignment from four negative cases; a saved-item
+   versus runtime overclaim exposed by those calls is under targeted validation.
+   More ordinary/revision cases and restart remain required. The initial consent
    must not silently authorize unrelated external tools or physical delivery.
 3. Verify continuity and adaptation across days and restart: recall why an item
    exists, inspect actual outcomes, cancel/snooze/complete correctly, respect

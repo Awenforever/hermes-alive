@@ -57,7 +57,8 @@ def register_setup_command(context,binding):
                     '这一步不会自动迁移旧身份、调用模型或启用发送。')
         control=len(parts)==1 and parts[0] in ('enable','pause','status')
         agenda_command=parts[0]=='agenda'
-        if not control and not agenda_command and (len(parts) != 2 or parts[0] != 'confirm'):
+        intake_command=parts[0]=='intake'
+        if not control and not agenda_command and not intake_command and (len(parts) != 2 or parts[0] != 'confirm'):
             return '请使用 /alive confirm 确认配置，或 /alive enable、/alive pause、/alive status。'
         if not session_id or not session_key or source is None:
             return '当前会话尚无 Hermes 会话记录。请先发一句普通消息，再重试原确认命令。'
@@ -79,6 +80,23 @@ def register_setup_command(context,binding):
                 if binding._agenda is None:
                     return '请先完成 Alive 会话配置，再管理持续事项。'
                 return binding._agenda.command(scope,parts[1:])
+            if intake_command:
+                from .kernel_execution_bridge import configured_owner,kernel
+                store,configured=configured_owner(binding,scope)
+                if len(parts)!=2 or parts[1] not in ('on','off','status'):
+                    return '请使用 /alive intake on、off 或 status。'
+                module=kernel('followup_intake')
+                if parts[1]=='status':
+                    return '明确交办自动接纳：'+('已开启。' if module.permission(store,configured)[0] else '已关闭。')
+                if parts[1]=='on' and configured.options.get('accept_explicit_followups') is not True:
+                    return '尚未授权自动接纳与事项保存期限，请先让 Hermes 引导更新这项配置。'
+                if binding._agenda is None:raise ValueError('configured agenda required')
+                with binding._agenda.lock:
+                    module.set_permission(store,configured,parts[1]=='on')
+                    binding._agenda.turns.clear()
+                    binding._agenda.latest_turn.clear()
+                return ('已开启明确交办自动接纳；含糊时仍会询问。' if parts[1]=='on' else
+                        '已停止接纳新的自动跟进事项；已有事项保留，可单独完成或取消。')
             if control:
                 from . import kernel_execution_bridge as execution
                 async with binding.control_lock:
@@ -120,7 +138,10 @@ def register_setup_command(context,binding):
             save_plugin_setting('hermes-alive',('kernel_setup',),
                 {'activation_event_id':configured.event_id,'status':'configured','enabled':False})
             attach_configured_continuity(binding,configured)
-            return ('目标会话和所选权限已确认，分享接续读取已接入。'
+            intake_summary=('明确交办自动接纳已授权，事项保留'+str(configured.options['outbound_retention_days'])
+                +'天；不留存全量聊天、不授权外部动作，可用 /alive intake off 关闭。'
+                if configured.options.get('accept_explicit_followups') is True else '')
+            return ('目标会话和所选权限已确认，分享接续读取已接入。'+intake_summary+
                     '当前仍未启用模型调用和主动发送。可发送 /alive enable 启用；公开检索是可选能力，'
                     '授权持续有效直到暂停或撤销，最多每日3次且间隔至少1小时；'
                     '/alive pause 可暂停。资料保留期限单独管理。旧身份不会自动迁移。')
@@ -135,4 +156,4 @@ def register_setup_command(context,binding):
             return ('未完成操作：请检查确认码或配置是否有效、目标会话是否仍在当前已授权网关，'
                     '以及安装更新后是否已按引导重启。不会自动补发历史消息。')
     return context.register_command('alive',command,description='Configure and control Alive in this authorized conversation',
-                                    args_hint='confirm <one-time-code> | enable | pause | status | agenda',argument_mode='text')
+                                    args_hint='confirm <one-time-code> | enable | pause | status | agenda | intake',argument_mode='text')

@@ -361,6 +361,9 @@ class ShareContinuityStore:
                     continue
                 result.append({'event_id':source['event_id'],'title':'Original admitted commitment','url':'',
                     'excerpt':json.dumps({'original_commitment':details,
+                        'original_proposal_authority':record.event.payload.get('authority'),
+                        'literal_owner_confirmation':record.event.payload.get('authority')=='user_explicit',
+                        'original_user_message_preserved':False,
                         'original_due_at':record.event.payload.get('due_at')},ensure_ascii=False),
                     'reading_status':'retained_original_commitment',
                     'reference_kind':'original_admitted_commitment',

@@ -45,6 +45,7 @@ class AgendaItemKind(StrEnum):
 
 class AgendaAuthority(StrEnum):
     USER_EXPLICIT = "user_explicit"
+    USER_DELEGATED = "user_delegated"
     DIRECT_OBSERVATION = "direct_observation"
     SYSTEM_MIGRATION = "system_migration"
     MODEL_PROPOSAL = "model_proposal"
@@ -471,6 +472,9 @@ class AgendaProjection:
                 and record.event.subject == subject
                 for record in source_records
             )
+        elif authority is AgendaAuthority.USER_DELEGATED:
+            from .followup_intake import validates_proposal
+            authority_valid = authority_valid and validates_proposal(self.journal,event)
         elif authority is AgendaAuthority.SYSTEM_MIGRATION:
             authority_valid = (
                 authority_valid
@@ -515,6 +519,7 @@ class AgendaProjection:
         reason = "authority_admitted"
         if kind is AgendaItemKind.COMMITMENT and authority not in {
             AgendaAuthority.USER_EXPLICIT,
+            AgendaAuthority.USER_DELEGATED,
             AgendaAuthority.SYSTEM_MIGRATION,
         }:
             state = AgendaState.PROPOSED

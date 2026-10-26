@@ -37,14 +37,14 @@ def validate_options(options):
               'model','public_queries','cited_reads'}
     if (not isinstance(options, dict) or not required<=set(options)
             or set(options)-required-{'language','communication_preference','interest_preferences','use_hermes_user_profile',
-                                     'refine_public_sources'}
+                                     'refine_public_sources','accept_explicit_followups'}
             or options['model_calls'] is not True or options['delivery'] is not True
             or options['outbound_retention_confirmed'] is not True
             or type(options['outbound_retention_days']) is not int
             or not 1 <= options['outbound_retention_days'] <= 365
             or type(options['cited_reads']) is not bool
             or any(key in options and type(options[key]) is not bool
-                   for key in ('use_hermes_user_profile','refine_public_sources'))):
+                   for key in ('use_hermes_user_profile','refine_public_sources','accept_explicit_followups'))):
         raise KernelSetupError('explicit model/delivery/retention choices required')
     model = options['model']
     queries = options['public_queries']
@@ -70,7 +70,7 @@ class KernelSetupStore:
     CONFIRMED_TYPE = 'alive.setup.confirmed'
     SETUP_OWNER = 'system:alive-setup'
 
-    def __init__(self, root, *, initialize=False):
+    def __init__(self, root, *, initialize=False, journal=None):
         self.root = Path(root).resolve()
         expected = (self.root/'identity.key',self.root/'experience.sqlite3',
                     self.root/'content-vault/content.key',self.root/'content-vault/content.sqlite3')
@@ -79,7 +79,12 @@ class KernelSetupStore:
         if type(initialize) is not bool or not all(present) and (not initialize or not empty):
             raise KernelSetupError('setup storage/key inventory incomplete; restore it, never replace its identity')
         self.protector = LocalIdentityProtector(self.root/'identity.key')
-        self.journal = ExperienceJournal(self.root/'experience.sqlite3')
+        if journal is not None and (not isinstance(journal,ExperienceJournal)
+                or journal.path.resolve()!=self.root/'experience.sqlite3'):
+            raise KernelSetupError('existing journal belongs to another setup root')
+        # Projection validation can already hold a write transaction. Reuse its
+        # exact journal rather than opening another schema-initializing writer.
+        self.journal = journal if journal is not None else ExperienceJournal(self.root/'experience.sqlite3')
         self.vault = ContentVault(self.root/'content-vault', backup_root=self.root/'content-backups')
         # Complete the initial key inventory during explicit operator setup,
         # before publishing any intent. Read/status/startup paths never seed it.

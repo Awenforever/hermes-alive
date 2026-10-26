@@ -12,14 +12,16 @@ from unittest.mock import patch
 import run_core_session_routing as core
 from run_core_guided_setup import cli
 
-async def test(home):
+async def test(home,*,direct_intake=False):
  home.mkdir();shutil.copytree(core.repo,home/'plugins/hermes-alive')
  config={'plugins':{'enabled':['hermes-alive']},'model':{'provider':'custom:owner','default':'configured-primary'},
   'custom_providers':[{'name':'owner','model':'configured-primary','base_url':'https://provider.invalid/v1','key_env':'OWNER_MAIN_KEY','api_mode':'chat_completions'}],
   'agent':{'reasoning_effort':False}}
  (home/'config.yaml').write_text(json.dumps(config),encoding='utf-8');(home/'.env').write_text('OWNER_MAIN_KEY=SYNTHETIC_OWNER_KEY\n')
- rc,staged=cli(home,'setup','--confirm-model-calls','--confirm-delivery','--confirm-outbound-retention','--language','zh-CN')
+ rc,staged=cli(home,'setup','--confirm-model-calls','--confirm-delivery','--confirm-outbound-retention','--language','zh-CN',
+  *(['--confirm-explicit-followup-intake'] if direct_intake else []))
  assert rc==0 and staged['confirmation_summary']['public_queries']==[]
+ assert staged['confirmation_summary']['explicit_followup_intake']==direct_intake
  assert cli(home,'install-runtime','--engine','kernel')[0]==0
  token=core.set_hermes_home_override(home);manager=None;sent=[];requests=[];reads=[]
  try:
@@ -61,6 +63,8 @@ async def test(home):
     else:
      item=data['opportunities'][0]
      assert item['origin_kind']=='commitment' and item['url']==''
+     assert item['provenance_metadata']['original_proposal_authority']==('user_delegated' if direct_intake else 'user_explicit')
+     assert item['provenance_metadata']['literal_owner_confirmation']==(not direct_intake)
      assert item['communication_situation']['kind']=='admitted_commitment'
      assert '只提醒，不代为提交' in item['summary_excerpt']
      value={'candidates':[{'agenda_item_id':item['agenda_item_id'],'kind':'share','topic':'owner commitment',
@@ -110,6 +114,10 @@ async def test(home):
     assert drafted['status']=='temporary_proposal_not_saved' and not drafted['external_action_authorized']
     assert 'error' in tool({'operation':'list'},task='foreign-main-task')
     assert 'error' in tool({'operation':'propose','task':'ambiguous time','due_at':'2026-12-01T09:00:00'})
+    oversized=tool({'operation':'propose','task':'\n'*1400,'constraint':'不得遗漏约束'})
+    assert oversized['error']=='alive_agenda_unavailable'
+    oversized=tool({'operation':'propose','task':'核对'*700,'constraint':'保留全部限制'*150})
+    assert oversized['error']=='alive_commitment_summary_too_large' and not oversized['item_saved']
     assert len(store.journal.read())==before,'unconfirmed proposal persisted chat-derived content'
    finally:core.clear_session_vars(variables)
    accept=drafted['confirmation_command'].removeprefix('/alive ')
@@ -118,15 +126,73 @@ async def test(home):
    with patch.object(binding._agenda,'DRAFT_TTL',-1):
     assert '已失效' in await command(accept)
    assert len(store.journal.read())==before
-   admitted=await command(accept)
-   assert '事项已保存' in admitted
-   assert '已失效' in await command(accept)
+   if not direct_intake:
+    import model_tools
+    variables=core.set_session_vars(platform='telegram',chat_id=source.chat_id,user_id=source.user_id,
+     session_key=entry.session_key,session_id=entry.session_id)
+    try:
+     refused=json.loads(model_tools.handle_function_call('alive_agenda',{
+      'operation':'record','task':'核对实验记录','evidence_span':'记下核对实验记录这件事，只提醒，不代为提交。'},
+      task_id='source-free-agenda-intake',session_id=entry.session_id,turn_id='intake-turn',
+      tool_call_id='no-intake-grant',enabled_tools=['alive_agenda']))
+     assert 'error' in refused and len(store.journal.read())==before
+     assert '尚未授权' in await command('intake on')
+    finally:core.clear_session_vars(variables)
+    admitted=await command(accept)
+    assert '事项已保存' in admitted
+    assert '已失效' in await command(accept)
+   else:
+    import model_tools
+    variables=core.set_session_vars(platform='telegram',chat_id=source.chat_id,user_id=source.user_id,
+     session_key=entry.session_key,session_id=entry.session_id)
+    try:
+     args={'operation':'record','task':'核对实验记录','constraint':'只提醒，不代为提交','due_at':due,
+      'evidence_span':'记下核对实验记录这件事，只提醒，不代为提交。'}
+     def record(turn_id='intake-turn',payload=None):
+      return json.loads(model_tools.handle_function_call('alive_agenda',payload or args,
+       task_id='source-free-agenda-intake',session_id=entry.session_id,turn_id=turn_id,
+       tool_call_id='synthetic-direct-intake',enabled_tools=['alive_agenda']))
+     assert 'error' in record(turn_id='stale-turn')
+     assert 'error' in record(payload={**args,'evidence_span':'unseen or old request'})
+     assert 'error' in tool(args),'direct registry calls without Core turn correlation must refuse'
+     accepted=record()
+     assert accepted.get('status')=='recorded_under_owner_intake_grant',accepted
+     assert accepted['authority']=='user_delegated' and not accepted['literal_owner_confirmation']
+     assert not accepted['automatic_followup_running'] and not accepted['external_delivery_proven']
+     assert record()['status']=='already_recorded'
+     from gateway.run_inbound_consumer import run_post_admission_hook
+     assert await run_post_admission_hook(runner,SimpleNamespace(message_id='new-owner-input',text='补充一句，稍后聊。'),
+      source,entry.session_key)==(False,None)
+     assert 'error' in record(),'new admitted input must invalidate a late model response'
+     assert '已停止' in await command('intake off')
+     assert 'error' in record(),'revoked intake must not accept new work or renew old work'
+     assert '已开启' in await command('intake on')
+     assert 'error' in record(),'new grant revision must require a fresh main turn'
+     _collect_pre_llm_call_context(SimpleNamespace(session_id=entry.session_id,model='configured-primary',
+      platform='telegram',_user_id=source.user_id),effective_task_id='new-main-task',turn_id='new-main-turn',
+      original_user_message='现在随便聊一句。',messages=[{'role':'user','content':'现在随便聊一句。'}],conversation_history=[])
+     assert 'error' in record(),'superseded main response must not become a new task'
+    finally:core.clear_session_vars(variables)
    agenda=agenda_module.AgendaProjection(store.journal)
    items=agenda.list_items(clearance=events.Sensitivity.PRIVATE,subject=owner)
-   assert len(items)==1 and items[0].authority.value=='user_explicit'
+   assert len(items)==1 and items[0].authority.value==('user_delegated' if direct_intake else 'user_explicit')
    proposal=store.journal.get('agenda.proposal:'+items[0].item_id)
    admitted_source=store.journal.get(proposal.event.payload['source_event_ids'][0])
-   assert admitted_source.event.source=='hermes.command.alive.agenda' and admitted_source.event.actor==owner
+   assert admitted_source.event.source==('hermes.core.alive.followup_intake' if direct_intake else 'hermes.command.alive.agenda') and admitted_source.event.actor==owner
+   if direct_intake:
+    import dataclasses
+    intake_module=execution.kernel('followup_intake')
+    assert intake_module.validates_proposal(store.journal,proposal.event)
+    assert not intake_module.validates_proposal(store.journal,dataclasses.replace(proposal.event,actor=owner))
+    real_get=store.journal.get
+    forged_source=dataclasses.replace(admitted_source,event=dataclasses.replace(admitted_source.event,
+     payload={**dict(admitted_source.event.payload),'literal_owner_confirmation':True}))
+    with patch.object(store.journal,'get',lambda identifier:forged_source if identifier==admitted_source.event.event_id else real_get(identifier)):
+     assert not intake_module.validates_proposal(store.journal,proposal.event),'changed receipt authority accepted'
+    # Rebuild verifies original historical grant even after it is revoked.
+    assert '已停止' in await command('intake off')
+    agenda.rebuild()
+    assert agenda.list_items(clearance=events.Sensitivity.PRIVATE,subject=owner)[0].state.value=='active'
    result=await native.step(build())
    assert result.disposition=='submitted',result.disposition
    assert len(sent)==1 and '核对实验记录' in sent[0] and due in sent[0]
@@ -135,6 +201,9 @@ async def test(home):
    assert references and references[-1]['text']==sent[0]
    assert references[-1]['sources'][0]['reading_status']=='retained_original_commitment',references[-1]['sources']
    assert '只提醒，不代为提交' in references[-1]['sources'][0]['excerpt']
+   original_context=json.loads(references[-1]['sources'][0]['excerpt'])
+   assert original_context['original_proposal_authority']==('user_delegated' if direct_intake else 'user_explicit')
+   assert original_context['literal_owner_confirmation']==(not direct_intake)
    from agent.turn_context import _collect_pre_llm_call_context
    variables=core.set_session_vars(platform='telegram',chat_id=source.chat_id,user_id=source.user_id,
     session_key=entry.session_key,session_id=entry.session_id)
@@ -176,14 +245,16 @@ async def test(home):
     share_id=references[-1]['share_id']) is None,'forgotten original request survived through a derived reminder'
    assert '已暂停' in await command('pause')
    assert (await native.step(build())).disposition=='paused' and not native.pending
-  print('HERMES_ALIVE_CORE_SOURCE_FREE_AGENDA_OK '+json.dumps({'public_reads':len(reads),'local_reminders':len(sent),'idle_wait_without_repeat':True,'completed_commitment_not_repeated':True,'actual_model_inference':False,'natural_language_intake_proven':False,'external_delivery_proven':False,'stages':requests}))
+  print('HERMES_ALIVE_CORE_SOURCE_FREE_AGENDA_OK '+json.dumps({'delegated_intake':direct_intake,'public_reads':len(reads),'local_reminders':len(sent),'idle_wait_without_repeat':True,'completed_commitment_not_repeated':True,'actual_model_inference':False,'natural_language_intake_proven':False,'external_delivery_proven':False,'stages':requests}))
  finally:
   if manager:manager.unload()
   core.reset_hermes_home_override(token)
 
 if __name__=='__main__':
  with tempfile.TemporaryDirectory(prefix='alive-core-source-free-') as root:
-  try:asyncio.run(test(Path(root)/'profile'))
+  try:
+   asyncio.run(test(Path(root)/'profile'))
+   asyncio.run(test(Path(root)/'direct-profile',direct_intake=True))
   finally:
    from hermes_state_registry import close_all_under
    close_all_under(root)

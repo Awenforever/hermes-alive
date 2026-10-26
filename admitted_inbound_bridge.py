@@ -31,7 +31,7 @@ def register_admitted_inbound_hook(ctx, binding=None):
             from .kernel_setup_bridge import setup_store
             store=setup_store(binding)
             configured=store.configuration()
-            if configured is None or store.activation() is None:return None
+            if configured is None:return None
             # Resolve the current Core route on the ingress caller's Gateway
             # loop. No source field or arbitrary user text can select a profile.
             source=values.get('source')
@@ -48,6 +48,10 @@ def register_admitted_inbound_hook(ctx, binding=None):
             if actual!=saved:return None
             for name in ('chat_id','user_id','chat_type','thread_id','scope_id','guild_id','parent_chat_id'):
                 if (source.get(name) or '')!=getattr(scope,name):return None
+            if binding._agenda is not None:
+                revision=store.protector.authenticate_json('alive.intake.admitted_revision.v1',{
+                    'message':values.get('message_id'),'text':values.get('text')})
+                binding._agenda.admitted_input(scope,revision)
             _kernel_module('admitted_inbound').record_configured_input(
                 store,configured,scope.binding_document(),values)
         except Exception as exc:

@@ -14,6 +14,19 @@ from .discovery_opportunities import DiscoveryOpportunityIngestor, OpportunityEv
 from .events import Sensitivity, _freeze_json
 
 
+class CommitmentSummaryTooLarge(ValueError):
+    code='alive_commitment_summary_too_large'
+
+
+def commitment_summary(details,*,state,available_at,due_at,expires_at):
+    """The same complete evidence window at admission and cognitive reading."""
+    summary=json.dumps(dict(commitment=details,state=state,
+        available_at=available_at,due_at=due_at,expires_at=expires_at,
+        temporal_bounds=dict(not_before=available_at,target_deadline=due_at,active_until=expires_at)),ensure_ascii=False)
+    if len(summary)>1800:raise CommitmentSummaryTooLarge('complete commitment does not fit the cognitive window')
+    return summary
+
+
 class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
     def __init__(self, journal, *, content_vault=None, commitment_vault=None):
         super().__init__(journal,content_vault=content_vault)
@@ -36,6 +49,9 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
         admitted = (payload.get('authority')==AgendaAuthority.USER_EXPLICIT.value and event.actor==subject
             and any(s.event.event_type=='conversation.inbound' and s.event.actor==subject and s.event.subject==subject
                     for s in sources))
+        if payload.get('authority')==AgendaAuthority.USER_DELEGATED.value:
+            from .followup_intake import validates_proposal
+            admitted=validates_proposal(self.journal,event)
         if not admitted and not (payload.get('authority')==AgendaAuthority.MODEL_PROPOSAL.value
                                  and event.actor.startswith('model:')):
             return None
@@ -83,12 +99,11 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
             return None
         if self.commitment_vault.digest_json(details)!=ref.digest:
             return None
-        summary = json.dumps(dict(commitment=details,state=state.value,available_at=available,
-            due_at=payload.get('due_at'),expires_at=payload.get('expires_at'),
-            temporal_bounds=dict(not_before=available,target_deadline=payload.get('due_at'),
-                                 active_until=payload.get('expires_at'))),ensure_ascii=False)
-        if len(summary)>1800:
-            return None  # Never silently cut a commitment's condition or negation.
+        try:
+            summary=commitment_summary(details,state=state.value,available_at=available,
+                due_at=payload.get('due_at'),expires_at=payload.get('expires_at'))
+        except CommitmentSummaryTooLarge:
+            return None  # Historical oversized items are not silently truncated.
         expiry = datetime.max.replace(tzinfo=timezone.utc)
         for value in (payload.get('expires_at'),ref.retention_until):
             if value:
@@ -101,6 +116,8 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
         return OpportunityEvidence(row['item_id'],event.event_id,expiry,event.sensitivity,
             _freeze_json(dict(source='user-admitted agenda commitment',title='Current commitment',url='',
                 summary=summary,published_at=None,origin_kind='commitment',
+                original_proposal_authority=payload.get('authority'),
+                literal_owner_confirmation=payload.get('authority')==AgendaAuthority.USER_EXPLICIT.value,
                 authority_is_not_execution_permission=True)))
 
     def active_evidence(self, *, subject, clearance, limit=8, observation_event_ids=None, source_cursor=None):
