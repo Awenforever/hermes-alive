@@ -1,7 +1,8 @@
 """Actual installed Core setup/control with source-free agenda cycles.
 
-Owner admission, source/model replies and adapter are synthetic fixtures. This
-proves native wiring, not natural-language intake, model quality or live sending.
+Owner admission uses the real Core command, main-turn collector and tool
+dispatcher. Language interpretation/model replies and adapter are controlled.
+This proves native wiring, not real-model quality or live sending.
 """
 import asyncio,importlib,json,shutil,tempfile
 from datetime import datetime,timedelta,timezone
@@ -92,12 +93,40 @@ async def test(home):
    count=len(requests)
    assert (await native.step(build())).disposition=='waiting_for_change' and len(requests)==count
    events=execution.kernel('events');agenda_module=execution.kernel('agenda')
-   original=store.journal.append(events.EventEnvelope(event_type='conversation.inbound',source='synthetic-owner-admission-fixture',actor=owner,subject=owner,payload={'synthetic':True}))
+   from agent.turn_context import _collect_pre_llm_call_context
+   variables=core.set_session_vars(platform='telegram',chat_id=source.chat_id,user_id=source.user_id,
+    session_key=entry.session_key,session_id=entry.session_id)
+   tool=lambda args,task='source-free-agenda-intake':json.loads(binding.context.dispatch_tool('alive_agenda',args,
+    task_id=task,session_id=entry.session_id))
+   before=len(store.journal.read())
+   try:
+    assert 'error' in tool({'operation':'propose','task':'not in a collected main turn'})
+    collector=_collect_pre_llm_call_context(SimpleNamespace(session_id=entry.session_id,model='configured-primary',
+     platform='telegram',_user_id=source.user_id),effective_task_id='source-free-agenda-intake',turn_id='intake-turn',
+     original_user_message='记下核对实验记录这件事，只提醒，不代为提交。',
+     messages=[{'role':'user','content':'记下核对实验记录这件事，只提醒，不代为提交。'}],conversation_history=[])
+    assert 'alive_agenda' in collector
+    drafted=tool({'operation':'propose','task':'核对实验记录','constraint':'只提醒，不代为提交','due_at':due})
+    assert drafted['status']=='temporary_proposal_not_saved' and not drafted['external_action_authorized']
+    assert 'error' in tool({'operation':'list'},task='foreign-main-task')
+    assert 'error' in tool({'operation':'propose','task':'ambiguous time','due_at':'2026-12-01T09:00:00'})
+    assert len(store.journal.read())==before,'unconfirmed proposal persisted chat-derived content'
+   finally:core.clear_session_vars(variables)
+   accept=drafted['confirmation_command'].removeprefix('/alive ')
+   preview=json.loads(await command(drafted['preview_command'].removeprefix('/alive ')))
+   assert preview['proposal']=={'task':'核对实验记录','constraint':'只提醒，不代为提交'}
+   with patch.object(binding._agenda,'DRAFT_TTL',-1):
+    assert '已失效' in await command(accept)
+   assert len(store.journal.read())==before
+   admitted=await command(accept)
+   assert '事项已保存' in admitted
+   assert '已失效' in await command(accept)
    agenda=agenda_module.AgendaProjection(store.journal)
-   proposal=agenda.append_proposal(agenda_module.AgendaProposal(kind=agenda_module.AgendaItemKind.COMMITMENT,subject=owner,
-    details={'task':'核对实验记录','constraint':'只提醒，不代为提交'},authority=agenda_module.AgendaAuthority.USER_EXPLICIT,
-    source_event_ids=(original.event.event_id,),confidence=1,due_at=datetime.fromisoformat(due)),actor=owner)
-   assert agenda.apply(proposal).outcome=='active'
+   items=agenda.list_items(clearance=events.Sensitivity.PRIVATE,subject=owner)
+   assert len(items)==1 and items[0].authority.value=='user_explicit'
+   proposal=store.journal.get('agenda.proposal:'+items[0].item_id)
+   admitted_source=store.journal.get(proposal.event.payload['source_event_ids'][0])
+   assert admitted_source.event.source=='hermes.command.alive.agenda' and admitted_source.event.actor==owner
    result=await native.step(build())
    assert result.disposition=='submitted',result.disposition
    assert len(sent)==1 and '核对实验记录' in sent[0] and due in sent[0]
@@ -123,6 +152,8 @@ async def test(home):
    assert home.resolve() in vault_root.parents and not vault_root.is_symlink() and not saved_vault.exists()
    vault_root.rename(saved_vault)
    try:
+    assert '未完成操作' in await command('agenda list')
+    assert not vault_root.exists(),'agenda command replaced missing retained storage/key'
     missing=binding._continuity.store.read_reference(scope=scope_document,clearance=events.Sensitivity.PRIVATE,
      share_id=references[-1]['share_id'])
     assert missing['sources'][0]['reading_status']=='no_longer_retained'
@@ -130,10 +161,9 @@ async def test(home):
    finally:saved_vault.rename(vault_root)
    assert not reads and not store.journal.read(event_type='discovery.host_read_started')
    assert 'interpret' in requests and 'author' in requests and 'final' in requests
-   completed_source=store.journal.append(events.EventEnvelope(event_type='conversation.inbound',source='synthetic-owner-admission-fixture',actor=owner,subject=owner,payload={'synthetic':True}))
-   completed=agenda.append_transition(proposal.event.payload['item_id'],agenda_module.AgendaState.COMPLETED,actor=owner,
-    authority=agenda_module.AgendaAuthority.USER_EXPLICIT,source_event_id=completed_source.event.event_id,reason='Synthetic owner completion')
-   assert agenda.apply(completed).outcome=='transitioned'
+   assert '已标记完成' in await command('agenda done '+items[0].item_id)
+   assert '已结束' in await command('agenda done '+items[0].item_id)
+   assert json.loads(await command('agenda list'))['items'][0]['state']=='completed'
    with patch.object(native.host.runtime.outbox,'next_delegated_start',return_value=datetime.now(timezone.utc)):
     assert (await native.step(build())).disposition=='silence'
    assert len(sent)==1 and not reads

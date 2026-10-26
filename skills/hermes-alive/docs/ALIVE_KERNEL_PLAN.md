@@ -16,7 +16,7 @@ not a completion measure for the entire agent.
 |---|---|---|
 | Experience and privacy | Protected journal/vault, provenance, deletion and replay checks | Real lifetime/migration/restore with all external associations preserved |
 | Personalization | Owner-confirmed preferences and current Core USER advice; real main turns automatically curate a synthetic profile, Native interpretation consumes its exact current value and two real followups complete | External-provider recall, noise-aware daily learning and attributed feedback |
-| Agenda and initiative | Installed source-free controlled reminder, quiet idle, unchanged wait and completed-item suppression; owner-admitted agenda is a fixture | Natural owner-intent admission, changing real priorities, cancellation/snooze and sustained useful initiative |
+| Agenda and initiative | Source-free controlled reminder, quiet idle/wait, completion suppression; real main model discovers the tool, proposes one synthetic item and avoids saving explicit casual chat; actual owner commands confirm/complete it (ADR0240) | Wider intent/quotation/revision cases, changing priorities, snooze, process-restart continuity and sustained useful initiative |
 | Content and judgment | Source-led composition, final wording review, real main-model examples | Samples remain too much like cautious paper digests; factual review is not a usefulness verdict |
 | Conversation continuity | Exact share/source excerpts reach actual Core main requests; real replies after context reduction no longer recite transport status | Missing evidence still becomes global negative claims in real followup; qualify ADR0230, plus natural old-quote/compaction/restart behavior |
 | Sources | Actual Core free search and substantive extraction demonstrated in isolated profiles | More useful live selection across Chinese and other sources, currentness, provenance and inaccessible/full-read boundaries |
@@ -213,6 +213,12 @@ competing active plans. ADRs remain the record of architectural decisions.
    superseded work and completed work. Preserve actual source/owner/authority;
    a wake fingerprint is not a retained request or admitted obligation. Advance
    authorized work or ask a useful question; never fabricate action completion.
+   ADR0240 supplies a bounded temporary proposal and exact owner-confirmation
+   path through the real main collector/tool/command registry. Controlled
+   admission-to-reminder and completion pass; two actual main-model cases verify
+   request versus explicit casual chat. This does not exhaust ordinary intent
+   or establish longitudinal behavior. Do not silently expand this into recording
+   every incoming message.
 3. Verify continuity and adaptation across days and restart: recall why an item
    exists, inspect actual outcomes, cancel/snooze/complete correctly, respect
    forgetting and use attributed feedback without permanent-interest shortcuts.

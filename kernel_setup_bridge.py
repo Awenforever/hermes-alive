@@ -33,7 +33,9 @@ def attach_configured_continuity(binding, configured=None):
         raise ValueError('configured Core conversation realm changed')
     if (getattr(binding,'_continuity_configuration_id',None)==configured.event_id
             and binding._continuity is not None and not binding._continuity._closed
-            and binding._continuity.router is router):return True
+            and binding._continuity.router is router):
+        binding.attach_agenda()
+        return True
     from importlib import import_module
     package = store.__class__.__module__.rsplit('.',1)[0]
     Outbox = import_module(package+'.dispatch_outbox').DispatchOutbox
@@ -42,6 +44,7 @@ def attach_configured_continuity(binding, configured=None):
     binding.attach_continuity(Continuity(Outbox(store.journal,content_vault=store.vault)),
                               router,clearance=Sensitivity.PRIVATE,replace=binding._continuity is not None)
     binding._continuity_configuration_id=configured.event_id
+    binding.attach_agenda()
     return True
 
 
@@ -53,7 +56,8 @@ def register_setup_command(context,binding):
                     '然后在希望接收分享的已授权会话中发送给出的 /alive confirm 命令。'
                     '这一步不会自动迁移旧身份、调用模型或启用发送。')
         control=len(parts)==1 and parts[0] in ('enable','pause','status')
-        if not control and (len(parts) != 2 or parts[0] != 'confirm'):
+        agenda_command=parts[0]=='agenda'
+        if not control and not agenda_command and (len(parts) != 2 or parts[0] != 'confirm'):
             return '请使用 /alive confirm 确认配置，或 /alive enable、/alive pause、/alive status。'
         if not session_id or not session_key or source is None:
             return '当前会话尚无 Hermes 会话记录。请先发一句普通消息，再重试原确认命令。'
@@ -71,6 +75,10 @@ def register_setup_command(context,binding):
             for name in ('chat_id','user_id','thread_id','scope_id','guild_id','parent_chat_id'):
                 if (getattr(source,name,None) or '') != getattr(scope,name):
                     raise ValueError('Core command source differs from its persisted conversation')
+            if agenda_command:
+                if binding._agenda is None:
+                    return '请先完成 Alive 会话配置，再管理持续事项。'
+                return binding._agenda.command(scope,parts[1:])
             if control:
                 from . import kernel_execution_bridge as execution
                 async with binding.control_lock:
@@ -124,7 +132,7 @@ def register_setup_command(context,binding):
                 except Exception as rollback_error:
                     logger.warning('Alive enable rollback requires attention: %s',type(rollback_error).__name__)
             logger.warning('Alive setup confirmation unavailable: %s',type(exc).__name__)
-            return ('未完成操作：请检查确认码或配置是否有效、公开检索主题是否已配置、目标会话是否仍在当前已授权网关，'
+            return ('未完成操作：请检查确认码或配置是否有效、目标会话是否仍在当前已授权网关，'
                     '以及安装更新后是否已按引导重启。不会自动补发历史消息。')
     return context.register_command('alive',command,description='Configure and control Alive in this authorized conversation',
-                                    args_hint='confirm <one-time-code> | enable | pause | status',argument_mode='text')
+                                    args_hint='confirm <one-time-code> | enable | pause | status | agenda',argument_mode='text')

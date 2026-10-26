@@ -20,6 +20,7 @@ class GatewayHostBinding:
         self._unsubscribe_channels=None
         self._session_routers={}
         self._continuity=None
+        self._agenda=None
         context.on_unload(self.close)
         read_config=getattr(context,'get_config',None)
         settings=read_config('kernel_shadow',{}) if callable(read_config) else {}
@@ -94,6 +95,22 @@ class GatewayHostBinding:
         self._continuity=fresh
         return self._continuity
 
+    def attach_agenda(self):
+        self._require_home()
+        if self.closed or self._continuity is None:
+            raise ValueError('current configured continuity required')
+        if self._agenda is not None:return
+        from .gateway_agenda_bridge import CoreAgendaBridge, AGENDA_SCHEMA
+        fresh = CoreAgendaBridge(self)
+        registered = self.context.register_tool(name='alive_agenda', toolset='hermes_alive',
+            schema=AGENDA_SCHEMA, handler=fresh.tool,
+            check_fn=lambda: not self.closed and self._continuity is not None)
+        if registered is None:
+            fresh.close()
+            raise ValueError('Core agenda tool registration unavailable')
+        self._agenda = fresh
+        self.context.register_hook('pre_llm_call',self._agenda_context)
+
     def _read_reference(self, args, **values):
         result = {'error': 'alive_reference_unavailable'}
         if not self.closed and self._continuity is not None:
@@ -112,6 +129,14 @@ class GatewayHostBinding:
             return self._continuity.context(**values)
         except Exception as exc:
             logging.getLogger(__name__).warning('Alive conversation context unavailable: %s',type(exc).__name__)
+            return None
+
+    def _agenda_context(self,**values):
+        if self.closed or self._agenda is None:return None
+        try:
+            return self._agenda.context(**values)
+        except Exception as exc:
+            logging.getLogger(__name__).warning('Alive agenda context unavailable: %s',type(exc).__name__)
             return None
 
     def attach(self,native,*,build_parameters,max_cycles,interval_seconds=60,continuous=False):
@@ -206,6 +231,7 @@ class GatewayHostBinding:
 
     def close(self):
         self.closed=True
+        if self._agenda is not None:self._agenda.close()
         if self._continuity is not None:self._continuity.close()
         for router in self._session_routers.values():router.close()
         self._session_routers.clear()

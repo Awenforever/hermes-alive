@@ -38,6 +38,24 @@ carry context into subsequent conversation. Content discovery is an optional
 input to that loop. Proactive contact should be a short natural contribution;
 requested reports or detailed work may need a different level of detail.
 
+## Continuing items from conversation
+
+After confirmed kernel setup, Hermes can use `alive_agenda` to propose an ongoing
+item in the configured conversation. It shows the task, constraints, any explicit
+dates, retention period and a `/alive agenda accept <handle>` command. The
+proposal is temporary and not yet a saved obligation; use the exact command to
+save it. `/alive agenda preview <handle>` shows the exact pending content.
+Handles expire after ten minutes or a Gateway reload/session reset.
+
+`/alive agenda list` shows at most eight retained items, not a complete inventory.
+`/alive agenda done <item-id>` marks a known item complete; `cancel <item-id>`
+ends it without claiming completion. Saving an item never grants external tool
+execution or sending authority. It also does not enable Alive: the separate
+`/alive enable` authorization still controls proactive work. No entire incoming
+chat is retained by creating a temporary proposal. Interpretation remains the
+main agent's responsibility; long-term adaptation and all action kinds have not
+been qualified merely by installing these commands.
+
 ## Explain the public reading choices
 
 | Choice | Installation flags | Scope |

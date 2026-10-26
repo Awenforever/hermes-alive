@@ -1081,3 +1081,20 @@ required subgate, never the entire definition of Alive. Default unsolicited
 conversation should be brief and natural; requested depth and necessary
 qualifications remain available. The unfinished quoted-feedback prototype was
 saved in Git WIP rather than accidentally merged or dropped during this change.
+
+## 2026-10-26 — A synthetic owner request cannot stand in for ordinary intake
+
+ADR0240 adds a main-owned proposal tool and admitted owner confirmation path.
+Do not infer user authority from a model's extracted task, a wake receipt or a
+remembered preference. Temporary proposals are memory-only; the user confirms
+the displayed item and retention before the existing agenda receives an actual
+owner source. The actual-Core controlled sequence now exercises the real main
+collector/tool dispatcher and command instead of inserting a synthetic request.
+It covers expiry, task mismatch, exact preview, completion, missing storage and
+forgetting; it is still not real-model judgment, real delivery or sustained life.
+
+Keep actual-Core tool discovery enabled in model probes. Eager-schema assertions
+can reject a healthy deferred tool registration before any model request. Always
+use the current Core agent close lifecycle; a nonexistent cleanup method can
+mask the first failure. Preserve failed experiment evidence and label requested
+model inference separately from an observed response.
