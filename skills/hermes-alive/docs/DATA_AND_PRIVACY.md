@@ -136,5 +136,21 @@ fallback coordinates.
 
 ## Removal
 
+### Kernel development: native work request retention
+
+Separately guided native background work uses Core's own model/profile context
+and task records. New guidance explicitly includes the current owner message
+for each handoff, at most 6000 characters, as exact source context alongside the
+prior agenda description. Longer requests are refused without truncation. This
+does not collect conversation history. Alive retains causal references and keyed
+fingerprints, not another copy of that message. Core task-record retention is
+separate from Alive's item/outbound retention; removing only Alive cannot erase
+Core's records. Old grants without the source-retention choice cannot create new
+handoffs until renewed guidance. Lifecycle observations contain metadata, not
+worker output bodies. Full Core-work cancellation/purge/migration qualification
+remains a development release gate; see LIFECYCLE_AND_PERSISTENCE.md.
+
+### Legacy shared-state removal
+
 Default uninstall preserves shared user/runtime state. `purge` removes all Hermes
 Alive-owned shared state and is destructive.

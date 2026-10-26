@@ -137,7 +137,8 @@ class CoreAgendaBridge:
             'For a clear current request to perform an existing ongoing item, use work with its exact version. '
             'Automatic toolsets: '+json.dumps(configured.options.get('automatic_core_toolsets',[]))+'. '
             'Outside that scope, show the complete returned preview and confirmation command. '
-            if configured.options.get('core_background_work') is True else 'Core background-work handoff is not configured. ')
+            if configured.options.get('core_background_work') is True and configured.options.get('core_work_request_retention') is True
+            else 'Current Core background-work/request-retention guidance is required before work handoff. ')
         return {'context': 'Alive continuing items: alive_agenda can propose, record authorized explicit follow-ups or inspect current items. '
                            +intake+management+work+'A proposal is temporary until the user confirms its exact command. '
                            'Remembering an item does not authorize tools or an external action, and does not enable '
@@ -281,7 +282,8 @@ class CoreAgendaBridge:
         from .kernel_execution_bridge import kernel
         def validate():
             _current_store,current=self._owner(scope)
-            if current.event_id!=configured.event_id or current.options.get('core_background_work') is not True:
+            if (current.event_id!=configured.event_id or current.options.get('core_background_work') is not True
+                    or current.options.get('core_work_request_retention') is not True):
                 raise ValueError('background grant changed')
             policy=kernel('autonomy_policy').AutonomyPolicyProjection(store.journal).current(configured.subject)
             if policy is None or not policy.enabled:raise ValueError('Alive is paused')
@@ -296,8 +298,12 @@ class CoreAgendaBridge:
 
     def _work(self,store,configured,scope,task,session_id,turn,args):
         from .kernel_execution_bridge import kernel
-        if configured.options.get('core_background_work') is not True:
+        if (configured.options.get('core_background_work') is not True
+                or configured.options.get('core_work_request_retention') is not True):
             return {'error':'guided_background_work_setup_required','job_created':False}
+        if not isinstance(turn[3],str) or not turn[3].strip() or len(turn[3])>6000:
+            return {'error':'bounded_current_work_request_required','job_created':False,
+                    'hint':'Provide a concise current work request; no silent truncation or historical-chat collection.'}
         if not isinstance(args.get('item_id'),str) or not args['item_id']:
             raise ValueError('exact work item required')
         items=self._items(store,configured,args['item_id'])
@@ -318,11 +324,11 @@ class CoreAgendaBridge:
         if previous or not set(sets)<=set(configured.options.get('automatic_core_toolsets',[])):
             handle=uuid4().hex
             with self.lock:
-                self.work_drafts[handle]=dict(item=item,toolsets=sets,evidence=evidence,
+                self.work_drafts[handle]=dict(item=item,toolsets=sets,evidence=evidence,owner_request=turn[3],
                     scope=scope,configuration=configured.event_id,created=time.monotonic())
                 while len(self.work_drafts)>16:self.work_drafts.popitem(last=False)
             return {'status':'work_confirmation_required','job_created':False,
-                'preview':{'item':item,'toolsets':sets,'uses_core_profile_context':True,
+                'preview':{'item':item,'toolsets':sets,'uses_core_profile_context':True,'current_owner_request':turn[3],
                            'job_record_retention_owned_by_core':True,'filesystem_sandbox':False,
                            'previous_work':previous,
                            'new_attempt_may_repeat_existing_effects':previous is not None},
@@ -331,7 +337,7 @@ class CoreAgendaBridge:
         def current():
             validate();self._turn_evidence(store,configured,scope,task,session_id,turn,args)
         return work_store.launch(configured,item=item,turn_evidence=evidence,
-            toolsets=sets,validate=current)
+            owner_request=turn[3],toolsets=sets,validate=current)
 
     def _record(self,store,configured,scope,task,session_id,turn,args,details,due,available):
         from .kernel_execution_bridge import kernel
@@ -470,7 +476,7 @@ class CoreAgendaBridge:
                     return '该确认码已失效或已处理。请查询原事项的工作状态；本次没有创建新任务。'
                 validate=self._work_validator(store,configured,scope,draft['item'])
                 result=kernel('core_work').CoreWorkStore(store).launch(configured,item=draft['item'],
-                    turn_evidence=draft['evidence'],toolsets=draft['toolsets'],
+                    turn_evidence=draft['evidence'],owner_request=draft['owner_request'],toolsets=draft['toolsets'],
                     validate=validate,explicit_confirmation=True)
                 del self.work_drafts[parts[1]]
                 self.work_receipts[parts[1]]={'scope':scope,'work_id':result['work_id']}

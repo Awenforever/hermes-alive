@@ -63,7 +63,7 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
     setup.add_argument('--confirm-core-tool-observation',action='store_true',
         help='Observe tool names, durations and terminal status only in the configured owner conversation; diagnostic validity follows retention days, structural ledger remains until removed; no arguments/results/error bodies or execution authority')
     setup.add_argument('--confirm-core-background-work',action='store_true',
-        help='Allow handing ongoing work to native Hermes jobs: they use Core models/profile memory and keep their own job records; requires explicit follow-up intake')
+        help='Allow native Hermes work with Core models/profile memory and task-record retention, including the exact current owner message (at most 6000 characters); requires explicit follow-up intake')
     setup.add_argument('--automatic-core-toolset',action='append',default=[],
         help='Core toolset allowed for automatic background work; repeat after guidance. Empty means model-only work; other requested toolsets require per-operation confirmation. This is not a filesystem sandbox')
     setup.add_argument('--model',default=None,help='Optional Core-configured alias; default inherits Hermes')
@@ -262,7 +262,7 @@ def alive_command(args: argparse.Namespace) -> int:
                 or getattr(args,'confirm_followup_management',False) else {}),
             **({'manage_explicit_followups':True} if getattr(args,'confirm_followup_management',False) else {}),
             **({'observe_core_tools':True} if getattr(args,'confirm_core_tool_observation',False) else {}),
-            **({'core_background_work':True,'automatic_core_toolsets':args.automatic_core_toolset}
+            **({'core_background_work':True,'core_work_request_retention':True,'automatic_core_toolsets':args.automatic_core_toolset}
                if getattr(args,'confirm_core_background_work',False) else {}),
             **({'refine_public_sources':True} if getattr(args,'confirm_public_refinement',False) else {}),
             **({'language':args.language} if getattr(args,'language',None) else {}),
@@ -283,6 +283,8 @@ def alive_command(args: argparse.Namespace) -> int:
                 'core_tool_structural_observation':bool(getattr(args,'confirm_core_tool_observation',False)),
                 'core_tool_arguments_or_results_retained':False,
                 'native_core_background_work':bool(getattr(args,'confirm_core_background_work',False)),
+                'exact_current_work_message_retained_by_core':bool(getattr(args,'confirm_core_background_work',False)),
+                'current_work_message_limit_chars':6000,
                 'automatic_core_toolsets':args.automatic_core_toolset,
                 'background_jobs_use_core_profile_context':bool(getattr(args,'confirm_core_background_work',False)),
                 'background_job_record_retention_owned_by_core':bool(getattr(args,'confirm_core_background_work',False)),

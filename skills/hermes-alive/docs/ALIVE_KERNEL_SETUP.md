@@ -103,6 +103,11 @@ item to native Hermes jobs. It is independently off for existing configurations.
 Only after guidance add `--confirm-core-background-work`, alongside explicit
 follow-up intake. This authorizes Core's normal model/profile-memory context and
 Core's separately retained task records, not just Alive's optional profile advice.
+That record includes the exact current owner message for the work handoff, bounded
+to 6000 characters, alongside the prior agenda context. No silent truncation or
+whole-chat collection. Explain this retention before confirming the guided scope.
+Older background grants without this choice remain readable but require renewed
+guidance before another handoff; an upgrade does not silently expand retention.
 Explain that these are the profile's normal Core capabilities and context; do not
 silently enable this on an upgrade or shared installation.
 

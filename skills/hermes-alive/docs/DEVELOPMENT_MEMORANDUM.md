@@ -1217,3 +1217,15 @@ abstention is not proof of real-model judgment, notification usefulness or
 independent task success. The fresh useful-sharing gate is still 0/10. Continue
 toward independent outcomes and changed later decisions, not repeated component
 green checks or a content-only plugin.
+
+The inherited-main four-turn synthetic handoff test exposed a separate source
+gap: a retained item can still contain earlier temporary execution restrictions,
+while Core previously received no original current work request. Do not call its
+structural pass semantic end-to-end acceptance. New guidance includes bounded
+exact current-message retention in Core's own record, beside the old agenda
+context. The bridge authenticates the full current message fingerprint, refuses
+oversize input without truncation, and carries the same text through a confirmed
+draft. Old grants do not gain this retention silently. Alive's journal still
+keeps references/fingerprints only. This preserves execution-source evidence;
+initial agenda-source retention, semantic conflicts and actual task/deadline
+revision remain distinct unfinished work. No word-specific override rules.

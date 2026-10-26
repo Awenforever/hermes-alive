@@ -38,21 +38,22 @@ def validate_options(options):
     if (not isinstance(options, dict) or not required<=set(options)
             or set(options)-required-{'language','communication_preference','interest_preferences','use_hermes_user_profile',
                                      'refine_public_sources','accept_explicit_followups','manage_explicit_followups','observe_core_tools',
-                                     'core_background_work','automatic_core_toolsets'}
+                                     'core_background_work','core_work_request_retention','automatic_core_toolsets'}
             or options['model_calls'] is not True or options['delivery'] is not True
             or options['outbound_retention_confirmed'] is not True
             or type(options['outbound_retention_days']) is not int
             or not 1 <= options['outbound_retention_days'] <= 365
             or type(options['cited_reads']) is not bool
             or any(key in options and type(options[key]) is not bool
-                   for key in ('use_hermes_user_profile','refine_public_sources','accept_explicit_followups','manage_explicit_followups','observe_core_tools','core_background_work'))
+                   for key in ('use_hermes_user_profile','refine_public_sources','accept_explicit_followups','manage_explicit_followups','observe_core_tools','core_background_work','core_work_request_retention'))
             or options.get('manage_explicit_followups') is True and options.get('accept_explicit_followups') is not True):
         raise KernelSetupError('explicit model/delivery/retention choices required')
     worksets=options.get('automatic_core_toolsets',[])
     from .core_work import CoreWorkStore
     try:CoreWorkStore.toolsets(worksets)
     except ValueError:raise KernelSetupError('bounded Core toolset selection required') from None
-    if (('automatic_core_toolsets' in options and options.get('core_background_work') is not True)
+    if (options.get('core_work_request_retention') is True and options.get('core_background_work') is not True
+            or ('automatic_core_toolsets' in options and options.get('core_background_work') is not True)
             or options.get('core_background_work') is True and options.get('accept_explicit_followups') is not True):
         raise KernelSetupError('guided background scope and explicit intake required')
     model = options['model']

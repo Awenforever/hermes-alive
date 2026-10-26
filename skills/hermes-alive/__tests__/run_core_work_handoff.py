@@ -5,6 +5,7 @@ This does not prove real-model intent, independent semantic verification or the
 Native autonomous decision branch. No channel, real provider or private history.
 """
 import asyncio,hashlib,importlib,json,os,shutil,subprocess,sys,tempfile,threading
+from dataclasses import replace
 from datetime import datetime,timedelta,timezone
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from pathlib import Path
@@ -61,6 +62,7 @@ async def test(home):
     rc,staged=cli(home,'setup','--confirm-model-calls','--confirm-delivery','--confirm-outbound-retention',
         '--confirm-followup-management','--confirm-core-background-work','--automatic-core-toolset','file')
     assert rc==0 and staged['confirmation_summary']['native_core_background_work']
+    assert staged['confirmation_summary']['exact_current_work_message_retained_by_core'] is True
     assert staged['confirmation_summary']['automatic_core_toolsets']==['file']
     assert cli(home,'install-runtime','--engine','kernel')[0]==0
     token=core.set_hermes_home_override(home);manager=None
@@ -111,7 +113,11 @@ async def test(home):
             'constraint':'不要发送消息','evidence_span':text})
         assert item.get('status')=='recorded_under_owner_intake_grant',item
         row=tool({'operation':'list','item_id':item['item_id']})['items'][0]
-        text='现在执行这项工作，写入指定结果文件，不要发送消息。'
+        oversized=turn('work-oversized','查'*6001)
+        refused=oversized({'operation':'work','item_id':row['item_id'],'item_version':row['item_version'],
+                          'toolsets':['file'],'evidence_span':'查'})
+        assert refused['error']=='bounded_current_work_request_required' and not jobs.list_jobs(include_disabled=True)
+        text='现在执行这项工作，写入指定结果文件。\n不要发送消息。'
         tool=turn('work-launch',text)
         payload={'operation':'work','item_id':row['item_id'],'item_version':row['item_version'],
                  'toolsets':['file'],'evidence_span':text}
@@ -119,6 +125,19 @@ async def test(home):
         assert tool(payload)['work_id']==started['work_id']
         assert len(jobs.list_jobs(include_disabled=True))==1
         job=jobs.get_job(started['job_id'])
+        assert json.loads(job['prompt'].rsplit('\n',1)[1])['current_owner_message']==text
+        work_store=execution.kernel('core_work').CoreWorkStore(store)
+        configured=store.configuration()
+        receipt=work_store._read(started['work_id'],'requested',configured.subject)
+        assert text not in store.journal.get(started['work_id']+':requested').event.canonical_json()
+        for candidate,body_request in ((replace(configured,options={**dict(configured.options),
+                'core_work_request_retention':False}),text),(configured,text+' tampered')):
+            try:
+                work_store.launch(candidate,item=row,turn_evidence=dict(receipt['turn_evidence']),
+                    owner_request=body_request,toolsets=['file'],validate=lambda:None)
+                raise AssertionError('legacy retention or changed source silently admitted')
+            except ValueError:pass
+        assert len(jobs.list_jobs(include_disabled=True))==1
         assert job['enabled_toolsets']==['file','no_mcp'] and job['deliver']=='local'
         cfg={'mcp_servers':{'synthetic-new-server':{'command':'not-executed'}}}
         assert set(_resolve_cron_enabled_toolsets({'enabled_toolsets':['file']},cfg))>{'file'}
@@ -154,6 +173,7 @@ async def test(home):
             rendered=json.dumps(data['messages'],ensure_ascii=False)
             assert str(artifact) in rendered and '不要发送消息' in rendered
             assert 'INDEPENDENT_SYNTHETIC_ARTIFACT' in rendered
+            assert 'current_owner_message' in rendered and '写入指定结果文件' in rendered
             if any(m['role']=='tool' for m in data['messages']):
                 message={'role':'assistant','content':'The requested test artifact was created.'};finish='stop'
             else:
