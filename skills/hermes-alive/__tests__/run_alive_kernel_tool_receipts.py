@@ -21,7 +21,8 @@ from alive_kernel import assess_reported_outcome  # noqa: E402
 
 class FakePluginContext:
     def __init__(self) -> None:
-        self.hooks: dict[str, list] = {}
+        self.hooks: dict[str, object] = {}
+        self._observers: dict[str, list] = {}
         self.cli: dict[str, object] = {}
         self.commands: dict[str, object] = {}
         self._manager=SimpleNamespace(scope_key=str(Path.cwd()))
@@ -31,7 +32,12 @@ class FakePluginContext:
         self.unload.append(callback)
 
     def register_hook(self, name, callback):
-        self.hooks.setdefault(name, []).append(callback)
+        self._observers.setdefault(name, []).append(callback)
+        if name not in self.hooks:
+            def dispatch(**values):
+                for observer in tuple(self._observers[name]):
+                    observer(**values)
+            self.hooks[name] = dispatch
 
     def register_cli_command(self, **values):
         self.cli[str(values["name"])] = values
@@ -83,12 +89,10 @@ def main() -> int:
             context = FakePluginContext()
             plugin.register(context)
             assert set(context.hooks) == {"pre_api_request", "post_tool_call", "post_gateway_admission"}
-            assert len(context.hooks['post_tool_call']) == 2
+            assert len(context._observers['post_tool_call']) == 2
             assert set(context.cli) == {"alive"}
             assert set(context.commands)=={'alive'}
-            def callback(**values):
-                for observer in context.hooks['post_tool_call']:
-                    observer(**values)
+            callback = context.hooks['post_tool_call']
             values = {
                 "tool_name": "terminal",
                 "task_id": "private-task-id",
@@ -104,8 +108,7 @@ def main() -> int:
                 "error_message": "private error sentinel",
             }
             callback(**values)
-            for observer in context.hooks['pre_api_request']:
-                observer(**values)
+            context.hooks['pre_api_request'](**values)
             assert not (shared / "kernel" / "experience.sqlite3").exists()
 
             os.environ["HERMES_ALIVE_KERNEL_SHADOW_ENABLED"] = "true"

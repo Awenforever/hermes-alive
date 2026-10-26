@@ -1339,3 +1339,19 @@ and partial windows must remain explicit. No source text grants instructions,
 completion, retry or new tool scope. Follow this with actual independent inspection
 and Native work decisions, not another claim that a record-reading API finishes
 the proactive agent. Controlled replies do not prove semantic judgments.
+
+
+The r152 full run stopped at admitted-inbound's imported FakePluginContext:
+changing hooks to list values broke the existing callable dispatch interface.
+Preserve both contracts in the shared fake: register multiple observers but expose
+one callable dispatcher for each hook name. Check both receipt and inbound tests
+together; do not work around it in product hooks or skip the imported consumer.
+The original r152 failure and 92 completed log files remain evidence, not PASS99.
+
+r153's opt-in actual-Core/Native record-review integration and its default-off
+counterpart pass, as does the four-Core entry focus. New record content with the
+same completed execution causes a new signed window/Native interpretation;
+unchanged records stay quiet. The controlled reply changes its attributed
+abstention reason, not agenda state or tools. Cold paused review and old grants
+refuse background body reads before SessionDB, with original keys preserved.
+This is not a real-model semantic verdict or fresh independent task inspection.

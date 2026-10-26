@@ -1,6 +1,6 @@
 # ADR 0249 — Owned historical work records enter Native cognition
 
-Status: implementation candidate under isolated qualification; no production acceptance.
+Status: implemented on the development branch; bounded actual-Core/Native integration qualified, no production acceptance.
 Date: 2026-10-27.
 
 ## Problem and choice
@@ -45,3 +45,13 @@ input, metadata-only old grants, pause/cold no-read behavior, same-status record
 changes causing reconsideration, unchanged suppression, exact association and
 fingerprint refusal, no new job/send, and preservation of the original keys.
 Controlled model replies prove integration, not real-model judgment quality.
+
+
+The r153 controlled-provider integration runs real Core file write/read, the
+actual assembled Native cycle, unchanged-wait suppression and changed-record
+reconsideration with the same execution status. It preserves an attributed
+abstention rather than upgrading a new worker claim to independent success.
+Default/old grants remain metadata-only; paused and cold-paused reviews perform
+no Core body read. Those checks do not prove real-model judgment or fresh world
+inspection. The separate inherited-model experiment remains subject to actual
+terminal results and semantic review.
