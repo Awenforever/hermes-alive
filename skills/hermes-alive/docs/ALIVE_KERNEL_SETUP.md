@@ -233,3 +233,16 @@ reason and binding are retained privately for at most seven days or the earlier
 item expiry; the original Core task record follows Core retention. Historical
 producer output and the later inspection readback remain different evidence.
 General autonomous work and automatic goal closure are still under development.
+## Stopping an owned background task
+
+In the configured owner conversation, ask Hermes to stop the exact continuing
+work. With explicit management enabled, it can use `alive_agenda work_stop` after
+identifying the owned work and the current request. You can also send
+`/alive agenda stop-work <work-id>`. This remains available while Alive is paused.
+
+The operation stops further authorized work, pauses its existing Core schedule
+and asks Core to cancel the current execution and its inspection. Acknowledgment
+is not proof that execution has ended; pending or unknown outcomes are reported
+honestly. Already-performed or in-flight effects are not undone. The agenda item
+is retained, so stopping execution and dismissing the item remain explicit choices.
+

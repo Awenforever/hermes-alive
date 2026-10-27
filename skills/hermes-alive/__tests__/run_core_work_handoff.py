@@ -39,10 +39,14 @@ from run_core_guided_setup import cli
 
 
 async def test(home):
+    stop_mode=os.environ.get('ALIVE_WORK_STOP_TEST','')
+    assert stop_mode in ('','pending','running','fenced','retry')
+    stop_entered=threading.Event();stop_release=threading.Event()
+    stopped_inspection=os.environ.get('ALIVE_WORK_INSPECTION_STOP_TEST')=='1'
     concurrent_inspection=os.environ.get('ALIVE_WORK_INSPECTION_CONCURRENT_TEST')=='1'
     concurrent_fired=[]
     revoked_inspection=os.environ.get('ALIVE_WORK_INSPECTION_REVOKE_TEST')=='1'
-    inspection_mode=os.environ.get('ALIVE_WORK_INSPECTION_TEST')=='1' or revoked_inspection
+    inspection_mode=os.environ.get('ALIVE_WORK_INSPECTION_TEST')=='1' or revoked_inspection or stopped_inspection
     review_records=os.environ.get('ALIVE_WORK_REVIEW_TEST')=='1' or inspection_mode
     home.mkdir(exist_ok=True);shutil.copytree(core.repo,home/'plugins/hermes-alive')
     responses={}
@@ -223,6 +227,9 @@ async def test(home):
             assert str(artifact) in rendered and '不要发送消息' in rendered
             assert 'INDEPENDENT_SYNTHETIC_ARTIFACT' in rendered
             assert 'current_owner_message' in rendered and '写入指定结果文件' in rendered
+            if stop_mode in ('running','fenced','retry'):
+                stop_entered.set()
+                assert stop_release.wait(30),'stop qualification did not release provider'
             if any(c.get('function',{}).get('name')=='read_file' for m in data['messages'] for c in m.get('tool_calls',[])):
                 message={'role':'assistant','content':'The requested test artifact was created.'};finish='stop'
             elif any(m['role']=='tool' for m in data['messages']):
@@ -244,6 +251,72 @@ async def test(home):
                 'model':'configured-primary','choices':[{'index':0,'message':message,'finish_reason':finish}],
                 'usage':{'prompt_tokens':10,'completion_tokens':10,'total_tokens':20}})
         responses['handler']=respond
+        if stop_mode:
+            clock=None
+            if stop_mode in ('running','fenced','retry'):
+                clock=asyncio.create_task(asyncio.to_thread(tick,verbose=False,sync=True,headless=False))
+                assert await asyncio.to_thread(stop_entered.wait,20),'Core worker did not enter its model request'
+            text='停止这项合成文件工作，不要再执行。'
+            stop_tool=turn('owner-stop-work',text)
+            count=len(list(store.journal.read()))
+            bad=await asyncio.to_thread(stop_tool,{'operation':'work_stop','work_id':started['work_id'],
+                'evidence_span':'not in current owner message'})
+            assert 'error' in bad and len(list(store.journal.read()))==count
+            foreign=await asyncio.to_thread(stop_tool,{'operation':'work_stop','work_id':'core-work:'+'f'*64,
+                'evidence_span':text})
+            assert 'error' in foreign and len(list(store.journal.read()))==count
+            try:
+                stop_args={'operation':'work_stop','work_id':started['work_id'],'evidence_span':text}
+                if stop_mode in ('fenced','retry'):
+                    control_type=execution.kernel('core_work_control').CoreWorkControl
+                    async def unavailable_owner(*args,**kwargs):raise TimeoutError('synthetic lost cancellation answer')
+                    with patch.object(control_type,'_cancel_owner',unavailable_owner):
+                        stopped=await asyncio.to_thread(stop_tool,stop_args)
+                        before_attempts=len(list(store.journal.read(event_type='work.stop_dispatch_started')))
+                        repeated=await asyncio.to_thread(stop_tool,stop_args)
+                        assert repeated['targets'][0]['needs_attention'] is True
+                        assert len(list(store.journal.read(event_type='work.stop_dispatch_started')))==before_attempts==1
+                    assert stopped['targets'][0]['status']=='owner_stop_outcome_unknown'
+                    assert stopped['targets'][0]['execution_stopped_proven'] is False
+                    if stop_mode=='retry':
+                        stopped=json.loads(await command('agenda stop-work '+started['work_id']))
+                        assert len(list(store.journal.read(event_type='work.stop_dispatch_started')))==2
+                else:
+                    stopped=await asyncio.to_thread(stop_tool,stop_args)
+                assert stopped['status']=='stop_requested',stopped
+                assert stopped['effects_undone'] is False and stopped['new_work_submitted'] is False
+                assert len(stopped['targets'])==1
+                observed=stopped['targets'][0]
+                if stop_mode in ('running','retry'):
+                    assert observed.get('cancel_acknowledged') is True,observed
+                elif stop_mode=='fenced':
+                    assert observed['needs_attention'] and observed['cancel_acknowledged'] is False
+                else:
+                    assert observed['status']=='schedule_paused_no_execution_observed',observed
+                    assert tick(verbose=False,sync=True,headless=False)==0
+            finally:
+                stop_release.set()
+                if clock is not None:await clock
+            assert not artifact.exists(),'a stopped Core worker wrote its file'
+            if stop_mode=='fenced':
+                assert 'This work no longer has valid authorization' in json.dumps(requests)
+            assert len(jobs.list_jobs(include_disabled=True))==1
+            current=work_store.status(started['work_id'],subject=configured.subject)
+            assert current['owner_stop_requested'] is True
+            assert current.get('core_execution_state') not in ('claimed','running')
+            before=len(list(store.journal.read(event_type='work.stop_dispatch_started')))
+            replay=json.loads(await command('agenda stop-work '+started['work_id']))
+            assert replay['status']=='stop_requested' and len(list(store.journal.read(event_type='work.stop_dispatch_started')))==before
+            assert not artifact.exists() and len(jobs.list_jobs(include_disabled=True))==1
+            assert tool({'operation':'work_stop','work_id':started['work_id'],
+                'evidence_span':original_request}).get('error')  # retired turn cannot authorize a stop
+            assert json.loads(await command('agenda list'))['items'][0]['state']=='active'
+            keys=('identity.key','content-vault/content.key','experience-content-vault/content.key')
+            (home/'stop-expected.json').write_text(json.dumps({'work_id':started['work_id'],
+                'owner':configured.subject,'artifact':str(artifact),
+                'keys':{n:hashlib.sha256((store.root/n).read_bytes()).hexdigest() for n in keys}}))
+            print('HERMES_ALIVE_CORE_WORK_HANDOFF_OK')
+            return
         assert tick(verbose=False,sync=True,headless=False)==1
         status=tool({'operation':'work_status','work_id':started['work_id']})
         assert status.get('core_execution_state')=='completed',(status,jobs.get_job(started['job_id']).get('last_error'))
@@ -389,6 +462,20 @@ async def test(home):
             leaf=inspector.latest(started['work_id'],subject=configured.subject)
             assert leaf is not None and len(jobs.list_jobs(include_disabled=True))==2
             assert work_store.previous(row['item_id'],subject=configured.subject)['work_id']==started['work_id']
+            if stopped_inspection:
+                answer=json.loads(await command('agenda stop-work '+started['work_id']))
+                assert answer['status']=='stop_requested' and len(answer['targets'])==2,answer
+                assert answer['targets'][0]['status']=='execution_already_terminal'
+                assert answer['targets'][1]['status']=='schedule_paused_no_execution_observed'
+                assert tick(verbose=False,sync=True,headless=False)==0 and not inspection_requests
+                assert artifact.read_text()==fresh and unapproved.read_text()=='MUST_NOT_BE_READ'
+                assert (await native.step(build())).disposition=='silence'
+                assert len(jobs.list_jobs(include_disabled=True))==2
+                keys=('identity.key','content-vault/content.key','experience-content-vault/content.key')
+                (home/'inspection-expected.json').write_text(json.dumps({'parent':started['work_id'],'child':leaf[0],
+                    'owner':configured.subject,'stopped':True,'keys':{n:hashlib.sha256((store.root/n).read_bytes()).hexdigest() for n in keys}}))
+                print('HERMES_ALIVE_CORE_WORK_HANDOFF_OK')
+                return
             if revoked_inspection:
                 scope=binding._continuity.router.capture_target(session_key=entry.session_key,
                     user_id=source.user_id,platform='telegram')
@@ -641,13 +728,34 @@ async def test(home):
 if __name__=='__main__':
     if os.environ.get('ALIVE_WORK_CHECK')=='1':
         home=Path(os.environ['HERMES_HOME'])
-        if os.environ.get('ALIVE_WORK_INSPECTION_TEST')=='1' or os.environ.get('ALIVE_WORK_INSPECTION_REVOKE_TEST')=='1':
+        if os.environ.get('ALIVE_WORK_STOP_TEST'):
+            expected=json.loads((home/'stop-expected.json').read_text())
+            execution=importlib.import_module('alive_session_fixture.kernel_execution_bridge')
+            store=execution.kernel('kernel_setup').KernelSetupStore(home/'plugin-data/hermes-alive/runtime/kernel')
+            assert all(hashlib.sha256((store.root/n).read_bytes()).hexdigest()==v for n,v in expected['keys'].items())
+            state=execution.kernel('core_work').CoreWorkStore(store).status(expected['work_id'],subject=expected['owner'])
+            assert state['owner_stop_requested'] and state.get('core_execution_state') not in ('claimed','running')
+            assert not Path(expected['artifact']).exists()
+            from cron.jobs import list_jobs
+            assert len(list_jobs(include_disabled=True))==1
+            print('HERMES_ALIVE_CORE_WORK_COLD_ASSOCIATION_OK')
+            raise SystemExit(0)
+        if os.environ.get('ALIVE_WORK_INSPECTION_TEST')=='1' or os.environ.get('ALIVE_WORK_INSPECTION_REVOKE_TEST')=='1' or os.environ.get('ALIVE_WORK_INSPECTION_STOP_TEST')=='1':
             expected=json.loads((home/'inspection-expected.json').read_text())
             execution=importlib.import_module('alive_session_fixture.kernel_execution_bridge')
             store=execution.kernel('kernel_setup').KernelSetupStore(home/'plugin-data/hermes-alive/runtime/kernel')
             assert all(hashlib.sha256((store.root/n).read_bytes()).hexdigest()==v for n,v in expected['keys'].items())
             work=execution.kernel('core_work').CoreWorkStore(store)
             inspection=execution.kernel('core_file_inspection').CoreFileInspection(store)
+            if expected.get('stopped'):
+                with patch('hermes_state.SessionDB',side_effect=AssertionError('stopped inspector opened Core records')):
+                    result=inspection.snapshot(expected['parent'],subject=expected['owner'])
+                assert result['work_id']==expected['child'] and result['state']['owner_stop_requested'] is True
+                assert result['inspection_records'] is None
+                from cron.jobs import list_jobs
+                assert len(list_jobs(include_disabled=True))==2
+                print('HERMES_ALIVE_CORE_WORK_COLD_ASSOCIATION_OK')
+                raise SystemExit(0)
             if expected.get('paused'):
                 with patch('hermes_state.SessionDB',side_effect=AssertionError('cold paused inspection opened Core bodies')):
                     try:

@@ -159,5 +159,5 @@ def register_inspection_guard(ctx,binding):
             owned=inspector.guard(execution,tool_name,args)
             if owned is None and reserved:raise ValueError('inspection authorization unavailable')
         except Exception as error:
-            if reserved or getattr(error,'inspection_owned',False):return {'action':'block','message':'This inspection no longer has a valid authorization for its approved file.'}
+            if reserved or getattr(error,'inspection_owned',False):return {'action':'block','message':'This work no longer has valid authorization for this tool call.'}
     ctx.register_hook('pre_tool_call',guard)

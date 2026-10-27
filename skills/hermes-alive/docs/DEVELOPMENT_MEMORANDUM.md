@@ -1434,3 +1434,15 @@ and projection removal precede real-response review. Preserve the failed runs.
 Further work must address stopping underlying work (agenda cancellation alone is
 explicitly insufficient), pending/in-flight lifecycle, appropriate autonomous
 closure, task revision and the rest of the longitudinal and distribution gates.
+
+
+ADR0253 distinguishes stopping actual owned Core work from cancelling its agenda
+entry. Persist stop intent before Core IO; gate new owned tool calls and use Core
+recover/cancel/status for the exact existing execution. A paused schedule or cancel
+ack is not a stopped-execution proof or effect rollback. r168 pending stop passes;
+r168 running stop performs actual cancellation/no file effect but fails on a
+repeat command because Core refuses pause on terminal jobs. Preserve this failed
+run. Recheck terminal state, including a completion racing the pause. A failed
+cancel transport must keep attention visible. Duplicate current-turn requests do
+not redispatch; a new explicit owner request may cancel the same admission again,
+never replay the work. Actual transport-loss/fence/retry tests remain required.

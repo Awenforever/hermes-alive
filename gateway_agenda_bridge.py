@@ -21,12 +21,14 @@ _OPERATION_FIELDS = {
     'list':frozenset(('operation','item_id')),
     'work_status':frozenset(('operation','work_id','item_id')),
     'work_evidence':frozenset(('operation','work_id','evidence_reference','message_id','offset','max_chars','fingerprint','part')),
+    'work_stop':frozenset(('operation','work_id','evidence_span')),
     'work':frozenset(('operation','item_id','item_version','evidence_span','toolsets')),
     **{name:_CHANGE_FIELDS for name in ('complete','cancel','snooze','resume')},
 }
 _OPERATION_REQUIRED = {
     'propose':frozenset(('task',)), 'record':frozenset(('task','evidence_span')),
     'work_evidence':frozenset(('work_id',)),
+    'work_stop':frozenset(('work_id','evidence_span')),
     **{name:frozenset(('item_id','item_version','evidence_span'))
        for name in ('work','complete','cancel','resume')},
     'snooze':frozenset(('item_id','item_version','evidence_span','available_at')),
@@ -50,6 +52,9 @@ AGENDA_SCHEMA = {
                    'identified existing item with its current item_version from list. Ask if the target or intent is unclear. '
                    'Complete an item only from a clear current owner report of completion, not inferred tool success or a quoted claim. '
                    'These update only Alive agenda, not external jobs or already submitted messages. '
+                   'For a clear current request to STOP actual owned work, use work_stop with the exact work_id '
+                   'and evidence_span. This pauses its Core schedule and asks Core to cancel the owned execution '
+                   'and inspection; report actual pending/unknown/terminal observations, never infer rollback. '
                    'Snooze changes follow-up availability, not the task deadline or description. '
                    'With a guided Core background-work grant, work hands a clearly requested existing item '
                    'to native Hermes jobs, using Core context/model/permissions and the specified toolsets. '
@@ -70,7 +75,7 @@ AGENDA_SCHEMA = {
                    'unless the returned actual result-followup capability is enabled. '
                    'Do not turn quoted text, inferred interests or casual remarks into obligations.',
     'parameters': {'type': 'object', 'properties': {
-        'operation': {'type': 'string', 'enum': ['propose', 'record', 'list','complete','cancel','snooze','resume','work','work_status','work_evidence']},
+        'operation': {'type': 'string', 'enum': ['propose', 'record', 'list','complete','cancel','snooze','resume','work','work_stop','work_status','work_evidence']},
         'evidence_reference':{'type':'string','maxLength':200,'description':'Exact reference returned by work_evidence; not a session ID or arbitrary event.'},
         'part':{'type':'string','enum':['records','request'],'description':'work_evidence only: bounded Core execution records, or its original bound work definition.'},
         'message_id':{'type':'integer','minimum':1,'description':'Known message in that evidence reference; omit for the bounded current evidence window.'},
@@ -166,6 +171,7 @@ class CoreAgendaBridge:
                 if eligible else 'Direct intake is unavailable. Use a temporary proposal and owner confirmation if wanted. ')
         management=('Explicit item management is authorized: identify the exact item using list and its current '
             'item_version, then complete/cancel/snooze/resume according to the current owner request. '
+            'For actual execution cancellation, obtain exact work_status then use work_stop, not agenda cancel alone. '
             'Ask for clarification for ambiguous targets or intentions; report success only after the tool succeeds. '
             if eligible and configured.options.get('manage_explicit_followups') is True else
             'Natural-language item state changes are not authorized in this setup. ')
@@ -210,7 +216,7 @@ class CoreAgendaBridge:
             if (turn is None or turn[0] != configured.event_id
                     or time.monotonic() - turn[1] > self.DRAFT_TTL):
                 raise ValueError('current main task required')
-            if not isinstance(args, dict) or args.get('operation') not in ('propose', 'record', 'list','complete','cancel','snooze','resume','work','work_status','work_evidence'):
+            if not isinstance(args, dict) or args.get('operation') not in ('propose', 'record', 'list','complete','cancel','snooze','resume','work','work_stop','work_status','work_evidence'):
                 raise ValueError('bounded agenda operation required')
             allowed=_OPERATION_FIELDS[args['operation']]
             required=_OPERATION_REQUIRED.get(args['operation'],frozenset())
@@ -250,6 +256,17 @@ class CoreAgendaBridge:
                     reference=args.get('evidence_reference'),message_id=args.get('message_id'),
                     offset=args.get('offset',0),max_chars=args.get('max_chars',4096),fingerprint=args.get('fingerprint'),
                     part=args.get('part','records'))
+            elif args['operation']=='work_stop':
+                if configured.options.get('manage_explicit_followups') is not True:
+                    raise ValueError('guided explicit management required')
+                from .kernel_execution_bridge import kernel
+                evidence=self._turn_evidence(store,configured,scope,task_id,session_id,turn,args)
+                def validate_stop():
+                    _store,current=self._owner(scope)
+                    if current!=configured or self._turn_evidence(store,current,scope,task_id,session_id,turn,args)!=evidence:
+                        raise ValueError('current stop request changed')
+                result=kernel('core_work_control').CoreWorkControl(store).stop(configured,args['work_id'],
+                    authority={'kind':'current_owner_interpretation','turn':evidence},validate=validate_stop)
             elif args['operation']=='work':
                 result=self._work(store,configured,scope,task_id,session_id,turn,args)
             elif args['operation'] in ('complete','cancel','snooze','resume'):
@@ -520,6 +537,17 @@ class CoreAgendaBridge:
         """Caller must already have checked the admitted Core command source."""
         from .kernel_execution_bridge import kernel
         store, configured = self._owner(scope)
+        if len(parts)==2 and parts[0]=='stop-work':
+            authority={'kind':'literal_owner_stop_command','configuration_event_id':configured.event_id,
+                'request_nonce':uuid4().hex,
+                'command_fingerprint':store.protector.authenticate_json('alive.core-work.stop-command.v1',
+                    {'scope':scope.binding_document(),'work_id':parts[1]})}
+            def validate_stop():
+                _store,current=self._owner(scope)
+                if current!=configured:raise ValueError('stop owner changed')
+            result=kernel('core_work_control').CoreWorkControl(store).stop(configured,parts[1],
+                authority=authority,validate=validate_stop)
+            return json.dumps(result,ensure_ascii=False)
         if len(parts)==2 and parts[0]=='work-confirm':
             with self.lock:
                 receipt=self.work_receipts.get(parts[1])

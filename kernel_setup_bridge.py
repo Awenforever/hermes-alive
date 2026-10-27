@@ -1,5 +1,6 @@
 """Core-registered conversation confirmation of operator-initiated choices."""
 import logging
+import asyncio
 
 from .tool_receipt_bridge import _kernel_module
 
@@ -79,6 +80,8 @@ def register_setup_command(context,binding):
             if agenda_command:
                 if binding._agenda is None:
                     return '请先完成 Alive 会话配置，再管理持续事项。'
+                if len(parts)==3 and parts[1]=='stop-work':
+                    return await asyncio.to_thread(binding._agenda.command,scope,parts[1:])
                 return binding._agenda.command(scope,parts[1:])
             if intake_command:
                 from .kernel_execution_bridge import configured_owner,kernel
@@ -142,7 +145,7 @@ def register_setup_command(context,binding):
                 +'天；不留存全量聊天、不授权外部动作，可用 /alive intake off 关闭。'
                 if configured.options.get('accept_explicit_followups') is True else '')
             if configured.options.get('manage_explicit_followups') is True:
-                intake_summary+='也已授权理解明确的完成、取消、暂缓和恢复请求；不控制外部任务或已提交消息。'
+                intake_summary+='也已授权理解明确的完成、取消、暂缓和恢复请求；议程状态变化本身不停止实际执行。明确要求停止已交办的Core工作时可请求取消执行；不撤销已发生操作或已发送消息。'
             if configured.options.get('retain_followup_source') is True:
                 intake_summary+='这些明确交办/管理请求的当前消息原文（每条最多6000字符）会与整理后的事项分别保留，按所选期限到期；不留存其他闲聊。'
             if configured.options.get('observe_core_tools') is True:

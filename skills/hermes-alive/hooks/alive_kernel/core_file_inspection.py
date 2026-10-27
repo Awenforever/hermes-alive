@@ -106,6 +106,7 @@ class CoreFileInspection:
 
     def source(self,parent,configured):
         self.authority(configured)
+        if self.work._read(parent,'stop_requested',configured.subject) is not None:return None
         request=self.work._read(parent,'requested',configured.subject)
         if (request is None or request['configuration_event_id']!=configured.event_id
                 or request.get('work_kind','perform')!='perform'):return None
@@ -257,6 +258,8 @@ class CoreFileInspection:
         if not rows:return None
         if len(rows)!=1:raise ValueError('ambiguous inspection owner')
         child=rows[0][0].removesuffix(':core_bound');request=self.work._read(child,'requested',configured.subject)
+        if self.work._read(child,'stop_requested',configured.subject) is not None:
+            raise InspectionDenied('owner stopped this work')
         if request.get('work_kind')!='inspection':return None
         try:
             return self.guard_owned(configured,execution,child,request,tool_name,args)
@@ -267,6 +270,8 @@ class CoreFileInspection:
         from cron.executions import get_execution
         from cron.jobs import get_job
         self.authority(configured)
+        if self.work._read(request['parent_work_id'],'stop_requested',configured.subject) is not None:
+            raise ValueError('owner stopped producer work')
         if request['configuration_event_id']!=configured.event_id:raise ValueError('inspection grant changed')
         intent=self.intent(child,request,subject=configured.subject);item=self.item(request['item_id'],configured)
         if item is None or item['item_version']!=intent['item_version']:raise ValueError('inspection item changed')

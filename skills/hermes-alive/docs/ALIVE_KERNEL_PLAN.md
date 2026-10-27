@@ -678,3 +678,13 @@ current runtime also passes 99 portable suites and four actual-Core integration
 cases. These are bounded qualifications, not general autonomous-work acceptance.
 Sharing is still 0/10, a subgate only. Disable/unload with pending or in-flight Core work remains
 an explicit lifecycle gate, alongside the final four-target consumer matrix.
+
+## 2026-10-27 — Actual work control
+
+Agenda state changes alone do not satisfy "stop working on this". ADR0253 adds
+current-owner stop control through Core's schedule and admission cancellation,
+with a durable gate against later tool calls. Qualification must cover transport
+failure and stopped/terminal races, not merely a cancellation acknowledgment.
+Unknown effects are retained, and a new explicit stop request may reconcile the
+same admission without repeating the task. Pending/in-flight unload, appropriate
+autonomous closure, task/deadline revisions and the other remaining gates stay open.

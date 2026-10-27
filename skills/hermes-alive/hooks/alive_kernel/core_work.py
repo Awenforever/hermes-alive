@@ -343,6 +343,8 @@ class CoreWorkStore:
                 'automatic_result_followup_enabled':False,
                 'core_profile_context_authorized':True,'physical_channel_send_requested':False}
         result['another_user_message_is_not_a_scheduling_requirement']=True
+        result['owner_stop_requested']=self._read(work_id,'stop_requested',subject) is not None
+        result['stop_request_is_not_rollback']=True
         bound=self._read(work_id,'core_bound',subject)
         if bound is None:return {**result,'status':'handoff_uncertain','needs_attention':True}
         from cron.jobs import get_job
