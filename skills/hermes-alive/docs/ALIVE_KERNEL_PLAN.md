@@ -505,4 +505,3 @@ October 26–27 qualification notes are retained in
 Earlier execution notes and the original change log are retained in
 [the progress archive](ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-25.md).
 See Git history and ADRs for subsequent code and design changes.
-
