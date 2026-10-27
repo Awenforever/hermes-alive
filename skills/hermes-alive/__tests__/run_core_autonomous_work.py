@@ -333,6 +333,21 @@ async def exercise(home):
                 assert retained['current_owner_message']==manual
                 if mode=='outcome-manual-long':assert len(job['prompt'])>4096
             assert job['enabled_toolsets']==['file','no_mcp'] and job['deliver']=='local'
+            if mode=='revision-before' and os.environ.get('ALIVE_REVISION_FORGED_TEST')=='1':
+                from dataclasses import replace
+                from contextlib import closing
+                valid=list(store.journal.read(event_type='agenda.revised'))[-1].event
+                # Copying a real receipt under another identity is not a fresh
+                # owner's amendment, even with otherwise well-formed metadata.
+                forged=replace(valid,event_id='forged-owner-amendment-with-copied-signature')
+                store.journal.append(forged)
+                projection=execution.kernel('agenda').AgendaProjection(store.journal)
+                projection.project_new()
+                with closing(store.journal._connect()) as c:
+                    rejected=c.execute('SELECT outcome FROM agenda_decisions_v1 WHERE event_id=?',
+                        (forged.event_id,)).fetchone()
+                assert rejected[0]=='rejected'
+                assert not work.status(state['work_id'],subject=store.configuration().subject).get('later_owner_amendment')
             if mode in ('revision-after','revision-manual','revision-recover'):
                 await amend({'task':'Write NEW_REVISION_ONLY to '+str(home/'new-revision-target.txt')},
                     '原来的目标不再适用；这项任务改为写 NEW_REVISION_ONLY 到 '+str(home/'new-revision-target.txt')+'，其他要求不变。')

@@ -365,7 +365,7 @@ class CoreWorkStore:
         result['parent_work_id']=request.get('parent_work_id')
         from .agenda_revisions import after_submission
         if after_submission(self.store,work_id,request):
-            result.update(later_owner_amendment=True,old_work_is_not_current_goal_evidence=True,
+            result.update(later_owner_amendment=True,historical_results_need_reassessment_against_current_goal=True,
                 revision_fence_is_not_execution_cancellation=True,effects_undone=False)
         if result['work_kind']=='perform':
             result['related_inspections']=self.related_inspections(work_id,subject=subject)

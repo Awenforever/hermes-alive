@@ -1,6 +1,6 @@
 # ADR 0257 — Explicit owner amendments are versioned goals
 
-Status: implemented candidate; actual Core qualification in progress.
+Status: implemented; bounded actual-Core and real-model qualification, not production acceptance.
 Date: 2026-10-27.
 
 ## Product behavior
@@ -44,3 +44,29 @@ general continuation planner or dependency implementation. Actual main-model
 interpretation, real followup after a revision, in-flight/unload and coordinated
 source-dependent erasure/migration remain explicit gates. Do not infer them from
 synthetic tool replies, type/schema checks or the preceding full CI baseline.
+
+## Bounded evidence
+
+The actual Core cases cover amendment before first work, fencing an already
+admitted producer (including manual work), setting/removing a deadline without
+changing other fields, unchanged old grants, and cold replay after interruption
+between the single durable fact and projection. The original, attention and
+outcome paths still pass their focused controls. A copied signed receipt under a
+new event identity is rejected and does not block legitimate current work.
+
+A real inherited main/Native/Core-worker chain distinguishes quoted text from an
+actual amendment, preserves original and two later source messages, writes and
+reads the new target while the old target stays absent, and closes only the
+attained current goal. A history-reduced main query uses the actual records.
+This is functional bounded qualification, not comprehensive natural language or
+production acceptance. The first cold fixture omitted the host's normal lifecycle
+refresh: the rebuilt goal was valid, but the stale work observation was excluded;
+qualification now verifies both that boundary and normal refresh without retry.
+
+That real chain exposed a separate reply error: a stopped runtime was described
+as requiring another execute message. The runtime view now distinguishes guided
+capability, actual running state and owner-specific waits. Four further real
+main turns preserve that distinction and an explicit wait-for-owner exception.
+A literal CLI list and a model tool return are different API views; a fixture
+expecting capability fields on the CLI failed before its remaining turns and is
+retained as a failure. The final whole portable regression is still running.

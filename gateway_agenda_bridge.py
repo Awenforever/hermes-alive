@@ -195,6 +195,12 @@ class CoreAgendaBridge:
             'Outside that scope, show the complete returned preview and confirmation command. '
             if configured.options.get('core_background_work') is True and configured.options.get('core_work_request_retention') is True
             else 'Current Core background-work/request-retention guidance is required before work handoff. ')
+        work+=('Later autonomous initial work is separately configured. When Alive is running, a normal wake '
+            'may reconsider the retained original request and amendments within the current guided scope. '
+            'The system does not require another execute message. Preserve any further-confirmation/wait '
+            'condition the owner actually imposed. A stopped or paused runtime must be started/resumed; '
+            'do not turn that runtime condition into a supposed requirement for another user execute turn. '
+            if configured.options.get('autonomous_core_work') is True else '')
         return {'context': 'Alive continuing items: alive_agenda can propose, record authorized explicit follow-ups or inspect current items. '
                            +intake+management+work+'A proposal is temporary until the user confirms its exact command. '
                            'Remembering an item does not authorize tools or an external action, and does not enable '
@@ -252,7 +258,7 @@ class CoreAgendaBridge:
                     raise ValueError('explicit item lookup requires an exact identifier')
                 result = {'items': self._items(store, configured,args.get('item_id')),
                           'view_limit': 8, 'complete_inventory_proven': False,
-                          'external_action_authorized': False,**self._runtime()}
+                          'external_action_authorized': False,**self._runtime(configured)}
             elif args['operation']=='work_status':
                 from .kernel_execution_bridge import kernel
                 work=kernel('core_work').CoreWorkStore(store)
@@ -444,7 +450,7 @@ class CoreAgendaBridge:
             if not intake.validates_proposal(store.journal,previous.event):raise ValueError('prior intake changed')
             # Never renew retention/recreate erased content or reactivate a
             # completed item when a model retries the same tool call.
-            return {'status':'already_recorded','item_id':item_id,'external_action_authorized':False,**self._runtime()}
+            return {'status':'already_recorded','item_id':item_id,'external_action_authorized':False,**self._runtime(configured)}
         agenda=kernel('agenda')
         event=projection.append_proposal(agenda.AgendaProposal(item_id=item_id,
             kind=agenda.AgendaItemKind.COMMITMENT,subject=configured.subject,details=details,
@@ -457,7 +463,7 @@ class CoreAgendaBridge:
                 'due_at':due.isoformat() if due else None,'authority':'user_delegated',
                 'literal_owner_confirmation':False,'external_action_authorized':False,
                 **({'natural_management_enabled':True} if configured.options.get('manage_explicit_followups') is True
-                   else {'cancel_command':'/alive agenda cancel '+item_id}),**self._runtime()}
+                   else {'cancel_command':'/alive agenda cancel '+item_id}),**self._runtime(configured)}
 
     def _change(self,store,configured,scope,task,session_id,turn,args):
         from .kernel_execution_bridge import kernel
@@ -500,7 +506,7 @@ class CoreAgendaBridge:
         return {'status':'updated_under_owner_management_grant','item_id':item_id,'state':target,
             'available_at':available.isoformat() if available else None,
             'basis':'current_owner_report_interpreted_under_grant',
-            'external_action_authorized':False,'external_jobs_or_messages_cancelled':False,**self._runtime()}
+            'external_action_authorized':False,'external_jobs_or_messages_cancelled':False,**self._runtime(configured)}
 
     def _revise(self,store,configured,scope,task,session_id,turn,args):
         from .kernel_execution_bridge import kernel
@@ -537,12 +543,18 @@ class CoreAgendaBridge:
             updated=self._items(store,configured,item['item_id'])[0]
         return {'status':'revised_under_owner_management_grant','item_changed':True,**updated,
                 'old_work_admissions_valid_for_revision':False,'effects_undone':False,
-                'old_execution_cancellation_proven':False,'replacement_job_created':False,**self._runtime()}
+                'old_execution_cancellation_proven':False,'replacement_job_created':False,**self._runtime(configured)}
 
-    def _runtime(self):
+    def _runtime(self,configured=None):
         observed=self.binding.runtime_status()
         return {'proactive_runtime':observed['status'],
                 'automatic_followup_running':observed['status']=='running',
+                **({'autonomous_initial_work_capability':{
+                    'configured':True,'selection_requires_running_runtime':True,
+                    'system_requires_fresh_execute_message':False,
+                    'retained_owner_conditions_and_current_scope_still_apply':True,
+                    'runtime_resume_means_reconsideration_not_guaranteed_execution':True}}
+                   if configured is not None and configured.options.get('autonomous_core_work') is True else {}),
                 'external_delivery_proven':False}
 
     @staticmethod

@@ -34,13 +34,13 @@ and dispatch path, not bypass it through raw registry dispatch.
 | Area | Current evidence | Still required |
 |---|---|---|
 | Experience and privacy | Protected journal/vault, provenance, deletion and replay checks | Real lifetime/migration/restore with all external associations preserved |
-| Request fidelity | New intake guidance retains a bounded exact admitted message separately from its interpreted description; current work instructions also reach Core verbatim. Old grants are not expanded | Actual source/constraint use in real decisions, task/deadline revision, dependent-content erasure/migration and legacy missing-source honesty |
+| Request fidelity | New intake guidance retains a bounded exact admitted message separately from its interpreted description; current work instructions also reach Core verbatim. Old grants are not expanded | Broader revision/dependency workflows, dependent-content erasure/migration, project context and legacy missing-source honesty |
 | Personalization | Owner-confirmed preferences and current Core USER advice; real main turns automatically curate a synthetic profile, Native interpretation consumes its exact current value and two real followups complete | External-provider recall, noise-aware daily learning and attributed feedback |
-| Agenda and initiative | First-grant creation plus separately guided management; eight actual main turns create, reject quoted completion, complete, snooze/re-snooze, resume and cancel; controlled actual-Core and two-process startup reconstruction pass (ADRs0241–0242) | Task/deadline revisions, dependencies, priorities, sustained useful initiative and sustained closure; actual continuous/cold semantic and platform qualification remain distinct |
+| Agenda and initiative | First-grant creation/management, scoped first work and finite closure; source-versioned task/deadline amendments, old-work fences and controlled cold recovery; real main/Native/worker uses the amended goal (ADRs0241–0257) | Dependencies, priorities, sustained useful initiative and sustained closure; actual continuous/cold semantic and platform qualification remain distinct |
 | Content and judgment | Source-led composition, final wording review, real main-model examples | Samples remain too much like cautious paper digests; factual review is not a usefulness verdict |
 | Conversation continuity | Exact share/source excerpts reach actual Core main requests; real replies after context reduction no longer recite transport status | Missing evidence still becomes global negative claims in real followup; qualify ADR0230, plus natural old-quote/compaction/restart behavior |
 | Sources | Actual Core free search and substantive extraction demonstrated in isolated profiles | More useful live selection across Chinese and other sources, currentness, provenance and inaccessible/full-read boundaries |
-| Actions and reflection | Guided first Core work, owner-directed control, bound record review and independent scoped inspection; original/later owner instructions reach outcome assessment. Separately guided finite-goal closure, partial/uncertain retention, owner reopening and pending-close cold recovery are qualified in isolation, including a corrected real main/worker/Native pair and real-model counterexamples | Useful autonomous continuation, task/deadline revisions and dependencies, project context, feedback adaptation and actual platform/production lifecycle; historical records and model judgment are not current-world certainty |
+| Actions and reflection | Guided first Core work, owner-directed control, bound record review and independent scoped inspection; original/later owner instructions reach outcome assessment. Separately guided finite-goal closure, partial/uncertain retention, owner reopening and pending-close cold recovery are qualified in isolation, including a corrected real main/worker/Native pair and real-model counterexamples | Useful autonomous continuation, revision/dependency workflows, project context, feedback adaptation and actual platform/production lifecycle; historical records and model judgment are not current-world certainty |
 | Authority and transport | Original delegation/policy/source checks and short physical permits preserved, including delayed-composition regression | Real daemon and channel outcomes under a separately approved production window; Enhance remains sole physical FIFO/token/retry owner |
 | Portability and migration | Managed supported-Core component integration | Independent Git consumer install/configure/run/upgrade/uninstall-preserve/reinstall across four agreed targets, plus legacy-state migration and rollback |
 
@@ -80,9 +80,11 @@ claimed to be fully integrated simply because their code exists.
   cases pass. That runtime baseline passed 99 independent portable suites; newer
   amendment code below has not inherited that full qualification.
 - Explicit task/deadline amendments now have a separately guided candidate
-  (ADR0257): same item, chronological owner sources, current effective version,
-  and old-work fences. Actual Core tests are in progress; dependencies, useful
-  continuation, real-model amendment semantics and lifecycle remain unqualified.
+  (ADR0257): same item, chronological owner sources, current effective version
+  and old-work fences. Actual Core and a real inherited main/Native/worker chain
+  qualify bounded amendment behavior. Replies distinguish stopped runtime from
+  retained authority and preserve explicit owner waits. Dependencies, useful
+  continuation, longitudinal/lifecycle and the latest full regression remain open.
 - Sharing and reply continuity have actual-model examples, but useful natural
   sharing has **0/10** fresh complete rounds. Functional work tests do not advance
   that counter. Longitudinal memory, fleet and production remain unqualified.

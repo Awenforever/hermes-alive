@@ -1579,3 +1579,25 @@ must not permit old Core tool effects. A tool fence is not cancellation/rollback
 The preceding full r214 portable CI passed 99 independent logs before this new
 revision runtime. It is not qualification of this candidate. Actual main/model
 semantics and old-delivery reference context after amendments still need evidence.
+
+
+The real amendment chain subsequently performed the new write/read and closure,
+rejected a quoted amendment, preserved both actual amendment messages and answered
+a history-reduced status query from Core records. However its early replies turned
+stopped runtime into waiting for another execute message. The runtime view must
+separate configured autonomous capability, actual running state and goal-specific
+owner waits. A stopped process does not erase retained authority; resumption is
+reconsideration, not guaranteed execution. Record this reply issue separately from
+the successful task effects; do not call the whole conversational gate passed.
+
+
+The corrected cold case verifies the rebuilt current goal first, then the existing
+host lifecycle refresh before reading actionable work observations; no new job or
+model is used for recovery. The copied-receipt authority counterexample is rejected
+without blocking legitimate work. The inherited-model status retest now preserves
+both cases: normal resumption may reconsider preauthorized work without a fresh
+execute turn; an explicit owner wait still requires their later instruction.
+CLI list shape is not model-tool result shape: that fixture error is retained,
+not recast as runtime failure or an excuse to rerun the entire worker scenario.
+Do not label historical results useless after amendment: they require reassessment
+against the current goal and are not discarded or automatically repeated.
