@@ -223,3 +223,17 @@ and decision metadata. Invalid proposals retain rejection metadata, not raw mode
 bodies. Original-source erasure/expiry disables the corresponding assessment
 view; transitive physical erasure of derived records remains a separate release
 gate. This does not delete or change Core's independent task retention.
+
+
+### Explicit owner task amendments (development candidate)
+
+The separate revision choice retains only admitted current-owner amendment
+messages and private effective task versions. Their signed metadata binds the
+prior version; it does not contain raw task/message bodies. Effective content
+keeps the item's original retention deadline. Original plus chronological source
+messages are read as a complete bounded view; missing source content is not
+reconstructed from the interpreted description. No whole-chat import or private
+provider scan is added. Core's already submitted task records keep Core's own
+retention rules; editing an item does not retract them. Full coordinated deletion
+of source-dependent derived content and managed backups remains a release gate,
+not a guarantee established by the revision fixture.

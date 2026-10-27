@@ -410,7 +410,7 @@ class AgendaProjection:
 
     def apply(self, record: JournalRecord) -> AgendaDecision:
         event = record.event
-        if event.event_type not in {"agenda.proposed", "agenda.transitioned"}:
+        if event.event_type not in {"agenda.proposed", "agenda.transitioned", "agenda.revised"}:
             raise AgendaValidationError("unsupported agenda event")
         with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -427,11 +427,12 @@ class AgendaProjection:
                         str(existing["reason"]),
                         existing["item_id"],
                     )
-                decision = (
-                    self._apply_proposal(connection, event)
-                    if event.event_type == "agenda.proposed"
-                    else self._apply_transition(connection, event)
-                )
+                if event.event_type == 'agenda.revised':
+                    from .agenda_revisions import apply
+                    decision = apply(self,connection,event)
+                else:
+                    decision = (self._apply_proposal(connection,event) if event.event_type=='agenda.proposed'
+                                else self._apply_transition(connection,event))
                 connection.execute("COMMIT")
                 return decision
             except Exception:
@@ -644,7 +645,7 @@ class AgendaProjection:
         decisions: list[AgendaDecision] = []
         start = self.journal.checkpoint(self.CHECKPOINT)
         for index, record in enumerate(self.journal.iter_replay(after_sequence=start), start=1):
-            if record.event.event_type in {"agenda.proposed", "agenda.transitioned"}:
+            if record.event.event_type in {"agenda.proposed", "agenda.transitioned", "agenda.revised"}:
                 decisions.append(self.apply(record))
             self.journal.advance_checkpoint(self.CHECKPOINT, record.sequence, coalesce=True)
             if index >= limit:

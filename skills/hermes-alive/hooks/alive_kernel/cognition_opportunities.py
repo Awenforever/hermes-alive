@@ -4,6 +4,7 @@ Commitments remain agenda state, never web facts, completed work or action grant
 The established typed-agenda vault is explicit; no adjacent-vault probing occurs.
 """
 from contextlib import closing
+from collections.abc import Mapping
 from dataclasses import replace
 from datetime import datetime, timezone
 import json
@@ -58,6 +59,8 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
             return None
         state = AgendaState.ACTIVE if admitted else AgendaState.PROPOSED
         available = payload.get('available_at')
+        effective_content=payload['content']
+        effective_due=payload.get('due_at')
         last_sequence = origin.sequence
         last_transition_event_id=event.event_id
         with closing(self.journal._connect()) as connection:
@@ -73,6 +76,19 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
             if command is None:
                 return None
             change = command.event
+            if change.event_type=='agenda.revised':
+                from .agenda_revisions import validates
+                amendment=change.payload.get('revision_binding',{})
+                if (not isinstance(amendment,Mapping) or command.sequence<=last_sequence or transition['from_state']!=state.value
+                        or transition['to_state']!=state.value
+                        or amendment.get('available_at')!=available
+                        or amendment.get('expires_at')!=payload.get('expires_at')
+                        or not validates(self.journal,change,subject=subject,from_state=state.value,
+                            prior_transition_event_id=last_transition_event_id)):
+                    return None
+                effective_content=amendment['content'];effective_due=amendment['due_at']
+                last_sequence=command.sequence;last_transition_event_id=change.event_id
+                continue
             target = AgendaState(transition['to_state'])
             source = self.journal.get(change.payload.get('source_event_id',''))
             if change.payload.get('authority')==AgendaAuthority.USER_DELEGATED.value:
@@ -101,9 +117,9 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
             admitted = True
         if (not admitted or state not in (AgendaState.ACTIVE,AgendaState.SNOOZED)
                 or row['state']!=state.value or row['available_at']!=available
-                or row['due_at']!=payload.get('due_at') or row['expires_at']!=payload.get('expires_at')):
+                or row['due_at']!=effective_due or row['expires_at']!=payload.get('expires_at')):
             return None
-        ref = ContentReference.from_event_payload(payload['content'])
+        ref = ContentReference.from_event_payload(effective_content)
         if ref.content_id!=row['content_id'] or ref.sensitivity is not event.sensitivity:
             return None
         try:
@@ -115,15 +131,15 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
             return None
         try:
             summary=commitment_summary(details,state=state.value,available_at=available,
-                due_at=payload.get('due_at'),expires_at=payload.get('expires_at'))
+                due_at=effective_due,expires_at=payload.get('expires_at'))
         except CommitmentSummaryTooLarge:
             return None  # Historical oversized items are not silently truncated.
         expiry = datetime.max.replace(tzinfo=timezone.utc)
         for value in (payload.get('expires_at'),ref.retention_until):
             if value:
                 expiry=min(expiry,datetime.fromisoformat(value) if isinstance(value,str) else value)
-        if payload.get('due_at'):
-            due=datetime.fromisoformat(payload['due_at'])
+        if effective_due:
+            due=datetime.fromisoformat(effective_due)
             if due>now: expiry=min(expiry,due)
         if expiry<=now:
             return None

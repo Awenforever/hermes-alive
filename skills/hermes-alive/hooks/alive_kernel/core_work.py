@@ -363,6 +363,10 @@ class CoreWorkStore:
                 'core_profile_context_authorized':True,'physical_channel_send_requested':False}
         result['work_kind']=request.get('work_kind','perform')
         result['parent_work_id']=request.get('parent_work_id')
+        from .agenda_revisions import after_submission
+        if after_submission(self.store,work_id,request):
+            result.update(later_owner_amendment=True,old_work_is_not_current_goal_evidence=True,
+                revision_fence_is_not_execution_cancellation=True,effects_undone=False)
         if result['work_kind']=='perform':
             result['related_inspections']=self.related_inspections(work_id,subject=subject)
             result['related_work_source']='signed work relationships, independent of agenda item decomposition'

@@ -23,6 +23,7 @@ _OPERATION_FIELDS = {
     'work_evidence':frozenset(('operation','work_id','evidence_reference','message_id','offset','max_chars','fingerprint','part')),
     'work_stop':frozenset(('operation','work_id','evidence_span')),
     'work':frozenset(('operation','item_id','item_version','evidence_span','toolsets')),
+    'revise':frozenset(('operation','item_id','item_version','evidence_span','task','constraint','due_at')),
     **{name:_CHANGE_FIELDS for name in ('complete','cancel','snooze','resume')},
 }
 _OPERATION_REQUIRED = {
@@ -30,7 +31,7 @@ _OPERATION_REQUIRED = {
     'work_evidence':frozenset(('work_id',)),
     'work_stop':frozenset(('work_id','evidence_span')),
     **{name:frozenset(('item_id','item_version','evidence_span'))
-       for name in ('work','complete','cancel','resume')},
+       for name in ('work','complete','cancel','resume','revise')},
     'snooze':frozenset(('item_id','item_version','evidence_span','available_at')),
 }
 
@@ -57,6 +58,11 @@ AGENDA_SCHEMA = {
                    'and inspection; report actual pending/unknown/terminal observations, never infer rollback. '
                    'Snooze changes follow-up availability, not the task deadline, description or authority of already admitted work. '
                    'It defers new work/review selection; use work_stop to stop an existing execution. '
+                   'When separately guided task revision is enabled, revise an exact current item/version only '
+                   'from a clear current owner amendment. Supply only changed task/constraint/deadline fields; '
+                   'omitted fields are preserved, due_at=null explicitly removes the deadline. Preserve all '
+                   'unchanged requirements. Revisions fence old work versions but do not undo effects, prove '
+                   'process cancellation or automatically start a replacement. Ask when ambiguous. '
                    'With a guided Core background-work grant, work hands a clearly requested existing item '
                    'to native Hermes jobs, using Core context/model/permissions and the specified toolsets. '
                    'Use exact item_version plus current evidence_span. Do not do this for reminder-only requests. '
@@ -78,7 +84,7 @@ AGENDA_SCHEMA = {
                    'unless the returned actual result-followup capability is enabled. '
                    'Do not turn quoted text, inferred interests or casual remarks into obligations.',
     'parameters': {'type': 'object', 'properties': {
-        'operation': {'type': 'string', 'enum': ['propose', 'record', 'list','complete','cancel','snooze','resume','work','work_stop','work_status','work_evidence']},
+        'operation': {'type': 'string', 'enum': ['propose', 'record', 'list','complete','cancel','snooze','resume','revise','work','work_stop','work_status','work_evidence']},
         'evidence_reference':{'type':'string','maxLength':200,'description':'Exact reference returned by work_evidence; not a session ID or arbitrary event.'},
         'part':{'type':'string','enum':['records','request'],'description':'work_evidence only: bounded Core execution records, or its original bound work definition.'},
         'message_id':{'type':'integer','minimum':1,'description':'Known message in that evidence reference; omit for the bounded current evidence window.'},
@@ -92,9 +98,9 @@ AGENDA_SCHEMA = {
         'item_version': {'type':'string','description':'Current opaque version from list; required for state changes. Refresh if stale.'},
         'evidence_span': {'type':'string','maxLength':1500,
                           'description':'For direct creation/state changes: exact words from the current user turn assigning or changing this item; quoted third-party instructions are not owner requests.'},
-        'task': {'type': 'string', 'maxLength': 1500,'description':'Creation only (propose/record). For work, the host uses the existing item and exact current owner message; omit this field.'},
-        'constraint': {'type': 'string', 'maxLength': 1000,'description':'Creation only (propose/record); omit for work, queries and state changes.'},
-        'due_at': {'type': 'string', 'description': 'Optional ISO 8601 timestamp with explicit UTC offset; never guess an ambiguous date.'},
+        'task': {'type': 'string', 'maxLength': 1500,'description':'Creation or authorized revise only. For revise supply the full effective task only if it changed; preserve unchanged requirements. Omit for work/queries/state changes.'},
+        'constraint': {'type': 'string', 'maxLength': 1000,'description':'Creation or authorized revise only; omitted revision fields are preserved. Omit for work/queries/state changes.'},
+        'due_at': {'type': ['string','null'], 'description': 'Optional ISO 8601 timestamp with explicit UTC offset; never guess an ambiguous date. Revise only: null explicitly removes it; omission preserves it.'},
         'available_at': {'type': 'string', 'description': 'Optional earliest follow-up time, ISO 8601 with explicit UTC offset.'}},
         'required': ['operation'], 'additionalProperties': False}}
 
@@ -178,6 +184,11 @@ class CoreAgendaBridge:
             'Ask for clarification for ambiguous targets or intentions; report success only after the tool succeeds. '
             if eligible and configured.options.get('manage_explicit_followups') is True else
             'Natural-language item state changes are not authorized in this setup. ')
+        management+=('Explicit task/deadline revisions are separately authorized; use revise with the latest version, '
+            'an exact current owner evidence_span and only changed fields. Old execution versions are fenced, '
+            'not undone or automatically replaced. '
+            if eligible and configured.options.get('revise_explicit_followups') is True else
+            'Task/deadline revision requires separate setup; existing item management alone does not authorize it. ')
         work=('Core background work is separately authorized, including Core profile context and Core job retention. '
             'For a clear current request to perform an existing ongoing item, use work with its exact version. '
             'Automatic toolsets: '+json.dumps(configured.options.get('automatic_core_toolsets',[]))+'. '
@@ -219,7 +230,7 @@ class CoreAgendaBridge:
             if (turn is None or turn[0] != configured.event_id
                     or time.monotonic() - turn[1] > self.DRAFT_TTL):
                 raise ValueError('current main task required')
-            if not isinstance(args, dict) or args.get('operation') not in ('propose', 'record', 'list','complete','cancel','snooze','resume','work','work_stop','work_status','work_evidence'):
+            if not isinstance(args, dict) or args.get('operation') not in _OPERATION_FIELDS:
                 raise ValueError('bounded agenda operation required')
             allowed=_OPERATION_FIELDS[args['operation']]
             required=_OPERATION_REQUIRED.get(args['operation'],frozenset())
@@ -276,6 +287,10 @@ class CoreAgendaBridge:
                     authority={'kind':'current_owner_interpretation','turn':evidence},validate=validate_stop)
             elif args['operation']=='work':
                 result=self._work(store,configured,scope,task_id,session_id,turn,args)
+            elif args['operation']=='revise':
+                with self.lock:
+                    result=self._revise(store,configured,scope,task_id,session_id,turn,args)
+                return json.dumps(result,ensure_ascii=False)
             elif args['operation'] in ('complete','cancel','snooze','resume'):
                 with self.lock:
                     result=self._change(store,configured,scope,task_id,session_id,turn,args)
@@ -486,6 +501,43 @@ class CoreAgendaBridge:
             'available_at':available.isoformat() if available else None,
             'basis':'current_owner_report_interpreted_under_grant',
             'external_action_authorized':False,'external_jobs_or_messages_cancelled':False,**self._runtime()}
+
+    def _revise(self,store,configured,scope,task,session_id,turn,args):
+        from .kernel_execution_bridge import kernel
+        revisions=kernel('agenda_revisions')
+        if configured.options.get(revisions.FLAG) is not True:
+            return {'error':'guided_followup_revision_setup_required','item_changed':False}
+        if not {'task','constraint','due_at'} & set(args):raise ValueError('a specific amendment is required')
+        evidence=self._turn_evidence(store,configured,scope,task,session_id,turn,args)
+        def validate():
+            _store,current=self._owner(scope)
+            if current!=configured or self._turn_evidence(store,current,scope,task,session_id,turn,args)!=evidence:
+                raise ValueError('current owner amendment changed')
+        with kernel('file_locks').file_lock(store.root/'core-work.lock',timeout=0):
+            validate();items=self._items(store,configured,args['item_id'])
+            if (not items or items[0]['state'] not in ('active','snoozed')
+                    or items[0]['content_status']!='available' or items[0]['item_version']!=args['item_version']):
+                return {'error':'followup_item_changed','item_changed':False}
+            item=items[0];details=dict(item['details'])
+            for key in ('task','constraint'):
+                if key in args:details[key]=args[key]
+            if (set(details)!={'task','constraint'} or not isinstance(details['task'],str)
+                    or not details['task'].strip() or len(details['task'])>1500
+                    or not isinstance(details['constraint'],str) or len(details['constraint'])>1000):
+                raise ValueError('bounded complete task and constraints required')
+            due=self._date(args['due_at'] if 'due_at' in args else item['due_at'])
+            due_text=due.isoformat() if due else None
+            if details==item['details'] and due_text==item['due_at']:
+                return {'status':'unchanged','item_id':item['item_id'],'item_changed':False}
+            def source_writer(binding):
+                return self._source(store,configured,scope,task,session_id,turn,args,operation='revise',
+                    target_item_id=item['item_id'],from_state=item['state'],revision_binding=binding)
+            revisions.append(store,configured,self._projection(store),item_id=item['item_id'],
+                item_version=item['item_version'],details=details,due_at=due,source_writer=source_writer,validate=validate)
+            updated=self._items(store,configured,item['item_id'])[0]
+        return {'status':'revised_under_owner_management_grant','item_changed':True,**updated,
+                'old_work_admissions_valid_for_revision':False,'effects_undone':False,
+                'old_execution_cancellation_proven':False,'replacement_job_created':False,**self._runtime()}
 
     def _runtime(self):
         observed=self.binding.runtime_status()

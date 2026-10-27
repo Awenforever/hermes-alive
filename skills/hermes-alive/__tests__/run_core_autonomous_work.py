@@ -14,7 +14,7 @@ if __name__=='__main__' and os.environ.get('ALIVE_AUTOWORK_CHILD')!='1':
         env={**os.environ,'HOME':root,'HERMES_HOME':str(Path(root)/'profile'),
             'ALIVE_AUTOWORK_CHILD':'1','PYTHONDONTWRITEBYTECODE':'1'}
         modes=os.environ.get('ALIVE_AUTOWORK_CASES','execute,wait,revoked,erased,off,restart').split(',')
-        assert set(modes)<=set(('execute','wait','revoked','erased','off','restart','outcome-complete','outcome-partial','outcome-forged','outcome-revoked','outcome-recover','outcome-manual-long','outcome-wrong-result','outcome-window','outcome-malformed','outcome-attention','attention-snooze','attention-resume','attention-cancel','attention-reopen'))
+        assert set(modes)<=set(('execute','wait','revoked','erased','off','restart','outcome-complete','outcome-partial','outcome-forged','outcome-revoked','outcome-recover','outcome-manual-long','outcome-wrong-result','outcome-window','outcome-malformed','outcome-attention','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover'))
         try:
             for mode in modes:
                 case={**env,'HERMES_HOME':str(Path(root)/mode),'ALIVE_AUTOWORK_CASE':mode}
@@ -94,6 +94,7 @@ async def exercise(home):
         rc,staged=cli(home,'setup','--confirm-model-calls','--confirm-delivery','--confirm-outbound-retention',
             '--confirm-followup-management','--confirm-core-background-work','--automatic-core-toolset','file',
             *(() if mode=='off' else ('--confirm-autonomous-core-work',)),
+            *(('--confirm-followup-revisions',) if mode.startswith('revision-') and mode!='revision-legacy' else ()),
             *(('--confirm-core-work-outcomes','--confirm-core-work-result-review') if mode.startswith('outcome-') else ()))
         assert rc==0 and staged['confirmation_summary']['autonomous_initial_core_work']==(mode!='off')
         assert cli(home,'install-runtime','--engine','kernel')[0]==0
@@ -150,6 +151,64 @@ async def exercise(home):
             assert store.activation()['activation_event_id']==saved['activation']
             assert all(hashlib.sha256((store.root/n).read_bytes()).hexdigest()==v for n,v in saved['keys'].items())
             assert not binding._agenda.turns and not jobs.list_jobs(include_disabled=True)
+        original_artifact=artifact;revision_messages=[]
+        async def amend(patch,message):
+            nonlocal variables
+            current=json.loads(await command('agenda list'))['items'][0]
+            variables=core.set_session_vars(platform='telegram',chat_id=source.chat_id,user_id=source.user_id,
+                session_key=entry.session_key,session_id=entry.session_id)
+            name='revision-'+str(len(revision_messages));revision_messages.append(message)
+            _collect_pre_llm_call_context(SimpleNamespace(session_id=entry.session_id,model='configured-primary',
+                platform='telegram',_user_id=source.user_id),effective_task_id=name,turn_id=name,
+                original_user_message=message,messages=[{'role':'user','content':message}],conversation_history=[])
+            args={'operation':'revise','item_id':saved['item_id'],'item_version':current['item_version'],
+                'evidence_span':message,**patch}
+            def apply(args):
+                return json.loads(model_tools.handle_function_call('alive_agenda',args,task_id=name,
+                    session_id=entry.session_id,turn_id=name,tool_call_id=name+'-call',enabled_tools=['alive_agenda']))
+            if mode=='revision-recover':
+                from unittest.mock import patch
+                projection=execution.kernel('agenda').AgendaProjection
+                project=projection.project_new
+                def interrupted(obj,*a,**kw):
+                    if list(store.journal.read(event_type='agenda.revised')):
+                        raise RuntimeError('synthetic crash after durable amendment before projection')
+                    return project(obj,*a,**kw)
+                with patch.object(projection,'project_new',interrupted):result=apply(args)
+                assert 'error' in result and len(list(store.journal.read(event_type='agenda.revised')))==1,result
+                from contextlib import closing
+                with closing(store.journal._connect()) as c:
+                    assert c.execute('SELECT COUNT(*) FROM agenda_transitions_v1 WHERE item_id=?',(saved['item_id'],)).fetchone()[0]==1
+                core.clear_session_vars(variables);variables=None
+                return result
+            result=apply(args)
+            if mode=='revision-legacy':
+                assert result.get('error')=='guided_followup_revision_setup_required',result
+                assert not list(store.journal.read(event_type='agenda.revised'))
+            else:
+                assert result.get('status')=='revised_under_owner_management_grant',result
+                assert result['item_id']==saved['item_id'] and result['item_version']!=current['item_version']
+                assert result['original_owner_message']==original
+                assert [a['message'] for a in result['owner_amendments']]==revision_messages
+                assert not result['replacement_job_created'] and not result['old_execution_cancellation_proven']
+                assert result['details']['constraint']==current['details']['constraint']
+                count=len(list(store.journal.read(event_type='agenda.revised')))
+                assert 'error' in apply(args),'stale old version cannot apply another amendment'
+                assert len(list(store.journal.read(event_type='agenda.revised')))==count
+            core.clear_session_vars(variables);variables=None
+            return result
+        if mode in ('revision-before','revision-legacy'):
+            new_artifact=home/'revised-result.txt';new_body='ACTUAL_REVISED_RESULT\n'
+            result=await amend({'task':'Write '+new_body.strip()+' plus newline into '+str(new_artifact)+' and read it back.'},
+                '修改这项任务：之后改为写入 '+str(new_artifact)+'，内容改为 '+new_body.strip()+' 加换行，并读回；其他要求保持不变。')
+            if mode=='revision-before':artifact=new_artifact;actual_body=new_body
+        if mode=='revision-deadline':
+            from datetime import datetime,timedelta,timezone
+            due=(datetime.now(timezone.utc)+timedelta(days=2)).isoformat()
+            updated=await amend({'due_at':due},'这项任务截止时间改为 '+due+'，其他要求不变。')
+            assert updated['due_at']==due
+            cleared=await amend({'due_at':None},'这项任务取消截止时间，其他要求不变。')
+            assert cleared['due_at'] is None and cleared['details']==updated['details']
         if mode=='restart' and not resuming:
             keys=('identity.key','content-vault/content.key','experience-content-vault/content.key')
             saved.update(session_key=entry.session_key,session_id=entry.session_id,
@@ -170,9 +229,9 @@ async def exercise(home):
                     c.execute('INSERT INTO agenda_items_v1 ('+','.join(columns)+') VALUES ('+','.join('?' for _ in columns)+')',
                         tuple(fake[k] for k in columns))
         manual=None
-        if mode=='outcome-manual-long':
+        if mode in ('outcome-manual-long','revision-manual'):
             current=json.loads(await command('agenda list'))['items'][0]
-            manual='现在执行这个已登记的文件任务。'+('这是公开合成附录，不改变任务目标。'*240)+'即使文件已正确写入并读回，也不要自动结项，等我另外确认。'
+            manual='现在执行这个已登记的文件任务。'+(('这是公开合成附录，不改变任务目标。'*240)+'即使文件已正确写入并读回，也不要自动结项，等我另外确认。' if mode=='outcome-manual-long' else '请遵守原任务约束。')
             variables=core.set_session_vars(platform='telegram',chat_id=source.chat_id,user_id=source.user_id,
                 session_key=entry.session_key,session_id=entry.session_id)
             _collect_pre_llm_call_context(SimpleNamespace(session_id=entry.session_id,model='configured-primary',
@@ -194,6 +253,8 @@ async def exercise(home):
                 if kw['task']=='alive_core_autonomous_work':
                     counts['start']+=1;supplied=json.loads(kw['messages'][-1]['content'])
                     assert supplied['item']['original_owner_request']==original
+                    if mode in ('revision-before','revision-deadline'):
+                        assert [a['message'] for a in supplied['item']['owner_amendments']]==revision_messages
                     answer={'decision':'wait' if mode=='wait' else 'execute','toolsets':[] if mode=='wait' else ['file'],
                         'step':'Write the exact requested marker and read it back.' if mode!='wait' else None,
                         'reason':'Original owner authorizes the later wake.' if mode!='wait' else 'Original owner requires a future instruction.',
@@ -201,6 +262,8 @@ async def exercise(home):
                 elif kw['task']=='alive_core_work_outcome':
                     counts['outcome']+=1;supplied=json.loads(kw['messages'][-1]['content'])
                     assert supplied['item']['original_owner_request']==original
+                    if mode in ('revision-before','revision-deadline'):
+                        assert [a['message'] for a in supplied['item']['owner_amendments']]==revision_messages
                     refs=[v['evidence_id'] for v in supplied['evidence']
                         if v.get('tool_name')=='read_file' and actual_body.strip() in v.get('content','')]
                     assert refs,'actual complete readback evidence required'
@@ -254,7 +317,7 @@ async def exercise(home):
             first=await binding.native.step(binding.arguments['build_parameters']())
             assert first.disposition in ('silence','evidence_changed')
         work=execution.kernel('core_work').CoreWorkStore(store)
-        if mode in ('execute','revoked','restart','attention-snooze','attention-resume','attention-cancel','attention-reopen') or mode.startswith('outcome-'):
+        if mode in ('execute','revoked','restart','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover') or mode.startswith('outcome-'):
             state=work.previous(saved['item_id'],subject=store.configuration().subject);assert state is not None
             assert len(jobs.list_jobs(include_disabled=True))==1
             request=work._read(state['work_id'],'requested',store.configuration().subject)
@@ -266,8 +329,14 @@ async def exercise(home):
                 assert request['exact_current_work_message_retained_by_core'] is True
             job=jobs.get_job(state['job_id']);retained=json.loads(job['prompt'].rsplit('\n',1)[1])
             if manual is None:assert retained['retained_original_owner_request']==original and 'current_owner_message' not in retained
-            else:assert retained['current_owner_message']==manual and len(job['prompt'])>4096
+            else:
+                assert retained['current_owner_message']==manual
+                if mode=='outcome-manual-long':assert len(job['prompt'])>4096
             assert job['enabled_toolsets']==['file','no_mcp'] and job['deliver']=='local'
+            if mode in ('revision-after','revision-manual','revision-recover'):
+                await amend({'task':'Write NEW_REVISION_ONLY to '+str(home/'new-revision-target.txt')},
+                    '原来的目标不再适用；这项任务改为写 NEW_REVISION_ONLY 到 '+str(home/'new-revision-target.txt')+'，其他要求不变。')
+                assert work.status(state['work_id'],subject=store.configuration().subject)['later_owner_amendment']
             if mode.startswith('attention-') or mode=='outcome-attention':
                 from datetime import datetime,timedelta,timezone
                 # A real fresh owner turn changes attention, not execution scope.
@@ -306,7 +375,7 @@ async def exercise(home):
                     await asyncio.to_thread(tick,verbose=False,sync=True,headless=False)
                 await asyncio.sleep(.1);state=work.status(state['work_id'],subject=store.configuration().subject)
             assert state['core_execution_state']=='completed'
-            assert not artifact.exists() if mode in ('revoked','attention-cancel','attention-reopen') else artifact.read_text(encoding='utf-8')==actual_body
+            assert not artifact.exists() if mode in ('revoked','attention-cancel','attention-reopen','revision-after','revision-manual','revision-recover') else artifact.read_text(encoding='utf-8')==actual_body
             assert len(work_requests)==(4 if mode=='outcome-window' else 3) and state['task_success_proven'] is False
         else:
             state=None;assert not jobs.list_jobs(include_disabled=True) and not artifact.exists()
@@ -348,7 +417,7 @@ async def exercise(home):
                 await binding.native.step(binding.arguments['build_parameters']())
                 raise AssertionError('unauthorized outcome was accepted')
             except ValueError:pass
-        else:await binding.native.step(binding.arguments['build_parameters']())
+        elif mode!='revision-recover':await binding.native.step(binding.arguments['build_parameters']())
         if mode.startswith('outcome-'):assert counts['outcome']==1
         if mode in ('outcome-complete','outcome-window','outcome-attention'):
             listed=json.loads(await command('agenda list'))['items'][0]
@@ -370,7 +439,9 @@ async def exercise(home):
             assert reopened.get('state')=='active',reopened
             await binding.native.step(binding.arguments['build_parameters']())
             assert counts['outcome']==1 and outcomes.view(state['work_id'],store.configuration())['later_item_change']
-        assert counts['start']==(0 if mode in ('erased','off','outcome-manual-long') else 1) and len(jobs.list_jobs(include_disabled=True))==(1 if mode in ('execute','revoked','restart','attention-snooze','attention-resume','attention-cancel','attention-reopen') or mode.startswith('outcome-') else 0)
+        if mode=='revision-before':assert not original_artifact.exists()
+        if mode in ('revision-after','revision-manual','revision-recover'):assert not (home/'new-revision-target.txt').exists()
+        assert counts['start']==(0 if mode in ('erased','off','outcome-manual-long','revision-manual') else 1) and len(jobs.list_jobs(include_disabled=True))==(1 if mode in ('execute','revoked','restart','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover') or mode.startswith('outcome-') else 0)
         from contextlib import closing
         with closing(store.journal._connect()) as c:
             assert c.execute('SELECT state FROM agenda_items_v1 WHERE item_id=?',(saved['item_id'],)).fetchone()[0]==('snoozed' if mode=='attention-snooze' else 'dismissed' if mode=='attention-cancel' else 'active')
@@ -379,7 +450,9 @@ async def exercise(home):
         if manual is not None:assert manual not in raw
         keys=('identity.key','content-vault/content.key','experience-content-vault/content.key')
         (home/'autonomous-expected.json').write_text(json.dumps({'work_id':state['work_id'] if state else None,
-            'owner':store.configuration().subject,'artifact':str(artifact),'body':actual_body,'revoked':mode in ('revoked','attention-cancel','attention-reopen'),'outcomes':mode.startswith('outcome-'),'pending_closure':mode=='outcome-recover','manual':manual is not None,
+            'owner':store.configuration().subject,'artifact':str(artifact),'body':actual_body,'revoked':mode in ('revoked','attention-cancel','attention-reopen','revision-after','revision-manual','revision-recover'),'outcomes':mode.startswith('outcome-'),'pending_closure':mode=='outcome-recover','manual':manual is not None,'revision_item':saved['item_id'] if mode.startswith('revision-') else None,
+            'revision_due':json.loads(await command('agenda list'))['items'][0]['due_at'] if mode.startswith('revision-') and mode!='revision-recover' else None,
+            'revision_expected_task':'Write NEW_REVISION_ONLY to '+str(home/'new-revision-target.txt') if mode=='revision-recover' else None,
             'keys':{n:hashlib.sha256((store.root/n).read_bytes()).hexdigest() for n in keys}}),encoding='utf-8')
     finally:
         if variables:core.clear_session_vars(variables)
@@ -405,6 +478,25 @@ if __name__=='__main__':
                 assert len(list(store.journal.read(event_type='work.outcome_decided')))==1
             projection=execution.kernel('agenda').AgendaProjection(store.journal);projection.rebuild()
             assert projection.list_items(subject=expected['owner'],clearance='private',include_future=True,states=tuple(execution.kernel('agenda').AgendaState))[0].state.value==('completed' if expected['pending_closure'] else 'active')
+        if expected.get('revision_item'):
+            projection=execution.kernel('agenda').AgendaProjection(store.journal);projection.rebuild()
+            row=projection.list_items(subject=expected['owner'],clearance='private',include_future=True)[0]
+            assert row.item_id==expected['revision_item'] and (row.due_at.isoformat() if row.due_at else None)==expected['revision_due']
+            if expected.get('revision_expected_task'):assert row.details['task']==expected['revision_expected_task']
+            reader=execution.kernel('cognition_opportunities').CognitionOpportunityReader(store.journal,content_vault=store.vault)
+            if expected.get('revision_expected_task'):
+                # The crashed process never reached the host's normal lifecycle
+                # refresh. The goal itself must already be valid after replay.
+                from contextlib import closing
+                from datetime import datetime,timezone
+                with closing(store.journal._connect()) as c:
+                    cached=c.execute('SELECT * FROM agenda_items_v1 WHERE item_id=?',(row.item_id,)).fetchone()
+                assert reader._commitment(cached,subject=expected['owner'],now=datetime.now(timezone.utc))
+                work=execution.kernel('core_work').CoreWorkStore(store)
+                assert work.current_observation(row.item_id,subject=expected['owner']) is None
+                cfg=store.configuration()
+                work.refresh_observations(cfg,validate=lambda:execution.kernel('core_work_source').OwnedWorkSource(store).authority(cfg))
+            assert reader.commitments(subject=expected['owner'],clearance='private')
         from cron.jobs import list_jobs
         if expected['work_id']:
             state=execution.kernel('core_work').CoreWorkStore(store).status(expected['work_id'],subject=expected['owner'])

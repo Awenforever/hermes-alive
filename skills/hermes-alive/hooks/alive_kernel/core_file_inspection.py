@@ -241,6 +241,9 @@ class CoreFileInspection:
         if not rows:return None
         if len(rows)!=1:raise ValueError('ambiguous inspection owner')
         child=rows[0][0].removesuffix(':core_bound');request=self.work._read(child,'requested',configured.subject)
+        from .agenda_revisions import after_submission
+        if after_submission(self.store,child,request):
+            raise InspectionDenied('owner amended this work; old admission cannot perform further tools')
         if self.work._read(child,'stop_requested',configured.subject) is not None:
             raise InspectionDenied('owner stopped this work')
         if request.get('authority')=='guided_autonomous_initial_work':

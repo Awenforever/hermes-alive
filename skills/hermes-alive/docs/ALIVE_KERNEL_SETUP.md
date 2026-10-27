@@ -265,3 +265,15 @@ goal it judges attained. `--confirm-core-work-outcomes` needs guided item
 management and result review, including retained original intent. Existing setups
 keep it off. Uncertain, ongoing or blocked items remain open. You can explicitly
 ask Hermes to reopen a completed item; doing so does not redo the work.
+
+
+### Optional task amendments
+
+After intake/management guidance, separately offer `--confirm-followup-revisions`
+if the owner wants explicit task/deadline edits in ordinary conversation. Requires
+`--confirm-followup-management`; it retains those admitted amendment messages,
+not whole chat. Existing grants remain unchanged. Explain that edits fence old
+execution versions, do not undo effects/prove cancellation, and do not start a
+replacement automatically. Omitted fields are preserved; a null deadline clears
+it. Conflicts with attention/retention require a clear owner choice. This is a
+development candidate under isolated qualification, not a production migration.

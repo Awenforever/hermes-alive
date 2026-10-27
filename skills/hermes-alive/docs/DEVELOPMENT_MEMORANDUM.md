@@ -1565,3 +1565,17 @@ refusal after reopening and both pause fences pass. An already admitted inspecto
 also performs its approved read while attention is snoozed; fresh observations
 and cold identity/association survive resume. The full portable regression is
 still pending its terminal proof. No production change is authorized here.
+
+
+### Versioned owner amendments (ADR0257)
+
+Goal changes are not attention changes. Carry original and later owner sources
+with their actual attribution into Native and Core definitions. Preserve omitted
+fields and distinguish removing a deadline from leaving it alone. Do not let an
+old completed job close a newly amended goal or silently repeat it. A typed signed
+intake receipt is the agenda revision fact; using a second mutation event creates
+an unnecessary crash interval and conflicting authorities. Pending projection
+must not permit old Core tool effects. A tool fence is not cancellation/rollback.
+The preceding full r214 portable CI passed 99 independent logs before this new
+revision runtime. It is not qualification of this candidate. Actual main/model
+semantics and old-delivery reference context after amendments still need evidence.

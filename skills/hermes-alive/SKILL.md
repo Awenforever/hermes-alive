@@ -32,8 +32,13 @@ never credentials. Translate ordinary choices into flags for the user.
 
 Before presenting kernel choices, read [the kernel setup guide](docs/ALIVE_KERNEL_SETUP.md).
 It owns the distinct ongoing-item, item-management, structural-observation and
-native-background-work choices. Do not infer one from another, enable new grants
-on upgrade or promise autonomous result followup from a submitted Core task. Separately offer owned-work
+native-background-work choices. These are independent; upgrades do not expand
+existing consent. Separately offer task/deadline edits (`--confirm-followup-revisions`)
+after management guidance: preserve original and amendment sources, fence old
+execution versions, and explain that this is not rollback, process cancellation
+or automatic replacement work. Omitted fields stay unchanged; a null deadline
+removes it. Never infer this new choice from older management consent or promise
+autonomous result followup merely from a submitted Core task. Separately offer owned-work
 record review only after explaining its bounded historical reads, derived-data
 retention and pause behavior; use `--confirm-core-work-result-review` only for
 that explicit choice. It does not grant fresh inspection or autonomous work. Separately

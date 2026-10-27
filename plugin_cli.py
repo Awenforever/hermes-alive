@@ -60,6 +60,8 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
         help='Authorize interpreting explicit ongoing requests and retaining their exact current messages (at most 6000 characters) for the selected item retention period; not whole-chat collection or execution authority')
     setup.add_argument('--confirm-followup-management',action='store_true',
         help='Guide explicit follow-up creation/management and bounded exact request-source retention for the chosen period; no external job control')
+    setup.add_argument('--confirm-followup-revisions',action='store_true',
+        help='Allow explicit current-owner task/deadline amendments with retained history. Requires follow-up management; old work versions are fenced, not undone or automatically repeated')
     setup.add_argument('--confirm-core-tool-observation',action='store_true',
         help='Observe tool names, durations and terminal status only in the configured owner conversation; diagnostic validity follows retention days, structural ledger remains until removed; no arguments/results/error bodies or execution authority')
     setup.add_argument('--confirm-core-background-work',action='store_true',
@@ -273,6 +275,7 @@ def alive_command(args: argparse.Namespace) -> int:
             **({'accept_explicit_followups':True,'retain_followup_source':True} if getattr(args,'confirm_explicit_followup_intake',False)
                 or getattr(args,'confirm_followup_management',False) else {}),
             **({'manage_explicit_followups':True} if getattr(args,'confirm_followup_management',False) else {}),
+            **({'revise_explicit_followups':True} if getattr(args,'confirm_followup_revisions',False) else {}),
             **({'observe_core_tools':True} if getattr(args,'confirm_core_tool_observation',False) else {}),
             **({'core_background_work':True,'core_work_request_retention':True,'automatic_core_toolsets':args.automatic_core_toolset}
                if getattr(args,'confirm_core_background_work',False) else {}),
@@ -301,6 +304,7 @@ def alive_command(args: argparse.Namespace) -> int:
                 'native_core_background_work':bool(getattr(args,'confirm_core_background_work',False)),
                 'bounded_owned_core_result_review':bool(getattr(args,'confirm_core_work_result_review',False)),
                 'automatic_owned_work_outcomes':bool(getattr(args,'confirm_core_work_outcomes',False)),
+                'explicit_owner_task_revisions':bool(getattr(args,'confirm_followup_revisions',False)),
                 'autonomous_initial_core_work':bool(getattr(args,'confirm_autonomous_core_work',False)),
                 'automatic_owned_file_inspection':bool(getattr(args,'confirm_core_file_inspection',False)),
                 'exact_current_work_message_retained_by_core':bool(getattr(args,'confirm_core_background_work',False)),

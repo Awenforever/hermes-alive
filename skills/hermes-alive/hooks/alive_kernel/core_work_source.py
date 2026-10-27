@@ -41,10 +41,14 @@ class OwnedWorkSource:
         if include_source:
             original=evidence.content.get('original_owner_message')
             if (evidence.content.get('original_source_available') is not True
+                    or evidence.content.get('owner_history_available',True) is not True
                     or not isinstance(original,str) or not original.strip() or len(original)>6000):return None
             result.update(original_owner_request=original,owner_source_event_id=evidence.content['source_event_id'],
                 source_recorded_at=evidence.content['source_recorded_at'],
                 source_retention_until=evidence.content['original_source_retention_until'])
+            if 'owner_amendments' in evidence.content:
+                from .events import _thaw_json
+                result['owner_amendments']=_thaw_json(evidence.content['owner_amendments'])
         return result
 
     def existing(self,item_id,configured,version,*,include_source=False):
@@ -66,6 +70,9 @@ class OwnedWorkSource:
                 'configuration':configured.event_id,'owner':configured.subject,'item':item_id,
                 'event':row['caused_by_event_id']})
             if candidate==version:return current
+            # A same-state goal/deadline amendment is not an attention transition.
+            event=self.store.journal.get(row['caused_by_event_id'])
+            if event is None or event.event.event_type=='agenda.revised':break
         return None
 
     def page(self,configured,*,kind='autonomous-work'):

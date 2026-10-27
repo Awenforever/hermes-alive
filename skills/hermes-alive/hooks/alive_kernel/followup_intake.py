@@ -5,6 +5,7 @@ identity or authority. Readers independently verify the protected setup grant
 and receipt; metadata/fingerprints are not independent semantic proof.
 """
 from dataclasses import replace
+from contextlib import closing
 from datetime import datetime, timedelta, timezone
 import json
 
@@ -55,14 +56,21 @@ def set_permission(store,configured,enabled):
 
 
 def record_request(store, configured, *, turn_identity, request_fingerprint, evidence_fingerprint, permission_id,
-                   operation='record', target_item_id=None, from_state=None, available_at=None, now=None,source_message=None):
+                   operation='record', target_item_id=None, from_state=None, available_at=None, now=None,source_message=None,
+                   revision_binding=None):
     """Current configured Core host only, never a public/model-callable API."""
     current = store.configuration()
     if (current is None or current.event_id != configured.event_id
             or permission(store,configured)!=(True,permission_id)):
         raise ValueError('current owner intake grant required')
-    if operation not in ('record','complete','cancel','snooze','resume'):
+    if operation not in ('record','complete','cancel','snooze','resume','revise'):
         raise ValueError('bounded follow-up purpose required')
+    if operation=='revise':
+        from .agenda_revisions import FLAG,FIELDS
+        if (configured.options.get(FLAG) is not True or configured.options.get('retain_followup_source') is not True
+                or not isinstance(revision_binding,dict) or set(revision_binding)!=set(FIELDS)):
+            raise ValueError('guided revision and exact amendment binding required')
+    elif revision_binding is not None:raise ValueError('unexpected amendment binding')
     if operation!='record' and (configured.options.get('manage_explicit_followups') is not True
             or not isinstance(target_item_id,str) or not target_item_id
             or from_state not in ('active','snoozed') and not (operation=='resume' and from_state in ('completed','dismissed'))):
@@ -80,6 +88,7 @@ def record_request(store, configured, *, turn_identity, request_fingerprint, evi
     identity = {'configuration':configured.event_id, 'owner':configured.subject,
                 'turn':turn_identity, 'request':request_fingerprint,'evidence':evidence_fingerprint,
                 'operation':operation,'target':target_item_id,'from_state':from_state,'available_at':available_at}
+    if revision_binding is not None:identity['revision_binding']=revision_binding
     event_id = 'followup.request:' + store.protector.authenticate_json(DOMAIN, identity)
     existing = store.journal.get(event_id)
     if existing is not None:
@@ -88,7 +97,7 @@ def record_request(store, configured, *, turn_identity, request_fingerprint, evi
     content=(store.vault.put_json({'message':source_message},subject=configured.subject,
         purpose='agenda.owner-request',sensitivity=Sensitivity.PRIVATE,retention_until=expiry,
         content_id=event_id+':source') if retain else None)
-    event = EventEnvelope(event_id=event_id, event_type='conversation.inbound', source=SOURCE,
+    event = EventEnvelope(event_id=event_id, event_type='agenda.revised' if operation=='revise' else 'conversation.inbound', source=SOURCE,
         actor=configured.subject, subject=configured.subject, observed_at=now, occurred_at=now,
         sensitivity=Sensitivity.PRIVATE, payload={
             'configuration_event_id':configured.event_id, 'permission_event_id':permission_id,'turn_identity':turn_identity,
@@ -97,6 +106,7 @@ def record_request(store, configured, *, turn_identity, request_fingerprint, evi
             'retention_until':expiry.isoformat(),
             'interpretation':'main_model_under_owner_grant', 'literal_owner_confirmation':False,
             'raw_content_stored':retain, 'external_action_authorized':False,
+            **({'revision_binding':revision_binding} if revision_binding is not None else {}),
             **({'content':content.to_event_payload()} if content else {})})
     def still_allowed(_connection):
         current=store.configuration()
@@ -110,10 +120,12 @@ def _validated_source(journal,source_id,subject,observed_at):
     source=journal.get(source_id)
     if source is None:raise ValueError('source unavailable')
     event=source.event
-    if (event.source!=SOURCE or event.event_type!='conversation.inbound'
+    if (event.source!=SOURCE or event.event_type not in ('conversation.inbound','agenda.revised')
             or event.actor!=subject or event.subject!=subject
             or event.sensitivity is not Sensitivity.PRIVATE or event.observed_at>observed_at):
         raise ValueError('current owner source required')
+    if event.event_type=='agenda.revised' and event.payload.get('operation')!='revise':
+        raise ValueError('typed amendment receipt required')
     store=KernelSetupStore(journal.path.parent,journal=journal)
     grant=journal.get(event.payload.get('configuration_event_id',''))
     configured=store._configuration(grant)
@@ -173,10 +185,38 @@ def item_source_view(store,item_id,*,subject,include_message=False):
         if source.event.payload.get('raw_content_stored') is not True:return missing
         message=_source_message(store,source.event,expiry)
     except (ValueError,TypeError,KeyError,OSError,RuntimeError,ContentVaultError):return missing
+    amendments=[];history={}
+    try:
+        with closing(store.journal._connect()) as c:
+            transitions=c.execute('SELECT caused_by_event_id,from_state FROM agenda_transitions_v1 '
+                'WHERE item_id=? ORDER BY transition_id LIMIT 65',(item_id,)).fetchall()
+        if len(transitions)>64:raise ValueError('owner history exceeds bounded agenda view')
+        previous=proposal.event.event_id;total=len(message)
+        for transition in transitions[1:]:
+            record=store.journal.get(transition['caused_by_event_id'])
+            if record is None:raise ValueError('owner history unavailable')
+            if record.event.event_type=='agenda.revised':
+                from .agenda_revisions import validates
+                if not validates(store.journal,record.event,subject=subject,from_state=transition['from_state'],
+                        prior_transition_event_id=previous):raise ValueError('amendment authority unavailable')
+                amendment,_grant,until=_validated_source(store.journal,record.event.event_id,
+                    subject,datetime.now(timezone.utc))
+                text=_source_message(store,amendment.event,until);total+=len(text)
+                if total>6000:raise ValueError('complete retained owner history exceeds 6000 characters')
+                amendments.append({'source_event_id':amendment.event.event_id,'message':text,
+                    'recorded_at':amendment.event.observed_at.isoformat(),'retention_until':until.isoformat(),
+                    'kind':'current_owner_amendment_at_recorded_time_not_a_new_turn'})
+            previous=record.event.event_id
+        if amendments:
+            history={'owner_history_available':True,'owner_amendment_count':len(amendments),
+                **({'owner_amendments':amendments} if include_message else {})}
+    except (ValueError,TypeError,KeyError,OSError,RuntimeError,ContentVaultError):
+        history={'owner_history_available':False,'owner_history_scope':'retained amendment history unavailable or exceeds its bounded view'}
     return {'original_source_available':True,'original_owner_message_included':include_message,
             'source_event_id':source.event.event_id,'original_source_retention_until':expiry.isoformat(),
             'source_recorded_at':source.event.observed_at.isoformat(),
             'source_timestamp_kind':'intake_recorded_at_not_sender_timestamp',
+            **history,
             **({'original_owner_message':message} if include_message else {})}
 
 

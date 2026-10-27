@@ -77,7 +77,12 @@ claimed to be fully integrated simply because their code exists.
   evidence window. Invalid proposals cannot silently kill the host.
 - Attention-only snooze/resume now preserves already admitted work while new
   selection remains deferred. Actual cancellation/reopening, outcome and inspector
-  cases pass; the new whole portable regression is still awaiting terminal proof.
+  cases pass. That runtime baseline passed 99 independent portable suites; newer
+  amendment code below has not inherited that full qualification.
+- Explicit task/deadline amendments now have a separately guided candidate
+  (ADR0257): same item, chronological owner sources, current effective version,
+  and old-work fences. Actual Core tests are in progress; dependencies, useful
+  continuation, real-model amendment semantics and lifecycle remain unqualified.
 - Sharing and reply continuity have actual-model examples, but useful natural
   sharing has **0/10** fresh complete rounds. Functional work tests do not advance
   that counter. Longitudinal memory, fleet and production remain unqualified.
