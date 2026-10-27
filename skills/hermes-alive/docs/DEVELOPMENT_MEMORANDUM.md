@@ -1416,3 +1416,21 @@ identity. ADR0252 distinguishes this expected evidence change from authorization
 provider and unknown-effect failures. Close the stale judgment without admitting
 it, then let the existing loop reconsider current evidence on its normal interval.
 Never turn all exceptions into retries or create a replacement job to get green.
+
+
+The r166 concurrent actual-Core test now closes the stale cycle, rejects its
+candidate output and consumes the changed-file result in a new judgment; the
+continuous-host test keeps ordinary errors and pauses terminal. The real inherited
+DeepSeek chain also passes its explicit independent-inspection assignment: one
+producer and one inspector, actual read_file returns the externally changed
+marker, and a subsequent model judgment names that discrepancy without repair,
+notification or agenda completion. This qualifies this file task only. The real
+wait run remains separate evidence; do not force every task to inspect, or
+equate a controlled concurrent case with real-model concurrency coverage.
+
+Current runtime qualification includes 99 portable suites and four actual-Core
+cases, with actual terminal exits and container destruction. Credential audit
+and projection removal precede real-response review. Preserve the failed runs.
+Further work must address stopping underlying work (agenda cancellation alone is
+explicitly insufficient), pending/in-flight lifecycle, appropriate autonomous
+closure, task revision and the rest of the longitudinal and distribution gates.

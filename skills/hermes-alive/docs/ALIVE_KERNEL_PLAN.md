@@ -670,6 +670,11 @@ path honors the no-message restriction. Inspect-path interpretation failures are
 still failures. A concurrent actual-Core counterexample identified a durable
 cycle recovery defect: rejected stale evidence could strand later judgments.
 ADR0252 addresses that class without accepting the stale answer or repeating work.
-Its qualification and new real-model inspection remain open. Sharing is still
-0/10, a subgate only. Disable/unload with pending or in-flight Core work remains
+Its actual-Core concurrent qualification and the new inherited-DeepSeek inspection
+chain have now passed in isolation: the model chooses inspection, the separate
+worker reads an independently changed artifact, and the next Native judgment
+recognizes the mismatch while honoring no-message/no-repair constraints. The
+current runtime also passes 99 portable suites and four actual-Core integration
+cases. These are bounded qualifications, not general autonomous-work acceptance.
+Sharing is still 0/10, a subgate only. Disable/unload with pending or in-flight Core work remains
 an explicit lifecycle gate, alongside the final four-target consumer matrix.
