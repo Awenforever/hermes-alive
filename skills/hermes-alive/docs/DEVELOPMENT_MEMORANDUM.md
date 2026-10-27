@@ -1704,3 +1704,19 @@ make no job/file/item/runtime/send changes. This bounded semantic pass still has
 verbose replies. Keep that limitation, then advance useful continued work instead
 of indefinitely chasing individual wording defects. No actual Core permission,
 execution route or operator choice was changed by this explanation work.
+
+### 2026-10-28 — Discover earlier work without claiming complete history
+
+The first-work-only guard remains a real product limit. Do not simply remove it
+or convert an outcome recommendation into authority. The owned evidence reader
+previously discovered only the newest 16 active rows, although known message
+bodies could be paged. Those are different limits. The existing work_evidence
+operation now also supports chronological keyset pages through Core's scoped
+reader, retaining the exact observed session reference and independent body
+fingerprints. The installed-Core/cold-process r250 case passes, including an
+actual earlier readback outside the newest window and labelled synthetic later
+fixtures. No new job, journal-body copy, model call or execution grant is created
+by paging. It still covers one active segment, not erased, compacted or ancestor
+history, and is not an atomic multi-page snapshot. ADR0260 records the remaining
+continuation requirements. Do not score this as autonomous progression or use a
+bounded empty page as proof an earlier physical effect never occurred.

@@ -20,7 +20,7 @@ _OPERATION_FIELDS = {
     'record':_CREATION_FIELDS|{'evidence_span'},
     'list':frozenset(('operation','item_id')),
     'work_status':frozenset(('operation','work_id','item_id')),
-    'work_evidence':frozenset(('operation','work_id','evidence_reference','message_id','offset','max_chars','fingerprint','part')),
+    'work_evidence':frozenset(('operation','work_id','evidence_reference','message_id','after_message_id','offset','max_chars','fingerprint','part')),
     'work_stop':frozenset(('operation','work_id','evidence_span')),
     'work':frozenset(('operation','item_id','item_version','evidence_span','toolsets')),
     'revise':frozenset(('operation','item_id','item_version','evidence_span','task','constraint','due_at')),
@@ -96,6 +96,7 @@ AGENDA_SCHEMA = {
         'evidence_reference':{'type':'string','maxLength':200,'description':'Exact reference returned by work_evidence; not a session ID or arbitrary event.'},
         'part':{'type':'string','enum':['records','request'],'description':'work_evidence only: bounded Core execution records, or its original bound work definition.'},
         'message_id':{'type':'integer','minimum':1,'description':'Known message in that evidence reference; omit for the bounded current evidence window.'},
+        'after_message_id':{'type':'integer','minimum':0,'description':'work_evidence records only: 0 starts chronological active-segment paging. Use returned next_after_message_id and the SAME evidence_reference for later pages. Mutually exclusive with message_id/body offset/fingerprint. Exhausting this segment is not whole execution history or proof of absent effects.'},
         'offset':{'type':'integer','minimum':0},
         'max_chars':{'type':'integer','minimum':256,'maximum':4096},
         'fingerprint':{'type':'string','maxLength':64,'description':'Returned content fingerprint, required for continuation pages.'},
@@ -322,6 +323,7 @@ class CoreAgendaBridge:
                 work=kernel('core_work').CoreWorkStore(store)
                 result=kernel('core_work_evidence').CoreWorkEvidence(work).read(args['work_id'],subject=configured.subject,
                     reference=args.get('evidence_reference'),message_id=args.get('message_id'),
+                    after_message_id=args.get('after_message_id'),
                     offset=args.get('offset',0),max_chars=args.get('max_chars',4096),fingerprint=args.get('fingerprint'),
                     part=args.get('part','records'))
             elif args['operation']=='work_stop':

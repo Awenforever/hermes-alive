@@ -645,6 +645,51 @@ async def test(home):
         assert (await native.step(build())).disposition=='silence'
         assert len(progress_prompts)==3 and 'core_job_definition_changed' in progress_prompts[-1]
         jobs.update_job(started['job_id'],{'enabled_toolsets':['file','no_mcp']})
+        if os.environ.get('ALIVE_WORK_HISTORY_TEST')=='1':
+            # Controlled fixtures appended through Core's actual store, not
+            # claimed to be additional worker calls. They push the real earlier
+            # readback outside the default last-16 window.
+            db=SessionDB()
+            try:
+                for index in range(20):
+                    db.append_message(observed['session_id'],'assistant',f'SYNTHETIC_HISTORY_FIXTURE_{index:02d}')
+                all_rows=db.get_messages(observed['session_id'],limit=64)
+                assert 20<len(all_rows)<64
+            finally:db.close()
+            before_history=store.journal.last_sequence();job_count=len(jobs.list_jobs(include_disabled=True))
+            newest=tool({'operation':'work_evidence','work_id':started['work_id']})
+            assert not any('INDEPENDENT_SYNTHETIC_ARTIFACT' in e['content'] for e in newest['entries'])
+            collected=[];cursor=0;reference=None;page_count=0
+            while True:
+                history=tool({'operation':'work_evidence','work_id':started['work_id'],
+                    'after_message_id':cursor,**({'evidence_reference':reference} if reference else {})})
+                assert history['status']=='core_execution_evidence',history
+                reference=reference or history['evidence_reference']
+                assert history['evidence_reference']==reference and not history['entire_execution_history_loaded']
+                details=history['history_page'];assert details['scanned_rows']<=16
+                assert not details['atomic_multi_page_snapshot']
+                collected.extend(history['entries']);page_count+=1
+                assert page_count<6
+                if not details['has_more_active_rows']:
+                    assert details['next_after_message_id'] is None
+                    break
+                assert details['next_after_message_id']>cursor
+                cursor=details['next_after_message_id']
+            expected_ids=[m['id'] for m in all_rows if m['role'] in ('tool','assistant')
+                and (m.get('content') or m.get('tool_calls'))]
+            assert page_count>=2 and [e['message_id'] for e in collected]==expected_ids
+            assert len(set(expected_ids))==len(expected_ids)
+            assert any('INDEPENDENT_SYNTHETIC_ARTIFACT' in e['content'] for e in collected)
+            with patch('hermes_state.SessionDB',side_effect=AssertionError('invalid history selector opened Core')):
+                for extra in ({'after_message_id':True},{'after_message_id':-1},
+                        {'after_message_id':1},{'after_message_id':0,'message_id':witness['message_id']},
+                        {'after_message_id':0,'part':'request'},{'after_message_id':0,'offset':1}):
+                    rejected=tool({'operation':'work_evidence','work_id':started['work_id'],**extra})
+                    assert 'error' in rejected and 'entries' not in rejected,rejected
+            assert store.journal.last_sequence()==before_history
+            assert len(jobs.list_jobs(include_disabled=True))==job_count
+            assert not any('SYNTHETIC_HISTORY_FIXTURE_' in r.event.canonical_json() for r in store.journal.read())
+            print('HERMES_ALIVE_CORE_WORK_HISTORY_PAGING_OK')
         assert (await native.step(build())).disposition=='silence'
         assert len(progress_prompts)==4 and 'core_completed_result_unverified' in progress_prompts[-1]
         assert len(list(store.journal.read(event_type='work.observed')))==3
@@ -866,6 +911,15 @@ if __name__=='__main__':
         assert original['original_owner_message']==expected['original_request']
         recovered=execution.kernel('core_work_evidence').CoreWorkEvidence(
             execution.kernel('core_work').CoreWorkStore(store)).read(expected['work_id'],subject=expected['owner'])
+        if os.environ.get('ALIVE_WORK_HISTORY_TEST')=='1':
+            reader=execution.kernel('core_work_evidence').CoreWorkEvidence(execution.kernel('core_work').CoreWorkStore(store))
+            history=reader.read(expected['work_id'],subject=expected['owner'],after_message_id=0)
+            assert history['history_page']['has_more_active_rows']
+            next_page=reader.read(expected['work_id'],subject=expected['owner'],
+                reference=history['evidence_reference'],after_message_id=history['history_page']['next_after_message_id'])
+            assert all(e['message_id']>history['history_page']['last_scanned_message_id'] for e in next_page['entries'])
+            assert not history['entire_execution_history_loaded']
+            recovered=history
         assert recovered['status']=='core_execution_evidence'
         assert any(e['kind']=='recorded_tool_result' and e['tool_name']=='read_file'
             and 'INDEPENDENT_SYNTHETIC_ARTIFACT' in e['content'] for e in recovered['entries'])

@@ -83,13 +83,16 @@ class CoreWorkEvidence:
                 'requests_describe_attempts_not_success':True,
                 'body_budget_chars':budget_chars,'body_chars_used':budget_chars-remaining}}
 
-    def read(self,work_id,*,subject,reference=None,message_id=None,offset=0,max_chars=4096,fingerprint=None,part='records'):
+    def read(self,work_id,*,subject,reference=None,message_id=None,after_message_id=None,offset=0,max_chars=4096,fingerprint=None,part='records'):
         work=self.work;work._home()
         request=work._read(work_id,'requested',subject)
         bound=work._read(work_id,'core_bound',subject)
         if request is None or bound is None:raise ValueError('owned bound Core work required')
         if (part not in ('records','request') or type(offset) is not int or offset<0 or type(max_chars) is not int or not 256<=max_chars<=4096
                 or message_id is not None and (type(message_id) is not int or not 0<message_id<2**63)
+                or after_message_id is not None and (type(after_message_id) is not int or not 0<=after_message_id<2**63
+                    or part!='records' or message_id is not None or offset or fingerprint is not None
+                    or after_message_id>0 and reference is None)
                 or part=='records' and message_id is None and (offset or fingerprint is not None)):
             raise ValueError('bounded evidence page required')
         from cron.executions import get_execution,latest_execution
@@ -153,7 +156,14 @@ class CoreWorkEvidence:
             session=db.get_session(association['session_id'])
             if session is None or session.get('source')!='cron':
                 raise ValueError('observed Core work session unavailable')
-            if message_id is None:
+            has_more=None
+            if after_message_id is not None:
+                # Use Core's scoped keyset reader. Do not merge ancestors, inactive
+                # or compacted rows, or confuse a body offset with history paging.
+                rows=db.get_messages(association['session_id'],limit=17,after_id=after_message_id)
+                has_more=len(rows)>16
+                rows=rows[:16]
+            elif message_id is None:
                 rows=db.get_messages(association['session_id'],limit=16,latest=True)
             else:
                 rows=db.get_messages(association['session_id'],limit=1,after_id=message_id-1)
@@ -196,7 +206,16 @@ class CoreWorkEvidence:
             work._home()
             return {**result,'status':'core_execution_evidence','execution_id':execution['id'],
                     'core_execution_state':execution['status'],'evidence_reference':reference,'entries':entries,
-                    'history_scope':'one requested active message in the observed Core segment' if message_id is not None
+                    'history_scope':'up to 16 active rows after the supplied cursor in one observed Core segment' if after_message_id is not None
+                        else 'one requested active message in the observed Core segment' if message_id is not None
                         else 'last 16 active rows of one observed Core session segment',
+                    **({'history_page':{'after_message_id':after_message_id,'scanned_rows':len(rows),
+                        'has_more_active_rows':has_more,
+                        'next_after_message_id':rows[-1]['id'] if rows and has_more else None,
+                        'last_scanned_message_id':rows[-1]['id'] if rows else after_message_id,
+                        'row_limit':16,'requires_same_evidence_reference':True,
+                        'coverage':'this active session segment at read time; not ancestors, compacted or erased records',
+                        'atomic_multi_page_snapshot':False,
+                        'body_completion_requires_individual_message_pages':True}} if after_message_id is not None else {}),
                     'underlying_tool_observation_may_itself_be_partial':True}
         finally:db.close()

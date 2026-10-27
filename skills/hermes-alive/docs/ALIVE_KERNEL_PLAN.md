@@ -120,6 +120,10 @@ records and ADRs0241–0256. Historical detail is retained in
    replace uncertain jobs automatically, or introduce another executor/scheduler.
    Existing first-work, stop and finite-closure paths are foundations already
    qualified in isolation, not tasks to restart from scratch.
+   ADR0260 identifies a concrete prerequisite: newest-window evidence is not work
+   history. Owner-scoped chronological active-segment paging now passes an
+   isolated installed-Core and cold-process qualification using Core's reader.
+   Paging a segment does not recover erased/compacted history or grant new work.
 2. **Close memory and adaptation.** Use Core's existing memory/provider ownership.
    Distinguish durable preferences, tentative conversation, quotations and noise;
    retain attributed, reversible feedback rather than permanent labels inferred
