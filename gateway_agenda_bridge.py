@@ -370,9 +370,15 @@ class CoreAgendaBridge:
 
     def _source(self,store,configured,scope,task,session_id,turn,args,**purpose):
         from .kernel_execution_bridge import kernel
+        project={}
+        if configured.options.get('core_work_context_version')==1 and purpose.get('operation','record')=='record':
+            # Validate before reading context; this is an admitted tool turn,
+            # not an observer harvesting project metadata from every message.
+            self._turn_evidence(store,configured,scope,task,session_id,turn,args)
+            project={'project_context':kernel('core_work_context').capture(task,session_id)}
         return kernel('followup_intake').record_request(store,configured,
             **self._turn_evidence(store,configured,scope,task,session_id,turn,args),
-            source_message=turn[3] if configured.options.get('retain_followup_source') is True else None,**purpose)
+            source_message=turn[3] if configured.options.get('retain_followup_source') is True else None,**purpose,**project)
 
     def _work_validator(self,store,configured,scope,item):
         from .kernel_execution_bridge import kernel
@@ -413,11 +419,20 @@ class CoreAgendaBridge:
         work_store=module.CoreWorkStore(store)
         sets=module.CoreWorkStore.toolsets(args.get('toolsets',[]))
         evidence=self._turn_evidence(store,configured,scope,task,session_id,turn,args)
+        project_choice=False
+        if configured.options.get('core_work_context_version')==1:
+            context=kernel('core_work_context')
+            if item.get('core_project_context') is None:
+                chosen=context.capture(task,session_id)
+                context.workdir(chosen)
+                item={**item,'core_project_context':chosen,'core_project_context_origin':'owner_confirmed_current_turn'}
+                project_choice=True
+            else:context.workdir(item['core_project_context'])
         validate=self._work_validator(store,configured,scope,item);validate()
         previous=work_store.previous(item['item_id'],subject=configured.subject)
         if previous and previous['work_id']==work_store.identifier(configured,item=item,turn_evidence=evidence,toolsets=sets):
             return previous
-        if previous or not set(sets)<=set(configured.options.get('automatic_core_toolsets',[])):
+        if previous or project_choice or not set(sets)<=set(configured.options.get('automatic_core_toolsets',[])):
             handle=uuid4().hex
             with self.lock:
                 self.work_drafts[handle]=dict(item=item,toolsets=sets,evidence=evidence,owner_request=turn[3],
@@ -427,6 +442,7 @@ class CoreAgendaBridge:
                 'preview':{'item':item,'toolsets':sets,'uses_core_profile_context':True,'current_owner_request':turn[3],
                            'job_record_retention_owned_by_core':True,'filesystem_sandbox':False,
                            'previous_work':previous,
+                           'project_context_choice_requires_confirmation':project_choice,
                            'new_attempt_may_repeat_existing_effects':previous is not None},
                 'confirmation_command':'/alive agenda work-confirm '+handle,
                 'expires_in_seconds':self.DRAFT_TTL}
@@ -583,7 +599,8 @@ class CoreAgendaBridge:
                                                                 include_message=item_id is not None),
                      content_status=item.content_status.value,
                      available_at=item.available_at.isoformat() if item.available_at else None,
-                     due_at=item.due_at.isoformat() if item.due_at else None) for item in items]
+                     due_at=item.due_at.isoformat() if item.due_at else None,
+                     expires_at=item.expires_at.isoformat() if item.expires_at else None) for item in items]
 
     @staticmethod
     def _item_version(store,configured,item_id):

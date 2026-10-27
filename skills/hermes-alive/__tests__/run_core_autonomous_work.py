@@ -14,14 +14,14 @@ if __name__=='__main__' and os.environ.get('ALIVE_AUTOWORK_CHILD')!='1':
         env={**os.environ,'HOME':root,'HERMES_HOME':str(Path(root)/'profile'),
             'ALIVE_AUTOWORK_CHILD':'1','PYTHONDONTWRITEBYTECODE':'1'}
         modes=os.environ.get('ALIVE_AUTOWORK_CASES','execute,wait,revoked,erased,off,restart').split(',')
-        assert set(modes)<=set(('execute','wait','revoked','erased','off','restart','outcome-complete','outcome-partial','outcome-forged','outcome-revoked','outcome-recover','outcome-manual-long','outcome-wrong-result','outcome-window','outcome-malformed','outcome-attention','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover'))
+        assert set(modes)<=set(('execute','wait','revoked','erased','off','restart','outcome-complete','outcome-partial','outcome-forged','outcome-revoked','outcome-recover','outcome-manual-long','outcome-wrong-result','outcome-window','outcome-malformed','outcome-attention','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover','project-pinned','project-manual','project-missing','project-replaced','project-restart'))
         try:
             for mode in modes:
                 case={**env,'HERMES_HOME':str(Path(root)/mode),'ALIVE_AUTOWORK_CASE':mode}
                 result=subprocess.run([sys.executable,'-B',__file__,*sys.argv[1:]],env=case,
                     capture_output=True,text=True,timeout=300)
                 assert result.returncode==0,mode+'\n'+result.stdout+'\n'+result.stderr
-                if mode=='restart':
+                if mode in ('restart','project-restart'):
                     resumed=subprocess.run([sys.executable,'-B',__file__,*sys.argv[1:]],env={**case,'ALIVE_AUTOWORK_RESUME':'1'},
                         capture_output=True,text=True,timeout=300)
                     assert resumed.returncode==0,resumed.stdout+'\n'+resumed.stderr
@@ -55,6 +55,14 @@ async def exercise(home):
             message={'role':'assistant','content':'Auxiliary probe.'};finish='stop'
             if actual:
                 work_requests.append(data)
+                if mode.startswith('project-') and len(work_requests)==1:
+                    rendered=json.dumps(data['messages'],ensure_ascii=False)
+                    assert 'PUBLIC_PROJECT_A_RULE_SENTINEL_228' in rendered, 'Core did not load project A rules'
+                    assert 'PUBLIC_PROJECT_B_RULE_MUST_NOT_APPLY' not in rendered, 'another project supplied Core rules'
+                    if mode=='project-replaced':
+                        assert project.resolve().parent==home.resolve() and not moved.exists()
+                        project.rename(moved);project.mkdir()
+                        (project/'AGENTS.md').write_text('PUBLIC_PROJECT_B_RULE_MUST_NOT_APPLY',encoding='utf-8')
                 assert {'write_file','read_file'}<={t.get('function',t)['name'] for t in data.get('tools',[])}
                 if any(m.get('role')=='tool' and m.get('tool_call_id')=='autonomous-read' for m in data['messages']):
                     message={'role':'assistant','content':'Actual write and readback recorded; no messages or completion claimed.'}
@@ -62,7 +70,7 @@ async def exercise(home):
                     read=any(m.get('role')=='tool' and m.get('tool_call_id')=='autonomous-write' for m in data['messages'])
                     message={'role':'assistant','content':None,'tool_calls':[{'id':'autonomous-read' if read else 'autonomous-write',
                         'type':'function','function':{'name':'read_file' if read else 'write_file',
-                            'arguments':json.dumps({'path':str(artifact),**({} if read else {'content':actual_body})})}}]}
+                            'arguments':json.dumps({'path':'relative-result.txt' if mode.startswith('project-') else str(artifact),**({} if read else {'content':actual_body})})}}]}
                     finish='tool_calls'
             if actual and mode=='outcome-window' and not any(m.get('role')=='tool' for m in data['messages']):
                 message={'role':'assistant','content':None,'tool_calls':[{'id':'autonomous-preface','type':'function',
@@ -82,6 +90,12 @@ async def exercise(home):
     server=ThreadingHTTPServer(('127.0.0.1',0),Handler);server.daemon_threads=True
     thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
     artifact=home/'autonomous-result.txt';body='ACTUAL_AUTONOMOUS_CORE_RESULT\n'
+    project=home/'project-a';other=home/'project-b';moved=home/'project-a-retired'
+    if mode.startswith('project-'):
+        for directory,marker in ((project,'PUBLIC_PROJECT_A_RULE_SENTINEL_228'),(other,'PUBLIC_PROJECT_B_RULE_MUST_NOT_APPLY')):
+            directory.mkdir(exist_ok=True)
+            (directory/'AGENTS.md').write_text('# Project instructions\n'+marker+'\nKeep the synthetic task inside this project.\n',encoding='utf-8')
+        artifact=project/'relative-result.txt'
     actual_body='ACTUAL_WRONG_RESULT\n' if mode=='outcome-wrong-result' else body
     preface=home/'public-preface.txt'
     if mode=='outcome-window':preface.write_text('\n'.join(str(i)+': public background '+'x'*70 for i in range(200)),encoding='utf-8')
@@ -129,18 +143,29 @@ async def exercise(home):
         original=(('登记持续整理这项合成工作；从下一次自然唤醒开始，' if mode!='wait'
             else '仅登记这项合成工作，必须等我以后明确说执行，不能自行开工；')
             +f'在本地文件 {artifact} 写入 {body.strip()} 和一个换行并读回结果，不发消息。')
+        if mode.startswith('project-'):original='登记并持续跟进当前项目：把 '+body.strip()+' 加换行写入 relative-result.txt，并读回核对。允许后续唤醒在 file 范围内自主处理；本轮仅登记，不动文件，不发消息、不重试。'
         if mode=='outcome-window':original+=f'执行时允许先读取 {preface} 作为背景，无需输出其内容；最终验收仍仅以目标文件写入并读回一致为准。'
         if not resuming:
             variables=core.set_session_vars(platform='telegram',chat_id=source.chat_id,user_id=source.user_id,
                 session_key=entry.session_key,session_id=entry.session_id)
+            if mode.startswith('project-'):
+                from agent.runtime_cwd import set_session_cwd
+                from tools.terminal_tool import record_session_cwd
+                set_session_cwd(str(other))
+                record_session_cwd('register-autonomous',str(project))
             _collect_pre_llm_call_context(SimpleNamespace(session_id=entry.session_id,model='configured-primary',
                 platform='telegram',_user_id=source.user_id),effective_task_id='register-autonomous',turn_id='register-autonomous',
                 original_user_message=original,messages=[{'role':'user','content':original}],conversation_history=[])
             saved=json.loads(model_tools.handle_function_call('alive_agenda',{'operation':'record',
-                'task':'Write '+body.strip()+' plus newline into '+str(artifact)+' and read it back.',
+                'task':'Write '+body.strip()+' plus newline into '+('relative-result.txt' if mode.startswith('project-') else str(artifact))+' and read it back.',
                 'constraint':'No messages. '+original,'evidence_span':original},task_id='register-autonomous',
                 session_id=entry.session_id,turn_id='register-autonomous',tool_call_id='register-autonomous-call',enabled_tools=['alive_agenda']))
             assert saved['status']=='recorded_under_owner_intake_grant' and not jobs.list_jobs(include_disabled=True)
+            if mode.startswith('project-'):
+                view=execution.kernel('followup_intake').item_source_view(store,saved['item_id'],subject=store.configuration().subject,include_message=True)
+                assert view['core_project_context']['source']=='core_task'
+                assert view['core_project_context']['declared_cwd']==str(project)
+                record_session_cwd('register-autonomous',str(other))
             core.clear_session_vars(variables);variables=None
             with binding._agenda.lock:
                 binding._agenda.turns.clear();binding._agenda.latest_turn.clear()
@@ -209,7 +234,7 @@ async def exercise(home):
             assert updated['due_at']==due
             cleared=await amend({'due_at':None},'这项任务取消截止时间，其他要求不变。')
             assert cleared['due_at'] is None and cleared['details']==updated['details']
-        if mode=='restart' and not resuming:
+        if mode in ('restart','project-restart') and not resuming:
             keys=('identity.key','content-vault/content.key','experience-content-vault/content.key')
             saved.update(session_key=entry.session_key,session_id=entry.session_id,
                 configuration=store.configuration().event_id,activation=store.activation()['activation_event_id'],
@@ -229,8 +254,11 @@ async def exercise(home):
                     c.execute('INSERT INTO agenda_items_v1 ('+','.join(columns)+') VALUES ('+','.join('?' for _ in columns)+')',
                         tuple(fake[k] for k in columns))
         manual=None
-        if mode in ('outcome-manual-long','revision-manual'):
+        if mode in ('outcome-manual-long','revision-manual','project-manual'):
             current=json.loads(await command('agenda list'))['items'][0]
+            if mode=='project-manual':
+                from tools.terminal_tool import record_session_cwd
+                record_session_cwd('manual-long',str(other))
             manual='现在执行这个已登记的文件任务。'+(('这是公开合成附录，不改变任务目标。'*240)+'即使文件已正确写入并读回，也不要自动结项，等我另外确认。' if mode=='outcome-manual-long' else '请遵守原任务约束。')
             variables=core.set_session_vars(platform='telegram',chat_id=source.chat_id,user_id=source.user_id,
                 session_key=entry.session_key,session_id=entry.session_id)
@@ -253,6 +281,11 @@ async def exercise(home):
                 if kw['task']=='alive_core_autonomous_work':
                     counts['start']+=1;supplied=json.loads(kw['messages'][-1]['content'])
                     assert supplied['item']['original_owner_request']==original
+                    if mode.startswith('project-'):
+                        assert supplied['item']['core_project_context']['declared_cwd']==str(project)
+                        if mode=='project-missing':
+                            assert project.resolve().parent==home.resolve() and not moved.exists()
+                            project.rename(moved)
                     if mode in ('revision-before','revision-deadline'):
                         assert [a['message'] for a in supplied['item']['owner_amendments']]==revision_messages
                     answer={'decision':'wait' if mode=='wait' else 'execute','toolsets':[] if mode=='wait' else ['file'],
@@ -317,7 +350,7 @@ async def exercise(home):
             first=await binding.native.step(binding.arguments['build_parameters']())
             assert first.disposition in ('silence','evidence_changed')
         work=execution.kernel('core_work').CoreWorkStore(store)
-        if mode in ('execute','revoked','restart','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover') or mode.startswith('outcome-'):
+        if mode in ('execute','revoked','restart','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover','project-pinned','project-manual','project-replaced','project-restart') or mode.startswith('outcome-'):
             state=work.previous(saved['item_id'],subject=store.configuration().subject);assert state is not None
             assert len(jobs.list_jobs(include_disabled=True))==1
             request=work._read(state['work_id'],'requested',store.configuration().subject)
@@ -328,6 +361,9 @@ async def exercise(home):
                 assert request['authority']=='user_delegated' and request['turn_evidence']
                 assert request['exact_current_work_message_retained_by_core'] is True
             job=jobs.get_job(state['job_id']);retained=json.loads(job['prompt'].rsplit('\n',1)[1])
+            if mode.startswith('project-'):
+                assert job['workdir']==str(project.resolve())
+                assert state['project_context_binding']['status']=='available'
             if manual is None:assert retained['retained_original_owner_request']==original and 'current_owner_message' not in retained
             else:
                 assert retained['current_owner_message']==manual
@@ -390,7 +426,7 @@ async def exercise(home):
                     await asyncio.to_thread(tick,verbose=False,sync=True,headless=False)
                 await asyncio.sleep(.1);state=work.status(state['work_id'],subject=store.configuration().subject)
             assert state['core_execution_state']=='completed'
-            assert not artifact.exists() if mode in ('revoked','attention-cancel','attention-reopen','revision-after','revision-manual','revision-recover') else artifact.read_text(encoding='utf-8')==actual_body
+            assert not artifact.exists() if mode in ('revoked','attention-cancel','attention-reopen','revision-after','revision-manual','revision-recover','project-replaced') else artifact.read_text(encoding='utf-8')==actual_body
             assert len(work_requests)==(4 if mode=='outcome-window' else 3) and state['task_success_proven'] is False
         else:
             state=None;assert not jobs.list_jobs(include_disabled=True) and not artifact.exists()
@@ -454,9 +490,12 @@ async def exercise(home):
             assert reopened.get('state')=='active',reopened
             await binding.native.step(binding.arguments['build_parameters']())
             assert counts['outcome']==1 and outcomes.view(state['work_id'],store.configuration())['later_item_change']
+        if mode.startswith('project-'):
+            assert not (other/'relative-result.txt').exists() and not (home/'relative-result.txt').exists()
+            if mode in ('project-missing','project-replaced'):assert not (moved/'relative-result.txt').exists()
         if mode=='revision-before':assert not original_artifact.exists()
         if mode in ('revision-after','revision-manual','revision-recover'):assert not (home/'new-revision-target.txt').exists()
-        assert counts['start']==(0 if mode in ('erased','off','outcome-manual-long','revision-manual') else 1) and len(jobs.list_jobs(include_disabled=True))==(1 if mode in ('execute','revoked','restart','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover') or mode.startswith('outcome-') else 0)
+        assert counts['start']==(0 if mode in ('erased','off','outcome-manual-long','revision-manual','project-manual') else 1) and len(jobs.list_jobs(include_disabled=True))==(1 if mode in ('execute','revoked','restart','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover','project-pinned','project-manual','project-replaced','project-restart') or mode.startswith('outcome-') else 0)
         from contextlib import closing
         with closing(store.journal._connect()) as c:
             assert c.execute('SELECT state FROM agenda_items_v1 WHERE item_id=?',(saved['item_id'],)).fetchone()[0]==('snoozed' if mode=='attention-snooze' else 'dismissed' if mode=='attention-cancel' else 'active')
@@ -465,7 +504,8 @@ async def exercise(home):
         if manual is not None:assert manual not in raw
         keys=('identity.key','content-vault/content.key','experience-content-vault/content.key')
         (home/'autonomous-expected.json').write_text(json.dumps({'work_id':state['work_id'] if state else None,
-            'owner':store.configuration().subject,'artifact':str(artifact),'body':actual_body,'revoked':mode in ('revoked','attention-cancel','attention-reopen','revision-after','revision-manual','revision-recover'),'outcomes':mode.startswith('outcome-'),'pending_closure':mode=='outcome-recover','manual':manual is not None,'revision_item':saved['item_id'] if mode.startswith('revision-') else None,
+            'owner':store.configuration().subject,'artifact':str(artifact),'body':actual_body,'revoked':mode in ('revoked','attention-cancel','attention-reopen','revision-after','revision-manual','revision-recover','project-replaced'),'outcomes':mode.startswith('outcome-'),'pending_closure':mode=='outcome-recover','manual':manual is not None,'revision_item':saved['item_id'] if mode.startswith('revision-') else None,
+            'project_dir':str(project) if mode.startswith('project-') else None,'project_missing':mode in ('project-missing','project-replaced'),
             'revision_due':json.loads(await command('agenda list'))['items'][0]['due_at'] if mode.startswith('revision-') and mode!='revision-recover' else None,
             'revision_expected_task':'Write NEW_REVISION_ONLY to '+str(home/'new-revision-target.txt') if mode=='revision-recover' else None,
             'keys':{n:hashlib.sha256((store.root/n).read_bytes()).hexdigest() for n in keys}}),encoding='utf-8')
@@ -512,6 +552,13 @@ if __name__=='__main__':
                 cfg=store.configuration()
                 work.refresh_observations(cfg,validate=lambda:execution.kernel('core_work_source').OwnedWorkSource(store).authority(cfg))
             assert reader.commitments(subject=expected['owner'],clearance='private')
+        if expected.get('project_dir'):
+            work=execution.kernel('core_work').CoreWorkStore(store)
+            if expected['work_id']:
+                value=work.status(expected['work_id'],subject=expected['owner'])
+                assert value['project_context_binding']['status']==('unavailable' if expected['project_missing'] else 'available')
+                from cron.jobs import get_job
+                assert get_job(value['job_id'])['workdir']==expected['project_dir']
         from cron.jobs import list_jobs
         if expected['work_id']:
             state=execution.kernel('core_work').CoreWorkStore(store).status(expected['work_id'],subject=expected['owner'])

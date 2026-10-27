@@ -39,6 +39,7 @@ from run_core_guided_setup import cli
 
 
 async def test(home):
+    project_mode=os.environ.get('ALIVE_WORK_PROJECT_TEST')=='1'
     stop_mode=os.environ.get('ALIVE_WORK_STOP_TEST','')
     assert stop_mode in ('','pending','running','fenced','retry')
     stop_entered=threading.Event();stop_release=threading.Event()
@@ -106,12 +107,22 @@ async def test(home):
             binding.arguments['stop'].set();await binding.task
         store=setup.setup_store(binding)
         artifact=home/'core-work-result.txt';body='INDEPENDENT_SYNTHETIC_ARTIFACT\n'
+        if project_mode:
+            project=home/'assigned-project';project.mkdir()
+            other=home/'other-project';other.mkdir()
+            (project/'AGENTS.md').write_text('PUBLIC_INSPECTION_PROJECT_RULE_A',encoding='utf-8')
+            (other/'AGENTS.md').write_text('PUBLIC_INSPECTION_PROJECT_RULE_B',encoding='utf-8')
+            artifact=project/artifact.name
+        producer_path=artifact.name if project_mode else str(artifact)
         variables=None
         def turn(name,text):
             nonlocal variables
             if variables:core.clear_session_vars(variables)
             variables=core.set_session_vars(platform='telegram',chat_id=source.chat_id,user_id=source.user_id,
                 session_key=entry.session_key,session_id=entry.session_id)
+            if project_mode:
+                from tools.terminal_tool import record_session_cwd
+                record_session_cwd(name,str(project if name=='work-intake' else other))
             context=_collect_pre_llm_call_context(SimpleNamespace(session_id=entry.session_id,model='configured-primary',
                 platform='telegram',_user_id=source.user_id),effective_task_id=name,turn_id=name,
                 original_user_message=text,messages=[{'role':'user','content':text}],conversation_history=[])
@@ -168,6 +179,7 @@ async def test(home):
             except ValueError:pass
         assert len(jobs.list_jobs(include_disabled=True))==1
         assert job['enabled_toolsets']==['file','no_mcp'] and job['deliver']=='local'
+        if project_mode:assert job['workdir']==str(project.resolve())
         cfg={'mcp_servers':{'synthetic-new-server':{'command':'not-executed'}}}
         assert set(_resolve_cron_enabled_toolsets({'enabled_toolsets':['file']},cfg))>{'file'}
         assert set(_resolve_cron_enabled_toolsets(job,cfg))=={'file'}
@@ -225,6 +237,9 @@ async def test(home):
             data=json.loads(request.content);requests.append(data)
             rendered=json.dumps(data['messages'],ensure_ascii=False)
             assert str(artifact) in rendered and '不要发送消息' in rendered
+            if project_mode:
+                assert 'PUBLIC_INSPECTION_PROJECT_RULE_A' in rendered
+                assert 'PUBLIC_INSPECTION_PROJECT_RULE_B' not in rendered
             assert 'INDEPENDENT_SYNTHETIC_ARTIFACT' in rendered
             assert 'current_owner_message' in rendered and '写入指定结果文件' in rendered
             if stop_mode in ('running','fenced','retry'):
@@ -234,12 +249,12 @@ async def test(home):
                 message={'role':'assistant','content':'The requested test artifact was created.'};finish='stop'
             elif any(m['role']=='tool' for m in data['messages']):
                 message={'role':'assistant','content':None,'tool_calls':[{'id':'read-owned-result','type':'function',
-                    'function':{'name':'read_file','arguments':json.dumps({'path':str(artifact)})}}]};finish='tool_calls'
+                    'function':{'name':'read_file','arguments':json.dumps({'path':producer_path})}}]};finish='tool_calls'
             else:
                 names=[t.get('function',{}).get('name') for t in data.get('tools',[])]
                 assert 'write_file' in names,names
                 message={'role':'assistant','content':None,'tool_calls':[{'id':'write-owned-result','type':'function',
-                    'function':{'name':'write_file','arguments':json.dumps({'path':str(artifact),'content':body})}}]};finish='tool_calls'
+                    'function':{'name':'write_file','arguments':json.dumps({'path':producer_path,'content':body})}}]};finish='tool_calls'
             if data.get('stream'):
                 delta={k:v for k,v in message.items() if k!='role'}
                 if 'tool_calls' in delta:delta['tool_calls'][0]['index']=0
@@ -370,7 +385,7 @@ async def test(home):
             'evidence_reference':evidence['evidence_reference'],'message_id':read_request['message_id'],
             'fingerprint':read_request['fingerprint']})
         actual_call=json.loads(request_page['entries'][0]['content'])['tool_calls'][0]
-        assert json.loads(actual_call['function']['arguments'])['path']==str(artifact)
+        assert json.loads(actual_call['function']['arguments'])['path']==producer_path
         assert actual_call['id']==witness['tool_call_id']
         page=tool({'operation':'work_evidence','work_id':started['work_id'],
             'evidence_reference':evidence['evidence_reference'],'message_id':witness['message_id'],
@@ -423,6 +438,9 @@ async def test(home):
                 inspection_requests.append(data)
                 names={t.get('function',t)['name'] for t in data.get('tools',[])}
                 assert names=={'read_file'},names
+                if project_mode:
+                    assert 'PUBLIC_INSPECTION_PROJECT_RULE_A' in json.dumps(data['messages'])
+                    assert 'PUBLIC_INSPECTION_PROJECT_RULE_B' not in json.dumps(data['messages'])
                 rendered=json.dumps(data['messages'])
                 assert 'MUST_NOT_BE_READ' not in rendered
                 if revoked_inspection:

@@ -34,13 +34,13 @@ and dispatch path, not bypass it through raw registry dispatch.
 | Area | Current evidence | Still required |
 |---|---|---|
 | Experience and privacy | Protected journal/vault, provenance, deletion and replay checks | Real lifetime/migration/restore with all external associations preserved |
-| Request fidelity | New intake guidance retains a bounded exact admitted message separately from its interpreted description; current work instructions also reach Core verbatim. Old grants are not expanded | Broader revision/dependency workflows, dependent-content erasure/migration, project context and legacy missing-source honesty |
+| Request fidelity | New intake guidance retains a bounded exact admitted message separately from its interpreted description; current work instructions also reach Core verbatim. Old grants are not expanded | Dependency workflows, dependent-content erasure/migration, real project-context semantics and legacy missing-source honesty |
 | Personalization | Owner-confirmed preferences and current Core USER advice; real main turns automatically curate a synthetic profile, Native interpretation consumes its exact current value and two real followups complete | External-provider recall, noise-aware daily learning and attributed feedback |
 | Agenda and initiative | First-grant creation/management, scoped first work and finite closure; source-versioned task/deadline amendments, old-work fences and controlled cold recovery; real main/Native/worker uses the amended goal (ADRs0241–0257) | Dependencies, priorities, sustained useful initiative and sustained closure; actual continuous/cold semantic and platform qualification remain distinct |
 | Content and judgment | Source-led composition, final wording review, real main-model examples | Samples remain too much like cautious paper digests; factual review is not a usefulness verdict |
 | Conversation continuity | Exact share/source excerpts reach actual Core main requests; real replies after context reduction no longer recite transport status | Missing evidence still becomes global negative claims in real followup; qualify ADR0230, plus natural old-quote/compaction/restart behavior |
 | Sources | Actual Core free search and substantive extraction demonstrated in isolated profiles | More useful live selection across Chinese and other sources, currentness, provenance and inaccessible/full-read boundaries |
-| Actions and reflection | Guided first Core work, owner-directed control, bound record review and independent scoped inspection; original/later owner instructions reach outcome assessment. Separately guided finite-goal closure, partial/uncertain retention, owner reopening and pending-close cold recovery are qualified in isolation, including a corrected real main/worker/Native pair and real-model counterexamples | Useful autonomous continuation, revision/dependency workflows, project context, feedback adaptation and actual platform/production lifecycle; historical records and model judgment are not current-world certainty |
+| Actions and reflection | Guided first Core work, owner-directed control, bound record review and independent scoped inspection; original/later owner instructions reach outcome assessment. Separately guided finite-goal closure, partial/uncertain retention, owner reopening and pending-close cold recovery are qualified in isolation, including a corrected real main/worker/Native pair and real-model counterexamples | Useful autonomous continuation, dependency workflows, broader project-context/lifecycle semantics, feedback adaptation and actual platform/production lifecycle; historical records and model judgment are not current-world certainty |
 | Authority and transport | Original delegation/policy/source checks and short physical permits preserved, including delayed-composition regression | Real daemon and channel outcomes under a separately approved production window; Enhance remains sole physical FIFO/token/retry owner |
 | Portability and migration | Managed supported-Core component integration | Independent Git consumer install/configure/run/upgrade/uninstall-preserve/reinstall across four agreed targets, plus legacy-state migration and rollback |
 
@@ -77,8 +77,7 @@ claimed to be fully integrated simply because their code exists.
   evidence window. Invalid proposals cannot silently kill the host.
 - Attention-only snooze/resume now preserves already admitted work while new
   selection remains deferred. Actual cancellation/reopening, outcome and inspector
-  cases pass. That runtime baseline passed 99 independent portable suites; newer
-  amendment code below has not inherited that full qualification.
+  cases pass. The following amendment baseline also has its own full qualification.
 - Explicit task/deadline amendments now have a separately guided candidate
   (ADR0257): same item, chronological owner sources, current effective version
   and old-work fences. Actual Core and a real inherited main/Native/worker chain
@@ -86,6 +85,11 @@ claimed to be fully integrated simply because their code exists.
   retained authority and preserve explicit owner waits. Dependencies, useful
   continuation and longitudinal/lifecycle remain open. The new portable baseline
   passes 99 independent suites; fleet and production acceptance are separate.
+- Core-declared project context is now retained and passed to native jobs;
+  controlled actual-Core/relative-file/inspection/cold cases pass (ADR0258).
+  New guidance exposes metadata retention, legacy grants do not expand and
+  missing/replaced directories block later tools. Real semantics and the new
+  portable regression are pending; this is not a sandbox or migration proof.
 - Sharing and reply continuity have actual-model examples, but useful natural
   sharing has **0/10** fresh complete rounds. Functional work tests do not advance
   that counter. Longitudinal memory, fleet and production remain unqualified.
@@ -98,8 +102,8 @@ records and ADRs0241–0256. Historical detail is retained in
 
 ## Next work in order
 
-1. **Finish the useful task lifecycle.** Verify explicit task/deadline revisions,
-   necessary dependencies and project context; then advance genuinely unfinished
+1. **Finish the useful task lifecycle.** Complete project-context semantic and
+   lifecycle qualification (ADR0258), then necessary dependencies and genuinely unfinished
    work within the guided range using Core. Carry actual earlier results forward.
    Do not repeat unknown effects, treat a model's suggested next step as permission,
    replace uncertain jobs automatically, or introduce another executor/scheduler.

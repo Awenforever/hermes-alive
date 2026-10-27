@@ -78,6 +78,8 @@ def source_prompt_excerpt(content, *, policy=None):
             **({'owner_amendments':content['owner_amendments'],'owner_history_available':True}
                if 'owner_amendments' in content else
                {'owner_history_available':False} if content.get('owner_history_available') is False else {}),
+            **({'core_project_context':content['core_project_context']} if 'core_project_context' in content else {}),
+            **({'core_project_context_status':content['core_project_context_status']} if 'core_project_context_status' in content else {}),
             **({'core_work_lifecycle':dict(content['core_work'])} if 'core_work' in content else {}),
             **({'autonomous_work_wait':dict(content['autonomous_work_wait'])} if 'autonomous_work_wait' in content else {}),
             **({'core_work_outcome':dict(content['core_work_outcome'])} if 'core_work_outcome' in content else {}),

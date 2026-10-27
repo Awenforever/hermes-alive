@@ -49,6 +49,11 @@ class OwnedWorkSource:
             if 'owner_amendments' in evidence.content:
                 from .events import _thaw_json
                 result['owner_amendments']=_thaw_json(evidence.content['owner_amendments'])
+        if 'core_project_context' in evidence.content:
+            from .events import _thaw_json
+            result['core_project_context']=_thaw_json(evidence.content['core_project_context'])
+        if 'core_project_context_status' in evidence.content:
+            result['core_project_context_status']=evidence.content['core_project_context_status']
         return result
 
     def existing(self,item_id,configured,version,*,include_source=False):

@@ -38,7 +38,7 @@ def validate_options(options):
     if (not isinstance(options, dict) or not required<=set(options)
             or set(options)-required-{'language','communication_preference','interest_preferences','use_hermes_user_profile',
                                      'refine_public_sources','accept_explicit_followups','manage_explicit_followups','revise_explicit_followups','observe_core_tools',
-                                     'core_background_work','core_work_request_retention','automatic_core_toolsets','retain_followup_source','review_core_work_results','inspect_core_work_files','autonomous_core_work','manage_core_work_outcomes'}
+                                     'core_background_work','core_work_request_retention','core_work_context_version','automatic_core_toolsets','retain_followup_source','review_core_work_results','inspect_core_work_files','autonomous_core_work','manage_core_work_outcomes'}
             or options['model_calls'] is not True or options['delivery'] is not True
             or options['outbound_retention_confirmed'] is not True
             or type(options['outbound_retention_days']) is not int
@@ -49,6 +49,10 @@ def validate_options(options):
             or (options.get('manage_explicit_followups') is True or options.get('retain_followup_source') is True)
                 and options.get('accept_explicit_followups') is not True):
         raise KernelSetupError('explicit model/delivery/retention choices required')
+    if 'core_work_context_version' in options and (type(options['core_work_context_version']) is not int
+            or options['core_work_context_version']!=1
+            or any(options.get(k) is not True for k in ('core_background_work','core_work_request_retention','retain_followup_source'))):
+        raise KernelSetupError('versioned Core project context requires guided native work/source retention')
     if options.get('revise_explicit_followups') is True and any(options.get(k) is not True for k in
             ('accept_explicit_followups','manage_explicit_followups','retain_followup_source')):
         raise KernelSetupError('guided revision requires management and retained owner requests')

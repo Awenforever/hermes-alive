@@ -1609,3 +1609,19 @@ unchanged. Related focused and real-model qualifications remain bounded as above
 A later derivative changes the historical-result qualifier and documentation only;
 keep exact equality evidence rather than rerun the entire suite for those edits.
 No production, fleet or ten fresh natural-sharing qualification follows from this.
+
+
+## 2026-10-27 — Delegated project context belongs to Core
+
+A successful file task in the process/default directory does not prove it ran in
+the user's project. Capture only Core-declared task/session context at admitted
+intake, retain it privately, pass the existing job workdir and let Core load rules.
+Test with conflicting project A/B rules, relative tool arguments and foreground
+switches; neither a workdir field nor a marker in a model reply is sufficient.
+Independently check actual files, actual Core worker input and cold associations.
+Directory disappearance/replacement must block later tools without being reported
+as rollback/cancellation. Inode identity is not a filesystem sandbox or migration
+ID. Inspector-relative targets need the protected producer cwd, not today's cwd.
+Old grants do not expand silently; old items missing context require an explicit
+existing operation preview. Current controlled project/inspection cases pass;
+real-model, full regression and lifecycle/fleet gates remain distinct (ADR0258).

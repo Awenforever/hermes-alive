@@ -91,6 +91,10 @@ class CoreFileInspection:
         request=self.work._read(parent,'requested',configured.subject)
         if (request is None or request['configuration_event_id']!=configured.event_id
                 or request.get('work_kind','perform')!='perform'):return None
+        if 'project_context_reference' in request:
+            from .core_work_context import expected_workdir
+            try:expected_workdir(self.work,parent,request,configured.subject)
+            except (ValueError,OSError,RuntimeError):return None
         state=self.work.status(parent,subject=configured.subject)
         if state.get('core_execution_state') not in ('completed','failed'):return None
         if self.latest(parent,subject=configured.subject) is not None:return None
@@ -116,7 +120,14 @@ class CoreFileInspection:
             for call in json.loads(page['entries'][0]['content'])['tool_calls']:
                 if call['function']['name']!='read_file':continue
                 arguments=json.loads(call['function']['arguments']);path=arguments.get('path')
-                if not isinstance(path,str) or len(path)>2048 or '\x00' in path or not Path(path).is_absolute():continue
+                if not isinstance(path,str) or not path or len(path)>2048 or '\x00' in path:continue
+                if not Path(path).is_absolute():
+                    # Resolve recorded relative tool arguments only against the
+                    # authenticated producer's retained Core directory.
+                    if 'project_context_reference' not in request:continue
+                    directory=expected_workdir(self.work,parent,request,configured.subject)
+                    if directory is None or job.get('workdir')!=directory:continue
+                    path=str((Path(directory)/path).resolve())
                 if not any(e['kind']=='recorded_tool_result' and e['tool_call_id']==call['id'] for e in records['entries']):continue
                 target={'reference':records['evidence_reference'],'message_id':entry['message_id'],
                     'tool_call_id':call['id'],'fingerprint':entry['fingerprint'],'path':path}
@@ -203,12 +214,15 @@ class CoreFileInspection:
             expiry=min(datetime.now(timezone.utc)+timedelta(days=7),datetime.fromisoformat(source['item']['expires_at']))
             ref=self.store.vault.put_json(intent,subject=owner,purpose='core-work.file-inspection-intent',
                 sensitivity=Sensitivity.PRIVATE,retention_until=expiry,content_id=child+':intent')
+            parent_request=self.work._read(parent,'requested',owner)
+            project={k:parent_request[k] for k in ('project_context_reference','project_context_work_id',
+                'project_context_origin','project_context_protocol') if k in parent_request}
             self.work._append(child,'requested',owner,{'configuration_event_id':configured.event_id,
                 'item_id':intent['item_id'],'item_version':intent['item_version'],'source_event_id':'agenda.proposal:'+intent['item_id'],
                 'work_kind':'inspection','parent_work_id':parent,'inspection_intent':ref.to_event_payload(),
                 'toolsets':[self.scope_name],'exact_current_work_message_retained_by_core':False,
                 'authority':'guided_owned_file_inspection','task_body_copied_into_alive_journal':False,
-                'task_success_proven':False},causation=parent+':requested')
+                'task_success_proven':False,**project},causation=parent+':requested')
             self.work._append(child,'handoff_started',owner,{'replacement_job_allowed':False},causation=child+':requested')
             def current_authority():
                 validate();self.authority(configured)
@@ -241,6 +255,16 @@ class CoreFileInspection:
         if not rows:return None
         if len(rows)!=1:raise ValueError('ambiguous inspection owner')
         child=rows[0][0].removesuffix(':core_bound');request=self.work._read(child,'requested',configured.subject)
+        if 'project_context_reference' in request:
+            from .core_work_context import expected_workdir
+            try:
+                directory=expected_workdir(self.work,child,request,configured.subject)
+                bound=self.work._read(child,'core_bound',configured.subject);job=get_job(execution.job_id)
+                if (job is None or job.get('workdir')!=directory
+                        or self.work._definition(job)!=bound['definition_fingerprint']):
+                    raise ValueError('Core job project binding changed')
+            except (ValueError,OSError,RuntimeError):
+                raise InspectionDenied('owned Core project is unavailable or changed') from None
         from .agenda_revisions import after_submission
         if after_submission(self.store,child,request):
             raise InspectionDenied('owner amended this work; old admission cannot perform further tools')

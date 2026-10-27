@@ -237,3 +237,16 @@ provider scan is added. Core's already submitted task records keep Core's own
 retention rules; editing an item does not retract them. Full coordinated deletion
 of source-dependent derived content and managed backups remains a release gate,
 not a guarantee established by the revision fixture.
+
+
+### Private project metadata for delegated Core work
+
+The versioned background-work choice retains the directory declared by Core,
+its resolved path and filesystem device/inode in the private source vault. No
+project file bodies are harvested. Structural journal facts contain protected
+references/fingerprints, not raw paths. Work-specific copies expire with the
+item; inspectors reuse their producer's protected reference. Status observations
+expose binding availability, not a raw cwd. Core's independent job record retains
+its workdir and instructions under Core retention. Deleting an Alive source does
+not delete Core records or arbitrary backups. Coordinated derived erasure and
+portable identity rebinding remain explicit migration/release gates.

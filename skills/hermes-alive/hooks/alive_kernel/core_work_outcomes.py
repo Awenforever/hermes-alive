@@ -91,6 +91,10 @@ class CoreWorkOutcomes:
         state=self.work.previous(item_id,subject=configured.subject)
         if state is None or state.get('core_execution_state') not in ('completed','failed'):return None
         request=self.work._read(state['work_id'],'requested',configured.subject)
+        if 'project_context_reference' in request:
+            from .core_work_context import expected_workdir
+            try:expected_workdir(self.work,state['work_id'],request,configured.subject)
+            except (ValueError,OSError,RuntimeError):return None
         if (request['configuration_event_id']!=configured.event_id
                 or self.sources.existing(item_id,configured,request['item_version'],include_source=True) is None
                 or self.work._read(state['work_id'],'stop_requested',configured.subject) is not None):return None

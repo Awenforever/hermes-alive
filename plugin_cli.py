@@ -65,7 +65,7 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
     setup.add_argument('--confirm-core-tool-observation',action='store_true',
         help='Observe tool names, durations and terminal status only in the configured owner conversation; diagnostic validity follows retention days, structural ledger remains until removed; no arguments/results/error bodies or execution authority')
     setup.add_argument('--confirm-core-background-work',action='store_true',
-        help='Allow native Hermes work with Core models/profile memory and task-record retention, including the exact current owner message (at most 6000 characters); requires explicit follow-up intake')
+        help='Allow native Hermes work with Core models/profile memory, retained Core-declared project directory and task-record retention, including the exact current owner message (at most 6000 characters). Core loads project rules; no process/env/home cwd guessing. Requires explicit follow-up intake')
     setup.add_argument('--confirm-core-work-result-review',action='store_true',
         help='Allow Alive cognition to read bounded retained request/results of its own terminal Core work; derived assessments follow Alive retention. Records are historical evidence, not independent current-world proof; no new execution authority')
     setup.add_argument('--confirm-core-work-outcomes',action='store_true',
@@ -277,7 +277,7 @@ def alive_command(args: argparse.Namespace) -> int:
             **({'manage_explicit_followups':True} if getattr(args,'confirm_followup_management',False) else {}),
             **({'revise_explicit_followups':True} if getattr(args,'confirm_followup_revisions',False) else {}),
             **({'observe_core_tools':True} if getattr(args,'confirm_core_tool_observation',False) else {}),
-            **({'core_background_work':True,'core_work_request_retention':True,'automatic_core_toolsets':args.automatic_core_toolset}
+            **({'core_background_work':True,'core_work_request_retention':True,'core_work_context_version':1,'automatic_core_toolsets':args.automatic_core_toolset}
                if getattr(args,'confirm_core_background_work',False) else {}),
             **({'review_core_work_results':True} if getattr(args,'confirm_core_work_result_review',False) else {}),
             **({'manage_core_work_outcomes':True} if getattr(args,'confirm_core_work_outcomes',False) else {}),
@@ -302,6 +302,7 @@ def alive_command(args: argparse.Namespace) -> int:
                 'core_tool_structural_observation':bool(getattr(args,'confirm_core_tool_observation',False)),
                 'core_tool_arguments_or_results_retained':False,
                 'native_core_background_work':bool(getattr(args,'confirm_core_background_work',False)),
+                'retained_core_declared_project_context':bool(getattr(args,'confirm_core_background_work',False)),
                 'bounded_owned_core_result_review':bool(getattr(args,'confirm_core_work_result_review',False)),
                 'automatic_owned_work_outcomes':bool(getattr(args,'confirm_core_work_outcomes',False)),
                 'explicit_owner_task_revisions':bool(getattr(args,'confirm_followup_revisions',False)),

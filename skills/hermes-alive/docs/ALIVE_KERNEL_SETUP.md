@@ -277,3 +277,21 @@ execution versions, do not undo effects/prove cancellation, and do not start a
 replacement automatically. Omitted fields are preserved; a null deadline clears
 it. Conflicts with attention/retention require a clear owner choice. This is a
 development candidate under isolated qualification, not a production migration.
+
+
+### Project context follows the assignment
+
+New `--confirm-core-background-work` guidance includes private retention of the
+Core-declared project directory and directory identity. Explain this alongside
+the exact bounded owner request and Core task-record retention. The directory is
+captured when the item is accepted; switching the current conversation's project
+does not move the assignment. Core loads its own project rules at execution.
+Alive does not read/copy those rules or infer a directory from the process/home.
+Missing/replaced or unavailable project directories block later tools; this does
+not cancel an in-flight effect or restrict Core's file access to a sandbox.
+
+Old configurations do not silently acquire directory retention. If an older item
+has no retained project, a new guided work request must preview and explicitly
+confirm the selected current Core context, even inside the automatic tool range.
+Do not describe unknown project metadata as a verified current project. No new
+per-item question is required for a newly admitted item with retained context.

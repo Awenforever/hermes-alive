@@ -83,6 +83,8 @@ class CoreWorkStore:
     def identifier(self,configured,*,item,turn_evidence,toolsets):
         identity=dict(owner=configured.subject,configuration=configured.event_id,
             item=item['item_id'],version=item['item_version'],turn=turn_evidence,toolsets=self.toolsets(toolsets))
+        if configured.options.get('core_work_context_version')==1 and item.get('core_project_context') is not None:
+            identity['project_context']=self.protector.authenticate_json('alive.core-work.context-identity.v1',item['core_project_context'])
         return 'core-work:'+self.protector.authenticate_json('alive.core-work.identity.v1',identity)
 
     def launch(self,configured,*,item,turn_evidence,owner_request,toolsets,validate,explicit_confirmation=False):
@@ -100,6 +102,8 @@ class CoreWorkStore:
         native_sets=self.native_toolsets(sets)
         if not explicit_confirmation and not set(sets)<=set(configured.options.get('automatic_core_toolsets',[])):
             raise ValueError('this operation needs owner confirmation')
+        if item.get('core_project_context_origin')=='owner_confirmed_current_turn' and not explicit_confirmation:
+            raise ValueError('the newly chosen project requires explicit owner confirmation')
         work_id=self.identifier(configured,item=item,turn_evidence=turn_evidence,toolsets=sets)
         with file_lock(self.store.root/'core-work.lock',timeout=0):
             self._home()
@@ -114,6 +118,8 @@ class CoreWorkStore:
             plan={'task':item['details'],'due_at':item.get('due_at'),'current_owner_request':owner_request,
                   'toolsets':sets,'configuration':configured.event_id,'item_version':item['item_version']}
             source_id='agenda.proposal:'+item['item_id']
+            from .core_work_context import retain
+            project=retain(self.store,configured,item,work_id,origin=item.get('core_project_context_origin','recorded_task'))
             self._append(work_id,'requested',configured.subject,{
                 'configuration_event_id':configured.event_id,'item_id':item['item_id'],
                 'item_version':item['item_version'],'source_event_id':source_id,
@@ -123,7 +129,7 @@ class CoreWorkStore:
                 'exact_current_work_message_retained_by_core':True,
                 'toolsets':sets,'literal_operation_confirmation':explicit_confirmation,
                 'authority':'user_confirmed' if explicit_confirmation else 'user_delegated',
-                'task_success_proven':False},causation=source_id)
+                'task_success_proven':False,**project},causation=source_id)
             self._append(work_id,'handoff_started',configured.subject,{'replacement_job_allowed':False},
                 causation=work_id+':requested')
             # The durable intent precedes Core IO. A crash before binding keeps
@@ -154,18 +160,24 @@ class CoreWorkStore:
 
     def dispatch_prepared(self,work_id,configured,prompt,native_sets,validate,*,inspection=False):
         from cron.jobs import create_job,get_job,trigger_job
+        from .core_work_context import expected_workdir
         validate();self._home()
+        request=self._read(work_id,'requested',configured.subject)
+        directory=expected_workdir(self,work_id,request,configured.subject)
         job=create_job(prompt=prompt,schedule='1h',name=('alive-inspect-' if inspection else 'alive-')+work_id.split(':')[1][:32],
-            repeat=1,deliver='local',enabled_toolsets=native_sets,paused=True)
+            repeat=1,deliver='local',enabled_toolsets=native_sets,paused=True,workdir=directory)
         if (job.get('state')!='paused' or job.get('enabled_toolsets')!=native_sets
                 or job.get('deliver')!='local' or job.get('script') or job.get('no_agent')
                 or (job.get('repeat') or {}).get('times')!=1
-                or any(job.get(k) for k in ('model','provider','base_url','context_from','skills','skill','workdir'))):
+                or job.get('workdir')!=directory
+                or any(job.get(k) for k in ('model','provider','base_url','context_from','skills','skill'))):
             raise ValueError('Core prepared job differs from authorized work')
         fingerprint=self._definition(job)
         self._append(work_id,'core_bound',configured.subject,{
             'job_id':job['id'],'definition_fingerprint':fingerprint},causation=work_id+':handoff_started')
         validate();self._home()
+        if expected_workdir(self,work_id,request,configured.subject)!=directory:
+            raise ValueError('Core project binding changed before activation')
         current=get_job(job['id'])
         if current is None or current.get('state')!='paused' or self._definition(current)!=fingerprint:
             raise ValueError('prepared Core job changed before activation')
@@ -363,6 +375,13 @@ class CoreWorkStore:
                 'core_profile_context_authorized':True,'physical_channel_send_requested':False}
         result['work_kind']=request.get('work_kind','perform')
         result['parent_work_id']=request.get('parent_work_id')
+        if 'project_context_reference' in request:
+            from .core_work_context import read,binding_status
+            try:project_status=binding_status(read(self,work_id,request,subject))
+            except (ValueError,OSError,RuntimeError):project_status='unavailable'
+            result['project_context_binding']={'status':project_status,'rules_loaded_by':'Core',
+                'directory_identity_is_not_filesystem_sandbox':True}
+            result['project_context_attention']=project_status=='unavailable'
         from .agenda_revisions import after_submission
         if after_submission(self.store,work_id,request):
             result.update(later_owner_amendment=True,historical_results_need_reassessment_against_current_goal=True,

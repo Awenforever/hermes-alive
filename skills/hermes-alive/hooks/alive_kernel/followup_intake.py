@@ -57,7 +57,7 @@ def set_permission(store,configured,enabled):
 
 def record_request(store, configured, *, turn_identity, request_fingerprint, evidence_fingerprint, permission_id,
                    operation='record', target_item_id=None, from_state=None, available_at=None, now=None,source_message=None,
-                   revision_binding=None):
+                   revision_binding=None,project_context=None):
     """Current configured Core host only, never a public/model-callable API."""
     current = store.configuration()
     if (current is None or current.event_id != configured.event_id
@@ -71,6 +71,12 @@ def record_request(store, configured, *, turn_identity, request_fingerprint, evi
                 or not isinstance(revision_binding,dict) or set(revision_binding)!=set(FIELDS)):
             raise ValueError('guided revision and exact amendment binding required')
     elif revision_binding is not None:raise ValueError('unexpected amendment binding')
+    context_fingerprint=None
+    if operation=='record' and configured.options.get('core_work_context_version')==1:
+        from .core_work_context import validate
+        project_context=validate(project_context)
+        context_fingerprint=store.protector.authenticate_json('alive.core-project-context.v1',project_context)
+    elif project_context is not None:raise ValueError('project context was not admitted for this source purpose')
     if operation!='record' and (configured.options.get('manage_explicit_followups') is not True
             or not isinstance(target_item_id,str) or not target_item_id
             or from_state not in ('active','snoozed') and not (operation=='resume' and from_state in ('completed','dismissed'))):
@@ -89,12 +95,14 @@ def record_request(store, configured, *, turn_identity, request_fingerprint, evi
                 'turn':turn_identity, 'request':request_fingerprint,'evidence':evidence_fingerprint,
                 'operation':operation,'target':target_item_id,'from_state':from_state,'available_at':available_at}
     if revision_binding is not None:identity['revision_binding']=revision_binding
+    if context_fingerprint is not None:identity['core_project_context']=context_fingerprint
     event_id = 'followup.request:' + store.protector.authenticate_json(DOMAIN, identity)
     existing = store.journal.get(event_id)
     if existing is not None:
         return existing
     expiry=now+timedelta(days=configured.options['outbound_retention_days'])
-    content=(store.vault.put_json({'message':source_message},subject=configured.subject,
+    content=(store.vault.put_json({'message':source_message,
+        **({'core_project_context':project_context} if context_fingerprint is not None else {})},subject=configured.subject,
         purpose='agenda.owner-request',sensitivity=Sensitivity.PRIVATE,retention_until=expiry,
         content_id=event_id+':source') if retain else None)
     event = EventEnvelope(event_id=event_id, event_type='agenda.revised' if operation=='revise' else 'conversation.inbound', source=SOURCE,
@@ -107,6 +115,8 @@ def record_request(store, configured, *, turn_identity, request_fingerprint, evi
             'interpretation':'main_model_under_owner_grant', 'literal_owner_confirmation':False,
             'raw_content_stored':retain, 'external_action_authorized':False,
             **({'revision_binding':revision_binding} if revision_binding is not None else {}),
+            **({'core_project_context_retained':True,'core_project_context_fingerprint':context_fingerprint}
+               if context_fingerprint is not None else {}),
             **({'content':content.to_event_payload()} if content else {})})
     def still_allowed(_connection):
         current=store.configuration()
@@ -185,6 +195,14 @@ def item_source_view(store,item_id,*,subject,include_message=False):
         if source.event.payload.get('raw_content_stored') is not True:return missing
         message=_source_message(store,source.event,expiry)
     except (ValueError,TypeError,KeyError,OSError,RuntimeError,ContentVaultError):return missing
+    project={}
+    from .core_work_context import from_source,binding_status
+    try:
+        context=from_source(store,source.event,expiry)
+        if context is not None:project={'core_project_context':context,'core_project_context_status':binding_status(context)}
+        elif store.configuration().options.get('core_work_context_version')==1:
+            project={'core_project_context_status':'not_retained'}
+    except (ValueError,TypeError,KeyError,OSError,RuntimeError):project={'core_project_context_status':'unavailable'}
     amendments=[];history={}
     try:
         with closing(store.journal._connect()) as c:
@@ -217,6 +235,7 @@ def item_source_view(store,item_id,*,subject,include_message=False):
             'source_recorded_at':source.event.observed_at.isoformat(),
             'source_timestamp_kind':'intake_recorded_at_not_sender_timestamp',
             **history,
+            **project,
             **({'original_owner_message':message} if include_message else {})}
 
 
