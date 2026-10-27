@@ -20,7 +20,7 @@ class OwnedWorkSource:
         if not policy.enabled:raise ValueError('owned autonomous work is paused')
         return policy
 
-    def item(self,item_id,configured,*,include_source=False):
+    def item(self,item_id,configured,*,include_source=False,require_available=True):
         from .cognition_opportunities import CognitionOpportunityReader
         now=datetime.now(timezone.utc)
         with closing(self.store.journal._connect()) as c:
@@ -32,7 +32,7 @@ class OwnedWorkSource:
         evidence=CognitionOpportunityReader(self.store.journal,content_vault=self.store.vault)._commitment(
             row,subject=configured.subject,now=now)
         if evidence is None or row['state'] not in ('active','snoozed'):return None
-        if row['available_at'] and datetime.fromisoformat(row['available_at'])>now:return None
+        if require_available and row['available_at'] and datetime.fromisoformat(row['available_at'])>now:return None
         if datetime.fromisoformat(row['expires_at'])<=now:return None
         version=self.store.protector.authenticate_json('alive.agenda.item_version.v1',{
             'configuration':configured.event_id,'owner':configured.subject,'item':item_id,'event':transition[0]})
@@ -46,6 +46,27 @@ class OwnedWorkSource:
                 source_recorded_at=evidence.content['source_recorded_at'],
                 source_retention_until=evidence.content['original_source_retention_until'])
         return result
+
+    def existing(self,item_id,configured,version,*,include_source=False):
+        """Attention-only transitions do not revoke already admitted work.
+
+        The complete current chain is verified by item/_commitment first. Never
+        cross completion, cancellation, expiry or reopening into a new task life.
+        New work selection and result assessment still obey availability.
+        """
+        current=self.item(item_id,configured,include_source=include_source,require_available=False)
+        if current is None:return None
+        with closing(self.store.journal._connect()) as c:
+            rows=c.execute('SELECT caused_by_event_id,to_state FROM agenda_transitions_v1 WHERE item_id=? '
+                'ORDER BY transition_id DESC LIMIT 65',(item_id,)).fetchall()
+        if not rows or len(rows)>64:return None
+        for row in rows:
+            if row['to_state'] not in ('active','snoozed'):break
+            candidate=self.store.protector.authenticate_json('alive.agenda.item_version.v1',{
+                'configuration':configured.event_id,'owner':configured.subject,'item':item_id,
+                'event':row['caused_by_event_id']})
+            if candidate==version:return current
+        return None
 
     def page(self,configured,*,kind='autonomous-work'):
         if kind not in ('autonomous-work','work-outcomes'):raise ValueError('known work page required')

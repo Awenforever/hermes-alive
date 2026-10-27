@@ -1545,3 +1545,19 @@ Also audit whether attention snooze/resume should alter the execution/goal versi
 source-version equality alone is not a substitute for the intended task lifecycle.
 General continuation, revisions/dependencies, context, memory and lifecycle gates
 remain open; no production release is implied.
+
+
+### Attention is not execution authority (ADR0256)
+
+A working task must not silently lose permission when the owner asks to hear
+about it tomorrow. Keep new selection availability separate from existing-work
+validation. r211 reproduced a missing actual file after attention-only snooze;
+r213 both attention-only variants pass. An unbroken authenticated active/snoozed
+chain can preserve prior admission; a terminal transition followed by resume is
+a new lifetime and must reject the old job. Merely comparing descriptions is not
+authority. Current command/snapshot versions must still change on every transition
+so stale owner edits or stale model closure cannot overwrite new intent.
+
+Do not infer generic task revision/continued-work support from this change. This
+stage does not change deadlines, descriptions, scopes or allow replacement work.
+Broader tests are pending, and no production change is authorized by this record.

@@ -14,7 +14,7 @@ if __name__=='__main__' and os.environ.get('ALIVE_AUTOWORK_CHILD')!='1':
         env={**os.environ,'HOME':root,'HERMES_HOME':str(Path(root)/'profile'),
             'ALIVE_AUTOWORK_CHILD':'1','PYTHONDONTWRITEBYTECODE':'1'}
         modes=os.environ.get('ALIVE_AUTOWORK_CASES','execute,wait,revoked,erased,off,restart').split(',')
-        assert set(modes)<=set(('execute','wait','revoked','erased','off','restart','outcome-complete','outcome-partial','outcome-forged','outcome-revoked','outcome-recover','outcome-manual-long','outcome-wrong-result','outcome-window','outcome-malformed'))
+        assert set(modes)<=set(('execute','wait','revoked','erased','off','restart','outcome-complete','outcome-partial','outcome-forged','outcome-revoked','outcome-recover','outcome-manual-long','outcome-wrong-result','outcome-window','outcome-malformed','outcome-attention','attention-snooze','attention-resume','attention-cancel','attention-reopen'))
         try:
             for mode in modes:
                 case={**env,'HERMES_HOME':str(Path(root)/mode),'ALIVE_AUTOWORK_CASE':mode}
@@ -254,7 +254,7 @@ async def exercise(home):
             first=await binding.native.step(binding.arguments['build_parameters']())
             assert first.disposition in ('silence','evidence_changed')
         work=execution.kernel('core_work').CoreWorkStore(store)
-        if mode in ('execute','revoked','restart') or mode.startswith('outcome-'):
+        if mode in ('execute','revoked','restart','attention-snooze','attention-resume','attention-cancel','attention-reopen') or mode.startswith('outcome-'):
             state=work.previous(saved['item_id'],subject=store.configuration().subject);assert state is not None
             assert len(jobs.list_jobs(include_disabled=True))==1
             request=work._read(state['work_id'],'requested',store.configuration().subject)
@@ -268,6 +268,29 @@ async def exercise(home):
             if manual is None:assert retained['retained_original_owner_request']==original and 'current_owner_message' not in retained
             else:assert retained['current_owner_message']==manual and len(job['prompt'])>4096
             assert job['enabled_toolsets']==['file','no_mcp'] and job['deliver']=='local'
+            if mode.startswith('attention-') or mode=='outcome-attention':
+                from datetime import datetime,timedelta,timezone
+                # A real fresh owner turn changes attention, not execution scope.
+                actions={'attention-snooze':('snooze',),'attention-resume':('snooze','resume'),
+                    'attention-cancel':('cancel',),'attention-reopen':('cancel','resume'),
+                    'outcome-attention':('snooze','resume')}
+                for action in actions[mode]:
+                    listed=json.loads(await command('agenda list'))['items'][0]
+                    message=('明天再来跟我说这件事，已经授权的工作继续进行。' if action=='snooze'
+                             else '取消这件事。' if action=='cancel' else '重新打开这件事，不要重新执行旧工作。' if mode=='attention-reopen'
+                             else '恢复这件事的关注，工作内容和权限保持不变。')
+                    variables=core.set_session_vars(platform='telegram',chat_id=source.chat_id,user_id=source.user_id,
+                        session_key=entry.session_key,session_id=entry.session_id)
+                    _collect_pre_llm_call_context(SimpleNamespace(session_id=entry.session_id,model='configured-primary',
+                        platform='telegram',_user_id=source.user_id),effective_task_id=action,turn_id=action,
+                        original_user_message=message,messages=[{'role':'user','content':message}],conversation_history=[])
+                    change={'operation':action,'item_id':saved['item_id'],'item_version':listed['item_version'],
+                            'evidence_span':message}
+                    if action=='snooze':change['available_at']=(datetime.now(timezone.utc)+timedelta(days=1)).isoformat()
+                    changed=json.loads(model_tools.handle_function_call('alive_agenda',change,task_id=action,
+                        session_id=entry.session_id,turn_id=action,tool_call_id=action+'-call',enabled_tools=['alive_agenda']))
+                    core.clear_session_vars(variables);variables=None
+                    assert changed.get('state')==('snoozed' if action=='snooze' else 'dismissed' if action=='cancel' else 'active'),changed
             if mode=='revoked':
                 scope=binding._continuity.router.capture_target(session_key=entry.session_key,
                     user_id=source.user_id,platform='telegram')
@@ -283,7 +306,7 @@ async def exercise(home):
                     await asyncio.to_thread(tick,verbose=False,sync=True,headless=False)
                 await asyncio.sleep(.1);state=work.status(state['work_id'],subject=store.configuration().subject)
             assert state['core_execution_state']=='completed'
-            assert not artifact.exists() if mode=='revoked' else artifact.read_text(encoding='utf-8')==actual_body
+            assert not artifact.exists() if mode in ('revoked','attention-cancel','attention-reopen') else artifact.read_text(encoding='utf-8')==actual_body
             assert len(work_requests)==(4 if mode=='outcome-window' else 3) and state['task_success_proven'] is False
         else:
             state=None;assert not jobs.list_jobs(include_disabled=True) and not artifact.exists()
@@ -327,7 +350,7 @@ async def exercise(home):
             except ValueError:pass
         else:await binding.native.step(binding.arguments['build_parameters']())
         if mode.startswith('outcome-'):assert counts['outcome']==1
-        if mode in ('outcome-complete','outcome-window'):
+        if mode in ('outcome-complete','outcome-window','outcome-attention'):
             listed=json.loads(await command('agenda list'))['items'][0]
             assert listed['state']=='completed'
             outcomes=execution.kernel('core_work_outcomes').CoreWorkOutcomes(store)
@@ -347,16 +370,16 @@ async def exercise(home):
             assert reopened.get('state')=='active',reopened
             await binding.native.step(binding.arguments['build_parameters']())
             assert counts['outcome']==1 and outcomes.view(state['work_id'],store.configuration())['later_item_change']
-        assert counts['start']==(0 if mode in ('erased','off','outcome-manual-long') else 1) and len(jobs.list_jobs(include_disabled=True))==(1 if mode in ('execute','revoked','restart') or mode.startswith('outcome-') else 0)
+        assert counts['start']==(0 if mode in ('erased','off','outcome-manual-long') else 1) and len(jobs.list_jobs(include_disabled=True))==(1 if mode in ('execute','revoked','restart','attention-snooze','attention-resume','attention-cancel','attention-reopen') or mode.startswith('outcome-') else 0)
         from contextlib import closing
         with closing(store.journal._connect()) as c:
-            assert c.execute('SELECT state FROM agenda_items_v1 WHERE item_id=?',(saved['item_id'],)).fetchone()[0]=='active'
+            assert c.execute('SELECT state FROM agenda_items_v1 WHERE item_id=?',(saved['item_id'],)).fetchone()[0]==('snoozed' if mode=='attention-snooze' else 'dismissed' if mode=='attention-cancel' else 'active')
         raw='\n'.join(r.event.canonical_json() for r in store.journal.read())
         assert original not in raw and str(artifact) not in raw and body.strip() not in raw
         if manual is not None:assert manual not in raw
         keys=('identity.key','content-vault/content.key','experience-content-vault/content.key')
         (home/'autonomous-expected.json').write_text(json.dumps({'work_id':state['work_id'] if state else None,
-            'owner':store.configuration().subject,'artifact':str(artifact),'body':actual_body,'revoked':mode=='revoked','outcomes':mode.startswith('outcome-'),'pending_closure':mode=='outcome-recover','manual':manual is not None,
+            'owner':store.configuration().subject,'artifact':str(artifact),'body':actual_body,'revoked':mode in ('revoked','attention-cancel','attention-reopen'),'outcomes':mode.startswith('outcome-'),'pending_closure':mode=='outcome-recover','manual':manual is not None,
             'keys':{n:hashlib.sha256((store.root/n).read_bytes()).hexdigest() for n in keys}}),encoding='utf-8')
     finally:
         if variables:core.clear_session_vars(variables)

@@ -72,8 +72,9 @@ class CoreFileInspection:
         result={'work_id':child,'parent_work_id':parent,'state':state,'task_success_proven':False,
             'source':'separate read-only Core inspection; observations are historical at their recorded time',
             'current_world_state_unbounded':False,'automatic_retry_allowed':False}
-        item=self.item(request['item_id'],configured)
-        if item is None or item['item_version']!=request['item_version']:
+        from .core_work_source import OwnedWorkSource
+        item=OwnedWorkSource(self.store).existing(request['item_id'],configured,request['item_version'])
+        if item is None:
             return {**result,'source_item_changed':True}
         try:
             intent=self.intent(child,request,subject=subject)
@@ -95,7 +96,9 @@ class CoreFileInspection:
         if self.latest(parent,subject=configured.subject) is not None:return None
         if self.work.previous(request['item_id'],subject=configured.subject)['work_id']!=parent:return None
         item=self.item(request['item_id'],configured)
-        if item is None:return None
+        from .core_work_source import OwnedWorkSource
+        if (item is None or OwnedWorkSource(self.store).existing(request['item_id'],configured,
+                request['item_version']) is None):return None
         bound=self.work._read(parent,'core_bound',configured.subject)
         from cron.jobs import get_job
         job=get_job(bound['job_id'])
@@ -259,8 +262,10 @@ class CoreFileInspection:
         if self.work._read(request['parent_work_id'],'stop_requested',configured.subject) is not None:
             raise ValueError('owner stopped producer work')
         if request['configuration_event_id']!=configured.event_id:raise ValueError('inspection grant changed')
-        intent=self.intent(child,request,subject=configured.subject);item=self.item(request['item_id'],configured)
-        if item is None or item['item_version']!=intent['item_version']:raise ValueError('inspection item changed')
+        from .core_work_source import OwnedWorkSource
+        intent=self.intent(child,request,subject=configured.subject)
+        item=OwnedWorkSource(self.store).existing(request['item_id'],configured,intent['item_version'])
+        if item is None:raise ValueError('inspection item changed')
         if self.work.previous(item['item_id'],subject=configured.subject)['work_id']!=intent['parent_work_id']:
             raise ValueError('producer work changed')
         producer=self.work.status(intent['parent_work_id'],subject=configured.subject)

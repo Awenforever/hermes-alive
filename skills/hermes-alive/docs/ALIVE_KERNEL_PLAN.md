@@ -768,3 +768,15 @@ attention scheduling and work authority, then useful continued action within the
 guided range. Project context, memory learning, source-dependent erasure and the
 remaining lifecycle/fleet/production gates remain open. These bounded tests are
 not ten fresh sharing rounds or production acceptance.
+
+
+### Attention deferral versus execution — ADR0256
+
+An actual Core audit reproduced an existing job losing its effects after a
+follow-up snooze. New selection availability and existing-work authorization now
+use different views of the same validated agenda history. Attention-only changes
+preserve the original work admission; terminal transitions and reopening do not.
+Owner commands and closure retain exact latest-version checks. Two actual-Core
+attention cases pass; cancellation/reopening, deferred outcome assessment,
+inspection and full regression are being qualified before committing this stage.
+This does not implement general task/deadline revision or continuation planning.

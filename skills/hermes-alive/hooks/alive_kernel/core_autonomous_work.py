@@ -180,8 +180,8 @@ class CoreAutonomousWork:
     def guard(self,configured,execution,work_id,request):
         self.authority(configured)
         if request['configuration_event_id']!=configured.event_id:raise ValueError('autonomous grant changed')
-        item=self.sources.item(request['item_id'],configured,include_source=True)
-        if (item is None or item['item_version']!=request['item_version']
+        item=self.sources.existing(request['item_id'],configured,request['item_version'],include_source=True)
+        if (item is None
                 or item['owner_source_event_id']!=request['original_owner_source_event_id']
                 or not set(request['toolsets'])<=set(configured.options.get('automatic_core_toolsets',()))):
             raise ValueError('autonomous source or scope changed')

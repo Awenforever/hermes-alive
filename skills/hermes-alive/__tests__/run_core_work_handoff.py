@@ -468,6 +468,15 @@ async def test(home):
             leaf=inspector.latest(started['work_id'],subject=configured.subject)
             assert leaf is not None and len(jobs.list_jobs(include_disabled=True))==2
             assert work_store.previous(row['item_id'],subject=configured.subject)['work_id']==started['work_id']
+            if os.environ.get('ALIVE_WORK_INSPECTION_ATTENTION')=='1':
+                text='这件事明天再向我跟进，已经授权的核验继续。'
+                tool=turn('inspection-attention-snooze',text)
+                current=tool({'operation':'list','item_id':row['item_id']})['items'][0]
+                changed=tool({'operation':'snooze','item_id':row['item_id'],'item_version':current['item_version'],
+                    'evidence_span':text,'available_at':(datetime.now(timezone.utc)+timedelta(days=1)).isoformat()})
+                assert changed.get('state')=='snoozed',changed
+                assert inspector.source(started['work_id'],configured) is None
+                assert not inspector.snapshot(started['work_id'],subject=configured.subject).get('source_item_changed')
             if stopped_inspection:
                 answer=json.loads(await command('agenda stop-work '+started['work_id']))
                 assert answer['status']=='stop_requested' and len(answer['targets'])==2,answer
@@ -513,6 +522,13 @@ async def test(home):
                 return
             assert artifact.read_text()==fresh and unapproved.read_text()=='MUST_NOT_BE_READ'
             assert len(inspection_requests)==3
+            if os.environ.get('ALIVE_WORK_INSPECTION_ATTENTION')=='1':
+                text='恢复这件事的关注，核验权限不变。'
+                tool=turn('inspection-attention-resume',text)
+                current=tool({'operation':'list','item_id':row['item_id']})['items'][0]
+                changed=tool({'operation':'resume','item_id':row['item_id'],'item_version':current['item_version'],
+                    'evidence_span':text})
+                assert changed.get('state')=='active',changed
             after_inspection=await native.step(build())
             assert after_inspection.disposition=='silence'
             assert 'separate_result_inspection' in progress_prompts[-1] and fresh in progress_prompts[-1]
