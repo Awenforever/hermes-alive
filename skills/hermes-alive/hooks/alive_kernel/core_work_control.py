@@ -40,7 +40,13 @@ class CoreWorkControl:
         self.work._home();validate()
         if self.store.configuration()!=configured:raise ValueError('current configured owner required')
         owner=configured.subject
-        attempt_id=self.store.protector.authenticate_json('alive.core-work.stop-attempt.v1',authority)
+        attempt_authority=dict(authority)
+        if authority.get('kind')=='current_owner_interpretation':
+            # A different valid excerpt is still the same Core owner request,
+            # not permission to dispatch another cancellation attempt.
+            turn=authority.get('turn',{})
+            attempt_authority['turn']={k:turn.get(k) for k in ('turn_identity','permission_id','request_fingerprint')}
+        attempt_id=self.store.protector.authenticate_json('alive.core-work.stop-attempt.v1',attempt_authority)
         with file_lock(self.store.root/'core-work.lock',timeout=0):
             targets=self.group(work_id,subject=owner)
             # Mark the entire exact group first. A crash or an unavailable owner
@@ -65,7 +71,10 @@ class CoreWorkControl:
     def _stop_one(self,work_id,owner,validate,attempt_id):
         from cron.jobs import get_job,pause_job,is_terminal_job
         from cron.executions import latest_execution
-        result={'work_id':work_id,'effects_undone':False,'execution_stopped_proven':False}
+        request=self.work._read(work_id,'requested',owner)
+        result={'work_id':work_id,'work_kind':request.get('work_kind','perform'),
+            'parent_work_id':request.get('parent_work_id'),
+            'effects_undone':False,'execution_stopped_proven':False}
         bound=self.work._read(work_id,'core_bound',owner)
         if bound is None:return {**result,'status':'unbound_handoff_needs_reconciliation','needs_attention':True}
         job=get_job(bound['job_id'])

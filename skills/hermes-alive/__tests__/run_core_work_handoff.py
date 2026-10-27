@@ -252,6 +252,10 @@ async def test(home):
                 'usage':{'prompt_tokens':10,'completion_tokens':10,'total_tokens':20}})
         responses['handler']=respond
         if stop_mode:
+            if stop_mode=='pending':
+                scope=binding._continuity.router.capture_target(session_key=entry.session_key,
+                    user_id=source.user_id,platform='telegram')
+                execution.pause(binding,scope)  # pausing Alive cannot revoke the owner's ability to stop its work
             clock=None
             if stop_mode in ('running','fenced','retry'):
                 clock=asyncio.create_task(asyncio.to_thread(tick,verbose=False,sync=True,headless=False))
@@ -275,6 +279,8 @@ async def test(home):
                         before_attempts=len(list(store.journal.read(event_type='work.stop_dispatch_started')))
                         repeated=await asyncio.to_thread(stop_tool,stop_args)
                         assert repeated['targets'][0]['needs_attention'] is True
+                        another_span=await asyncio.to_thread(stop_tool,{**stop_args,'evidence_span':'不要再执行'})
+                        assert another_span['targets'][0]['needs_attention'] is True
                         assert len(list(store.journal.read(event_type='work.stop_dispatch_started')))==before_attempts==1
                     assert stopped['targets'][0]['status']=='owner_stop_outcome_unknown'
                     assert stopped['targets'][0]['execution_stopped_proven'] is False
@@ -465,6 +471,8 @@ async def test(home):
             if stopped_inspection:
                 answer=json.loads(await command('agenda stop-work '+started['work_id']))
                 assert answer['status']=='stop_requested' and len(answer['targets'])==2,answer
+                assert answer['targets'][0]['work_kind']=='perform' and answer['targets'][0]['parent_work_id'] is None
+                assert answer['targets'][1]['work_kind']=='inspection' and answer['targets'][1]['parent_work_id']==started['work_id']
                 assert answer['targets'][0]['status']=='execution_already_terminal'
                 assert answer['targets'][1]['status']=='schedule_paused_no_execution_observed'
                 assert tick(verbose=False,sync=True,headless=False)==0 and not inspection_requests
@@ -514,6 +522,12 @@ async def test(home):
             assert assessed['abstentions'][0]['reason']=='Fresh inspection shows changed content; keep this work unresolved.'
 
             snapshot=inspector.snapshot(started['work_id'],subject=configured.subject)
+            parent_status=work_store.status(started['work_id'],subject=configured.subject)
+            assert parent_status['work_kind']=='perform' and parent_status['parent_work_id'] is None
+            linked=parent_status['related_inspections']
+            assert len(linked)==1 and linked[0]['work_id']==leaf[0]
+            assert linked[0]['work_kind']=='inspection' and linked[0]['parent_work_id']==started['work_id']
+            assert linked[0]['core_execution_state']=='completed'
             assert snapshot['work_id']==leaf[0] and snapshot['task_success_proven'] is False
             assert snapshot['target_path']==str(artifact)
             before_calls=len(progress_prompts)

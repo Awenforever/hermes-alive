@@ -332,6 +332,24 @@ class CoreWorkStore:
             raise ValueError('Core session association contents changed')
         return {**saved,'session_id':document['session_id']}
 
+    def related_inspections(self,work_id,*,subject):
+        # Authenticated structural relationships, not inferred agenda similarity.
+        # One bounded leaf is the current contract; never recursively traverse
+        # arbitrary model-selected work or claim an absent result from another item.
+        with closing(self.journal._connect()) as connection:
+            rows=connection.execute("SELECT event_id FROM experience_events WHERE subject=? "
+                "AND event_type='work.requested' AND json_extract(canonical_json,'$.payload.parent_work_id')=? "
+                "AND json_extract(canonical_json,'$.payload.work_kind')='inspection' ORDER BY sequence DESC LIMIT 2",
+                (subject,work_id)).fetchall()
+        if len(rows)>1:raise ValueError('ambiguous owned inspection relationship')
+        result=[]
+        for row in rows:
+            child=row[0].removesuffix(':requested');request=self._read(child,'requested',subject)
+            if request['parent_work_id']!=work_id or request['work_kind']!='inspection':
+                raise ValueError('owned inspection relationship changed')
+            result.append(self.status(child,subject=subject))
+        return result
+
     def status(self,work_id,*,subject):
         self._home()
         request=self._read(work_id,'requested',subject)
@@ -342,6 +360,11 @@ class CoreWorkStore:
                 'agenda_completed':False,'automatic_retry_allowed':False,
                 'automatic_result_followup_enabled':False,
                 'core_profile_context_authorized':True,'physical_channel_send_requested':False}
+        result['work_kind']=request.get('work_kind','perform')
+        result['parent_work_id']=request.get('parent_work_id')
+        if result['work_kind']=='perform':
+            result['related_inspections']=self.related_inspections(work_id,subject=subject)
+            result['related_work_source']='signed work relationships, independent of agenda item decomposition'
         result['another_user_message_is_not_a_scheduling_requirement']=True
         result['owner_stop_requested']=self._read(work_id,'stop_requested',subject) is not None
         result['stop_request_is_not_rollback']=True

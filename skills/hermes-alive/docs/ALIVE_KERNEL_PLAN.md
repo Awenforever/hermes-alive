@@ -688,3 +688,12 @@ failure and stopped/terminal races, not merely a cancellation acknowledgment.
 Unknown effects are retained, and a new explicit stop request may reconcile the
 same admission without repeating the task. Pending/in-flight unload, appropriate
 autonomous closure, task/deadline revisions and the other remaining gates stay open.
+
+
+A real stop conversation exposed another information gap: an independent agenda
+item and a producer's inspection can refer to related work without sharing item
+identity. Main-facing status must expose authenticated work relationships rather
+than leave the model to infer absence from one item. Correct structural stop
+behavior alone does not certify its factual explanation. Task decomposition and
+revision still need broader semantic/lifecycle evaluation; do not prohibit a
+reasonable decomposition merely to satisfy a single-item fixture.

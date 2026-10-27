@@ -1446,3 +1446,25 @@ run. Recheck terminal state, including a completion racing the pause. A failed
 cancel transport must keep attention visible. Duplicate current-turn requests do
 not redispatch; a new explicit owner request may cancel the same admission again,
 never replay the work. Actual transport-loss/fence/retry tests remain required.
+
+
+Real stop qualification r172 failed before reaching stop because its fixture
+assumed exactly one agenda item. The owner explicitly also requested a later
+verification, so the main model legitimately recorded a second item. Preserve
+that failed run; evaluate exact work identity and all preserved item states,
+not a preferred decomposition count. r174's structural stop and quoted-command
+boundary pass, but its final answer wrongly suggested verification had not run.
+The separate agenda item had no execution of its own, yet the producer already
+had a completed Core inspection. This is not semantic zero-error acceptance.
+
+Expose the existing signed producer/inspection relationships in work_status and
+label each stop target with work_kind/parent_work_id. Do not infer relationships
+from title/keyword similarity or silently merge agenda items. A missing execution
+on one agenda item does not prove related work absent. The main model can read
+the exact linked work_evidence; output must distinguish those facts. Recheck this
+through the real main conversation, not only nested-field presence. Longer-term
+semantic task decomposition/dependencies and revisions remain open.
+
+Cancellation retry identity binds the current owner request, independent of which
+valid exact excerpt the main model selects. Changing the excerpt must not grant
+a second dispatch; an explicit later request can still retry the same admission.
