@@ -152,6 +152,8 @@ def register_setup_command(context,binding):
                 intake_summary+='已授权记录本会话的工具名称、时长和终止状态，不保存参数、结果正文或错误正文；诊断有效期按所选保留期，结构化账本保留至移除。这不授权执行工具，也不自动认定任务成功。'
             if configured.options.get('core_background_work') is True:
                 intake_summary+='已授权原生Hermes后台工作，使用Core已有模型及画像/记忆，任务记录按Core自身规则保留；自动工具范围为'+str(configured.options.get('automatic_core_toolsets',[]))+'，范围外逐项确认。该范围不代表文件系统隔离；任务结束仍须另核实成果。'
+            if configured.options.get('autonomous_core_work') is True:
+                intake_summary+='另已允许Alive在后续唤醒时，按保留的明确交办原文和所选工具范围发起首次Core工作；不伪造新用户消息，不自动重试已有执行或标记完成。'
             if configured.options.get('inspect_core_work_files') is True:
                 intake_summary+='另已允许对自己受托工作记录中的文件目标自动发起只读核验，使用Core模型/权限与独立任务记录；不会写文件、扫描其他路径、重做原工作或自动完成事项。'
             if configured.options.get('review_core_work_results') is True:

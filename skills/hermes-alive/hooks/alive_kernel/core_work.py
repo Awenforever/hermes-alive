@@ -357,6 +357,7 @@ class CoreWorkStore:
         result={'work_id':work_id,'item_id':request['item_id'],'task_success_proven':False,
                 'execution_evidence_query_supported':True,
                 'exact_current_work_message_retained_by_core':request.get('exact_current_work_message_retained_by_core') is True,
+                'historical_owner_request_retained_by_core':request.get('historical_owner_request_retained_by_core') is True,
                 'agenda_completed':False,'automatic_retry_allowed':False,
                 'automatic_result_followup_enabled':False,
                 'core_profile_context_authorized':True,'physical_channel_send_requested':False}

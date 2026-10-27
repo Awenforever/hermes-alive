@@ -201,6 +201,16 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
                     **dict(value.content),'source':'Core-owned work lifecycle observation',
                     'title':'Ongoing delegated work','core_work':status,
                     **({'core_work_record_review':review} if review is not None else {})}))
+            elif value is not None:
+                from .kernel_setup import KernelSetupStore
+                try:setup=KernelSetupStore(self.journal.path.parent,journal=self.journal)
+                except (ValueError,OSError,RuntimeError):setup=None
+                configured=setup.configuration() if setup is not None else None
+                if configured is not None and configured.subject==subject and configured.options.get('autonomous_core_work') is True:
+                    from .core_autonomous_work import CoreAutonomousWork
+                    waiting=CoreAutonomousWork(setup).wait_evidence(row['item_id'],configured)
+                    if waiting is not None:value=replace(value,content=_freeze_json({
+                        **dict(value.content),'autonomous_work_wait':waiting}))
             if value is not None and observation_event_ids is not None and value.observation_event_id not in observation_event_ids:
                 continue
             if value is not None:

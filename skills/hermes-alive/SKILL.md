@@ -366,3 +366,10 @@ shared_state_preserved=false
 - Complete repository transport, real GitHub URL installation, spare-WeChat E2E,
   controlled production deployment, restart persistence, and stability
   observation remain separate gates.
+
+When offering ongoing-task autonomy, guide the automatic operation scope first.
+Separately offer the default-off autonomous first-work option; never enable it
+implicitly for an old installation. Preserve original instructions to wait for
+further confirmation. Explain original-request retention in Core's local work
+record. Operations outside scope need confirmation. A running/completed Core job
+is not proof that an agenda item has succeeded.

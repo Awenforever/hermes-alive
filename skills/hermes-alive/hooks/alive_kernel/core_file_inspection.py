@@ -32,32 +32,12 @@ class CoreFileInspection:
                 or configured.options.get('review_core_work_results') is not True
                 or configured.options.get('core_background_work') is not True):
             raise ValueError('current guided file-inspection grant required')
-        from .autonomy_policy import AutonomyPolicyProjection
-        from .transport_reconciliation_runtime import TransportReconciliationRuntime
-        policies=AutonomyPolicyProjection(self.store.journal);policies.project_new()
-        policy=TransportReconciliationRuntime.canonical_owner_policy(policies,self.store.journal,configured.subject)
-        if not policy.enabled:raise ValueError('file inspection is paused')
-        return policy
+        from .core_work_source import OwnedWorkSource
+        return OwnedWorkSource(self.store).authority(configured)
 
     def item(self,item_id,configured):
-        from .cognition_opportunities import CognitionOpportunityReader
-        now=datetime.now(timezone.utc)
-        with closing(self.store.journal._connect()) as c:
-            row=c.execute('SELECT * FROM agenda_items_v1 WHERE item_id=? AND subject=?',
-                (item_id,configured.subject)).fetchone()
-            transition=c.execute('SELECT caused_by_event_id FROM agenda_transitions_v1 WHERE item_id=? '
-                'ORDER BY transition_id DESC LIMIT 1',(item_id,)).fetchone()
-        if row is None or transition is None or not row['expires_at']:return None
-        evidence=CognitionOpportunityReader(self.store.journal,content_vault=self.store.vault)._commitment(
-            row,subject=configured.subject,now=now)
-        if evidence is None or row['state'] not in ('active','snoozed'):return None
-        if any(row[k] and datetime.fromisoformat(row[k])>now for k in ('available_at',)):return None
-        if row['expires_at'] and datetime.fromisoformat(row['expires_at'])<=now:return None
-        version=self.store.protector.authenticate_json('alive.agenda.item_version.v1',{
-            'configuration':configured.event_id,'owner':configured.subject,'item':item_id,'event':transition[0]})
-        summary=json.loads(evidence.content['summary'])
-        return {'item_id':item_id,'item_version':version,'details':summary['commitment'],
-                'due_at':row['due_at'],'expires_at':row['expires_at']}
+        from .core_work_source import OwnedWorkSource
+        return OwnedWorkSource(self.store).item(item_id,configured)
 
     def latest(self,parent,*,subject):
         with closing(self.store.journal._connect()) as c:
@@ -260,6 +240,12 @@ class CoreFileInspection:
         child=rows[0][0].removesuffix(':core_bound');request=self.work._read(child,'requested',configured.subject)
         if self.work._read(child,'stop_requested',configured.subject) is not None:
             raise InspectionDenied('owner stopped this work')
+        if request.get('authority')=='guided_autonomous_initial_work':
+            try:
+                from .core_autonomous_work import CoreAutonomousWork
+                return CoreAutonomousWork(self.store).guard(configured,execution,child,request)
+            except Exception:
+                raise InspectionDenied('autonomous work authorization changed') from None
         if request.get('work_kind')!='inspection':return None
         try:
             return self.guard_owned(configured,execution,child,request,tool_name,args)

@@ -716,3 +716,13 @@ stop markers or use the agenda's active label as permission to execute. Keep
 source restrictions and project context, and request approval outside the guided
 scope. Task revision/dependencies, appropriate closure, memory learning and the
 remaining lifecycle/fleet gates remain necessary parts of the original goal.
+
+### Guided autonomous first-work implementation (qualification pending)
+
+The candidate now admits an initial existing Core job from a later Native wake
+using a separately guided automatic scope and retained historical owner intent.
+It can instead wait and expose the attributed reason to cognition. Old grants
+stay off; existing/uncertain/stopped work is not repeated. Qualification must show
+actual file effects without fresh main-turn evidence, preserved wait instructions,
+source/permission revocation and cold associations. This is one missing link of
+the broader autonomous-work goal, not completed general autonomy.

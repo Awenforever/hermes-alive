@@ -1489,3 +1489,13 @@ again. No Core job or cancel dispatch was repeated for that terminal execution.
 Do not hide this inefficiency or count structural correctness as polished
 conversation quality. Keep later autonomous execution sensitive to explicit
 stops even when an agenda item remains active.
+
+### Autonomous work authority
+
+First guidance chooses automatically executable scope; outside it needs per-action
+confirmation. A later wake must not forge current owner-turn evidence. Use the
+retained original request, preserve waiting qualifications, and label it historical
+in Core. Reuse Core execution; never build another executor or delivery FIFO.
+A private wait assessment must reach cognition, so blocked work can be explained
+without assuming that waiting is permission or that Core completion proves success.
+See ADR 0254; qualification remains pending.

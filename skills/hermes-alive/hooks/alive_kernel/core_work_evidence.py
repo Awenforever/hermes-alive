@@ -81,6 +81,7 @@ class CoreWorkEvidence:
             end=min(len(body),offset+max_chars)
             return {**result,'status':'core_work_request_evidence','kind':'authorized_work_definition',
                 'contains_exact_current_owner_message':request.get('exact_current_work_message_retained_by_core') is True,
+                'contains_retained_historical_owner_request':request.get('historical_owner_request_retained_by_core') is True,
                 'definition_contains_interpretation_and_host_instructions':True,
                 'fingerprint':digest,'offset':offset,'total_chars':len(body),'content':body[offset:end],
                 'content_complete':end==len(body),'next_offset':None if end==len(body) else end}

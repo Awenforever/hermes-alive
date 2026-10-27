@@ -246,3 +246,14 @@ is not proof that execution has ended; pending or unknown outcomes are reported
 honestly. Already-performed or in-flight effects are not undone. The agenda item
 is retained, so stopping execution and dismissing the item remain explicit choices.
 
+
+## Optional autonomous first work
+
+After guiding automatic Core tool scope, ask separately whether explicit ongoing
+assignments may start on a later Alive wake. `--confirm-autonomous-core-work`
+requires background work and retained original intake/Core request permission.
+Existing installations keep it off. If the original asks to wait for another
+instruction, wait. Outside the chosen scope, request operation confirmation.
+The original request will be retained in Core's local task record under Core's
+retention policy; Alive's private source expiry does not erase Core records.
+This option admits first work only, never automatic retry or agenda completion.

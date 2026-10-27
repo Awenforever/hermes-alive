@@ -205,3 +205,10 @@ The signed owner policy, not a cached enabled row, controls background access.
 Source erasure/expiry, pause and changed authority are checked again at use.
 Coordinated dependent-data erasure, in-flight uninstall and migration remain
 release gates; see ADR0251. No new physical queue or transport is introduced.
+
+Guided autonomous first work uses an explicitly retained historical owner intake.
+Source erasure/expiry prevents new work; admission never fabricates a fresh user
+turn. Its exact original text and proposed step enter the existing local Core job
+when work starts, under Core retention. Alive journals retain signed references,
+not these bodies; private decision records expire within seven days or earlier
+item expiry. Waiting reasons remain attributed model assessments, not permissions.

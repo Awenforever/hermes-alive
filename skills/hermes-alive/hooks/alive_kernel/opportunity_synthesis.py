@@ -255,6 +255,11 @@ Return only JSON: {"abstentions":[{"agenda_item_id":"supplied ID","reason":"why 
 """
 
 _PLAN_GUIDANCE = """Separate intended meaning from illustrative draft wording.
+An autonomous_work_wait is an attributed model assessment that no work has been
+submitted, not new owner authority. Use its actual scope/reason when considering
+whether a permission question would help; preserve the original contact and
+confirmation restrictions and never imply execution or permission already exists.
+
 For discretionary discovery shares, choose a substantive angle worth this
 recipient's attention, not an exhaustive compression of the source. A few closely
 related points may serve that angle; prominent statistics, feature inventories

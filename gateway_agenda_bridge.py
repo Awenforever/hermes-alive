@@ -248,6 +248,8 @@ class CoreAgendaBridge:
                     result=work.status(args['work_id'],subject=configured.subject)
                 elif (set(args)=={'operation','item_id'} and isinstance(args['item_id'],str) and args['item_id']):
                     result=work.previous(args['item_id'],subject=configured.subject) or {'status':'no_work_registered_for_this_item'}
+                    if result['status']=='no_work_registered_for_this_item' and configured.options.get('autonomous_core_work') is True:
+                        result['autonomous_work_wait']=kernel('core_autonomous_work').CoreAutonomousWork(store).wait_evidence(args['item_id'],configured)
                 else:raise ValueError('one exact work or item identifier required')
             elif args['operation']=='work_evidence':
                 if 'work_id' not in args:
