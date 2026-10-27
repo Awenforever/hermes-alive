@@ -33,6 +33,12 @@ attach an old producer to a reopened lifetime merely because the wording matches
 - r211 retains the failing actual-Core attention-snooze counterexample.
 - r213 actual Core snooze and snooze/resume cases pass: the admitted job performs
   its actual write/read, no additional job or outbound message.
-- More cancellation/reopening/outcome and whole regression checks are in progress.
+- r214 actual Core cancellation, cancel/reopen, assessment after attention resume,
+  stale-result refusal after reopening, pre-tool pause and assessment-time pause
+  pass. The prior inspector qualification also passes on the new runtime.
+- r215 admits an inspector, snoozes attention before its actual read, resumes
+  attention and consumes the fresh observation. Cold identity/association checks
+  pass without adding another job or broadening the approved read target.
+- Whole portable regression r214 is still in progress; no final claim is made.
 - This is synthetic controlled-provider Core integration, not fresh real-model
   interpretation, physical process sandboxing or production/fleet acceptance.

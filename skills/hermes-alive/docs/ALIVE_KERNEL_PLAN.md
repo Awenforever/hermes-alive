@@ -36,7 +36,7 @@ and dispatch path, not bypass it through raw registry dispatch.
 | Experience and privacy | Protected journal/vault, provenance, deletion and replay checks | Real lifetime/migration/restore with all external associations preserved |
 | Request fidelity | New intake guidance retains a bounded exact admitted message separately from its interpreted description; current work instructions also reach Core verbatim. Old grants are not expanded | Actual source/constraint use in real decisions, task/deadline revision, dependent-content erasure/migration and legacy missing-source honesty |
 | Personalization | Owner-confirmed preferences and current Core USER advice; real main turns automatically curate a synthetic profile, Native interpretation consumes its exact current value and two real followups complete | External-provider recall, noise-aware daily learning and attributed feedback |
-| Agenda and initiative | First-grant creation plus separately guided management; eight actual main turns create, reject quoted completion, complete, snooze/re-snooze, resume and cancel; controlled actual-Core and two-process startup reconstruction pass (ADRs0241–0242) | Task/deadline revisions, dependencies, priorities, sustained useful initiative and appropriate closure; actual continuous/cold semantic and platform qualification remain distinct |
+| Agenda and initiative | First-grant creation plus separately guided management; eight actual main turns create, reject quoted completion, complete, snooze/re-snooze, resume and cancel; controlled actual-Core and two-process startup reconstruction pass (ADRs0241–0242) | Task/deadline revisions, dependencies, priorities, sustained useful initiative and sustained closure; actual continuous/cold semantic and platform qualification remain distinct |
 | Content and judgment | Source-led composition, final wording review, real main-model examples | Samples remain too much like cautious paper digests; factual review is not a usefulness verdict |
 | Conversation continuity | Exact share/source excerpts reach actual Core main requests; real replies after context reduction no longer recite transport status | Missing evidence still becomes global negative claims in real followup; qualify ADR0230, plus natural old-quote/compaction/restart behavior |
 | Sources | Actual Core free search and substantive extraction demonstrated in isolated profiles | More useful live selection across Chinese and other sources, currentness, provenance and inaccessible/full-read boundaries |
@@ -59,217 +59,79 @@ commitment, action and reflection components. ADR0239 corrects the execution
 entry and restores behavior-wide qualification. Those other components are not
 claimed to be fully integrated simply because their code exists.
 
-## Latest qualified slices
+## Current qualified capabilities and limits
 
-- Split review responsibilities (ADR0237), implementation ffce973 / frozen r100:
-  r99 five focuses, actual-model same-topic request-scope control, new Linux and
-  Windows source-correction/cold recovery and r100 full99 portable regression pass.
-  Required meaning/literal/speech-act boundaries and final source/value judgment
-  have separate scopes. A boundary receipt never certifies source facts; current
-  final-source proof stays mandatory. The real control submits one local share
-  and completes two real main turns without production sends. This is not a new
-  useful round, arbitrary main-response accuracy or four-device acceptance.
+- First guidance separates proactive contact, intake, source retention, management
+  and automatic action scope. Clear current assignments can be recorded without
+  repeated per-item approval; uncertain, quoted and casual material is different.
+- Existing Core main/job/tool/model/approval paths perform actual work. A later
+  Native wake can start an authorized first task from retained historical intent,
+  without fabricating a fresh owner turn. Controlled cold startup and real
+  main/Native/worker positive/wait pairs qualify this bounded capability.
+- Core lifecycle observation, exact owned result reading, optional independent
+  file inspection and actual owner stop control have isolated qualifications.
+  Stop acknowledgments are distinct from terminal evidence or rollback.
+- Independently guided outcome assessment can close an attained finite goal,
+  retain uncertain/partial or explicitly not-to-be-closed work, and honor owner
+  reopening. Actual real-model counterexamples exposed and corrected a truncated
+  evidence window. Invalid proposals cannot silently kill the host.
+- Attention-only snooze/resume now preserves already admitted work while new
+  selection remains deferred. Actual cancellation/reopening, outcome and inspector
+  cases pass; the new whole portable regression is still awaiting terminal proof.
+- Sharing and reply continuity have actual-model examples, but useful natural
+  sharing has **0/10** fresh complete rounds. Functional work tests do not advance
+  that counter. Longitudinal memory, fleet and production remain unqualified.
 
-- Main-owned profile curation (ADR0225): four actual main-model synthetic turns
-  call Core's memory tool five times, with an initially empty USER profile.
-  Current profile advice reaches Alive exactly after each turn; reader content checks
-  show no Core profile content changes. Stable interests, later qualifications and exploration
-  preference survive the final state. Core also retained low-value negative
-  reminders, and one intermediate patch dropped a qualification before the model
-  restored it. Do not call this perfect denoising or an atomic semantic update.
-  No manual USER seeding, external provider or private production history was
-  used. A subsequent actual Native integration repeats actual Core curation with
-  initially empty USER and consumes the exact final advice in candidate
-  interpretation; public planning remains source-only. It produces one local
-  adapter submission and two actual main turns, with no owned work pending.
-  This proves integration, not useful content: the share remains number-heavy
-  and followup overstates what a limited benchmark establishes. Core also turns
-  one unrelated reading example into a more specific inferred topic. Broader
-  noisy learning, attributed feedback and external recall remain open.
-
-- Retained-reference reader (ADR0236): r90/r92 five-suite Core focuses pass;
-  r91 compact-notice collector also passes. Encrypted authorized text longer than
-  the hook cap is reconstructed exactly through bounded pages, with original
-  task/session/retention/forgetting guards. r92's actual official-model control
-  starts with a512-character context that contains no share text. Core's own
-  deferred-tool discovery leads to two complete text reads and one source-excerpt
-  read across two consecutive real main turns. Physical requests receive the
-  exact words, prior actual reply is preserved, sends0 and kernel sequence unchanged.
-  Typed content and source catalog distinguish past wording from collected evidence.
-  These are same-source controls, not fresh quality rounds or production-default
-  routing proof. The main answers still overgeneralize an observation; quality0/10.
-  r93 additionally verifies default CLI/Telegram/Weixin/Feishu toolset admission
-  and saved/global suppression through Core's actual resolver. A final negative
-  boundary now rejects an expired/missing source as unavailable while retaining
-  the separately consented outward text; read handles follow the live Core task
-  and original data lifetime, without an unrelated short wall-clock deadline.
-  The64-entry map and generation/owner/retention guards stay. An empty successful excerpt would be
-  misleading. r95 five-suite actual Core regression passes, including original-data expiry
-  before decryption, source expiry, replacement retirement and Core toolset
-  suppression. r96 full99 portable regression also passes on the exact committed tree
-  de8bcd4cd820c350ab15c0304538fd78adc6f28d (0cd9555). This does not
-  replace independent Git/fleet or real-content acceptance; release remains pending.
-
-The supported test supply still matches the latest non-prerelease official
-[Hermes v0.22.5 release](https://github.com/NousResearch/hermes-agent/releases/tag/v0.22.5),
-verified from the official latest-release API on2026-10-26; target commit is
-`bf0203a794a07aac3ff764972ab9087baa4e4f4e`. This is version verification, not a
-production upgrade or fleet qualification.
-
-- r86 / `6c14c61`: five focused suites pass, including actual Core plugin scan,
-  guided setup, execution control and the expanded conversation collector cases.
-  Windows atomic context-boundary checks pass. A cold replay of the exact settled
-  r85 encrypted/public kernel restores its original authenticated route identity,
-  performs zero sends and starts no native loop. Two consecutive real official
-  DeepSeek main turns receive the complete original share without spilling;
-  previous actual reply is in the next request and kernel history is unchanged.
-  This qualifies the handoff under default/custom hook limits, not semantic
-  accuracy: the main replies still overstate the bottleneck and misdescribe
-  which source was read. No fresh-round, production-default or fleet credit.
-
-- r85 / `710ea7a`: complete99 portable suites and ten focused authoring/Core
-  suites pass. Actual clock-aware public composition correctly treats an old
-  forecast as historical; it is not a quality round. The fresh VLM native run
-  inherited Hermes main/fallback, recovered via official fallback, submitted one
-  local share and settled pending work, then failed the exact-context assertion
-  in its first main turn. Core spilled the10,341-character hook into a preview;
-  its main reply overstated a performance trend. No dialogue or quality credit.
-  [ADR0235](adr/0235-core-hook-budgeted-conversation-reference.md) now addresses
-  the actual final context boundary without changing host limits or permissions.
-
-- r84 / `2f497aa`: twelve focused suites pass, including actual Core standard
-  submission, continuity, routing and execution controls. Windows17 standard
-  cases pass, including15-second local preparation, original-deadline expiry,
-  revocation and no renewed authorization. Actual public-source/native regression
-  exercises overlapping search results, one local-only submission, two genuinely
-  consecutive main turns and zero pending work. Exact share and prior actual
-  main reply reach the next request. This uses the configured official model in
-  a disposable profile, not production-default or physical-delivery proof.
-  The original body and followup still fail the content-quality target. Complete99
-  baseline is r83; r84 has the focused qualification above.
-- r79 / `b444031`: PASS99 portable suites and twelve focused suites, including
-  actual Core guided setup/control/continuity. Windows executes both new source
-  refinement and Core discovery-tool suites successfully. The real native
-  repeated-topic test recovered from an unreachable aggregator through one
-  derived public search and read an original dataset card; source-only planning
-  excluded the fictional private profile. One local submission and two independent
-  main requests settled. This is source-recovery qualification, not natural
-  consecutive dialogue, a fresh quality round or fleet acceptance. The first
-  reply still presented unsupported causal explanations as facts.
-- r65 / `5077671`: PASS98 portable suites and actual Core setup/control tests;
-  current personal Core profile is separate opt-in advice, with default-off,
-  foreign-home, disabled-target and pending-forgetting boundaries. No external
-  memory backend or private production data was read.
-- r67 / `6fed839`: five actual setup/control/CLI/authoring suites, nine recovery
-  suites and the focused actual installed-native wait scenario pass. The normal
-  assembler now exposes discovery phases and bounded retry, so unchanged input
-  waits rather than repeatedly reasoning. Profile replacement/deletion and
-  admitted input wake it; cooldown and pause perform no extra inference.
-- r69 / `6763f57`: protected final-current-purpose extension (ADR0226) passes
-  eight source/clock/authorization/repair/history/protocol suites and the expanded
-  Windows delayed-selection regression, then full PASS98 portable. The real
-  public-source regression settled with one local submission, two main replies
-  and zero pending work; credentials audited/removed. Its version3 selection
-  reached authorization after344s using a48s final review, naturally exercising
-  the delayed-value path. This is not natural version2 proof or a fresh quality round.
-  The real dated product warning was refused after slow composition because
-  final fact review lacked a fresh purpose witness. Keep protected warning meaning
-  and short permits; do not weaken expiry or force it into an editorial brief.
-- r58 / `0b16986`: PASS98 portable suites, eight clock/source/authorization/repair
-  suites, seventeen supported-Core control/ingress/continuity checks, and Windows
-  delayed-selection regression. Fresh final source/value review can qualify an
-  older delegated discovery selection only with unchanged owner input and all
-  original checks; physical permission stays short and old permits never renew.
-- Real VISTA r58: one local-only submission plus two actual main replies. The
-  selection-to-permit interval was74s, so this replay does not prove a natural
-  slow-response exception. Content failed quality; synthetic clocks qualify the
-  delay boundary. No external delivery or quality round credited.
-- r59 / `891c8b4`: actual Core continuity regression passes. Exact text and source
-  reading limits remain in ordinary model context; IDs, excerpt-policy internals
-  and adapter receipts remain only in the authenticated diagnostic store.
-- r61 / `e48d06a`: five focused suites pass including actual Core CLI/owner
-  confirmation and execution control; Windows setup passes. Optional interests
-  have no default developer profile, don't modify public queries and aren't
-  recreated by replay after forgetting. This is not automatic chat learning.
-- Actual Core keyless search succeeded; default Firecrawl extraction returned
-  empty/error with TLS timeout. An isolated Core Parallel selection retrieved
-  substantive primary text. Returning an envelope is not a successful read.
-- Actual live Chinese-source r59: one local submission, two main replies and no
-  pending work. Substantive research content came from a search listing; the
-  article extraction was footer/navigation only. Main followup mixed source-only
-  numbers with what it had actually said. Native assistant-history comparison
-  avoided that one error but made another false correction; no product mirror
-  or successful quality round is adopted. Core-owned official model fallback
-  recovered after two USTC timeouts; no routing change was made.
-- r63 / `51515f2`: six focused suites pass after aligning source choice and final
-  review with planning's existing allowance for an interesting fact to suffice.
-  Initial real product-news retrieval failed before any model call; a separate
-  isolated Exa/Parallel run generated a valid protected warning but was refused
-  for selection_stale after slow composition. No local submission or main reply.
-  This hypothesis about unnecessary critical prose is not a style success claim.
-- ADR0225 has actual native component qualification: owner-confirmed personal
-  profile read, current Core USER advice in cognition, and actual Core updates,
-  disable/delete/forgetting checks. No second chat logger or permanent import;
-  real external-provider recall and production memory remain out of scope of
-  that slice and are still required for the full goal.
-
-Full r58 tests do not automatically qualify later code, and focused results do
-not claim fleet, consumer installation, physical delivery or production quality.
-The current shared status records exact candidate trees, job handles and terminal
-results. Previous snapshots are preserved in
-[the historical archive](ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-25.md); they are not
-competing active plans. ADRs remain the record of architectural decisions.
+These are bounded verified capabilities, not a reason to replay settled tests or
+rebuild them. Exact commits, failures and terminal proofs belong in collaboration
+records and ADRs0241–0256. Historical detail is retained in
+[the October 27 archive](ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-27.md) and
+[the earlier archive](ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-25.md).
 
 ## Next work in order
 
-1. Restore the complete-agent execution path (ADR0239). Public discovery must be
-   optional. Qualify installed Core activation without public queries, quiet idle
-   behavior without repeated spend, and an admitted commitment entering the same
-   native decision/action/outcome loop. A seeded agenda fixture is not proof of
-   natural-language admission. Do not call all seven ActionKind variants live
-   because their enum or component tests exist.
-2. Close natural owner-intent and evidence intake through Core, including the
-   distinction between requests, tentative thoughts, third-party material,
-   superseded work and completed work. Preserve actual source/owner/authority;
-   a wake fingerprint is not a retained request or admitted obligation. Advance
-   authorized work or ask a useful question; never fabricate action completion.
-   ADR0240 supplies a bounded temporary proposal and exact owner-confirmation
-   path through the real main collector/tool/command registry. Controlled
-   admission-to-reminder and completion pass; two actual main-model cases verify
-   request versus explicit casual chat. This does not exhaust ordinary intent
-   or establish longitudinal behavior. Do not silently expand this into recording
-   every incoming message.
-   Apply the owner's first-grant intake decision above: guide and confirm its
-   scope/retention once, retain only the interpreted item, distinguish current
-   direct assignment from quotation/tentative/negated/revised work, and ask when
-   uncertain. Qualify those distinctions with real Core/main-model cases before
-   making it the normal configured experience. ADR0241 implements guided consent,
-   delegated authority, current-turn evidence and revocation. Five real main
-   cases distinguish clear assignment from four negative cases; a saved-item
-   versus runtime overclaim exposed by those calls is under targeted validation.
-   More ordinary/revision cases and restart remain required. The initial consent
-   must not silently authorize unrelated external tools or physical delivery.
-3. Verify continuity and adaptation across days and restart: recall why an item
-   exists, inspect actual outcomes, cancel/snooze/complete correctly, respect
-   forgetting and use attributed feedback without permanent-interest shortcuts.
-   The unfinished quoted-feedback work is isolated in Git WIP, not qualified or
-   enabled. Its target locator is a prerequisite, not the whole memory system.
-4. Complete balanced fresh useful end-to-end acceptance across these behaviors,
-   alongside worthwhile exploratory conversation. Preserve the ten consecutive
-   fresh share-quality requirement as one subgate; ten news examples cannot
-   substitute for the full kernel. Proactive sharing should feel like a short
-   natural contribution, with deeper explanation available when wanted. Splitting
-   a long report across bubbles does not meet that requirement. Owner-requested
-   reports/reminders keep the detail and qualifications their task needs.
-5. Finish migration/rollback, final public Git consumer lifecycle and the four
-   agreed targets (WSL thin layer), onboarding/default-engine/release consistency.
-   Production deployment needs a new concrete qualified window. Keep all data,
-   memory, credentials and external associations; no maintainer overlays on wmw.
+1. **Finish the useful task lifecycle.** Verify explicit task/deadline revisions,
+   necessary dependencies and project context; then advance genuinely unfinished
+   work within the guided range using Core. Carry actual earlier results forward.
+   Do not repeat unknown effects, treat a model's suggested next step as permission,
+   replace uncertain jobs automatically, or introduce another executor/scheduler.
+   Existing first-work, stop and finite-closure paths are foundations already
+   qualified in isolation, not tasks to restart from scratch.
+2. **Close memory and adaptation.** Use Core's existing memory/provider ownership.
+   Distinguish durable preferences, tentative conversation, quotations and noise;
+   retain attributed, reversible feedback rather than permanent labels inferred
+   from a sample rating. Verify real external-provider recall, source-dependent
+   derived erasure, bounded history and restoration. Do not import whole private
+   chats or add a competing profile/logger to fill a missing host capability.
+3. **Prove whole-assistant continuity.** Exercise ordinary non-discovery journeys
+   over restart and reduced context: accept, wait appropriately, do useful work,
+   revise, inspect results, stop, reopen and follow up naturally. Include
+   disable/unload with pending/in-flight work and meaningful silence without
+   repeated model spend. Clear source limits must survive conversational replies.
+4. **Pass fresh useful sharing.** Keep the ten consecutive fresh complete rounds
+   as one subgate, alongside the non-sharing journeys. Use varied Chinese/global
+   sources, preference plus exploration, grounded reasons to share and short
+   ordinary conversation. Splitting a report into bubbles is not natural brevity.
+   Requested reports/reminders may retain the detail their purpose needs.
+5. **Close distribution and preservation.** Consume exact public Git artifacts
+   independently through install/configure/run/upgrade/uninstall-preserve/reinstall
+   on native Linux, NAS/Linux Docker, Windows Hermes Desktop and a thin WSL2 check.
+   Preserve all data, credentials, external memories and associations through
+   migration and rollback; keep personal configuration out of distributed defaults.
+   Do not patch wmw to make a distribution test appear to pass.
+6. **Release and qualify production.** Resolve the current Core/other-plugin and
+   updater NO-GO boundary, guide required customization, and present concrete
+   backup/rollback and deployment evidence for a new production window. Development
+   branch tests alone do not authorize deployment or establish production quality.
 
-Do not append execution diaries above this plan. Update this state and priorities
-when evidence changes; put detailed runs in the shared status or history. The
-original North Star, invariants and phase requirements below remain obligations,
-not a claim that the old legacy diagnosis describes the new engine.
+These priorities may change when real evidence warrants it. Prefer closing a
+useful product journey to adding speculative mechanisms or enumerating every
+possible task. Preserve user requirements and known failures when narrowing an
+implementation; never lower the acceptance standard to make a test pass.
+
+Keep this plan current and concise. Detailed runs belong in shared status, ADRs
+and dated archives. The North Star, invariants and phase requirements below remain
+obligations, not a claim that the legacy diagnosis describes the new engine.
 
 ## North Star
 
@@ -638,145 +500,9 @@ For each material change:
 
 ## Change log
 
+October 26–27 qualification notes are retained in
+[the October 27 archive](ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-27.md).
 Earlier execution notes and the original change log are retained in
 [the progress archive](ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-25.md).
 See Git history and ADRs for subsequent code and design changes.
 
-## 2026-10-26 — Evaluation calibration
-
-Judge understandable explanations against versioned primary evidence, not a
-model's later self-criticism. An excerpt's missing detail does not establish
-worldwide absence. Distinguish supported plain-language explanation, bounded
-inference, unresolved assertion and contradicted empirical claim. The original
-context-spill regression still failed correctly: later evidence cannot retroactively
-put missing words into a recorded request. Same-source controls do not increment
-the fresh useful-round counter. See the memorandum for the primary-source check.
-
-Unfamiliar topics can be worthwhile exploration without becoming lasting interests.
-Sample feedback must remain attributable and reversible; do not infer a permanent
-dislike from unfamiliarity, or equate clear exposition with proactive usefulness.
-
-## 2026-10-27 — Work inspection is a slice of the agent loop
-
-The guided owned-work chain can now use a separate read-only Core inspection and
-feed its observations into a later judgment. Controlled actual-Core qualification
-covers an independently changed file, rejection of another path, preserved
-producer identity, no duplicate jobs, cold recovery and a signed pause despite
-a tampered enabled cache. This does not finish general autonomous work, appropriate
-closure, project context, task revision, memory learning or distribution.
-
-Real inherited-model runs have exercised both inspect and wait choices; the wait
-path honors the no-message restriction. Inspect-path interpretation failures are
-still failures. A concurrent actual-Core counterexample identified a durable
-cycle recovery defect: rejected stale evidence could strand later judgments.
-ADR0252 addresses that class without accepting the stale answer or repeating work.
-Its actual-Core concurrent qualification and the new inherited-DeepSeek inspection
-chain have now passed in isolation: the model chooses inspection, the separate
-worker reads an independently changed artifact, and the next Native judgment
-recognizes the mismatch while honoring no-message/no-repair constraints. The
-that inspection revision passed 99 portable suites and four actual-Core integration
-cases. These are bounded qualifications, not general autonomous-work acceptance.
-Sharing is still 0/10, a subgate only. Disable/unload with pending or in-flight Core work remains
-an explicit lifecycle gate, alongside the final four-target consumer matrix.
-
-## 2026-10-27 — Actual work control
-
-Agenda state changes alone do not satisfy "stop working on this". ADR0253 adds
-current-owner stop control through Core's schedule and admission cancellation,
-with a durable gate against later tool calls. Qualification must cover transport
-failure and stopped/terminal races, not merely a cancellation acknowledgment.
-Unknown effects are retained, and a new explicit stop request may reconcile the
-same admission without repeating the task. Pending/in-flight unload, appropriate
-autonomous closure, task/deadline revisions and the other remaining gates stay open.
-
-
-A real stop conversation exposed another information gap: an independent agenda
-item and a producer's inspection can refer to related work without sharing item
-identity. Main-facing status must expose authenticated work relationships rather
-than leave the model to infer absence from one item. Correct structural stop
-behavior alone does not certify its factual explanation. Task decomposition and
-revision still need broader semantic/lifecycle evaluation; do not prohibit a
-reasonable decomposition merely to satisfy a single-item fixture.
-
-
-The owned-work control revision now has isolated pending/running, lost-transport
-fence, explicit retry, paused-owner and producer/inspection-group qualifications.
-Its main-facing relationship view passes the portable suites and actual-Core
-cases. A real inherited-model conversation preserves quoted-command boundaries,
-uses actual stop control and describes already-ended producer/inspection states
-without claiming rollback. The same run discards a genuinely stale interpretation
-and judges the later observation in a new cycle. These are bounded results, not
-final production, platform or longitudinal acceptance.
-
-The next work gate is a useful, bounded task lifecycle: determine from actual
-results whether to stop, ask, continue within authority or close an item, without
-a second agent executor or inferred permission. Preserve source restrictions and
-project context, request approval outside scope, and keep independent observation
-distinct from historical reports. Task revision/dependencies, noise-aware memory,
-feedback and the remaining lifecycle/fleet gates are still part of the goal.
-
-### Guided autonomous first work — bounded qualification
-
-A separate default-off option admits initial existing Core work from a later
-Native wake using guided automatic scope and retained historical owner intent.
-Actual Core positive/wait, pause before tools (including a tampered enabled cache),
-erased source and old-grant-off cases pass; original identity keys and work
-associations survive cold reads. A real inherited main/Native/Core-worker pair
-performs the positive file write/read and respects a second item's explicit
-waiting instruction. No fresh execute message or fabricated current turn is used.
-
-Native preparation may run more than once inside one cycle; the existing Native
-call budget governs total inference. Each preparation pass makes at most one new
-work decision. An actual round used execute, wait and communication abstention in
-one cycle. This is not another periodic planner or message queue.
-
-The two-process controlled qualification also passes: the first process only
-registers the item; a cold process restores the same session, grant, activation
-and identity keys, then its normal startup loop admits work without a manual
-Native step or shortened interval. Actual Core writes and reads back the result.
-These tests do not certify multi-step goal closure, independent Git installation,
-four platforms, production operation or ten fresh sharing rounds. Existing,
-uncertain and stopped work is not automatically repeated.
-
-### Outcome management — bounded functional qualification
-
-The candidate adds attributed owned-work outcome assessment and an independently
-guided automatic closure option, with explicit owner reopening. Closure is based
-on original intent and bounded actual evidence, not a completed runner status.
-Changed evidence and exact prior-version checks protect concurrent corrections.
-It does not yet authorize continued external work, task revision/dependencies or
-claim overall completion. Actual-Core positive/partial, invalid-support rejection,
-authority revocation, pending-admission cold recovery and owner reopening pass.
-Additional actual-Core captures cover an incorrect artifact, later restrictions
-beyond the default definition window, and success records behind a large earlier
-result. A real inherited main/worker/Native pair now closes an attained finite
-goal while retaining an attained but explicitly not-to-be-closed item; the later
-main query reports both correctly without re-execution or sending.
-
-The first real pair had a semantic failure despite green state assertions: an
-old short review window hid later success, causing an unsupported failure claim
-and a repeated-work recommendation. It remains a failure. The shared owned reader
-now hydrates bounded known results and matching requests, preserving incomplete
-and omitted scope instead of collapsing missing evidence into nonexistence.
-Captured real-model judgments also distinguish actual wrong content and preserve
-later owner restrictions. Invalid model proposals now keep the host and item
-alive; benign extra fields do not invalidate an otherwise valid decision.
-
-This is finite-goal assessment/closure, not general autonomous continuation.
-Next work must qualify task revision/dependencies and the distinction between
-attention scheduling and work authority, then useful continued action within the
-guided range. Project context, memory learning, source-dependent erasure and the
-remaining lifecycle/fleet/production gates remain open. These bounded tests are
-not ten fresh sharing rounds or production acceptance.
-
-
-### Attention deferral versus execution — ADR0256
-
-An actual Core audit reproduced an existing job losing its effects after a
-follow-up snooze. New selection availability and existing-work authorization now
-use different views of the same validated agenda history. Attention-only changes
-preserve the original work admission; terminal transitions and reopening do not.
-Owner commands and closure retain exact latest-version checks. Two actual-Core
-attention cases pass; cancellation/reopening, deferred outcome assessment,
-inspection and full regression are being qualified before committing this stage.
-This does not implement general task/deadline revision or continuation planning.

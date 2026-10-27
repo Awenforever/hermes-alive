@@ -1560,4 +1560,8 @@ so stale owner edits or stale model closure cannot overwrite new intent.
 
 Do not infer generic task revision/continued-work support from this change. This
 stage does not change deadlines, descriptions, scopes or allow replacement work.
-Broader tests are pending, and no production change is authorized by this record.
+Actual Core cancellation/reopening, assessment after attention resume, old-result
+refusal after reopening and both pause fences pass. An already admitted inspector
+also performs its approved read while attention is snoozed; fresh observations
+and cold identity/association survive resume. The full portable regression is
+still pending its terminal proof. No production change is authorized here.
