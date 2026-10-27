@@ -95,3 +95,33 @@ The later-turn candidate passes five focused actual-Core cases: project work,
 normal cold startup, explicit owner wait, partial-result retention and finite
 attained-goal closure. The unchanged real-model scenario is still in flight at
 this note; controlled responses do not establish real temporal interpretation.
+
+
+## Subsequent qualification — 2026-10-27
+
+The project-context baseline passed the portable 99-suite regression. The later
+phase-context delta consists only of the worker prompt and factual turn DTO,
+plus focused phase assertions; removing those exact additions restores the
+whole runtime module byte for byte. Its five actual-Core controls passed, and
+a fresh inherited-model main/Native/canonical-worker chain now writes/reads the
+correct artifact in A, closes the supported goal, and answers a reduced-history
+query from foreground B without moving or repeating work. Windows NTFS identity
+also distinguishes missing and replaced directories in a thin helper check.
+These are bounded qualifications, not an exact whole-suite run of the derivative,
+Core Windows installation, independent Git/fleet or production acceptance.
+
+The real trace also exposed limitations in the explanation layer: replies are
+overly technical, call project rules an authorization basis and offer a general
+project-rebinding operation that is not implemented. No such operation occurred;
+the actual grant and tool guards were unchanged. Preserve these as open semantic
+issues for the broader capability/provenance presentation, rather than scoring
+the whole dialogue zero-error or patching individual phrases.
+
+Two observation-fixture errors are retained separately from runtime evidence:
+a foreground hook cannot observe a canonical worker's other process, and Core's
+request-record kind is worker_tool_request. One known-invalid run was stopped
+and cleaned instead of wasting further inference. The corrected exact fixture
+helper first passed actual prior records and wrong-project/missing-result
+counterexamples, then verified the new actual worker records. It does not claim
+that an unobserved API payload was captured. All completed real-model reports
+were read only after process/container termination, credential audit and removal.

@@ -90,9 +90,13 @@ claimed to be fully integrated simply because their code exists.
   New guidance exposes metadata retention, legacy grants do not expand and
   missing/replaced directories block later tools. A real run retained A while
   foreground B was queried, but the worker misread an original-turn restriction
-  as current and did no work. The goal stayed open. Later-turn context has been
-  made explicit and is being requalified; real/full qualification remains pending.
-  This is not a sandbox or migration proof.
+  as current and did no work. The goal stayed open. Explicit later-turn context
+  now passes a fresh real A/B work-and-followup chain and five focused controls.
+  The project baseline passed 99 portable suites; the later prompt/turn-DTO delta
+  is separately qualified, not an exact derivative full run. Replies still blur
+  project requirements with authority, offer unsupported rebinding and expose
+  internal jargon. These remain open explanation gates, not a zero-error dialogue
+  or sandbox/migration proof.
 - Sharing and reply continuity have actual-model examples, but useful natural
   sharing has **0/10** fresh complete rounds. Functional work tests do not advance
   that counter. Longitudinal memory, fleet and production remain unqualified.
@@ -106,7 +110,8 @@ records and ADRs0241–0256. Historical detail is retained in
 ## Next work in order
 
 1. **Finish the useful task lifecycle.** Complete project-context semantic and
-   lifecycle qualification (ADR0258), then handle necessary dependencies and advance
+   lifecycle/migration and general capability/provenance explanation (ADR0258),
+   then handle necessary dependencies and advance
    genuinely unfinished work within the guided range using Core. Carry actual earlier results forward.
    Do not repeat unknown effects, treat a model's suggested next step as permission,
    replace uncertain jobs automatically, or introduce another executor/scheduler.

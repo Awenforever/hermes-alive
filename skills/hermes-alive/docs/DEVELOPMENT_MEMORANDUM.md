@@ -1640,3 +1640,18 @@ force. Outcome assessment correctly retained the unfinished task in the failing
 case. A type-valid execute choice or a worker's completed receipt is not task
 success. Keep this counterexample and test the unchanged scenario in a fresh
 profile, plus an explicit wait-for-owner control.
+
+
+The corrected real project chain subsequently writes/reads in the original
+project, closes the attained goal and answers a history-reduced followup from a
+different foreground project. Keep the remaining reply issues visible: project
+rules are requirements, not permission grants; do not promise unsupported
+workspace rebinding or expose internal state jargon as the default answer. This
+needs a general capability/provenance explanation review, not canned replacement
+words. The physical functional pass does not make the entire dialogue zero-error.
+The foreground process also cannot observe another canonical worker's API hooks;
+use authenticated Core task evidence for real file reads, and clearly distinguish
+it from the separately controlled model-input capture. A fixture was stopped
+when its wrong record kind was known, then validated against actual old records
+before another real run. Preserve the failures instead of retroactively editing
+them into passes. All owned test containers are now terminated and removed.
