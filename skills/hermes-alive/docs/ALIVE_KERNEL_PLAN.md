@@ -36,11 +36,11 @@ and dispatch path, not bypass it through raw registry dispatch.
 | Experience and privacy | Protected journal/vault, provenance, deletion and replay checks | Real lifetime/migration/restore with all external associations preserved |
 | Request fidelity | New intake guidance retains a bounded exact admitted message separately from its interpreted description; current work instructions also reach Core verbatim. Old grants are not expanded | Actual source/constraint use in real decisions, task/deadline revision, dependent-content erasure/migration and legacy missing-source honesty |
 | Personalization | Owner-confirmed preferences and current Core USER advice; real main turns automatically curate a synthetic profile, Native interpretation consumes its exact current value and two real followups complete | External-provider recall, noise-aware daily learning and attributed feedback |
-| Agenda and initiative | First-grant creation plus separately guided management; eight actual main turns create, reject quoted completion, complete, snooze/re-snooze, resume and cancel; controlled actual-Core and two-process startup reconstruction pass (ADRs0241–0242) | Task/deadline revisions, autonomous post-restart work, priorities and sustained useful initiative; bounded inventory and verbose acknowledgments remain limitations |
+| Agenda and initiative | First-grant creation plus separately guided management; eight actual main turns create, reject quoted completion, complete, snooze/re-snooze, resume and cancel; controlled actual-Core and two-process startup reconstruction pass (ADRs0241–0242) | Task/deadline revisions, dependencies, priorities, sustained useful initiative and appropriate closure; actual continuous/cold semantic and platform qualification remain distinct |
 | Content and judgment | Source-led composition, final wording review, real main-model examples | Samples remain too much like cautious paper digests; factual review is not a usefulness verdict |
 | Conversation continuity | Exact share/source excerpts reach actual Core main requests; real replies after context reduction no longer recite transport status | Missing evidence still becomes global negative claims in real followup; qualify ADR0230, plus natural old-quote/compaction/restart behavior |
 | Sources | Actual Core free search and substantive extraction demonstrated in isolated profiles | More useful live selection across Chinese and other sources, currentness, provenance and inaccessible/full-read boundaries |
-| Actions and reflection | Guided Core observation, natural main submission/status, actual Core agent/file effect, lifecycle changes back into Native cognition, and scoped on-demand bound request/execution evidence (ADRs0243–0248). Optional separately guided bounded record review now reaches actual Native cognition, with same-status record changes triggering reconsideration (ADR0249). An inherited real main/real worker single-job file write/read and history-reduced foreground evidence query now complete in isolation; this is not Native autonomous result assessment. A Core read_file-only inspection composition is now qualified with actual fresh read, forbidden-write rejection and cold loading, but is not yet connected to Native inspection intent (ADR0250). Native autonomous work selection remains unfinished | Fresh independent goal evidence consumed into later Native decisions, feedback adaptation, project context and Core-work lifecycle; runner completion and historical transcripts are not semantic success |
+| Actions and reflection | Guided Core tools, owner-directed submission/control and exact bound work evidence. Native can request an independently scoped Core file inspection and reconsider a genuinely changed result. Separately guided first-work autonomy now interprets a retained historical assignment and starts existing Core work without another execute turn; an actual main/Native/worker pair distinguishes later-autonomous execution from explicit waiting, with write/readback evidence and zero sends | General multi-step result assessment and appropriate closure, revisions/dependencies, feedback adaptation and project context; Core completion is not semantic success |
 | Authority and transport | Original delegation/policy/source checks and short physical permits preserved, including delayed-composition regression | Real daemon and channel outcomes under a separately approved production window; Enhance remains sole physical FIFO/token/retry owner |
 | Portability and migration | Managed supported-Core component integration | Independent Git consumer install/configure/run/upgrade/uninstall-preserve/reinstall across four agreed targets, plus legacy-state migration and rollback |
 
@@ -708,21 +708,32 @@ without claiming rollback. The same run discards a genuinely stale interpretatio
 and judges the later observation in a new cycle. These are bounded results, not
 final production, platform or longitudinal acceptance.
 
-Next meaningful acceptance is autonomous execution of an explicitly assigned
-ongoing task on a later wake, including restart, without requiring another owner
-message to start it. Reuse Core work/model/permissions and the current signed
-source; do not fabricate a fresh user turn, silently expand old grants, ignore
-stop markers or use the agenda's active label as permission to execute. Keep
-source restrictions and project context, and request approval outside the guided
-scope. Task revision/dependencies, appropriate closure, memory learning and the
-remaining lifecycle/fleet gates remain necessary parts of the original goal.
+The next work gate is a useful, bounded task lifecycle: determine from actual
+results whether to stop, ask, continue within authority or close an item, without
+a second agent executor or inferred permission. Preserve source restrictions and
+project context, request approval outside scope, and keep independent observation
+distinct from historical reports. Task revision/dependencies, noise-aware memory,
+feedback and the remaining lifecycle/fleet gates are still part of the goal.
 
-### Guided autonomous first-work implementation (qualification pending)
+### Guided autonomous first work — bounded qualification
 
-The candidate now admits an initial existing Core job from a later Native wake
-using a separately guided automatic scope and retained historical owner intent.
-It can instead wait and expose the attributed reason to cognition. Old grants
-stay off; existing/uncertain/stopped work is not repeated. Qualification must show
-actual file effects without fresh main-turn evidence, preserved wait instructions,
-source/permission revocation and cold associations. This is one missing link of
-the broader autonomous-work goal, not completed general autonomy.
+A separate default-off option admits initial existing Core work from a later
+Native wake using guided automatic scope and retained historical owner intent.
+Actual Core positive/wait, pause before tools (including a tampered enabled cache),
+erased source and old-grant-off cases pass; original identity keys and work
+associations survive cold reads. A real inherited main/Native/Core-worker pair
+performs the positive file write/read and respects a second item's explicit
+waiting instruction. No fresh execute message or fabricated current turn is used.
+
+Native preparation may run more than once inside one cycle; the existing Native
+call budget governs total inference. Each preparation pass makes at most one new
+work decision. An actual round used execute, wait and communication abstention in
+one cycle. This is not another periodic planner or message queue.
+
+The two-process controlled qualification also passes: the first process only
+registers the item; a cold process restores the same session, grant, activation
+and identity keys, then its normal startup loop admits work without a manual
+Native step or shortened interval. Actual Core writes and reads back the result.
+These tests do not certify multi-step goal closure, independent Git installation,
+four platforms, production operation or ten fresh sharing rounds. Existing,
+uncertain and stopped work is not automatically repeated.

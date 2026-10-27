@@ -1498,4 +1498,15 @@ retained original request, preserve waiting qualifications, and label it histori
 in Core. Reuse Core execution; never build another executor or delivery FIFO.
 A private wait assessment must reach cognition, so blocked work can be explained
 without assuming that waiting is permission or that Core completion proves success.
-See ADR 0254; qualification remains pending.
+See ADR 0254. Controlled actual-Core positive/wait/revocation/erasure/old-off
+cases and a real inherited-model positive/wait pair now pass. Core records show
+actual read/write/readback, rather than treating job completion as success.
+
+Preparation can re-enter within one Native cycle. Progress cursors must verify
+and reuse the exact existing signed point; regenerating a timestamped event with
+the same ID creates a real conflict. Rotate bounded pages past unavailable rows;
+projection rows alone must never grant task authority. One decision per preparation
+pass is not one decision per entire cycle: retain the host's total call budget.
+Cold metadata reconstruction, explicit post-restart stepping, automatic startup
+wake and real-model semantics are different proofs. Do not combine them into an
+unsupported claim of unattended platform or production acceptance.

@@ -1,7 +1,8 @@
 """Actual installed Native -> first Core job without a fresh main turn.
 
 Synthetic owner/provider, actual Core dispatcher, jobs, agent, file effects and
-cold metadata. This does not certify real-model intent or generic completion.
+cold metadata and automatic startup wake. This does not certify real-model
+intent, external-channel daemon operation or generic completion.
 """
 import asyncio,hashlib,importlib,json,os,shutil,subprocess,sys,tempfile,threading
 from pathlib import Path
@@ -112,7 +113,8 @@ async def exercise(home):
         else:
             assert '已确认' in await command(staged['confirmation_command'].removeprefix('/alive '))
             assert '已启用' in await command('enable')
-        binding.arguments['stop'].set();await binding.task
+        if not resuming:
+            binding.arguments['stop'].set();await binding.task
         store=importlib.import_module(loaded.module.__name__+'.kernel_setup_bridge').setup_store(binding)
         original=(('登记持续整理这项合成工作；从下一次自然唤醒开始，' if mode!='wait'
             else '仅登记这项合成工作，必须等我以后明确说执行，不能自行开工；')
@@ -189,8 +191,20 @@ async def exercise(home):
             ref=execution.kernel('followup_intake')._source_reference(intake,
                 __import__('datetime').datetime.fromisoformat(intake.payload['retention_until']))
             store.vault.erase_item(ref.content_id)
-        first=await binding.native.step(binding.arguments['build_parameters']())
-        assert first.disposition in ('silence','evidence_changed')
+        if resuming:
+            # Leave the actual startup loop running. No manual Native step and
+            # no shortened interval: its first automatic wake starts the work.
+            assert binding.arguments['interval_seconds']==600 and not binding.task.done()
+            deadline=asyncio.get_running_loop().time()+60
+            while binding.native.last_call_count<2:
+                assert not binding.task.done() and asyncio.get_running_loop().time()<deadline
+                await asyncio.sleep(.05)
+            binding.arguments['stop'].set()
+            stopped=await binding.task
+            assert stopped['completed_cycles']>=1 and stopped['exit_reason']=='stopped'
+        else:
+            first=await binding.native.step(binding.arguments['build_parameters']())
+            assert first.disposition in ('silence','evidence_changed')
         work=execution.kernel('core_work').CoreWorkStore(store)
         if mode in ('execute','revoked','restart'):
             state=work.previous(saved['item_id'],subject=store.configuration().subject);assert state is not None
