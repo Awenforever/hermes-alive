@@ -199,10 +199,10 @@ def main() -> int:
             actor="model:test",
             authority=AgendaAuthority.MODEL_PROPOSAL,
             source_event_id=model_source.event_id,
-            reason="terminal state cannot reopen",
+            reason="a model proposal cannot reopen an owner task",
             operation_id="agenda-op:invalid-reopen-test",
         )
-        assert agenda.apply(invalid).reason == "invalid_state_transition"
+        assert agenda.apply(invalid).reason == "commitment_transition_requires_authority"
 
         replay_states = (
             AgendaState.PROPOSED,

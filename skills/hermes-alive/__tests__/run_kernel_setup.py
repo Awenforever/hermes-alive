@@ -34,6 +34,8 @@ def test(root):
     refuse(lambda:store.stage({**OPTIONS,'review_core_work_results':'true'}))
     refuse(lambda:store.stage({**OPTIONS,'inspect_core_work_files':True}))
     refuse(lambda:store.stage({**OPTIONS,'inspect_core_work_files':'true'}))
+    refuse(lambda:store.stage({**OPTIONS,'manage_core_work_outcomes':True}))
+    refuse(lambda:store.stage({**OPTIONS,'manage_core_work_outcomes':'true'}))
     refuse(lambda:store.stage({**OPTIONS,'autonomous_core_work':True}))
     refuse(lambda:store.stage({**OPTIONS,'autonomous_core_work':'true'}))
     refuse(lambda:store.stage({**OPTIONS,'outbound_retention_confirmed':False}))

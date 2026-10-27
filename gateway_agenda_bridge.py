@@ -49,7 +49,7 @@ AGENDA_SCHEMA = {
                    'Stored descriptions are interpretations, not original quotes. Exact list lookup by item_id '
                    'can return a separately retained original_owner_message when available; never reconstruct unavailable originals. '
                    'When current context permits management, use complete/cancel/snooze/resume only for a clearly '
-                   'identified existing item with its current item_version from list. Ask if the target or intent is unclear. '
+                   'identified existing item with its current item_version from list. Resume may reopen a completed or cancelled item when the owner explicitly corrects it. Ask if the target or intent is unclear. '
                    'Complete an item only from a clear current owner report of completion, not inferred tool success or a quoted claim. '
                    'These update only Alive agenda, not external jobs or already submitted messages. '
                    'For a clear current request to STOP actual owned work, use work_stop with the exact work_id '
@@ -251,6 +251,8 @@ class CoreAgendaBridge:
                     if result['status']=='no_work_registered_for_this_item' and configured.options.get('autonomous_core_work') is True:
                         result['autonomous_work_wait']=kernel('core_autonomous_work').CoreAutonomousWork(store).wait_evidence(args['item_id'],configured)
                 else:raise ValueError('one exact work or item identifier required')
+                if result.get('work_id') and configured.options.get('manage_core_work_outcomes') is True:
+                    result['work_outcome']=kernel('core_work_outcomes').CoreWorkOutcomes(store).view(result['work_id'],configured)
             elif args['operation']=='work_evidence':
                 if 'work_id' not in args:
                     raise ValueError('exact owned work and bounded evidence fields required')
@@ -451,7 +453,7 @@ class CoreAgendaBridge:
         items=self._items(store,configured,item_id)
         if not items:return {'error':'followup_item_unavailable'}
         item=items[0]
-        if item['state'] in ('completed','dismissed','expired'):
+        if item['state'] in ('completed','dismissed','expired') and not (args['operation']=='resume' and item['state']!='expired'):
             return {'status':'already_terminal','item_id':item_id,'state':item['state'],'external_action_authorized':False}
         if item['item_version']!=version:return {'error':'followup_item_changed','hint':'Refresh list and reconsider the current owner request.'}
         operation=args['operation'];available=self._date(args.get('available_at'))

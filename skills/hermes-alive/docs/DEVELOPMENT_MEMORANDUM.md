@@ -1510,3 +1510,11 @@ pass is not one decision per entire cycle: retain the host's total call budget.
 Cold metadata reconstruction, explicit post-restart stepping, automatic startup
 wake and real-model semantics are different proofs. Do not combine them into an
 unsupported claim of unattended platform or production acceptance.
+
+## Owned-work outcomes (qualification pending)
+
+Core completion is not task success. Assess against original intent and actual
+records, keep model judgment distinct from owner reports, wait for an admitted
+inspection, and recheck facts/authority before effects. Bind automatic closure to
+the exact prior agenda transition, so an owner correction cannot be overwritten
+by an old completion. Scope this as an independent first-guide choice. See ADR0255.

@@ -50,6 +50,39 @@ class CoreWorkEvidence:
             task_success_proven=False,automatic_retry_allowed=False,body_copied_into_journal=False)
         return view
 
+    def window(self,work_id,*,subject,budget_chars=16384,include_tool_requests=False):
+        """Hydrate only known owned results; preserve partial and missing scope."""
+        if type(include_tool_requests) is not bool or type(budget_chars) is not int or not 0<=budget_chars<=16384:
+            raise ValueError('bounded owned-record body budget required')
+        records=self.read(work_id,subject=subject,max_chars=max(256,min(4096,budget_chars)))
+        results={e.get('tool_call_id') for e in records.get('entries',()) if e.get('kind')=='recorded_tool_result'}
+        entries=[e for e in records.get('entries',()) if e.get('kind') in ('recorded_tool_result','worker_statement')
+            or include_tool_requests and e.get('kind')=='worker_tool_request'
+                and any(call.get('call_id') in results for call in e.get('tool_requests',()))]
+        order=sorted(range(len(entries)),key=lambda i:(entries[i]['kind']!='recorded_tool_result',-i))
+        selected={};omitted=[];remaining=budget_chars
+        for index in order:
+            entry=entries[index]
+            if remaining<256:
+                omitted.append({k:entry.get(k) for k in
+                    ('message_id','kind','tool_name','recorded_at','fingerprint','total_chars')})
+                continue
+            if entry.get('content_complete') is True and len(entry.get('content',''))<=remaining:
+                value=dict(entry)
+            else:
+                page=self.read(work_id,subject=subject,reference=records['evidence_reference'],
+                    message_id=entry['message_id'],fingerprint=entry['fingerprint'],max_chars=min(4096,remaining))
+                value=page['entries'][0]
+            remaining-=len(value.get('content',''));selected[index]=value
+        return {**records,'entries':[selected[i] for i in sorted(selected)],
+            'evidence_scope':{'history_scope':records.get('history_scope'),'complete_execution_history':False,
+                'known_record_bodies':len(entries),'represented_bodies':len(selected),'omitted_bodies':omitted,
+                'partial_message_ids':[v['message_id'] for v in selected.values() if v.get('content_complete') is not True],
+                'underlying_tool_observation_may_itself_be_partial':True,
+                'absence_in_this_window_is_not_global_absence':True,'tool_request_arguments_omitted':not include_tool_requests,
+                'requests_describe_attempts_not_success':True,
+                'body_budget_chars':budget_chars,'body_chars_used':budget_chars-remaining}}
+
     def read(self,work_id,*,subject,reference=None,message_id=None,offset=0,max_chars=4096,fingerprint=None,part='records'):
         work=self.work;work._home()
         request=work._read(work_id,'requested',subject)

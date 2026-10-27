@@ -205,6 +205,11 @@ def assemble(binding):
                     await inspector.run(configured,call=parameters['expression_parameters']['call'],
                         validate=current_work_authority,operation_id=cycle.operation_id)
                     kernel('core_work').CoreWorkStore(store).refresh_observations(configured,validate=current_work_authority)
+                if configured.options.get('manage_core_work_outcomes') is True:
+                    await kernel('core_work_outcomes').CoreWorkOutcomes(store).run(
+                        configured,call=parameters['expression_parameters']['call'],
+                        validate=current_work_authority,operation_id=cycle.operation_id)
+                    kernel('core_work').CoreWorkStore(store).refresh_observations(configured,validate=current_work_authority)
             authorization={'authorization_operation_id':'core-auth:'+store.vault.digest_json(
                 {'cycle':cycle.operation_id,'activation':active['activation_event_id']})[:40],
                 'route_binding_id':active['route_binding_id'],'delegation_event_id':active['delegation_event_id']}

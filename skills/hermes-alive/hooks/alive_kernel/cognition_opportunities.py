@@ -59,6 +59,7 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
         state = AgendaState.ACTIVE if admitted else AgendaState.PROPOSED
         available = payload.get('available_at')
         last_sequence = origin.sequence
+        last_transition_event_id=event.event_id
         with closing(self.journal._connect()) as connection:
             transitions = connection.execute('SELECT * FROM agenda_transitions_v1 WHERE item_id=? ORDER BY transition_id LIMIT 65',
                 (row['item_id'],)).fetchall()
@@ -77,6 +78,10 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
             if change.payload.get('authority')==AgendaAuthority.USER_DELEGATED.value:
                 from .followup_intake import validates_transition
                 authority_valid=validates_transition(self.journal,change,subject=subject,from_state=state.value)
+            elif change.payload.get('authority')==AgendaAuthority.USER_DELEGATED_OUTCOME.value:
+                from .core_work_outcomes import validates_transition
+                authority_valid=validates_transition(self.journal,change,subject=subject,from_state=state.value,
+                    prior_transition_event_id=last_transition_event_id)
             else:
                 authority_valid=(change.payload.get('authority')==AgendaAuthority.USER_EXPLICIT.value
                     and change.actor==subject and source is not None
@@ -92,6 +97,7 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
                     ):
                 return None
             state,available,last_sequence = target,change.payload.get('available_at'),command.sequence
+            last_transition_event_id=change.event_id
             admitted = True
         if (not admitted or state not in (AgendaState.ACTIVE,AgendaState.SNOOZED)
                 or row['state']!=state.value or row['available_at']!=available
@@ -197,9 +203,14 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
                 if observation is None:continue  # Never ask the user to do handed-off work.
                 event_id,status=observation
                 review=work.review_evidence(status,subject=subject)
+                configured=work.store.configuration()
+                from .core_work_outcomes import CoreWorkOutcomes
+                assessment=(CoreWorkOutcomes(work.store).view(status['work_id'],configured)
+                    if configured is not None and configured.options.get('manage_core_work_outcomes') is True else None)
                 value=replace(value,observation_event_id=event_id,content=_freeze_json({
                     **dict(value.content),'source':'Core-owned work lifecycle observation',
                     'title':'Ongoing delegated work','core_work':status,
+                    **({'core_work_outcome':assessment} if assessment is not None else {}),
                     **({'core_work_record_review':review} if review is not None else {})}))
             elif value is not None:
                 from .kernel_setup import KernelSetupStore

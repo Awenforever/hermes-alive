@@ -13,24 +13,26 @@ if __name__=='__main__' and os.environ.get('ALIVE_AUTOWORK_CHILD')!='1':
     with tempfile.TemporaryDirectory(prefix='alive-core-autonomous-') as root:
         env={**os.environ,'HOME':root,'HERMES_HOME':str(Path(root)/'profile'),
             'ALIVE_AUTOWORK_CHILD':'1','PYTHONDONTWRITEBYTECODE':'1'}
+        modes=os.environ.get('ALIVE_AUTOWORK_CASES','execute,wait,revoked,erased,off,restart').split(',')
+        assert set(modes)<=set(('execute','wait','revoked','erased','off','restart','outcome-complete','outcome-partial','outcome-forged','outcome-revoked','outcome-recover','outcome-manual-long','outcome-wrong-result','outcome-window','outcome-malformed'))
         try:
-            for mode in ('execute','wait','revoked','erased','off','restart'):
+            for mode in modes:
                 case={**env,'HERMES_HOME':str(Path(root)/mode),'ALIVE_AUTOWORK_CASE':mode}
                 result=subprocess.run([sys.executable,'-B',__file__,*sys.argv[1:]],env=case,
                     capture_output=True,text=True,timeout=300)
-                assert result.returncode==0,result.stdout+'\n'+result.stderr
+                assert result.returncode==0,mode+'\n'+result.stdout+'\n'+result.stderr
                 if mode=='restart':
                     resumed=subprocess.run([sys.executable,'-B',__file__,*sys.argv[1:]],env={**case,'ALIVE_AUTOWORK_RESUME':'1'},
                         capture_output=True,text=True,timeout=300)
                     assert resumed.returncode==0,resumed.stdout+'\n'+resumed.stderr
                 cold=subprocess.run([sys.executable,'-B',__file__,*sys.argv[1:]],env={**case,'ALIVE_AUTOWORK_COLD':'1'},
                     capture_output=True,text=True,timeout=60)
-                assert cold.returncode==0,cold.stdout+'\n'+cold.stderr
+                assert cold.returncode==0,mode+'\n'+cold.stdout+'\n'+cold.stderr
                 stopped=subprocess.run([sys.executable,'-B','-m','hermes_cli.main','gateway','stop'],env=case,
                     capture_output=True,text=True,timeout=30)
                 assert stopped.returncode==0
         finally:
-            for mode in ('execute','wait','revoked','erased','off','restart'):
+            for mode in modes:
                 subprocess.run([sys.executable,'-B','-m','hermes_cli.main','gateway','stop'],
                     env={**env,'HERMES_HOME':str(Path(root)/mode)},capture_output=True,text=True,timeout=30)
     print('HERMES_ALIVE_CORE_AUTONOMOUS_WORK_OK')
@@ -49,7 +51,7 @@ async def exercise(home):
         def do_GET(self):self.send_error(503)
         def do_POST(self):
             data=json.loads(self.rfile.read(int(self.headers.get('content-length','0'))))
-            actual=any('Perform this ongoing owner assignment' in str(m.get('content')) for m in data['messages'])
+            actual=any(any(prefix in str(m.get('content')) for prefix in ('Perform this ongoing owner assignment','Perform the following ongoing owner-assigned work.')) for m in data['messages'])
             message={'role':'assistant','content':'Auxiliary probe.'};finish='stop'
             if actual:
                 work_requests.append(data)
@@ -57,11 +59,14 @@ async def exercise(home):
                 if any(m.get('role')=='tool' and m.get('tool_call_id')=='autonomous-read' for m in data['messages']):
                     message={'role':'assistant','content':'Actual write and readback recorded; no messages or completion claimed.'}
                 else:
-                    read=any(m.get('role')=='tool' for m in data['messages'])
+                    read=any(m.get('role')=='tool' and m.get('tool_call_id')=='autonomous-write' for m in data['messages'])
                     message={'role':'assistant','content':None,'tool_calls':[{'id':'autonomous-read' if read else 'autonomous-write',
                         'type':'function','function':{'name':'read_file' if read else 'write_file',
-                            'arguments':json.dumps({'path':str(artifact),**({} if read else {'content':body})})}}]}
+                            'arguments':json.dumps({'path':str(artifact),**({} if read else {'content':actual_body})})}}]}
                     finish='tool_calls'
+            if actual and mode=='outcome-window' and not any(m.get('role')=='tool' for m in data['messages']):
+                message={'role':'assistant','content':None,'tool_calls':[{'id':'autonomous-preface','type':'function',
+                    'function':{'name':'read_file','arguments':json.dumps({'path':str(preface)})}}]};finish='tool_calls'
             if data.get('stream'):
                 delta={k:v for k,v in message.items() if k!='role'}
                 if 'tool_calls' in delta:delta['tool_calls'][0]['index']=0
@@ -77,6 +82,9 @@ async def exercise(home):
     server=ThreadingHTTPServer(('127.0.0.1',0),Handler);server.daemon_threads=True
     thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
     artifact=home/'autonomous-result.txt';body='ACTUAL_AUTONOMOUS_CORE_RESULT\n'
+    actual_body='ACTUAL_WRONG_RESULT\n' if mode=='outcome-wrong-result' else body
+    preface=home/'public-preface.txt'
+    if mode=='outcome-window':preface.write_text('\n'.join(str(i)+': public background '+'x'*70 for i in range(200)),encoding='utf-8')
     (home/'config.yaml').write_text(json.dumps({'plugins':{'enabled':['hermes-alive']},
         'model':{'provider':'custom:owner','default':'configured-primary'},
         'custom_providers':[{'name':'owner','model':'configured-primary','base_url':f'http://127.0.0.1:{server.server_port}/v1',
@@ -85,7 +93,8 @@ async def exercise(home):
     if not resuming:
         rc,staged=cli(home,'setup','--confirm-model-calls','--confirm-delivery','--confirm-outbound-retention',
             '--confirm-followup-management','--confirm-core-background-work','--automatic-core-toolset','file',
-            *(() if mode=='off' else ('--confirm-autonomous-core-work',)))
+            *(() if mode=='off' else ('--confirm-autonomous-core-work',)),
+            *(('--confirm-core-work-outcomes','--confirm-core-work-result-review') if mode.startswith('outcome-') else ()))
         assert rc==0 and staged['confirmation_summary']['autonomous_initial_core_work']==(mode!='off')
         assert cli(home,'install-runtime','--engine','kernel')[0]==0
     token=core.set_hermes_home_override(home);manager=None;variables=None
@@ -119,6 +128,7 @@ async def exercise(home):
         original=(('登记持续整理这项合成工作；从下一次自然唤醒开始，' if mode!='wait'
             else '仅登记这项合成工作，必须等我以后明确说执行，不能自行开工；')
             +f'在本地文件 {artifact} 写入 {body.strip()} 和一个换行并读回结果，不发消息。')
+        if mode=='outcome-window':original+=f'执行时允许先读取 {preface} 作为背景，无需输出其内容；最终验收仍仅以目标文件写入并读回一致为准。'
         if not resuming:
             variables=core.set_session_vars(platform='telegram',chat_id=source.chat_id,user_id=source.user_id,
                 session_key=entry.session_key,session_id=entry.session_id)
@@ -159,7 +169,22 @@ async def exercise(home):
                     columns=list(fake)
                     c.execute('INSERT INTO agenda_items_v1 ('+','.join(columns)+') VALUES ('+','.join('?' for _ in columns)+')',
                         tuple(fake[k] for k in columns))
-        counts={'start':0,'cognition':0}
+        manual=None
+        if mode=='outcome-manual-long':
+            current=json.loads(await command('agenda list'))['items'][0]
+            manual='现在执行这个已登记的文件任务。'+('这是公开合成附录，不改变任务目标。'*240)+'即使文件已正确写入并读回，也不要自动结项，等我另外确认。'
+            variables=core.set_session_vars(platform='telegram',chat_id=source.chat_id,user_id=source.user_id,
+                session_key=entry.session_key,session_id=entry.session_id)
+            _collect_pre_llm_call_context(SimpleNamespace(session_id=entry.session_id,model='configured-primary',
+                platform='telegram',_user_id=source.user_id),effective_task_id='manual-long',turn_id='manual-long',
+                original_user_message=manual,messages=[{'role':'user','content':manual}],conversation_history=[])
+            submitted=json.loads(model_tools.handle_function_call('alive_agenda',{'operation':'work',
+                'item_id':saved['item_id'],'item_version':current['item_version'],'toolsets':['file'],
+                'evidence_span':'现在执行这个已登记的文件任务。'},task_id='manual-long',
+                session_id=entry.session_id,turn_id='manual-long',tool_call_id='manual-long-call',enabled_tools=['alive_agenda']))
+            core.clear_session_vars(variables);variables=None
+            assert submitted.get('work_id') and len(jobs.list_jobs(include_disabled=True))==1,submitted
+        counts={'start':0,'cognition':0,'outcome':0}
         class Caller:
             pending=()
             def __init__(self,*,cycle,read_binding):self.calls=0;self.read_binding=read_binding
@@ -173,8 +198,31 @@ async def exercise(home):
                         'step':'Write the exact requested marker and read it back.' if mode!='wait' else None,
                         'reason':'Original owner authorizes the later wake.' if mode!='wait' else 'Original owner requires a future instruction.',
                         'reconsider_after_seconds':3600 if mode=='wait' else None}
+                elif kw['task']=='alive_core_work_outcome':
+                    counts['outcome']+=1;supplied=json.loads(kw['messages'][-1]['content'])
+                    assert supplied['item']['original_owner_request']==original
+                    refs=[v['evidence_id'] for v in supplied['evidence']
+                        if v.get('tool_name')=='read_file' and actual_body.strip() in v.get('content','')]
+                    assert refs,'actual complete readback evidence required'
+                    if os.environ.get('ALIVE_OUTCOME_CAPTURE_DIR'):
+                        capture=Path(os.environ['ALIVE_OUTCOME_CAPTURE_DIR'])/('source-'+mode+'.json')
+                        capture.write_text(json.dumps({'task':kw['task'],'messages':kw['messages']},ensure_ascii=False),encoding='utf-8')
+                    if manual is not None:
+                        assert supplied['owner_work_instruction']['complete'] and supplied['owner_work_instruction']['message']==manual
+                        assert supplied['owner_work_instruction']['kind']=='current_owner_message'
+                    answer={'outcome':'partial' if mode in ('outcome-partial','outcome-wrong-result') else 'achieved',
+                        'agenda_action':'keep_active' if mode in ('outcome-partial','outcome-manual-long','outcome-wrong-result') else 'complete',
+                        'support_refs':['invented'] if mode=='outcome-forged' else refs,
+                        'reason':'Actual readback records support this bounded assessment.',
+                        'next_step':'Await the owner decision.' if mode in ('outcome-partial','outcome-manual-long','outcome-wrong-result') else None}
+                    answer['benign_additional_field']='future annotation, not an action'
+                    if mode=='outcome-malformed':answer='not an outcome object'
+                    if mode=='outcome-revoked':
+                        scope=binding._continuity.router.capture_target(session_key=entry.session_key,
+                            user_id=source.user_id,platform='telegram')
+                        execution.pause(binding,scope)
                 else:
-                    assert kw['task']=='alive_opportunity_candidates',kw['task'];counts['cognition']+=1
+                    assert kw['task']=='alive_opportunity_candidates' ,kw['task'];counts['cognition']+=1
                     if mode=='wait':assert 'autonomous_work_wait' in str(kw['messages'])
                     answer={'candidates':[],'abstentions':[]}
                 return SimpleNamespace(model='synthetic-model',choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps(answer)))])
@@ -206,14 +254,19 @@ async def exercise(home):
             first=await binding.native.step(binding.arguments['build_parameters']())
             assert first.disposition in ('silence','evidence_changed')
         work=execution.kernel('core_work').CoreWorkStore(store)
-        if mode in ('execute','revoked','restart'):
+        if mode in ('execute','revoked','restart') or mode.startswith('outcome-'):
             state=work.previous(saved['item_id'],subject=store.configuration().subject);assert state is not None
             assert len(jobs.list_jobs(include_disabled=True))==1
             request=work._read(state['work_id'],'requested',store.configuration().subject)
-            assert request['authority']=='guided_autonomous_initial_work' and request['current_owner_turn'] is False
-            assert 'turn_evidence' not in request and request['historical_owner_request_retained_by_core'] is True
+            if manual is None:
+                assert request['authority']=='guided_autonomous_initial_work' and request['current_owner_turn'] is False
+                assert 'turn_evidence' not in request and request['historical_owner_request_retained_by_core'] is True
+            else:
+                assert request['authority']=='user_delegated' and request['turn_evidence']
+                assert request['exact_current_work_message_retained_by_core'] is True
             job=jobs.get_job(state['job_id']);retained=json.loads(job['prompt'].rsplit('\n',1)[1])
-            assert retained['retained_original_owner_request']==original and 'current_owner_message' not in retained
+            if manual is None:assert retained['retained_original_owner_request']==original and 'current_owner_message' not in retained
+            else:assert retained['current_owner_message']==manual and len(job['prompt'])>4096
             assert job['enabled_toolsets']==['file','no_mcp'] and job['deliver']=='local'
             if mode=='revoked':
                 scope=binding._continuity.router.capture_target(session_key=entry.session_key,
@@ -230,8 +283,8 @@ async def exercise(home):
                     await asyncio.to_thread(tick,verbose=False,sync=True,headless=False)
                 await asyncio.sleep(.1);state=work.status(state['work_id'],subject=store.configuration().subject)
             assert state['core_execution_state']=='completed'
-            assert not artifact.exists() if mode=='revoked' else artifact.read_text(encoding='utf-8')==body
-            assert len(work_requests)==3 and state['task_success_proven'] is False
+            assert not artifact.exists() if mode=='revoked' else artifact.read_text(encoding='utf-8')==actual_body
+            assert len(work_requests)==(4 if mode=='outcome-window' else 3) and state['task_success_proven'] is False
         else:
             state=None;assert not jobs.list_jobs(include_disabled=True) and not artifact.exists()
             if mode=='wait':
@@ -240,16 +293,70 @@ async def exercise(home):
         if mode=='revoked':
             with closing(store.journal._connect()) as c:
                 c.execute('UPDATE autonomy_policies_v1 SET enabled=0 WHERE subject=?',(store.configuration().subject,))
-        await binding.native.step(binding.arguments['build_parameters']())
-        assert counts['start']==(0 if mode in ('erased','off') else 1) and len(jobs.list_jobs(include_disabled=True))==(1 if mode in ('execute','revoked','restart') else 0)
+        if mode=='outcome-recover':
+            from unittest.mock import patch
+            cls=execution.kernel('core_work_outcomes').CoreWorkOutcomes
+            with patch.object(cls,'close',side_effect=RuntimeError('synthetic interruption after signed admission')):
+                try:
+                    await binding.native.step(binding.arguments['build_parameters']())
+                    raise AssertionError('synthetic interruption was not observed')
+                except RuntimeError:pass
+            assert len(list(store.journal.read(event_type='work.outcome_decided')))==1
+        elif mode=='outcome-malformed':
+            stop=asyncio.Event()
+            task=binding.native.start(binding.context,build_parameters=binding.arguments['build_parameters'],
+                stop=stop,max_cycles=None,interval_seconds=600,continuous=True)
+            deadline=asyncio.get_running_loop().time()+60
+            while not list(store.journal.read(event_type='work.outcome_rejected')) or not binding.native.last_call_count:
+                assert not task.done() and asyncio.get_running_loop().time()<deadline
+                await asyncio.sleep(.05)
+            assert not task.done(),'one bad model proposal must not terminate the host'
+            stop.set();summary=await task
+            assert summary['exit_reason']=='stopped' and summary['completed_cycles']>=1
+            assert len(list(store.journal.read(event_type='work.outcome_rejected')))==1
+            assert not list(store.journal.read(event_type='work.outcome_decided'))
+        elif mode=='outcome-forged':
+            result=await binding.native.step(binding.arguments['build_parameters']())
+            assert result.disposition in ('silence','evidence_changed')
+            assert len(list(store.journal.read(event_type='work.outcome_rejected')))==1
+            assert not list(store.journal.read(event_type='work.outcome_decided'))
+        elif mode=='outcome-revoked':
+            try:
+                await binding.native.step(binding.arguments['build_parameters']())
+                raise AssertionError('unauthorized outcome was accepted')
+            except ValueError:pass
+        else:await binding.native.step(binding.arguments['build_parameters']())
+        if mode.startswith('outcome-'):assert counts['outcome']==1
+        if mode in ('outcome-complete','outcome-window'):
+            listed=json.loads(await command('agenda list'))['items'][0]
+            assert listed['state']=='completed'
+            outcomes=execution.kernel('core_work_outcomes').CoreWorkOutcomes(store)
+            assert outcomes.view(state['work_id'],store.configuration())['current_item_state']=='completed'
+            # A clear owner correction reopens it; old work cannot close it again.
+            correction='刚才这项工作还没完成，请重新打开；不要重新执行。'
+            variables=core.set_session_vars(platform='telegram',chat_id=source.chat_id,user_id=source.user_id,
+                session_key=entry.session_key,session_id=entry.session_id)
+            _collect_pre_llm_call_context(SimpleNamespace(session_id=entry.session_id,model='configured-primary',
+                platform='telegram',_user_id=source.user_id),effective_task_id='reopen-outcome',turn_id='reopen-outcome',
+                original_user_message=correction,messages=[{'role':'user','content':correction}],conversation_history=[])
+            reopened=json.loads(model_tools.handle_function_call('alive_agenda',{'operation':'resume',
+                'item_id':saved['item_id'],'item_version':listed['item_version'],'evidence_span':correction},
+                task_id='reopen-outcome',session_id=entry.session_id,turn_id='reopen-outcome',
+                tool_call_id='reopen-outcome-call',enabled_tools=['alive_agenda']))
+            core.clear_session_vars(variables);variables=None
+            assert reopened.get('state')=='active',reopened
+            await binding.native.step(binding.arguments['build_parameters']())
+            assert counts['outcome']==1 and outcomes.view(state['work_id'],store.configuration())['later_item_change']
+        assert counts['start']==(0 if mode in ('erased','off','outcome-manual-long') else 1) and len(jobs.list_jobs(include_disabled=True))==(1 if mode in ('execute','revoked','restart') or mode.startswith('outcome-') else 0)
         from contextlib import closing
         with closing(store.journal._connect()) as c:
             assert c.execute('SELECT state FROM agenda_items_v1 WHERE item_id=?',(saved['item_id'],)).fetchone()[0]=='active'
         raw='\n'.join(r.event.canonical_json() for r in store.journal.read())
         assert original not in raw and str(artifact) not in raw and body.strip() not in raw
+        if manual is not None:assert manual not in raw
         keys=('identity.key','content-vault/content.key','experience-content-vault/content.key')
         (home/'autonomous-expected.json').write_text(json.dumps({'work_id':state['work_id'] if state else None,
-            'owner':store.configuration().subject,'artifact':str(artifact),'body':body,'revoked':mode=='revoked',
+            'owner':store.configuration().subject,'artifact':str(artifact),'body':actual_body,'revoked':mode=='revoked','outcomes':mode.startswith('outcome-'),'pending_closure':mode=='outcome-recover','manual':manual is not None,
             'keys':{n:hashlib.sha256((store.root/n).read_bytes()).hexdigest() for n in keys}}),encoding='utf-8')
     finally:
         if variables:core.clear_session_vars(variables)
@@ -266,10 +373,19 @@ if __name__=='__main__':
         execution=importlib.import_module('alive_session_fixture.kernel_execution_bridge')
         store=execution.kernel('kernel_setup').KernelSetupStore(home/'plugin-data/hermes-alive/runtime/kernel')
         assert all(hashlib.sha256((store.root/n).read_bytes()).hexdigest()==v for n,v in expected['keys'].items())
+        if expected['outcomes']:
+            if expected['pending_closure']:
+                cls=execution.kernel('core_work_outcomes').CoreWorkOutcomes
+                async def no_new_model(**kwargs):raise AssertionError('pending admission must not need another model call')
+                outcome=cls(store);cfg=store.configuration()
+                asyncio.run(outcome.run(cfg,call=no_new_model,validate=lambda:outcome.authority(cfg),operation_id='cold-outcome-recovery'))
+                assert len(list(store.journal.read(event_type='work.outcome_decided')))==1
+            projection=execution.kernel('agenda').AgendaProjection(store.journal);projection.rebuild()
+            assert projection.list_items(subject=expected['owner'],clearance='private',include_future=True,states=tuple(execution.kernel('agenda').AgendaState))[0].state.value==('completed' if expected['pending_closure'] else 'active')
         from cron.jobs import list_jobs
         if expected['work_id']:
             state=execution.kernel('core_work').CoreWorkStore(store).status(expected['work_id'],subject=expected['owner'])
-            assert state['core_execution_state']=='completed' and state['historical_owner_request_retained_by_core']
+            assert state['core_execution_state']=='completed' and state['historical_owner_request_retained_by_core'] is (not expected['manual'])
             assert not Path(expected['artifact']).exists() if expected['revoked'] else Path(expected['artifact']).read_text(encoding='utf-8')==expected['body']
         assert len(list_jobs(include_disabled=True))==(1 if expected['work_id'] else 0)
     else:asyncio.run(exercise(Path(os.environ['HERMES_HOME'])))

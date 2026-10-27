@@ -373,3 +373,9 @@ implicitly for an old installation. Preserve original instructions to wait for
 further confirmation. Explain original-request retention in Core's local work
 record. Operations outside scope need confirmation. A running/completed Core job
 is not proof that an agenda item has succeeded.
+
+Offer automatic outcome management separately from direct item intake and automatic
+work. Explain that Alive may close an attained owned goal from actual results,
+keeps uncertainty active, and permits an explicit owner correction to reopen it.
+This choice grants no new tool execution or notification. Never enable it for an
+old installation implicitly.

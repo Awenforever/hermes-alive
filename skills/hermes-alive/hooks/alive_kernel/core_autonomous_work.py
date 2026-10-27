@@ -68,20 +68,7 @@ class CoreAutonomousWork:
             'work_submitted':False,'authority':'model assessment under existing owner scope, not a new permission'}
 
     def scan(self,configured):
-        """Rotate a bounded agenda page, including unavailable-source rows."""
-        anchor='core-work:'+self.store.protector.authenticate_json('alive.autonomous-work.scan.v1',
-            {'owner':configured.subject})
-        with closing(self.store.journal._connect()) as c:
-            prior=c.execute("SELECT event_id FROM experience_events WHERE subject=? "
-                "AND event_type='work.scan_advanced' ORDER BY sequence DESC LIMIT 1",(configured.subject,)).fetchone()
-            cursor=(self.work._read(anchor,prior[0].removeprefix(anchor+':'),configured.subject,
-                event_type='work.scan_advanced') if prior else None)
-            created,item=(cursor['created_at'],cursor['item_id']) if cursor else ('','')
-            rows=c.execute("SELECT item_id,created_at FROM agenda_items_v1 WHERE subject=? "
-                "AND state IN ('active','snoozed') ORDER BY "
-                "CASE WHEN (created_at,item_id)>(?,?) THEN 0 ELSE 1 END,created_at,item_id LIMIT 8",
-                (configured.subject,created,item)).fetchall()
-        return anchor,rows
+        return self.sources.page(configured)
 
     async def run(self,configured,*,call,validate,operation_id):
         if configured.options.get('autonomous_core_work') is not True:return
@@ -89,12 +76,7 @@ class CoreAutonomousWork:
         scan_anchor,rows=self.scan(configured)
         for row in rows:
             validate();self.authority(configured)
-            suffix='scan:'+self.store.protector.authenticate_json('alive.autonomous-work.scan-step.v1',
-                {'operation':operation_id,'item':row['item_id']})
-            point={'configuration_event_id':configured.event_id,'item_id':row['item_id'],'created_at':row['created_at']}
-            existing=self.work._read(scan_anchor,suffix,configured.subject,event_type='work.scan_advanced')
-            if existing is None:self.work._append(scan_anchor,suffix,configured.subject,point,event_type='work.scan_advanced')
-            elif existing!=point:raise ValueError('autonomous agenda cursor changed within a cycle')
+            self.sources.advance(configured,scan_anchor,row,operation_id)
             source=self.source(row['item_id'],configured)
             if source is None:continue
             anchor='core-work:'+self.store.protector.authenticate_json('alive.autonomous-work.decisions.v1',

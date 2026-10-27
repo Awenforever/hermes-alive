@@ -737,3 +737,12 @@ Native step or shortened interval. Actual Core writes and reads back the result.
 These tests do not certify multi-step goal closure, independent Git installation,
 four platforms, production operation or ten fresh sharing rounds. Existing,
 uncertain and stopped work is not automatically repeated.
+
+### Outcome management implementation — qualification pending
+
+The candidate adds attributed owned-work outcome assessment and an independently
+guided automatic closure option, with explicit owner reopening. Closure is based
+on original intent and bounded actual evidence, not a completed runner status.
+Changed evidence and exact prior-version checks protect concurrent corrections.
+It does not yet authorize continued external work, task revision/dependencies or
+claim overall completion. Actual-Core and real semantic counterexamples must pass.

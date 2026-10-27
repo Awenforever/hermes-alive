@@ -46,3 +46,34 @@ class OwnedWorkSource:
                 source_recorded_at=evidence.content['source_recorded_at'],
                 source_retention_until=evidence.content['original_source_retention_until'])
         return result
+
+    def page(self,configured,*,kind='autonomous-work'):
+        if kind not in ('autonomous-work','work-outcomes'):raise ValueError('known work page required')
+        self.authority(configured)
+        """Rotate a bounded agenda page, including unavailable-source rows."""
+        anchor='core-work:'+self.store.protector.authenticate_json('alive.'+kind+'.scan.v1',
+            {'owner':configured.subject})
+        event_type='work.scan_advanced' if kind=='autonomous-work' else 'work.outcome_scan_advanced'
+        with closing(self.store.journal._connect()) as c:
+            prior=c.execute("SELECT event_id FROM experience_events WHERE subject=? "
+                "AND event_type=? ORDER BY sequence DESC LIMIT 1",(configured.subject,event_type)).fetchone()
+            cursor=(self.work._read(anchor,prior[0].removeprefix(anchor+':'),configured.subject,
+                event_type=event_type) if prior else None)
+            created,item=(cursor['created_at'],cursor['item_id']) if cursor else ('','')
+            rows=c.execute("SELECT item_id,created_at FROM agenda_items_v1 WHERE subject=? "
+                "AND state IN ('active','snoozed') ORDER BY "
+                "CASE WHEN (created_at,item_id)>(?,?) THEN 0 ELSE 1 END,created_at,item_id LIMIT 8",
+                (configured.subject,created,item)).fetchall()
+        return anchor,rows
+
+    def advance(self,configured,anchor,row,operation_id,*,kind='autonomous-work'):
+        if kind not in ('autonomous-work','work-outcomes'):raise ValueError('known work page required')
+        self.authority(configured)
+        event_type='work.scan_advanced' if kind=='autonomous-work' else 'work.outcome_scan_advanced'
+        suffix='scan:'+self.store.protector.authenticate_json('alive.'+kind+'.scan-step.v1',
+            {'operation':operation_id,'item':row['item_id']})
+        point={'configuration_event_id':configured.event_id,'item_id':row['item_id'],'created_at':row['created_at']}
+        existing=self.work._read(anchor,suffix,configured.subject,event_type=event_type)
+        if existing is None:self.work._append(anchor,suffix,configured.subject,point,event_type=event_type)
+        elif existing!=point:raise ValueError('owned work page changed within a cycle')
+

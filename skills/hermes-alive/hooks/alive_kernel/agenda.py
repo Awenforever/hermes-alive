@@ -46,6 +46,7 @@ class AgendaItemKind(StrEnum):
 class AgendaAuthority(StrEnum):
     USER_EXPLICIT = "user_explicit"
     USER_DELEGATED = "user_delegated"
+    USER_DELEGATED_OUTCOME = "user_delegated_outcome"
     DIRECT_OBSERVATION = "direct_observation"
     SYSTEM_MIGRATION = "system_migration"
     MODEL_PROPOSAL = "model_proposal"
@@ -199,8 +200,8 @@ _ALLOWED_TRANSITIONS = {
         AgendaState.DISMISSED,
         AgendaState.EXPIRED,
     },
-    AgendaState.COMPLETED: set(),
-    AgendaState.DISMISSED: set(),
+    AgendaState.COMPLETED: {AgendaState.ACTIVE},
+    AgendaState.DISMISSED: {AgendaState.ACTIVE},
     AgendaState.EXPIRED: set(),
 }
 
@@ -599,6 +600,13 @@ class AgendaProjection:
             from .followup_intake import validates_transition
             if not validates_transition(self.journal,event,subject=row['subject'],from_state=from_state.value):
                 return self._decision(connection,event,'rejected','invalid_delegated_transition',item_id)
+        if authority is AgendaAuthority.USER_DELEGATED_OUTCOME:
+            from .core_work_outcomes import validates_transition
+            prior=connection.execute('SELECT caused_by_event_id FROM agenda_transitions_v1 WHERE item_id=? '
+                'ORDER BY transition_id DESC LIMIT 1',(item_id,)).fetchone()
+            if prior is None or not validates_transition(self.journal,event,subject=row['subject'],
+                    from_state=from_state.value,prior_transition_event_id=prior[0]):
+                return self._decision(connection,event,'rejected','invalid_owned_work_outcome',item_id)
         if authority is AgendaAuthority.SYSTEM_MIGRATION and (
             authority_source.event.event_type != "system.migration"
         ):
@@ -609,7 +617,7 @@ class AgendaProjection:
             AgendaItemKind(row["kind"]) is AgendaItemKind.COMMITMENT
             and to_state is not AgendaState.EXPIRED
             and authority
-            not in {AgendaAuthority.USER_EXPLICIT, AgendaAuthority.USER_DELEGATED, AgendaAuthority.SYSTEM_MIGRATION}
+            not in {AgendaAuthority.USER_EXPLICIT, AgendaAuthority.USER_DELEGATED, AgendaAuthority.USER_DELEGATED_OUTCOME, AgendaAuthority.SYSTEM_MIGRATION}
         ):
             return self._decision(
                 connection, event, "rejected", "commitment_transition_requires_authority", item_id

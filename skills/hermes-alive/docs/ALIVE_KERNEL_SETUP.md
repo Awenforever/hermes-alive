@@ -257,3 +257,11 @@ instruction, wait. Outside the chosen scope, request operation confirmation.
 The original request will be retained in Core's local task record under Core's
 retention policy; Alive's private source expiry does not erase Core records.
 This option admits first work only, never automatic retry or agenda completion.
+
+## Optional owned-work outcome management
+
+Separately ask whether Alive may assess retained owned Core results and close a
+goal it judges attained. `--confirm-core-work-outcomes` needs guided item
+management and result review, including retained original intent. Existing setups
+keep it off. Uncertain, ongoing or blocked items remain open. You can explicitly
+ask Hermes to reopen a completed item; doing so does not redo the work.

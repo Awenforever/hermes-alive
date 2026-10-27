@@ -50,6 +50,7 @@ def provenance_metadata(content):
             original_user_message_preserved=content.get('original_owner_message_included') is True,
             agenda_description_is_verbatim=False,authority_is_not_execution_permission=True)
         if 'core_work' in content:metadata['core_work']=_thaw_json(content['core_work'])
+        if 'core_work_outcome' in content:metadata['core_work_outcome']=_thaw_json(content['core_work_outcome'])
         if 'autonomous_work_wait' in content:metadata['autonomous_work_wait']=_thaw_json(content['autonomous_work_wait'])
     return metadata
 
@@ -76,6 +77,7 @@ def source_prompt_excerpt(content, *, policy=None):
                if content.get('original_owner_message_included') is True else {}),
             **({'core_work_lifecycle':dict(content['core_work'])} if 'core_work' in content else {}),
             **({'autonomous_work_wait':dict(content['autonomous_work_wait'])} if 'autonomous_work_wait' in content else {}),
+            **({'core_work_outcome':dict(content['core_work_outcome'])} if 'core_work_outcome' in content else {}),
             **({'core_work_record_review':dict(content['core_work_record_review'])}
                if 'core_work_record_review' in content else {})}),ensure_ascii=False)
     depth = (policy == SOURCE_EXCERPT_POLICY

@@ -65,7 +65,7 @@ def record_request(store, configured, *, turn_identity, request_fingerprint, evi
         raise ValueError('bounded follow-up purpose required')
     if operation!='record' and (configured.options.get('manage_explicit_followups') is not True
             or not isinstance(target_item_id,str) or not target_item_id
-            or from_state not in ('active','snoozed')):
+            or from_state not in ('active','snoozed') and not (operation=='resume' and from_state in ('completed','dismissed'))):
         raise ValueError('guided management grant and exact current item required')
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
