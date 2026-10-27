@@ -40,7 +40,7 @@ and dispatch path, not bypass it through raw registry dispatch.
 | Content and judgment | Source-led composition, final wording review, real main-model examples | Samples remain too much like cautious paper digests; factual review is not a usefulness verdict |
 | Conversation continuity | Exact share/source excerpts reach actual Core main requests; real replies after context reduction no longer recite transport status | Missing evidence still becomes global negative claims in real followup; qualify ADR0230, plus natural old-quote/compaction/restart behavior |
 | Sources | Actual Core free search and substantive extraction demonstrated in isolated profiles | More useful live selection across Chinese and other sources, currentness, provenance and inaccessible/full-read boundaries |
-| Actions and reflection | Guided Core tools, owner-directed submission/control and exact bound work evidence. Native can request an independently scoped Core file inspection and reconsider a genuinely changed result. Separately guided first-work autonomy now interprets a retained historical assignment and starts existing Core work without another execute turn; an actual main/Native/worker pair distinguishes later-autonomous execution from explicit waiting, with write/readback evidence and zero sends | General multi-step result assessment and appropriate closure, revisions/dependencies, feedback adaptation and project context; Core completion is not semantic success |
+| Actions and reflection | Guided first Core work, owner-directed control, bound record review and independent scoped inspection; original/later owner instructions reach outcome assessment. Separately guided finite-goal closure, partial/uncertain retention, owner reopening and pending-close cold recovery are qualified in isolation, including a corrected real main/worker/Native pair and real-model counterexamples | Useful autonomous continuation, task/deadline revisions and dependencies, project context, feedback adaptation and actual platform/production lifecycle; historical records and model judgment are not current-world certainty |
 | Authority and transport | Original delegation/policy/source checks and short physical permits preserved, including delayed-composition regression | Real daemon and channel outcomes under a separately approved production window; Enhance remains sole physical FIFO/token/retry owner |
 | Portability and migration | Managed supported-Core component integration | Independent Git consumer install/configure/run/upgrade/uninstall-preserve/reinstall across four agreed targets, plus legacy-state migration and rollback |
 
@@ -738,11 +738,33 @@ These tests do not certify multi-step goal closure, independent Git installation
 four platforms, production operation or ten fresh sharing rounds. Existing,
 uncertain and stopped work is not automatically repeated.
 
-### Outcome management implementation — qualification pending
+### Outcome management — bounded functional qualification
 
 The candidate adds attributed owned-work outcome assessment and an independently
 guided automatic closure option, with explicit owner reopening. Closure is based
 on original intent and bounded actual evidence, not a completed runner status.
 Changed evidence and exact prior-version checks protect concurrent corrections.
 It does not yet authorize continued external work, task revision/dependencies or
-claim overall completion. Actual-Core and real semantic counterexamples must pass.
+claim overall completion. Actual-Core positive/partial, invalid-support rejection,
+authority revocation, pending-admission cold recovery and owner reopening pass.
+Additional actual-Core captures cover an incorrect artifact, later restrictions
+beyond the default definition window, and success records behind a large earlier
+result. A real inherited main/worker/Native pair now closes an attained finite
+goal while retaining an attained but explicitly not-to-be-closed item; the later
+main query reports both correctly without re-execution or sending.
+
+The first real pair had a semantic failure despite green state assertions: an
+old short review window hid later success, causing an unsupported failure claim
+and a repeated-work recommendation. It remains a failure. The shared owned reader
+now hydrates bounded known results and matching requests, preserving incomplete
+and omitted scope instead of collapsing missing evidence into nonexistence.
+Captured real-model judgments also distinguish actual wrong content and preserve
+later owner restrictions. Invalid model proposals now keep the host and item
+alive; benign extra fields do not invalidate an otherwise valid decision.
+
+This is finite-goal assessment/closure, not general autonomous continuation.
+Next work must qualify task revision/dependencies and the distinction between
+attention scheduling and work authority, then useful continued action within the
+guided range. Project context, memory learning, source-dependent erasure and the
+remaining lifecycle/fleet/production gates remain open. These bounded tests are
+not ten fresh sharing rounds or production acceptance.

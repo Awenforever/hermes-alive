@@ -25,8 +25,8 @@ Assessment bodies remain private, for at most seven days or the earlier original
 source/item expiry. Read availability follows the original source; journal events
 contain references and provenance rather than raw goals or reasons. General
 source-dependent erasure, continued multi-step work, revisions/dependencies and
-four-platform production lifecycle remain separate requirements. Actual-Core and
-real-model semantic qualification are pending for this implementation.
+four-platform production lifecycle remain separate requirements. Controlled actual-Core and bounded real-model semantic qualifications are
+recorded in the development plan; they are not final production acceptance.
 
 Exact later owner work instructions are read from the authenticated owned Core
 definition through at most three 4096-character pages. They are distinct from
@@ -63,3 +63,15 @@ keep it open, retain only signed rejection metadata, do not stop the whole host
 or retry the physical work. Repeated preparation in the same cycle does not
 re-infer that rejected basis. Harmless additional model fields are ignored;
 unknown action meaning is never guessed. Authority loss still interrupts normally.
+
+## Qualification scope
+
+Actual-Core tests cover positive/partial decisions, invalid support, pause during
+inference, crash between admission and effect, cold replay, owner reopening,
+complete later instructions and large/incorrect results. Invalid proposals are
+also tested in the actual continuous host loop. Real inherited main/worker/Native
+execution and a later status query now preserve the finite-goal/no-close pair;
+three real-model capture replays exercise the evidence counterexamples. Valid
+responses remain equivalent after protocol-error isolation. Four-platform Git
+consumer lifecycle, complete source-dependent erasure, general continued work
+and production acceptance remain unproven.

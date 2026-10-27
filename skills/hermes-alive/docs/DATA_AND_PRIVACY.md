@@ -212,3 +212,14 @@ turn. Its exact original text and proposed step enter the existing local Core jo
 when work starts, under Core retention. Alive journals retain signed references,
 not these bodies; private decision records expire within seven days or earlier
 item expiry. Waiting reasons remain attributed model assessments, not permissions.
+
+Optional outcome management reads retained original and later work instructions
+and bounded requests/results of the owner's own Core work. Matching tool
+arguments are included only under this separate guided choice. Bodies are used
+for assessment, not copied into the structural journal; a private derived
+assessment may quote evidence and expires within seven days or the earlier item
+or original-source expiry. The journal keeps protected references, fingerprints
+and decision metadata. Invalid proposals retain rejection metadata, not raw model
+bodies. Original-source erasure/expiry disables the corresponding assessment
+view; transitive physical erasure of derived records remains a separate release
+gate. This does not delete or change Core's independent task retention.

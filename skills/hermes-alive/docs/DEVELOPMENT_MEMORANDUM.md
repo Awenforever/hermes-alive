@@ -1511,10 +1511,37 @@ Cold metadata reconstruction, explicit post-restart stepping, automatic startup
 wake and real-model semantics are different proofs. Do not combine them into an
 unsupported claim of unattended platform or production acceptance.
 
-## Owned-work outcomes (qualification pending)
+## Owned-work outcomes — evidence and remaining limits
 
 Core completion is not task success. Assess against original intent and actual
 records, keep model judgment distinct from owner reports, wait for an admitted
 inspection, and recheck facts/authority before effects. Bind automatic closure to
 the exact prior agenda transition, so an owner correction cannot be overwritten
 by an old completion. Scope this as an independent first-guide choice. See ADR0255.
+
+The first real outcome test was structurally green yet semantically wrong: a
+large earlier search result exhausted the short historical body window and the
+outcome projection then discarded incomplete rows, losing later write/read
+successes. The model and main said no success existed and recommended repeating
+work that had already happened. Keep this counterexample, not a passing label.
+CoreWorkEvidence.window now reuses only known owned references, fills bounded
+bodies, pairs requests/results and reports partial/omitted scope. Matching tool
+requests require the new outcome grant and cannot alone establish success.
+
+A corrected real pair includes both successful readbacks and gives the intended
+complete/keep-active decisions. Three actual-Core captures replayed through the
+inherited real model also respect a late no-close restriction, detect wrong
+content despite Core completed and recognize later success behind a large result.
+After parser hardening, all five actual valid responses normalize identically.
+Invalid model JSON/references no longer terminate the whole host: record a signed
+per-cycle rejection, keep the item, and never retry the physical work. Actual
+continuous-loop qualification confirms a malformed proposal leaves it running
+until explicitly stopped. Harmless extra response fields are ignored.
+
+Natural main status answers still overexpose internal proof/status fields in
+these technical fixtures. Qualify concise everyday status reporting later without
+hiding material uncertainty. Do not call this broad conversational perfection.
+Also audit whether attention snooze/resume should alter the execution/goal version;
+source-version equality alone is not a substitute for the intended task lifecycle.
+General continuation, revisions/dependencies, context, memory and lifecycle gates
+remain open; no production release is implied.
