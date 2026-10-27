@@ -1655,3 +1655,52 @@ it from the separately controlled model-input capture. A fixture was stopped
 when its wrong record kind was known, then validated against actual old records
 before another real run. Preserve the failures instead of retroactively editing
 them into passes. All owned test containers are now terminated and removed.
+
+
+## 2026-10-27 — Operation facts and authority are separate
+
+The project trace's functional pass did not qualify its explanation. Replace
+scattered capability prose with a catalog derived from the real validator;
+current setup/turn eligibility is permission to evaluate a request, not a new
+execution grant. Project instructions/recorded results are requirements/evidence,
+not owner permission. State changes, task edits, stopping an execution and changing
+runtime/project settings are different operation domains. Do not extrapolate one
+from another or enumerate all of Hermes as unavailable because this tool has no
+operation. Keep machine identifiers for the next call and ordinary answers short
+in the owner's Hermes style. No phrase replacement list or canned answer is added.
+Actual installed-Core context parsing/revocation/no-effect checks and the positive
+file/inspection/cold case pass; broader controls and real main-model answers remain
+under qualification (ADR0259).
+
+
+The first real catalog probe regressed to asking for per-item approval after
+intake had already been authorized. Do not flatten an existing owner delegation
+into the weak statement “this request may be evaluated”. The descriptor now
+separates supported operations, the verified active delegation and current-turn
+conditions. A capability readout is not a new grant, but it must faithfully say
+which grant already exists. Preserve the failed real run and retest the unchanged
+requests; do not silently accept a proposal where a saved task was requested.
+
+
+The next real probe fixed direct intake and unsupported-rebind explanations, but
+still described an owner-selected toolset as a default. Capability values need
+provenance, not only a bare list. The descriptor identifies confirmed-setup scope
+selection, an empty unconfigured scope and the non-sandbox role of project binding;
+no provider/tool-specific default is added. Keep the full answer for review and
+do not mark this interim wording result zero-error. Do not turn a normal status
+answer into a replay of the task, internal states and all implementation limits.
+
+
+### 2026-10-28 — Short answers still need actual observations
+
+The next scope-origin probe improved provenance but skipped item lookup after
+history reduction and offered redundant read approval. Generic setup says what
+can be considered, not whether this particular owner asked to wait. Model context
+now distinguishes observation from preview, agenda mutation, work submission and
+stop request. A no-change/no-execution question can use existing owned-record
+observations; do not replace that lookup with a generic capability explanation.
+Two actual-main profiles now preserve opposite start conditions after lookup and
+make no job/file/item/runtime/send changes. This bounded semantic pass still has
+verbose replies. Keep that limitation, then advance useful continued work instead
+of indefinitely chasing individual wording defects. No actual Core permission,
+execution route or operator choice was changed by this explanation work.

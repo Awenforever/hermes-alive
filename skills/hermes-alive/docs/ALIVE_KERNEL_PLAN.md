@@ -1,7 +1,7 @@
 # Hermes Alive Kernel — Living Development Plan
 
 Status: active; development branch only, no production acceptance.
-Last reviewed: 2026-10-27 (Asia/Shanghai).
+Last reviewed: 2026-10-28 (Asia/Shanghai).
 
 ## Current product state
 
@@ -95,8 +95,10 @@ claimed to be fully integrated simply because their code exists.
   The project baseline passed 99 portable suites; the later prompt/turn-DTO delta
   is separately qualified, not an exact derivative full run. Replies still blur
   project requirements with authority, offer unsupported rebinding and expose
-  internal jargon. These remain open explanation gates, not a zero-error dialogue
-  or sandbox/migration proof.
+  internal jargon. The registry-derived operation/delegation/provenance/effect
+  contract now passes bounded real queries with opposite owner-start conditions
+  after actual lookup (ADR0259). Replies remain verbose; this is not universal
+  dialogue, natural-sharing, sandbox or migration qualification.
 - Sharing and reply continuity have actual-model examples, but useful natural
   sharing has **0/10** fresh complete rounds. Functional work tests do not advance
   that counter. Longitudinal memory, fleet and production remain unqualified.
@@ -109,10 +111,11 @@ records and ADRs0241–0256. Historical detail is retained in
 
 ## Next work in order
 
-1. **Finish the useful task lifecycle.** Complete project-context semantic and
-   lifecycle/migration and general capability/provenance explanation (ADR0258),
-   then handle necessary dependencies and advance
-   genuinely unfinished work within the guided range using Core. Carry actual earlier results forward.
+1. **Finish the useful task lifecycle.** Advance genuinely unfinished work and
+   necessary dependencies within the guided range using Core, carrying actual
+   earlier results forward. Project work and bounded capability/provenance
+   explanation now have real qualifications (ADRs0258–0259); their lifecycle,
+   migration and wider dialogue limitations remain explicit.
    Do not repeat unknown effects, treat a model's suggested next step as permission,
    replace uncertain jobs automatically, or introduce another executor/scheduler.
    Existing first-work, stop and finite-closure paths are foundations already

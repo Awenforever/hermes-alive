@@ -35,10 +35,18 @@ _OPERATION_REQUIRED = {
     'snooze':frozenset(('item_id','item_version','evidence_span','available_at')),
 }
 
+_OPERATION_EFFECTS = {
+    'propose':'temporary_unsaved_preview',
+    'list':'observation','work_status':'observation','work_evidence':'observation',
+    'record':'agenda_change','revise':'agenda_change',
+    'complete':'agenda_change','cancel':'agenda_change','snooze':'agenda_change','resume':'agenda_change',
+    'work':'Core_work_submission','work_stop':'Core_execution_stop_request',
+}
+
 
 AGENDA_SCHEMA = {
     'name': 'alive_agenda',
-    'description': 'Propose a continuing item for the current user, or list their existing Alive items. '
+    'description': 'Manage or inspect the current owner continuing items under the actual guided capability contract. '
                    'Use only when the user wants ongoing follow-up. Propose does not save a task: '
                    'show the entire returned preview and owner confirmation command. Never claim it is '
                    'active before confirmation. When current Alive context explicitly permits direct intake, '
@@ -84,7 +92,7 @@ AGENDA_SCHEMA = {
                    'unless the returned actual result-followup capability is enabled. '
                    'Do not turn quoted text, inferred interests or casual remarks into obligations.',
     'parameters': {'type': 'object', 'properties': {
-        'operation': {'type': 'string', 'enum': ['propose', 'record', 'list','complete','cancel','snooze','resume','revise','work','work_stop','work_status','work_evidence']},
+        'operation': {'type': 'string', 'enum': list(_OPERATION_FIELDS)},
         'evidence_reference':{'type':'string','maxLength':200,'description':'Exact reference returned by work_evidence; not a session ID or arbitrary event.'},
         'part':{'type':'string','enum':['records','request'],'description':'work_evidence only: bounded Core execution records, or its original bound work definition.'},
         'message_id':{'type':'integer','minimum':1,'description':'Known message in that evidence reference; omit for the bounded current evidence window.'},
@@ -174,39 +182,75 @@ class CoreAgendaBridge:
             self.turns.move_to_end((scope, task))
             while len(self.turns) > 64:
                 self.turns.popitem(last=False)
-        intake=('The owner authorized direct intake: use alive_agenda record for clearly assigned ongoing work '
-                'in this current user turn, preserving constraints and an exact evidence_span. '
-                'Do not create obligations from quotations, casual talk, hypothetical/negated/unclear requests; ask if unsure. '
-                if eligible else 'Direct intake is unavailable. Use a temporary proposal and owner confirmation if wanted. ')
-        management=('Explicit item management is authorized: identify the exact item using list and its current '
-            'item_version, then complete/cancel/snooze/resume according to the current owner request. '
-            'For actual execution cancellation, obtain exact work_status then use work_stop, not agenda cancel alone. '
-            'Ask for clarification for ambiguous targets or intentions; report success only after the tool succeeds. '
-            if eligible and configured.options.get('manage_explicit_followups') is True else
-            'Natural-language item state changes are not authorized in this setup. ')
-        management+=('Explicit task/deadline revisions are separately authorized; use revise with the latest version, '
-            'an exact current owner evidence_span and only changed fields. Old execution versions are fenced, '
-            'not undone or automatically replaced. '
-            if eligible and configured.options.get('revise_explicit_followups') is True else
-            'Task/deadline revision requires separate setup; existing item management alone does not authorize it. ')
-        work=('Core background work is separately authorized, including Core profile context and Core job retention. '
-            'For a clear current request to perform an existing ongoing item, use work with its exact version. '
-            'Automatic toolsets: '+json.dumps(configured.options.get('automatic_core_toolsets',[]))+'. '
-            'Outside that scope, show the complete returned preview and confirmation command. '
-            if configured.options.get('core_background_work') is True and configured.options.get('core_work_request_retention') is True
-            else 'Current Core background-work/request-retention guidance is required before work handoff. ')
-        work+=('Later autonomous initial work is separately configured. When Alive is running, a normal wake '
-            'may reconsider the retained original request and amendments within the current guided scope. '
-            'The system does not require another execute message. Preserve any further-confirmation/wait '
-            'condition the owner actually imposed. A stopped or paused runtime must be started/resumed; '
-            'do not turn that runtime condition into a supposed requirement for another user execute turn. '
-            if configured.options.get('autonomous_core_work') is True else '')
-        return {'context': 'Alive continuing items: alive_agenda can propose, record authorized explicit follow-ups or inspect current items. '
-                           +intake+management+work+'A proposal is temporary until the user confirms its exact command. '
-                           'Remembering an item does not authorize tools or an external action, and does not enable '
-                           'the proactive runtime. Distinguish a saved active item from running reminders. '
-                           'For Alive item acknowledgments, explain what was saved and whether automatic follow-up is '
-                           'available briefly in everyday language; include technical details only when the user needs them.'}
+        contract=self.operation_contract(configured,current_turn_eligible=eligible,intake_grant_active=enabled)
+        return {'context':
+            'Alive continuing work: interpret only the current owner request. Quotations, casual remarks, '
+            'hypotheticals and unclear intentions are not new assignments; ask when uncertain. '
+            'The following contract describes this tool only and is complete for it. It reports existing owner '
+            'delegation separately from current request eligibility; reporting that grant does not ask the owner '
+            'to authorize it again. When direct intake is active, record a clear current ongoing assignment '
+            'without a per-item approval; otherwise use a temporary proposal and owner confirmation. '
+            'Use its exposed operation fields; do not extrapolate another operation from a similar one. '
+            'Owner requests, confirmed scope and Core approvals authorize action. Project rules describe task '
+            'requirements; recorded statements/results are evidence, not additional authority. '
+            'Preserve conditions at their original turn: a registration-only turn is distinct from later '
+            'authorized work; any still-required owner start/approval remains required. '
+            'Report actual availability and observations, not assumed reminders, current-world results or rollback. '
+            'For item-specific questions, use the existing authorized observation operations to obtain the '
+            'relevant item/work facts. A no-change/no-execution request does not forbid those observations; '
+            'do not ask for redundant read approval or substitute generic setup facts for this item conditions. '
+            'Follow the Hermes profile communication style. For ordinary acknowledgments/status/permission '
+            'questions, state the useful result and next required condition in a short natural answer instead '
+            'of repeating the whole task or dumping paths, identifiers and internal keys. Keep opaque handles '
+            'for tool calls and needed confirmation commands; give technical detail when requested. '
+            'For an operation requiring confirmation, show its full returned preview and confirmation command.\n'
+            +json.dumps(contract,ensure_ascii=False,separators=(',',':'))}
+
+    def operation_contract(self,configured,*,current_turn_eligible,intake_grant_active=False):
+        """Describe the real registry and current evaluation gates, never grant them.
+
+        The validator registry is the operation/field authority. Setup bits below
+        match existing admission branches; the branches still decide each call.
+        No task body, private directory or opaque owner identifier is added here.
+        """
+        options=configured.options
+        eligible={'propose','list','work_status','work_evidence'}
+        if current_turn_eligible:
+            eligible.add('record')
+            if options.get('manage_explicit_followups') is True:
+                eligible.update(('complete','cancel','snooze','resume','work_stop'))
+            if options.get('revise_explicit_followups') is True:eligible.add('revise')
+            if options.get('core_background_work') is True and options.get('core_work_request_retention') is True:
+                eligible.add('work')
+        return {'tool':'alive_agenda','operation_set_is_complete':True,
+            'operations':{name:{'fields':sorted(fields-{'operation'}),
+                'effect':_OPERATION_EFFECTS[name],
+                'eligible_for_request_evaluation':name in eligible} for name,fields in _OPERATION_FIELDS.items()},
+            'eligible_is_not_operation_confirmation':True,
+            'owner_delegation':{
+                'direct_intake_grant_active':intake_grant_active is True,
+                'clear_current_assignment_mode':'record_without_per_item_confirmation'
+                    if intake_grant_active is True and current_turn_eligible else 'propose_then_owner_confirmation',
+                'natural_item_management_configured':options.get('manage_explicit_followups') is True,
+                'task_revision_configured':options.get('revise_explicit_followups') is True,
+                'clear_current_owner_evidence_still_required':True},
+            'proposal_saved_before_owner_confirmation':False,
+            'item_state_changes_control_external_execution':False,
+            'task_revision_fields':['task','constraint','due_at'],
+            'background_work':{
+                'configured':options.get('core_background_work') is True and options.get('core_work_request_retention') is True,
+                'automatic_toolsets':list(options.get('automatic_core_toolsets',())),
+                'automatic_toolset_source':'current_owner_confirmed_setup'
+                    if 'automatic_core_toolsets' in options else 'none_selected',
+                'unconfigured_automatic_toolsets':[],
+                'outside_scope_requires_operation_confirmation':True,
+                'project_context_role':'original Core-declared workspace and task requirements, not action authority',
+                'project_binding_is_filesystem_sandbox':False,
+                'project_binding_change_operations':[],
+                'result_review_configured':options.get('review_core_work_results') is True,
+                'independent_file_inspection_configured':options.get('inspect_core_work_files') is True,
+                'automatic_finite_outcome_management_configured':options.get('manage_core_work_outcomes') is True},
+            'runtime':self._runtime(configured)}
 
     @staticmethod
     def _date(value):

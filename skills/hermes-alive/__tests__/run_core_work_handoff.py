@@ -127,12 +127,42 @@ async def test(home):
                 platform='telegram',_user_id=source.user_id),effective_task_id=name,turn_id=name,
                 original_user_message=text,messages=[{'role':'user','content':text}],conversation_history=[])
             assert 'alive_agenda' in context
+            contract=json.JSONDecoder().raw_decode(context[context.index('{"tool":"alive_agenda"'):])[0]
+            turn.last_contract=contract
+            bridge=importlib.import_module(loaded.module.__name__+'.gateway_agenda_bridge')
+            assert set(contract['operations'])==set(bridge._OPERATION_FIELDS)==set(bridge._OPERATION_EFFECTS)
+            assert all(v['effect']==bridge._OPERATION_EFFECTS[k] for k,v in contract['operations'].items())
+            assert set(contract['operations'])==set(bridge.AGENDA_SCHEMA['parameters']['properties']['operation']['enum'])
+            assert all(set(value['fields'])==set(bridge._OPERATION_FIELDS[name])-{'operation'} for name,value in contract['operations'].items())
+            assert contract['eligible_is_not_operation_confirmation'] is True
+            assert contract['background_work']['project_binding_change_operations']==[]
+            assert contract['runtime']['proactive_runtime']=='stopped'
+            if not text:
+                assert not contract['operations']['record']['eligible_for_request_evaluation']
+                assert not contract['operations']['work']['eligible_for_request_evaluation']
+                assert contract['operations']['list']['eligible_for_request_evaluation']
             def tool(args):
                 return json.loads(model_tools.handle_function_call('alive_agenda',args,task_id=name,
                     session_id=entry.session_id,turn_id=name,tool_call_id=name+'-call',enabled_tools=['alive_agenda']))
             return tool
+        if os.environ.get('ALIVE_WORK_CONTRACT_TEST')=='1':
+            before=store.journal.last_sequence()
+            empty=turn('empty-owner-turn','')
+            rejected=empty({'operation':'record','task':'MUST_NOT_RECORD_EMPTY_TURN','evidence_span':'MUST_NOT_RECORD_EMPTY_TURN'})
+            assert 'error' in rejected and store.journal.last_sequence()==before and not jobs.list_jobs(include_disabled=True)
+            configured=store.configuration();intake=execution.kernel('followup_intake')
+            intake.set_permission(store,configured,False)
+            before=store.journal.last_sequence()
+            revoked=turn('revoked-owner-intake','请登记这项合成任务。')
+            denied=revoked({'operation':'record','task':'MUST_NOT_RECORD_REVOKED','evidence_span':'请登记这项合成任务。'})
+            assert 'error' in denied and store.journal.last_sequence()==before and not jobs.list_jobs(include_disabled=True)
+            assert turn.last_contract['owner_delegation']['direct_intake_grant_active'] is False
+            assert not turn.last_contract['operations']['record']['eligible_for_request_evaluation']
+            assert not binding._agenda.operation_contract(configured,current_turn_eligible=False)['operations']['record']['eligible_for_request_evaluation']
+            intake.set_permission(store,configured,True)
         text='持续整理测试记录，并在我要求执行时写到指定结果文件。不要发送消息。'
         tool=turn('work-intake',text)
+        assert turn.last_contract['owner_delegation']['clear_current_assignment_mode']=='record_without_per_item_confirmation'
         item=tool({'operation':'record','task':'将测试记录标识 INDEPENDENT_SYNTHETIC_ARTIFACT 原样写入 '+str(artifact),
             'constraint':'不要发送消息','evidence_span':text})
         assert item.get('status')=='recorded_under_owner_intake_grant',item

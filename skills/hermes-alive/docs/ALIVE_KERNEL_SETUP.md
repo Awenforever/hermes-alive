@@ -139,8 +139,9 @@ work ID or recover its association from the known item ID, without resubmission.
 While Alive is active, its existing owner cycle observes changed Core lifecycle
 facts and brings them into cognitive decisions. Unchanged state may stay quiet.
 By default this does not inspect output bodies or verify that the assigned goal was met.
-Independent automatic result followup and autonomous Native work selection remain
-unfinished; do not promise them. The current owner can inspect an exact known
+Separately guided result review, first-work selection, file inspection and finite
+result management have bounded development qualifications described below. They
+are not defaults or proof of a general continuous worker. The current owner can inspect an exact known
 work with `work_evidence`: its bound request or bounded execution evidence.
 Statements, requests and tool results are distinct; history is not a fresh
 inspection. Large bodies have explicit pages. The reader retains no body;
@@ -295,3 +296,15 @@ has no retained project, a new guided work request must preview and explicitly
 confirm the selected current Core context, even inside the automatic tool range.
 Do not describe unknown project metadata as a verified current project. No new
 per-item question is required for a newly admitted item with retained context.
+
+
+### Questions and actions have different effects
+
+Asking about a saved item can use its existing owned records without starting
+work or changing the item. Read-only questions do not need a second action
+confirmation. The selected automatic tool scope belongs to this owner's confirmed
+setup; fresh installations do not inherit another person's selection. Project
+rules describe requirements, not extra permission, and a recorded workspace is
+not a filesystem sandbox. Editing task text/deadlines is distinct from moving a
+workspace binding; the current agenda interface has no general rebind operation.
+Original per-item start/wait conditions still apply even when the runtime resumes.
