@@ -84,7 +84,8 @@ claimed to be fully integrated simply because their code exists.
   and old-work fences. Actual Core and a real inherited main/Native/worker chain
   qualify bounded amendment behavior. Replies distinguish stopped runtime from
   retained authority and preserve explicit owner waits. Dependencies, useful
-  continuation, longitudinal/lifecycle and the latest full regression remain open.
+  continuation and longitudinal/lifecycle remain open. The new portable baseline
+  passes 99 independent suites; fleet and production acceptance are separate.
 - Sharing and reply continuity have actual-model examples, but useful natural
   sharing has **0/10** fresh complete rounds. Functional work tests do not advance
   that counter. Longitudinal memory, fleet and production remain unqualified.

@@ -69,4 +69,8 @@ capability, actual running state and owner-specific waits. Four further real
 main turns preserve that distinction and an explicit wait-for-owner exception.
 A literal CLI list and a model tool return are different API views; a fixture
 expecting capability fields on the CLI failed before its remaining turns and is
-retained as a failure. The final whole portable regression is still running.
+retained as a failure. The portable baseline with the new amendment implementation and runtime capability
+view passed 99 independent suites. The later derivative changes only documentation
+and one status qualifier: historical results need reassessment against the new
+goal, not disposal. No execution/authority logic changes in that derivative.
+This is not independent Git/fleet, longitudinal or production acceptance.

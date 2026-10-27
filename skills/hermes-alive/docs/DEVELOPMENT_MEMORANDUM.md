@@ -1601,3 +1601,11 @@ CLI list shape is not model-tool result shape: that fixture error is retained,
 not recast as runtime failure or an excuse to rerun the entire worker scenario.
 Do not label historical results useless after amendment: they require reassessment
 against the current goal and are not discarded or automatically repeated.
+
+
+The new portable baseline subsequently finished with PASS and 99 independent
+suite logs, actual container exit zero/removal, and the official Core supplier
+unchanged. Related focused and real-model qualifications remain bounded as above.
+A later derivative changes the historical-result qualifier and documentation only;
+keep exact equality evidence rather than rerun the entire suite for those edits.
+No production, fleet or ten fresh natural-sharing qualification follows from this.
