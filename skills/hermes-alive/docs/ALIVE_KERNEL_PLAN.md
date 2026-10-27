@@ -124,6 +124,12 @@ records and ADRs0241–0256. Historical detail is retained in
    history. Owner-scoped chronological active-segment paging now passes an
    isolated installed-Core and cold-process qualification using Core's reader.
    Paging a segment does not recover erased/compacted history or grant new work.
+   ADR0261 now has a separately guided continuation candidate: an actual-Core
+   two-step file journey and nine controls/cold cases pass. A second five-case
+   matrix rejects a changed parent before submission and distinguishes revision
+   from cancelled/reopened task life. Broader negative/lifecycle cases, empty
+   automatic scope and real inherited-model judgment remain unqualified.
+   Old first-work grants and automatic closure stay separate.
 2. **Close memory and adaptation.** Use Core's existing memory/provider ownership.
    Distinguish durable preferences, tentative conversation, quotations and noise;
    retain attributed, reversible feedback rather than permanent labels inferred

@@ -1720,3 +1720,30 @@ by paging. It still covers one active segment, not erased, compacted or ancestor
 history, and is not an atomic multi-page snapshot. ADR0260 records the remaining
 continuation requirements. Do not score this as autonomous progression or use a
 bounded empty page as proof an earlier physical effect never occurred.
+
+### 2026-10-28 — Continued work is neither a retry nor automatic closure
+
+ADR0261 adds separately guided subsequent Core steps under the existing selected
+scope. Existing first-work-only grants do not expand. Original requests, later
+amendments and authenticated historical owner work instructions reach planning;
+bounded prior results are evidence, not new authority. A distinct parent/history
+basis participates in the durable identity and is checked before submission,
+activation and tools. Cancellation/completion followed by reopening does not
+silently create another authorized life; revisions may inform a new step while
+the strict fence still stops an old-version worker. Pending, failed, unknown or
+stopped work is observed rather than automatically retried.
+
+The initial r252 candidate replanned pending work during repeated preparation;
+the fixture caught that runtime defect. r253 then exposed a harness cycle/count
+arrangement error. Both failures remain recorded. r254 passed ten actual-Core/
+cold controlled cases, including two different file steps with no repeated first
+write and no third task. r255 adds a changed-parent race rejected before job/file
+creation, plus direct revision/attention/lifetime assertions in five cases. No
+automatic closure was required for the new continued-work case. This is bounded
+dispatch/ownership qualification, not real-model semantic or production proof.
+
+Do not hide the remaining limits: active-segment evidence is not whole history;
+the current finite history/body bounds can require review. Empty automatic scope
+still conflicts with the model-only setup description and needs its own actual
+case. Real inherited-model intent/dependency decisions, uncertain effects,
+interrupted/pending handoff, lifecycle/erasure/migration and fleet gates remain.

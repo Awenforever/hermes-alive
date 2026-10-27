@@ -80,6 +80,25 @@ class OwnedWorkSource:
             if event is None or event.event.event_type=='agenda.revised':break
         return None
 
+    def same_lifetime(self,item_id,configured,version):
+        """Historical work may inform a revised goal, never a cancelled/reopened life.
+
+        This does not admit tools under an old version. Existing() retains its
+        stricter amendment fence for already running work.
+        """
+        if self.item(item_id,configured,include_source=True,require_available=False) is None:return False
+        with closing(self.store.journal._connect()) as c:
+            rows=c.execute('SELECT caused_by_event_id,to_state FROM agenda_transitions_v1 WHERE item_id=? '
+                'ORDER BY transition_id DESC LIMIT 65',(item_id,)).fetchall()
+        if not rows or len(rows)>64:return False
+        for row in rows:
+            if row['to_state'] not in ('active','snoozed'):return False
+            candidate=self.store.protector.authenticate_json('alive.agenda.item_version.v1',{
+                'configuration':configured.event_id,'owner':configured.subject,'item':item_id,
+                'event':row['caused_by_event_id']})
+            if candidate==version:return True
+        return False
+
     def page(self,configured,*,kind='autonomous-work'):
         if kind not in ('autonomous-work','work-outcomes'):raise ValueError('known work page required')
         self.authority(configured)

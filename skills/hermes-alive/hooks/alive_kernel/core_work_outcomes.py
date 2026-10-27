@@ -43,6 +43,12 @@ class CoreWorkOutcomes:
         """Read only the owned bound definition, with a finite three-page budget."""
         from .core_work_evidence import CoreWorkEvidence
         reader=CoreWorkEvidence(self.work);parts=[];offset=0;fingerprint=None
+        if request.get('progression_version')==1:
+            header=reader.read(work_id,subject=configured.subject,part='request',max_chars=256)
+            if header.get('status')!='core_work_request_evidence':return {'complete':False}
+            # Continued work has an evidence prelude. Its separately labelled
+            # final owner envelope must still be read within a finite budget.
+            offset=max(0,header['total_chars']-12288);fingerprint=header['fingerprint']
         for _ in range(3):
             page=reader.read(work_id,subject=configured.subject,part='request',offset=offset,
                 fingerprint=fingerprint,max_chars=4096)

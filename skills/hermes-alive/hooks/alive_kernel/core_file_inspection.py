@@ -270,7 +270,7 @@ class CoreFileInspection:
             raise InspectionDenied('owner amended this work; old admission cannot perform further tools')
         if self.work._read(child,'stop_requested',configured.subject) is not None:
             raise InspectionDenied('owner stopped this work')
-        if request.get('authority')=='guided_autonomous_initial_work':
+        if request.get('authority') in ('guided_autonomous_initial_work','guided_autonomous_continued_work'):
             try:
                 from .core_autonomous_work import CoreAutonomousWork
                 return CoreAutonomousWork(self.store).guard(configured,execution,child,request)

@@ -14,7 +14,7 @@ if __name__=='__main__' and os.environ.get('ALIVE_AUTOWORK_CHILD')!='1':
         env={**os.environ,'HOME':root,'HERMES_HOME':str(Path(root)/'profile'),
             'ALIVE_AUTOWORK_CHILD':'1','PYTHONDONTWRITEBYTECODE':'1'}
         modes=os.environ.get('ALIVE_AUTOWORK_CASES','execute,wait,revoked,erased,off,restart').split(',')
-        assert set(modes)<=set(('execute','wait','revoked','erased','off','restart','outcome-complete','outcome-partial','outcome-forged','outcome-revoked','outcome-recover','outcome-manual-long','outcome-wrong-result','outcome-window','outcome-malformed','outcome-attention','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover','project-pinned','project-manual','project-missing','project-replaced','project-restart'))
+        assert set(modes)<=set(('execute','wait','revoked','erased','off','restart','outcome-complete','outcome-partial','outcome-forged','outcome-revoked','outcome-recover','outcome-manual-long','outcome-wrong-result','outcome-window','outcome-malformed','outcome-attention','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover','project-pinned','project-manual','project-missing','project-replaced','project-restart','continuation'))
         try:
             for mode in modes:
                 case={**env,'HERMES_HOME':str(Path(root)/mode),'ALIVE_AUTOWORK_CASE':mode}
@@ -51,10 +51,14 @@ async def exercise(home):
         def do_GET(self):self.send_error(503)
         def do_POST(self):
             data=json.loads(self.rfile.read(int(self.headers.get('content-length','0'))))
+            if 'messages' not in data:
+                print('UNSUPPORTED_SYNTHETIC_REQUEST',self.path,sorted(data),flush=True)
+                self.send_error(400);return
             actual=any(any(prefix in str(m.get('content')) for prefix in ('Perform this ongoing owner assignment','Perform the following ongoing owner-assigned work.')) for m in data['messages'])
             message={'role':'assistant','content':'Auxiliary probe.'};finish='stop'
             if actual:
                 work_requests.append(data)
+                target=second_artifact if mode=='continuation' and 'CONTINUATION_SECOND_STEP' in str(data['messages']) else artifact
                 if mode.startswith('project-') and len(work_requests)==1:
                     rendered=json.dumps(data['messages'],ensure_ascii=False)
                     assert 'PUBLIC_PROJECT_A_RULE_SENTINEL_228' in rendered, 'Core did not load project A rules'
@@ -70,7 +74,7 @@ async def exercise(home):
                     read=any(m.get('role')=='tool' and m.get('tool_call_id')=='autonomous-write' for m in data['messages'])
                     message={'role':'assistant','content':None,'tool_calls':[{'id':'autonomous-read' if read else 'autonomous-write',
                         'type':'function','function':{'name':'read_file' if read else 'write_file',
-                            'arguments':json.dumps({'path':'relative-result.txt' if mode.startswith('project-') else str(artifact),**({} if read else {'content':actual_body})})}}]}
+                            'arguments':json.dumps({'path':'relative-result.txt' if mode.startswith('project-') else str(target),**({} if read else {'content':actual_body})})}}]}
                     finish='tool_calls'
             if actual and mode=='outcome-window' and not any(m.get('role')=='tool' for m in data['messages']):
                 message={'role':'assistant','content':None,'tool_calls':[{'id':'autonomous-preface','type':'function',
@@ -89,6 +93,7 @@ async def exercise(home):
             self.end_headers();self.wfile.write(payload)
     server=ThreadingHTTPServer(('127.0.0.1',0),Handler);server.daemon_threads=True
     thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+    second_artifact=home/'continuation-second.txt'
     artifact=home/'autonomous-result.txt';body='ACTUAL_AUTONOMOUS_CORE_RESULT\n'
     project=home/'project-a';other=home/'project-b';moved=home/'project-a-retired'
     if mode.startswith('project-'):
@@ -108,6 +113,7 @@ async def exercise(home):
         rc,staged=cli(home,'setup','--confirm-model-calls','--confirm-delivery','--confirm-outbound-retention',
             '--confirm-followup-management','--confirm-core-background-work','--automatic-core-toolset','file',
             *(() if mode=='off' else ('--confirm-autonomous-core-work',)),
+            *(('--confirm-core-work-continuation','--confirm-core-work-result-review') if mode=='continuation' else ()),
             *(('--confirm-followup-revisions',) if mode.startswith('revision-') and mode!='revision-legacy' else ()),
             *(('--confirm-core-work-outcomes','--confirm-core-work-result-review') if mode.startswith('outcome-') else ()))
         assert rc==0 and staged['confirmation_summary']['autonomous_initial_core_work']==(mode!='off')
@@ -144,6 +150,7 @@ async def exercise(home):
             else '仅登记这项合成工作，必须等我以后明确说执行，不能自行开工；')
             +f'在本地文件 {artifact} 写入 {body.strip()} 和一个换行并读回结果，不发消息。')
         if mode.startswith('project-'):original='登记并持续跟进当前项目：把 '+body.strip()+' 加换行写入 relative-result.txt，并读回核对。允许后续唤醒在 file 范围内自主处理；本轮仅登记，不动文件，不发消息、不重试。'
+        if mode=='continuation':original+=f'这是两步任务：首次唤醒只处理前一个文件，下一次唤醒再在 {second_artifact} 写相同内容并读回，每个文件只写一次；两步完成后不要重复工作，仍不发消息。'
         if mode=='outcome-window':original+=f'执行时允许先读取 {preface} 作为背景，无需输出其内容；最终验收仍仅以目标文件写入并读回一致为准。'
         if not resuming:
             variables=core.set_session_vars(platform='telegram',chat_id=source.chat_id,user_id=source.user_id,
@@ -217,6 +224,10 @@ async def exercise(home):
                 assert [a['message'] for a in result['owner_amendments']]==revision_messages
                 assert not result['replacement_job_created'] and not result['old_execution_cancellation_proven']
                 assert result['details']['constraint']==current['details']['constraint']
+                sources=execution.kernel('core_work_source').OwnedWorkSource(store)
+                cfg=store.configuration()
+                assert sources.same_lifetime(saved['item_id'],cfg,current['item_version'])
+                assert sources.existing(saved['item_id'],cfg,current['item_version']) is None
                 count=len(list(store.journal.read(event_type='agenda.revised')))
                 assert 'error' in apply(args),'stale old version cannot apply another amendment'
                 assert len(list(store.journal.read(event_type='agenda.revised')))==count
@@ -272,6 +283,7 @@ async def exercise(home):
             core.clear_session_vars(variables);variables=None
             assert submitted.get('work_id') and len(jobs.list_jobs(include_disabled=True))==1,submitted
         counts={'start':0,'cognition':0,'outcome':0}
+        history_tamper={'armed':False,'count':0}
         class Caller:
             pending=()
             def __init__(self,*,cycle,read_binding):self.calls=0;self.read_binding=read_binding
@@ -292,6 +304,20 @@ async def exercise(home):
                         'step':'Write the exact requested marker and read it back.' if mode!='wait' else None,
                         'reason':'Original owner authorizes the later wake.' if mode!='wait' else 'Original owner requires a future instruction.',
                         'reconsider_after_seconds':3600 if mode=='wait' else None}
+                    if mode=='continuation' and 'continuation_history' in supplied:
+                        history=supplied['continuation_history'];assert history['blocked_reason'] is None,history
+                        assert history['whole_execution_history_proven'] is False
+                        assert history['steps'] and all(s['state']['core_execution_state']=='completed' for s in history['steps'])
+                        if len(history['steps'])==1:
+                            assert any(actual_body.strip() in e.get('content','') for s in history['steps'] for e in s['records']['entries'])
+                            answer['step']='CONTINUATION_SECOND_STEP: write the second requested file and read it back; do not repeat the first.'
+                            if history_tamper['armed']:
+                                parent=jobs.get_job(history['steps'][-1]['state']['job_id'])
+                                jobs.update_job(parent['id'],{'prompt':parent['prompt']+'\nSYNTHETIC_CHANGED_PARENT'})
+                                history_tamper['armed']=False;history_tamper['count']+=1
+                        else:
+                            assert len(history['steps'])==2
+                            answer={'decision':'wait','toolsets':[],'step':None,'reason':'Both steps have actual retained results. No third work.', 'reconsider_after_seconds':86400}
                 elif kw['task']=='alive_core_work_outcome':
                     counts['outcome']+=1;supplied=json.loads(kw['messages'][-1]['content'])
                     assert supplied['item']['original_owner_request']==original
@@ -350,7 +376,7 @@ async def exercise(home):
             first=await binding.native.step(binding.arguments['build_parameters']())
             assert first.disposition in ('silence','evidence_changed')
         work=execution.kernel('core_work').CoreWorkStore(store)
-        if mode in ('execute','revoked','restart','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover','project-pinned','project-manual','project-replaced','project-restart') or mode.startswith('outcome-'):
+        if mode in ('execute','revoked','restart','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover','project-pinned','project-manual','project-replaced','project-restart') or mode.startswith('outcome-') or mode=='continuation':
             state=work.previous(saved['item_id'],subject=store.configuration().subject);assert state is not None
             assert len(jobs.list_jobs(include_disabled=True))==1
             request=work._read(state['work_id'],'requested',store.configuration().subject)
@@ -414,6 +440,8 @@ async def exercise(home):
                         session_id=entry.session_id,turn_id=action,tool_call_id=action+'-call',enabled_tools=['alive_agenda']))
                     core.clear_session_vars(variables);variables=None
                     assert changed.get('state')==('snoozed' if action=='snooze' else 'dismissed' if action=='cancel' else 'active'),changed
+                    sources=execution.kernel('core_work_source').OwnedWorkSource(store)
+                    assert sources.same_lifetime(saved['item_id'],store.configuration(),request['item_version']) is (mode not in ('attention-cancel','attention-reopen'))
             if mode=='revoked':
                 scope=binding._continuity.router.capture_target(session_key=entry.session_key,
                     user_id=source.user_id,platform='telegram')
@@ -471,7 +499,7 @@ async def exercise(home):
                 await binding.native.step(binding.arguments['build_parameters']())
                 raise AssertionError('unauthorized outcome was accepted')
             except ValueError:pass
-        elif mode!='revision-recover':await binding.native.step(binding.arguments['build_parameters']())
+        elif mode not in ('revision-recover','continuation'):await binding.native.step(binding.arguments['build_parameters']())
         if mode.startswith('outcome-'):assert counts['outcome']==1
         if mode in ('outcome-complete','outcome-window','outcome-attention'):
             listed=json.loads(await command('agenda list'))['items'][0]
@@ -498,16 +526,49 @@ async def exercise(home):
             if mode in ('project-missing','project-replaced'):assert not (moved/'relative-result.txt').exists()
         if mode=='revision-before':assert not original_artifact.exists()
         if mode in ('revision-after','revision-manual','revision-recover'):assert not (home/'new-revision-target.txt').exists()
-        assert counts['start']==(0 if mode in ('erased','off','outcome-manual-long','revision-manual','project-manual') else 1) and len(jobs.list_jobs(include_disabled=True))==(1 if mode in ('execute','revoked','restart','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover','project-pinned','project-manual','project-replaced','project-restart') or mode.startswith('outcome-') else 0)
+        assert counts['start']==(0 if mode in ('erased','off','outcome-manual-long','revision-manual','project-manual') else 1) and len(jobs.list_jobs(include_disabled=True))==(1 if mode in ('execute','revoked','restart','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover','project-pinned','project-manual','project-replaced','project-restart','continuation') or mode.startswith('outcome-') else 0)
         from contextlib import closing
         with closing(store.journal._connect()) as c:
             assert c.execute('SELECT state FROM agenda_items_v1 WHERE item_id=?',(saved['item_id'],)).fetchone()[0]==('snoozed' if mode=='attention-snooze' else 'dismissed' if mode=='attention-cancel' else 'active')
         raw='\n'.join(r.event.canonical_json() for r in store.journal.read())
         assert original not in raw and str(artifact) not in raw and body.strip() not in raw
         if manual is not None:assert manual not in raw
+        if mode=='continuation':
+            first_work=state['work_id'];first_stat=artifact.stat().st_mtime_ns
+            assert not second_artifact.exists()
+            # Change actual parent definition after the planner read it. The
+            # stale step must not reach Core submission; restoration is test-only.
+            parent=jobs.get_job(state['job_id']);history_tamper['armed']=True
+            rejected=await binding.native.step(binding.arguments['build_parameters']())
+            assert rejected.disposition=='evidence_changed' and history_tamper['count']==1
+            assert len(jobs.list_jobs(include_disabled=True))==1 and not second_artifact.exists()
+            jobs.update_job(parent['id'],{'prompt':parent['prompt']})
+            await binding.native.step(binding.arguments['build_parameters']())
+            second=work.previous(saved['item_id'],subject=store.configuration().subject)
+            assert second['work_id']!=first_work and second['parent_work_id']==first_work,second
+            assert len(jobs.list_jobs(include_disabled=True))==2
+            request=work._read(second['work_id'],'requested',store.configuration().subject)
+            assert request['progression_version']==1 and request['authority']=='guided_autonomous_continued_work'
+            deadline=asyncio.get_running_loop().time()+120
+            while second.get('core_execution_state') not in ('completed','failed','unknown'):
+                assert asyncio.get_running_loop().time()<deadline
+                if second.get('core_execution_state') not in ('claimed','running'):
+                    await asyncio.to_thread(tick,verbose=False,sync=True,headless=False)
+                await asyncio.sleep(.1);second=work.status(second['work_id'],subject=store.configuration().subject)
+            assert second['core_execution_state']=='completed',second
+            assert second_artifact.read_text(encoding='utf-8')==actual_body
+            assert artifact.stat().st_mtime_ns==first_stat and len(work_requests)==6
+            cfg=store.configuration()
+            instruction=execution.kernel('core_work_outcomes').CoreWorkOutcomes(store).work_instruction(second['work_id'],cfg,request)
+            assert instruction['complete'] and instruction['message']==original
+            await binding.native.step(binding.arguments['build_parameters']())
+            assert counts['start']==4 and len(jobs.list_jobs(include_disabled=True))==2
+            assert artifact.stat().st_mtime_ns==first_stat
+            assert not list(store.journal.read(event_type='work.outcome_decided')), 'continuation must not require or grant automatic closure'
+            state=second
         keys=('identity.key','content-vault/content.key','experience-content-vault/content.key')
         (home/'autonomous-expected.json').write_text(json.dumps({'work_id':state['work_id'] if state else None,
-            'owner':store.configuration().subject,'artifact':str(artifact),'body':actual_body,'revoked':mode in ('revoked','attention-cancel','attention-reopen','revision-after','revision-manual','revision-recover','project-replaced'),'outcomes':mode.startswith('outcome-'),'pending_closure':mode=='outcome-recover','manual':manual is not None,'revision_item':saved['item_id'] if mode.startswith('revision-') else None,
+            'owner':store.configuration().subject,'work_count':2 if mode=='continuation' else 1,'second_artifact':str(second_artifact) if mode=='continuation' else None,'artifact':str(artifact),'body':actual_body,'revoked':mode in ('revoked','attention-cancel','attention-reopen','revision-after','revision-manual','revision-recover','project-replaced'),'outcomes':mode.startswith('outcome-'),'pending_closure':mode=='outcome-recover','manual':manual is not None,'revision_item':saved['item_id'] if mode.startswith('revision-') else None,
             'project_dir':str(project) if mode.startswith('project-') else None,'project_missing':mode in ('project-missing','project-replaced'),
             'revision_due':json.loads(await command('agenda list'))['items'][0]['due_at'] if mode.startswith('revision-') and mode!='revision-recover' else None,
             'revision_expected_task':'Write NEW_REVISION_ONLY to '+str(home/'new-revision-target.txt') if mode=='revision-recover' else None,
@@ -567,5 +628,6 @@ if __name__=='__main__':
             state=execution.kernel('core_work').CoreWorkStore(store).status(expected['work_id'],subject=expected['owner'])
             assert state['core_execution_state']=='completed' and state['historical_owner_request_retained_by_core'] is (not expected['manual'])
             assert not Path(expected['artifact']).exists() if expected['revoked'] else Path(expected['artifact']).read_text(encoding='utf-8')==expected['body']
-        assert len(list_jobs(include_disabled=True))==(1 if expected['work_id'] else 0)
+        assert len(list_jobs(include_disabled=True))==(expected.get('work_count',1) if expected['work_id'] else 0)
+        if expected.get('second_artifact'):assert Path(expected['second_artifact']).read_text(encoding='utf-8')==expected['body']
     else:asyncio.run(exercise(Path(os.environ['HERMES_HOME'])))

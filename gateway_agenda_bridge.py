@@ -249,6 +249,7 @@ class CoreAgendaBridge:
                 'project_binding_is_filesystem_sandbox':False,
                 'project_binding_change_operations':[],
                 'result_review_configured':options.get('review_core_work_results') is True,
+                'automatic_subsequent_work_configured':options.get('core_work_continuation_version')==1,
                 'independent_file_inspection_configured':options.get('inspect_core_work_files') is True,
                 'automatic_finite_outcome_management_configured':options.get('manage_core_work_outcomes') is True},
             'runtime':self._runtime(configured)}

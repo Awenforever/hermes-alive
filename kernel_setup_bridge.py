@@ -160,6 +160,8 @@ def register_setup_command(context,binding):
                 intake_summary+='另已允许Alive读取自身任务的指令、工具调用及结果来评估受托工作，在目标已达成时自动结项；不确定时保留事项，你也可以重新打开纠正。这不授权新工作或发送通知。'
             if configured.options.get('autonomous_core_work') is True:
                 intake_summary+='另已允许Alive在后续唤醒时，按保留的明确交办原文和所选工具范围发起首次Core工作；不伪造新用户消息，不自动重试已有执行或标记完成。'
+            if configured.options.get('core_work_continuation_version')==1:
+                intake_summary+='另已允许在目标尚未完成时，结合自身已结束工作的原指令和结果，在同一范围内推进不同的后续步骤；这些有界历史记录会作为证据进入Core新任务。失败、停止或结果不明的执行不自动重试，超出范围仍逐项确认；自动结项另行选择。'
             if configured.options.get('inspect_core_work_files') is True:
                 intake_summary+='另已允许对自己受托工作记录中的文件目标自动发起只读核验，使用Core模型/权限与独立任务记录；不会写文件、扫描其他路径、重做原工作或自动完成事项。'
             if configured.options.get('review_core_work_results') is True:

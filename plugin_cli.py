@@ -72,6 +72,8 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
         help='Allow Alive to assess owned Core work from retained original intent, bounded tool requests and results and close an attained item; owner can reopen it. Requires guided management and result review; no new work, retries or messages')
     setup.add_argument('--confirm-autonomous-core-work',action='store_true',
         help='Allow a later Alive wake to start first Core work for a retained explicit ongoing assignment within the selected automatic toolsets; original request is historical, Core retains job context; no automatic retries or completion')
+    setup.add_argument('--confirm-core-work-continuation',action='store_true',
+        help='Allow distinct subsequent Core steps for an unfinished owner assignment within the same automatic scope, carrying retained owned instructions/results forward. Requires autonomous work and result review. Unknown/failed/stopped work is not retried; automatic agenda closure is a separate choice')
     setup.add_argument('--confirm-core-file-inspection',action='store_true',
         help='Authorize automatic Core read_file-only inspection of retained file targets from owned work; requires result review, inherits Core permissions, retains inspection task records in Core; no writing, unrelated scan or automatic completion')
     setup.add_argument('--automatic-core-toolset',action='append',default=[],
@@ -247,6 +249,8 @@ def alive_command(args: argparse.Namespace) -> int:
                 or args.confirm_cited_reads and not args.public_query
                 or getattr(args,'confirm_core_file_inspection',False) and not getattr(args,'confirm_core_work_result_review',False)
                 or getattr(args,'confirm_autonomous_core_work',False) and not args.confirm_core_background_work
+                or getattr(args,'confirm_core_work_continuation',False) and (
+                    not getattr(args,'confirm_autonomous_core_work',False) or not getattr(args,'confirm_core_work_result_review',False))
                 or getattr(args,'confirm_core_work_outcomes',False) and (not getattr(args,'confirm_core_work_result_review',False) or not args.confirm_followup_management)
                 or args.automatic_core_toolset and not args.confirm_core_background_work
                 or getattr(args,'confirm_core_work_result_review',False) and not args.confirm_core_background_work
@@ -282,6 +286,7 @@ def alive_command(args: argparse.Namespace) -> int:
             **({'review_core_work_results':True} if getattr(args,'confirm_core_work_result_review',False) else {}),
             **({'manage_core_work_outcomes':True} if getattr(args,'confirm_core_work_outcomes',False) else {}),
             **({'autonomous_core_work':True} if getattr(args,'confirm_autonomous_core_work',False) else {}),
+            **({'core_work_continuation_version':1} if getattr(args,'confirm_core_work_continuation',False) else {}),
             **({'inspect_core_work_files':True} if getattr(args,'confirm_core_file_inspection',False) else {}),
             **({'refine_public_sources':True} if getattr(args,'confirm_public_refinement',False) else {}),
             **({'language':args.language} if getattr(args,'language',None) else {}),
@@ -307,6 +312,7 @@ def alive_command(args: argparse.Namespace) -> int:
                 'automatic_owned_work_outcomes':bool(getattr(args,'confirm_core_work_outcomes',False)),
                 'explicit_owner_task_revisions':bool(getattr(args,'confirm_followup_revisions',False)),
                 'autonomous_initial_core_work':bool(getattr(args,'confirm_autonomous_core_work',False)),
+                'autonomous_subsequent_core_steps':bool(getattr(args,'confirm_core_work_continuation',False)),
                 'automatic_owned_file_inspection':bool(getattr(args,'confirm_core_file_inspection',False)),
                 'exact_current_work_message_retained_by_core':bool(getattr(args,'confirm_core_background_work',False)),
                 'current_work_message_limit_chars':6000,

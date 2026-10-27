@@ -50,11 +50,24 @@ class CoreWorkEvidence:
             task_success_proven=False,automatic_retry_allowed=False,body_copied_into_journal=False)
         return view
 
-    def window(self,work_id,*,subject,budget_chars=16384,include_tool_requests=False):
+    def window(self,work_id,*,subject,budget_chars=16384,include_tool_requests=False,history_pages=0):
         """Hydrate only known owned results; preserve partial and missing scope."""
-        if type(include_tool_requests) is not bool or type(budget_chars) is not int or not 0<=budget_chars<=16384:
+        if (type(include_tool_requests) is not bool or type(budget_chars) is not int or not 0<=budget_chars<=16384
+                or type(history_pages) is not int or not 0<=history_pages<=4):
             raise ValueError('bounded owned-record body budget required')
         records=self.read(work_id,subject=subject,max_chars=max(256,min(4096,budget_chars)))
+        discovery_complete=None
+        if history_pages:
+            page=self.read(work_id,subject=subject,after_message_id=0,max_chars=256)
+            if page.get('status')!='core_execution_evidence':return {**page,'entries':[],
+                'evidence_scope':{'body_chars_used':0,'active_segment_discovery_complete':False}}
+            entries=list(page['entries']);discovery_complete=not page['history_page']['has_more_active_rows']
+            for _ in range(history_pages-1):
+                if discovery_complete:break
+                page=self.read(work_id,subject=subject,reference=page['evidence_reference'],
+                    after_message_id=page['history_page']['next_after_message_id'],max_chars=256)
+                entries.extend(page['entries']);discovery_complete=not page['history_page']['has_more_active_rows']
+            records={**page,'entries':entries}
         results={e.get('tool_call_id') for e in records.get('entries',()) if e.get('kind')=='recorded_tool_result'}
         entries=[e for e in records.get('entries',()) if e.get('kind') in ('recorded_tool_result','worker_statement')
             or include_tool_requests and e.get('kind')=='worker_tool_request'
@@ -76,6 +89,8 @@ class CoreWorkEvidence:
             remaining-=len(value.get('content',''));selected[index]=value
         return {**records,'entries':[selected[i] for i in sorted(selected)],
             'evidence_scope':{'history_scope':records.get('history_scope'),'complete_execution_history':False,
+                **({'active_segment_discovery_complete':discovery_complete,'history_page_budget':history_pages}
+                    if history_pages else {}),
                 'known_record_bodies':len(entries),'represented_bodies':len(selected),'omitted_bodies':omitted,
                 'partial_message_ids':[v['message_id'] for v in selected.values() if v.get('content_complete') is not True],
                 'underlying_tool_observation_may_itself_be_partial':True,
