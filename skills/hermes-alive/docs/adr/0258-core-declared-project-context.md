@@ -68,3 +68,30 @@ main/Native/worker probe and the portable regression are pending. Coordinated
 source-derived erasure, old-grant migration/rollback, independent Git/fleet and
 production remain release gates. This stage does not advance the 0/10 natural
 sharing subgate or authorize production changes.
+
+
+## Subsequent real-model finding — 2026-10-27
+
+The first independent-Agent fixture supplied AIAgent(cwd=A) but omitted Core's
+public session cwd binding. The hook cannot read the private Agent property;
+capture correctly returned no_declared_project and the fixture failed before
+Native/job execution. Official session policy declares cwd through Core's scoped
+context. The next fixture uses that public declaration; no cwd guessing or Core
+patch was added. This qualifies declared context, not arbitrary embedding callers.
+
+That real run retained A across a foreground B query and Native selected work in
+A. Its worker nevertheless reinterpreted the historical registration-only turn
+as its present turn and did no file work. Outcome assessment kept the task open;
+missing files made the run fail. This is a real semantic failure, not project
+routing success or an excuse to automatically retry the same owned work. The
+subsequent candidate explicitly supplies the later execution phase and time,
+keeps original text verbatim and distinguishes original-turn conditions from
+lasting constraints or outstanding owner-start approval. Requalification uses
+a fresh isolated profile and the unchanged synthetic request. Its result and
+new full qualification remain pending at this note.
+
+
+The later-turn candidate passes five focused actual-Core cases: project work,
+normal cold startup, explicit owner wait, partial-result retention and finite
+attained-goal closure. The unchanged real-model scenario is still in flight at
+this note; controlled responses do not establish real temporal interpretation.

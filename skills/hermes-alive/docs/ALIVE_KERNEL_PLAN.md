@@ -88,8 +88,11 @@ claimed to be fully integrated simply because their code exists.
 - Core-declared project context is now retained and passed to native jobs;
   controlled actual-Core/relative-file/inspection/cold cases pass (ADR0258).
   New guidance exposes metadata retention, legacy grants do not expand and
-  missing/replaced directories block later tools. Real semantics and the new
-  portable regression are pending; this is not a sandbox or migration proof.
+  missing/replaced directories block later tools. A real run retained A while
+  foreground B was queried, but the worker misread an original-turn restriction
+  as current and did no work. The goal stayed open. Later-turn context has been
+  made explicit and is being requalified; real/full qualification remains pending.
+  This is not a sandbox or migration proof.
 - Sharing and reply continuity have actual-model examples, but useful natural
   sharing has **0/10** fresh complete rounds. Functional work tests do not advance
   that counter. Longitudinal memory, fleet and production remain unqualified.
@@ -103,8 +106,8 @@ records and ADRs0241–0256. Historical detail is retained in
 ## Next work in order
 
 1. **Finish the useful task lifecycle.** Complete project-context semantic and
-   lifecycle qualification (ADR0258), then necessary dependencies and genuinely unfinished
-   work within the guided range using Core. Carry actual earlier results forward.
+   lifecycle qualification (ADR0258), then handle necessary dependencies and advance
+   genuinely unfinished work within the guided range using Core. Carry actual earlier results forward.
    Do not repeat unknown effects, treat a model's suggested next step as permission,
    replace uncertain jobs automatically, or introduce another executor/scheduler.
    Existing first-work, stop and finite-closure paths are foundations already

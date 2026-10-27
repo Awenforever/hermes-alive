@@ -364,7 +364,10 @@ async def exercise(home):
             if mode.startswith('project-'):
                 assert job['workdir']==str(project.resolve())
                 assert state['project_context_binding']['status']=='available'
-            if manual is None:assert retained['retained_original_owner_request']==original and 'current_owner_message' not in retained
+            if manual is None:
+                assert retained['retained_original_owner_request']==original and 'current_owner_message' not in retained
+                assert retained['work_turn_context']['kind']=='later_background_execution'
+                assert retained['work_turn_context']['original_intake_turn_is_current'] is False
             else:
                 assert retained['current_owner_message']==manual
                 if mode=='outcome-manual-long':assert len(job['prompt'])>4096

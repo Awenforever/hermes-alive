@@ -1625,3 +1625,18 @@ ID. Inspector-relative targets need the protected producer cwd, not today's cwd.
 Old grants do not expand silently; old items missing context require an explicit
 existing operation preview. Current controlled project/inspection cases pass;
 real-model, full regression and lifecycle/fleet gates remain distinct (ADR0258).
+
+
+### Temporal instructions must retain their original turn scope
+
+The real project case exposed a worker doing only registration after Native had
+correctly admitted a later execution: historical “this turn only register” was
+misread as a perpetual/current restriction. Preserve the original owner text;
+do not strip “do not operate”, rewrite the user's constraint or automatically
+retry the empty job. The work handoff now names the later execution phase/time
+and explains that source-relative conditions belong to their original turns.
+Continuing constraints and requirements for another owner approval remain in
+force. Outcome assessment correctly retained the unfinished task in the failing
+case. A type-valid execute choice or a worker's completed receipt is not task
+success. Keep this counterexample and test the unchanged scenario in a fresh
+profile, plus an explicit wait-for-owner control.

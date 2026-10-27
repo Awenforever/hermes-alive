@@ -176,11 +176,18 @@ class CoreAutonomousWork:
                         or not set(choice['toolsets'])<=set(configured.options.get('automatic_core_toolsets',()))):
                     raise ValueError('autonomous work authority changed')
             prompt=('Perform this ongoing owner assignment within the enabled Core tools and existing Core permissions. '
+                'This is a later background execution turn, distinct from the original intake turn. '
+                'Interpret turn-relative conditions at the turn they describe: a restriction limited to registration '
+                'does not by itself prohibit a later step that the owner already authorized. Preserve continuing '
+                'constraints and still-unmet owner-start/approval conditions; the proposed step cannot supply missing '
+                'permission. If the owner requires a further instruction not yet supplied, do no work. '
                 'The retained owner request is historical, not a new user message. Apply explicit retained owner '
                 'amendments chronologically only to the requirements they change. Preserve all unchanged original constraints; '
                 'the proposed step cannot broaden them. Do not send messages, schedule replacement jobs or delegate '
                 'untracked work. Return actual results and unresolved issues locally; do not claim unobserved effects.\n'
                 +json.dumps({'assignment':item['details'],'due_at':item['due_at'],
+                    'work_turn_context':{'kind':'later_background_execution','original_intake_turn_is_current':False,
+                        'admitted_at':datetime.now(timezone.utc).isoformat()},
                     'retained_original_owner_request':item['original_owner_request'],
                     **({'retained_owner_amendments':item['owner_amendments']} if 'owner_amendments' in item else {}),
                     'owner_source_recorded_at':item['source_recorded_at'],'proposed_step':choice['step'],
