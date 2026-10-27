@@ -674,7 +674,7 @@ Its actual-Core concurrent qualification and the new inherited-DeepSeek inspecti
 chain have now passed in isolation: the model chooses inspection, the separate
 worker reads an independently changed artifact, and the next Native judgment
 recognizes the mismatch while honoring no-message/no-repair constraints. The
-current runtime also passes 99 portable suites and four actual-Core integration
+that inspection revision passed 99 portable suites and four actual-Core integration
 cases. These are bounded qualifications, not general autonomous-work acceptance.
 Sharing is still 0/10, a subgate only. Disable/unload with pending or in-flight Core work remains
 an explicit lifecycle gate, alongside the final four-target consumer matrix.
@@ -697,3 +697,22 @@ than leave the model to infer absence from one item. Correct structural stop
 behavior alone does not certify its factual explanation. Task decomposition and
 revision still need broader semantic/lifecycle evaluation; do not prohibit a
 reasonable decomposition merely to satisfy a single-item fixture.
+
+
+The owned-work control revision now has isolated pending/running, lost-transport
+fence, explicit retry, paused-owner and producer/inspection-group qualifications.
+Its main-facing relationship view passes the portable suites and actual-Core
+cases. A real inherited-model conversation preserves quoted-command boundaries,
+uses actual stop control and describes already-ended producer/inspection states
+without claiming rollback. The same run discards a genuinely stale interpretation
+and judges the later observation in a new cycle. These are bounded results, not
+final production, platform or longitudinal acceptance.
+
+Next meaningful acceptance is autonomous execution of an explicitly assigned
+ongoing task on a later wake, including restart, without requiring another owner
+message to start it. Reuse Core work/model/permissions and the current signed
+source; do not fabricate a fresh user turn, silently expand old grants, ignore
+stop markers or use the agenda's active label as permission to execute. Keep
+source restrictions and project context, and request approval outside the guided
+scope. Task revision/dependencies, appropriate closure, memory learning and the
+remaining lifecycle/fleet gates remain necessary parts of the original goal.

@@ -1428,7 +1428,7 @@ notification or agenda completion. This qualifies this file task only. The real
 wait run remains separate evidence; do not force every task to inspect, or
 equate a controlled concurrent case with real-model concurrency coverage.
 
-Current runtime qualification includes 99 portable suites and four actual-Core
+The r166 runtime qualification includes 99 portable suites and four actual-Core
 cases, with actual terminal exits and container destruction. Credential audit
 and projection removal precede real-response review. Preserve the failed runs.
 Further work must address stopping underlying work (agenda cancellation alone is
@@ -1468,3 +1468,24 @@ semantic task decomposition/dependencies and revisions remain open.
 Cancellation retry identity binds the current owner request, independent of which
 valid exact excerpt the main model selects. Changing the excerpt must not grant
 a second dispatch; an explicit later request can still retry the same admission.
+
+
+r176 passes the updated actual-Core work/inspection relationship and group-stop
+cases, four actual-Core integration cases and 99 portable suites. r177's real
+conversation still exits before stop: two legitimate evidence changes were
+correctly fenced, while the probe had not awaited the existing inspection's
+terminal state. Keep that failure. r178 reuses the same runtime, observes the
+actual existing execution without resubmission, then drives bounded existing
+owner cycles for stale evidence. A real stale interpretation is discarded and a
+new cycle abstains under the no-message constraint. The quoted-stop example
+changes nothing; the explicit stop preserves all agenda states, affects the
+owned producer/inspection and correctly explains that both were already ended.
+No repair, new job or external send occurs. Credential projection removal and
+terminal audit precede review. This is one bounded conversation, not a ten-round
+quality pass; separate agenda decomposition/dependencies remain unresolved.
+
+The main model redundantly requested stop of the already-included inspection
+again. No Core job or cancel dispatch was repeated for that terminal execution.
+Do not hide this inefficiency or count structural correctness as polished
+conversation quality. Keep later autonomous execution sensitive to explicit
+stops even when an agenda item remains active.
