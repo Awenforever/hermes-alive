@@ -3,6 +3,22 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## 2026-10-28 — Preserved state must remain reachable after real reinstall
+
+The Ubuntu Git consumer preserved five state files across update/remove/reinstall
+but could not confirm a still-valid setup. Core removal cleared config hints;
+the handler failed to recover the retained signed intent. ADR0269 restores only
+its identifier, leaving all existing signature/challenge/expiry/route checks in
+place. Test actual command behavior after actual Core removal. Do not infer
+recovery from hashes, a loaded hook or an awaiting-confirmation status.
+
+Native test drivers must let Core bootstrap settle its managed environment
+before exposing a fixture as the main script. Core can legitimately re-exec;
+an in-memory path insertion is then lost. Avoid using temporary-profile library
+fixtures as substitutes for the already installed consumer: Core may provision
+each fresh profile and exceed a fixture's short subprocess timeout. Preserve
+those harness failures and verify their background processes have ended.
+
 ## 2026-10-28 — Native recall is a scoped context, not imported memory
 
 ADR0268 separates a model's semantic question, Core's retrieval, and the

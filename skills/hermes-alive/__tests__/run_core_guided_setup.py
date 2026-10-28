@@ -70,6 +70,11 @@ async def test(home,*,public_refinement=False):
     token=core.set_hermes_home_override(home)
     manager=None
     try:
+        # Actual Core plugin removal clears its config hint but preserves the
+        # separately owned Alive state. Confirmation must use signed state,
+        # while still requiring the original valid challenge and Core route.
+        from hermes_cli.plugins_state import save_plugin_setting
+        save_plugin_setting('hermes-alive',('kernel_setup',),{})
         manager=core.get_plugin_manager()
         manager.discover_and_load()
         loaded=manager._plugins['hermes-alive']

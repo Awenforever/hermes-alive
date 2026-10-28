@@ -139,6 +139,13 @@ def register_setup_command(context,binding):
             intent_id = settings.get('pending_intent_id')
             if not intent_id and settings.get('activation_event_id'):
                 intent_id = settings['activation_event_id'].removesuffix(':confirmed')
+            if not intent_id:
+                # Core may remove the plugin's config entry on uninstall while
+                # Alive's retained signed journal and identity remain intact.
+                # Recover only the identifier; confirm() still checks the latest
+                # signed intent, unexpired challenge and authenticated Core route.
+                latest = setup_store(binding).latest_intent()
+                intent_id = latest.event.event_id if latest is not None else None
             configured = setup_store(binding).confirm(intent_id,parts[1],scope=scope.binding_document())
             # Config is an inventory/startup hint; the signed journal remains
             # authoritative if another operator stages a replacement concurrently.

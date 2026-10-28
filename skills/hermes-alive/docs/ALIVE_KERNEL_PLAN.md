@@ -12,6 +12,12 @@ and safe portable operation. Component counts are not the completion metric.
 Whole-kernel acceptance also requires non-discovery behavior; this counter is
 not a completion measure for the entire agent.
 
+Native Ubuntu Git consumer installation, update and remove/reinstall have
+preserved pending state, but actual confirmation exposed a removable config-hint
+dependency before challenge expiry. ADR0269 is the current recovery candidate;
+requalify the real installed command after actual removal, not just file hashes.
+Core/environment fixture failures remain distinct from product behavior.
+
 ### Owner decision — 2026-10-26
 
 2026-10-28 lifecycle decision: explicit disable/uninstall stops unstarted owned
