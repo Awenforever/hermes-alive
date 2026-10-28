@@ -47,7 +47,6 @@ class CoreAutonomousWork:
             try:workdir(item.get('core_project_context'))
             except (ValueError,OSError,RuntimeError):return None
         scope=self.work.toolsets(list(configured.options.get('automatic_core_toolsets',())))
-        if not scope:return None
         self.work.native_toolsets(scope)
         value={'item':item,'automatic_toolsets':scope,'configuration_event_id':configured.event_id,
             'decision_context_version':2}
@@ -163,7 +162,7 @@ class CoreAutonomousWork:
                 or choice['decision'] not in ('execute','wait') or not isinstance(choice['reason'],str)
                 or not 0<len(choice['reason'])<=1500):raise ValueError('bounded autonomous work decision required')
         sets=CoreWorkStore.toolsets(choice['toolsets'])
-        if (choice['decision']=='execute' and (not sets or not set(sets)<=set(source['automatic_toolsets'])
+        if (choice['decision']=='execute' and (not set(sets)<=set(source['automatic_toolsets'])
                 or source.get('continuation_history',{}).get('blocked_reason')
                 or not isinstance(choice['step'],str) or not 0<len(choice['step'])<=1500
                 or choice['reconsider_after_seconds'] is not None)
@@ -240,8 +239,9 @@ class CoreAutonomousWork:
                     'A non-null blocked_reason requires wait. If the goal is already attained, wait rather '
                     'than inventing more work; agenda closure is separately authorized. Missing/partial or '
                     'active-segment-only evidence does not prove that an earlier effect never happened. '
-                    'Return JSON only: decision (execute or wait), toolsets (nonempty subset of supplied scope for '
-                    'execute, [] for wait), step (nonempty for execute, null for wait), reason (brief), '
+                    'Return JSON only: decision (execute or wait), toolsets (subset of supplied scope for '
+                    'execute, [] for wait; [] also permits model-only execution with no tools), '
+                    'step (nonempty for execute, null for wait), reason (brief), '
                     'reconsider_after_seconds (600 to 86400 for wait, null for execute). '
                     'If needed tools or permission are outside scope, wait and explain the missing owner decision.'},
                     {'role':'user','content':json.dumps({**{k:v for k,v in source.items() if k!='basis'},

@@ -127,16 +127,26 @@ records and ADRs0241–0256. Historical detail is retained in
    ADR0261 now has a separately guided continuation candidate: an actual-Core
    two-step file journey and nine controls/cold cases pass. A second five-case
    matrix rejects a changed parent before submission and distinguishes revision
-   from cancelled/reopened task life. Broader negative/lifecycle cases, empty
-   automatic scope and real inherited-model judgment remain unqualified.
+   from cancelled/reopened task life. Broader negative/lifecycle cases and real
+   inherited-model judgment remain unqualified.
    Old first-work grants and automatic closure stay separate.
    Real r258/r260 workflows failed before any useful work: misleading generic
    argument feedback induced an unrequested date, then a later wake was mistaken
    for the historical intake turn. ADRs0262–0264 add proposal-rejection liveness,
    observable next-step waiting, typed argument/lookup capabilities and consistent
-   turn roles. Their installed-Core/cold controls pass; unchanged real positive
-   and explicit-start-wait scenarios still require qualification. Neither failure
+   turn roles. Their installed-Core/cold controls and the unchanged real positive
+   plus independent explicit-start-wait scenarios pass their bounded work gates. Neither failure
    advances the sharing counter or establishes a missing owner permission.
+   The unchanged r262 real workflow now completes both phases in distinct wakes,
+   writes each file once, retains the original project and waits without a third
+   job or automatic closure. The independent r263 owner-start case preserves
+   waiting across two wakes with zero jobs/effects. Main replies remain verbose
+   and unnecessarily frame retained project binding as a further alignment point;
+   these dialogue limitations remain open. ADR0265 also corrects the
+   empty-scope contradiction: actual Core preserves [] through its native job
+   and worker request. Model-only execute/wait/outside-scope/off and ordinary
+   file/continuation controls pass, including cold readers; no additional tool
+   authority or plugin executor was introduced.
 2. **Close memory and adaptation.** Use Core's existing memory/provider ownership.
    Distinguish durable preferences, tentative conversation, quotations and noise;
    retain attributed, reversible feedback rather than permanent labels inferred

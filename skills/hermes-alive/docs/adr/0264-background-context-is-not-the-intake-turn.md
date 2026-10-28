@@ -48,3 +48,37 @@ version 2; the new decision still honors the owner's unmet start condition.
 Original process exit 0, container die 0/destroy/absence and clean Core supplier
 were checked before report inspection. These controlled judgments do not prove
 that a real model will interpret the same distinction correctly.
+
+The unchanged-driver real r262 run passes the bounded continued-work journey.
+Main records no unrequested date, retains project A while the foreground moves
+to B, and can query the original later. Three Native wakes use the inherited
+DeepSeek main model: first submit step one, then a distinct second step, then
+wait because both are attained. Two actual Core jobs write each requested file
+once and read it back; the first file's modification time stays fixed, B remains
+untouched, and no third job, automatic closure or external send occurs. A final
+fresh-history main query reads owned records without changes. Its reply is
+verbose and exposes implementation/status keys; this is a dialogue residual,
+not evidence of polished sharing or whole-assistant acceptance.
+
+The original process exits 0; actual container die 0/destroy/absence are confirmed.
+Before reading any model body, all six scanned files pass credential-disclosure
+audit and the temporary model projection is removed. Core remains clean and the
+isolated gateway stops normally. This positive case does not establish that a
+later wake satisfies an explicit owner-start requirement; the independent r263
+counterexample remains a separate test. No production or fleet claim follows.
+
+That independent r263 counterexample subsequently passes its waiting boundary:
+two Native wakes, one model wait decision and two cognition calls submit zero
+jobs and make no file or outward-message effects. The task remains unchanged;
+the fresh final main query is explicitly not a start instruction. Main and
+Native preserve the owner's requirement for a later explicit start, even with
+an existing file-scope grant. Original exit 0, actual die 0/destroy/absence and
+six-file credential audit false/projection removal precede body inspection.
+
+Main's final reply still presents the original project as a further alignment
+point although that binding is already retained; foreground B is not a new
+permission condition. No actual rebind or scope change occurs. Keep this and
+the verbose/status-key wording as dialogue limitations. The positive and wait
+pair qualify these bounded work decisions, not universal source semantics or
+zero-error conversation/sharing. Later empty-scope changes have their own
+controlled Core qualification rather than being silently called this exact run.

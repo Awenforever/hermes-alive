@@ -44,6 +44,8 @@ from run_core_guided_setup import cli
 
 async def exercise(home):
     mode=os.environ['ALIVE_AUTOWORK_CASE'];resuming=os.environ.get('ALIVE_AUTOWORK_RESUME')=='1';home.mkdir(exist_ok=True)
+    model_only=os.environ.get('ALIVE_WORK_MODEL_ONLY_TEST')=='1'
+    assert not model_only or mode in ('execute','wait','decision-outside-scope','off')
     if not resuming:shutil.copytree(core.repo,home/'plugins/hermes-alive')
     work_requests=[]
     class Handler(BaseHTTPRequestHandler):
@@ -67,8 +69,12 @@ async def exercise(home):
                         assert project.resolve().parent==home.resolve() and not moved.exists()
                         project.rename(moved);project.mkdir()
                         (project/'AGENTS.md').write_text('PUBLIC_PROJECT_B_RULE_MUST_NOT_APPLY',encoding='utf-8')
-                assert {'write_file','read_file'}<={t.get('function',t)['name'] for t in data.get('tools',[])}
-                if any(m.get('role')=='tool' and m.get('tool_call_id')=='autonomous-read' for m in data['messages']):
+                if not model_only:
+                    assert {'write_file','read_file'}<={t.get('function',t)['name'] for t in data.get('tools',[])}
+                if model_only:
+                    assert not data.get('tools'),'Core widened the explicit empty toolset'
+                    message={'role':'assistant','content':'Four plus seven is eleven. No tool or external operation was used.'}
+                elif any(m.get('role')=='tool' and m.get('tool_call_id')=='autonomous-read' for m in data['messages']):
                     message={'role':'assistant','content':'Actual write and readback recorded; no messages or completion claimed.'}
                 else:
                     read=any(m.get('role')=='tool' and m.get('tool_call_id')=='autonomous-write' for m in data['messages'])
@@ -111,7 +117,8 @@ async def exercise(home):
     (home/'.env').write_text('OWNER_MAIN_KEY=SYNTHETIC_OWNER_KEY\n',encoding='utf-8')
     if not resuming:
         rc,staged=cli(home,'setup','--confirm-model-calls','--confirm-delivery','--confirm-outbound-retention',
-            '--confirm-followup-management','--confirm-core-background-work','--automatic-core-toolset','file',
+            '--confirm-followup-management','--confirm-core-background-work',
+            *(() if model_only else ('--automatic-core-toolset','file')),
             *(() if mode=='off' else ('--confirm-autonomous-core-work',)),
             *(('--confirm-core-work-continuation','--confirm-core-work-result-review') if mode=='continuation' else ()),
             *(('--confirm-followup-revisions',) if mode.startswith('revision-') and mode!='revision-legacy' else ()),
@@ -149,6 +156,8 @@ async def exercise(home):
         original=(('登记持续整理这项合成工作；从下一次自然唤醒开始，' if mode!='wait'
             else '仅登记这项合成工作，必须等我以后明确说执行，不能自行开工；')
             +f'在本地文件 {artifact} 写入 {body.strip()} 和一个换行并读回结果，不发消息。')
+        if model_only:
+            original=('仅登记，必须等我以后明确说执行，不能自行开工。' if mode=='wait' else '登记并持续跟进；允许后续自然唤醒开始。')+'请在没有任何工具的情况下算出四加七并给出一个简单解释；不访问文件、不发消息、不执行外部操作。'
         if mode.startswith('project-'):original='登记并持续跟进当前项目：把 '+body.strip()+' 加换行写入 relative-result.txt，并读回核对。允许后续唤醒在 file 范围内自主处理；本轮仅登记，不动文件，不发消息、不重试。'
         if mode=='continuation':original+=f'这是两步任务：首次唤醒只处理前一个文件，下一次唤醒再在 {second_artifact} 写相同内容并读回，每个文件只写一次；两步完成后不要重复工作，仍不发消息。'
         if mode=='outcome-window':original+=f'执行时允许先读取 {preface} 作为背景，无需输出其内容；最终验收仍仅以目标文件写入并读回一致为准。'
@@ -182,7 +191,7 @@ async def exercise(home):
                     assert not rejected['request_admitted'] and not rejected['mutation_admitted'] and not rejected['new_job_created']
                     assert store.journal.last_sequence()==before_arguments and not jobs.list_jobs(include_disabled=True)
             saved=json.loads(model_tools.handle_function_call('alive_agenda',{'operation':'record',
-                'task':'Write '+body.strip()+' plus newline into '+('relative-result.txt' if mode.startswith('project-') else str(artifact))+' and read it back.',
+                'task':('Calculate four plus seven and explain without tools.' if model_only else 'Write '+body.strip()+' plus newline into '+('relative-result.txt' if mode.startswith('project-') else str(artifact))+' and read it back.'),
                 'constraint':'No messages. '+original,'evidence_span':original},task_id='register-autonomous',
                 session_id=entry.session_id,turn_id='register-autonomous',tool_call_id='register-autonomous-call',enabled_tools=['alive_agenda']))
             assert saved['status']=='recorded_under_owner_intake_grant' and not jobs.list_jobs(include_disabled=True)
@@ -335,6 +344,9 @@ async def exercise(home):
                         'step':'Write the exact requested marker and read it back.' if mode!='wait' else None,
                         'reason':'Original owner authorizes the later wake.' if mode!='wait' else 'Original owner requires a future instruction.',
                         'reconsider_after_seconds':3600 if mode=='wait' else None}
+                    if model_only and mode!='wait':
+                        assert supplied['automatic_toolsets']==[]
+                        answer['toolsets']=[];answer['step']='Explain that four plus seven is eleven without tools or external effects.'
                     if mode=='continuation' and 'continuation_history' in supplied:
                         history=supplied['continuation_history'];assert history['blocked_reason'] is None,history
                         assert history['whole_execution_history_proven'] is False
@@ -448,7 +460,7 @@ async def exercise(home):
             else:
                 assert retained['current_owner_message']==manual
                 if mode=='outcome-manual-long':assert len(job['prompt'])>4096
-            assert job['enabled_toolsets']==['file','no_mcp'] and job['deliver']=='local'
+            assert job['enabled_toolsets']==([] if model_only else ['file','no_mcp']) and job['deliver']=='local'
             if mode=='revision-before' and os.environ.get('ALIVE_REVISION_FORGED_TEST')=='1':
                 from dataclasses import replace
                 from contextlib import closing
@@ -508,8 +520,12 @@ async def exercise(home):
                     await asyncio.to_thread(tick,verbose=False,sync=True,headless=False)
                 await asyncio.sleep(.1);state=work.status(state['work_id'],subject=store.configuration().subject)
             assert state['core_execution_state']=='completed'
-            assert not artifact.exists() if mode in ('revoked','attention-cancel','attention-reopen','revision-after','revision-manual','revision-recover','project-replaced') else artifact.read_text(encoding='utf-8')==actual_body
-            assert len(work_requests)==(4 if mode=='outcome-window' else 3) and state['task_success_proven'] is False
+            assert not artifact.exists() if model_only or mode in ('revoked','attention-cancel','attention-reopen','revision-after','revision-manual','revision-recover','project-replaced') else artifact.read_text(encoding='utf-8')==actual_body
+            assert len(work_requests)==(1 if model_only else 4 if mode=='outcome-window' else 3) and state['task_success_proven'] is False
+            if model_only:
+                evidence=execution.kernel('core_work_evidence').CoreWorkEvidence(work).window(state['work_id'],subject=store.configuration().subject)
+                assert any('Four plus seven is eleven.' in e.get('content','') for e in evidence['entries'])
+                assert not any(e.get('tool_name') or e.get('tool_requests') for e in evidence['entries'])
         else:
             state=None;assert not jobs.list_jobs(include_disabled=True) and not artifact.exists()
             if mode=='wait':
@@ -656,7 +672,7 @@ async def exercise(home):
             state=second
         keys=('identity.key','content-vault/content.key','experience-content-vault/content.key')
         (home/'autonomous-expected.json').write_text(json.dumps({'work_id':state['work_id'] if state else None,
-            'owner':store.configuration().subject,'work_count':2 if mode=='continuation' else 1,'second_artifact':str(second_artifact) if mode=='continuation' else None,'artifact':str(artifact),'body':actual_body,'revoked':mode in ('revoked','attention-cancel','attention-reopen','revision-after','revision-manual','revision-recover','project-replaced'),'outcomes':mode.startswith('outcome-'),'pending_closure':mode=='outcome-recover','manual':manual is not None,'revision_item':saved['item_id'] if mode.startswith('revision-') else None,
+            'owner':store.configuration().subject,'work_count':2 if mode=='continuation' else 1,'second_artifact':str(second_artifact) if mode=='continuation' else None,'artifact':str(artifact),'body':actual_body,'revoked':model_only or mode in ('revoked','attention-cancel','attention-reopen','revision-after','revision-manual','revision-recover','project-replaced'),'outcomes':mode.startswith('outcome-'),'pending_closure':mode=='outcome-recover','manual':manual is not None,'revision_item':saved['item_id'] if mode.startswith('revision-') else None,
             'project_dir':str(project) if mode.startswith('project-') else None,'project_missing':mode in ('project-missing','project-replaced'),
             'revision_due':json.loads(await command('agenda list'))['items'][0]['due_at'] if mode.startswith('revision-') and mode!='revision-recover' else None,
             'revision_expected_task':'Write NEW_REVISION_ONLY to '+str(home/'new-revision-target.txt') if mode=='revision-recover' else None,

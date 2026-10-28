@@ -31,6 +31,24 @@ Do not claim broad autonomous competence from a pair of controlled file tasks,
 and do not replace Core's model fallback, executor or scheduler with plugin-owned
 alternatives while repairing these contracts.
 
+The unchanged real r262 positive and independent r263 explicit-start wait now
+pass their bounded work gates: distinct actual Core steps versus no execution
+until the required owner signal. Status replies remain verbose and can turn an
+already retained project binding into an unnecessary discussion point. Preserve
+that dialogue residual without reopening the settled execution tests or claiming
+zero-error conversation. All private bodies were read only after terminal
+container evidence, actual absence and credential audit/removal.
+
+Guidance's empty automatic scope also had a separate contradiction: it advertised
+model-only work while source discovery and proposal normalization excluded it.
+ADR0265 removes those two restrictions without granting a tool. Actual native
+jobs and worker requests preserve []; owned records contain the model-only
+result, no tool calls and no artifacts. Explicit wait, missing autonomous grant
+and out-of-scope proposals still block operations; ordinary file/continuation
+controls pass. A controlled provider result is scope evidence, not real-model
+reasoning competence. The next useful work is broader lifecycle and memory
+integration, not another rewrite of these same synthetic tasks.
+
 ## 2026-10-25 — Inspect actual writer inputs before changing the genre contract
 
 The r84 actual request has meaning, presentation, language and expression_context.
