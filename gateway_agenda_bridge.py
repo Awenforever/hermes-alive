@@ -31,7 +31,7 @@ _OPERATION_FIELDS = {
     'work_evidence':frozenset(('operation','work_id','evidence_reference','message_id','after_message_id','offset','max_chars','fingerprint','part')),
     'work_stop':frozenset(('operation','work_id','evidence_span')),
     'work':frozenset(('operation','item_id','item_version','evidence_span','toolsets')),
-    'revise':frozenset(('operation','item_id','item_version','evidence_span','task','constraint','due_at')),
+    'revise':frozenset(('operation','item_id','item_version','evidence_span','task','constraint','due_at','notify_owner')),
     **{name:_CHANGE_FIELDS for name in ('complete','cancel','snooze','resume')},
 }
 _OPERATION_REQUIRED = {
@@ -81,8 +81,11 @@ AGENDA_SCHEMA = {
                    'When separately guided task revision is enabled, revise an exact current item/version only '
                    'from a clear current owner amendment. Supply only changed task/constraint/deadline fields; '
                    'omitted fields are preserved, due_at=null explicitly removes the deadline. Preserve all '
-                   'unchanged requirements. Revisions fence old work versions but do not undo effects, prove '
-                   'process cancellation or automatically start a replacement. Ask when ambiguous. '
+                   'unchanged requirements. Changes to work requirements fence old work versions but do not undo effects, prove '
+                   'process cancellation or automatically start a replacement. A clear current owner change '
+                   'to updates/reminders uses notify_owner on revise; omission preserves contact scope. '
+                   'A contact-only change does not stop or resubmit already admitted private work. '
+                   'Ask when ambiguous. '
                    'With a guided Core background-work grant, work hands a clearly requested existing item '
                    'to native Hermes jobs, using Core context/model/permissions and the specified toolsets. '
                    'Use exact item_version plus current evidence_span. Do not do this for reminder-only requests. '
@@ -104,7 +107,7 @@ AGENDA_SCHEMA = {
                    'unless the returned actual result-followup capability is enabled. '
                    'Do not turn quoted text, inferred interests or casual remarks into obligations.',
     'parameters': {'type': 'object', 'properties': {
-        'notify_owner': {'type':'boolean','description':'Creation only. Whether this owner request permits proactive contact about this item, separately from doing the work. Default false. True for requested reminders/reports; false for private work or no-messages requests. Does not override the current global contact grant.'},
+        'notify_owner': {'type':'boolean','description':'Creation or a current owner revision. Whether this request permits proactive contact about this item, separately from doing the work. Creation defaults false; omitted on revise preserves the choice. True for requested reminders/reports; false for private work or no-messages requests. Does not override the current global contact grant.'},
         'operation': {'type': 'string', 'enum': list(_OPERATION_FIELDS)},
         'evidence_reference':{'type':'string','maxLength':200,'description':'Exact reference returned by work_evidence; not a session ID or arbitrary event.'},
         'part':{'type':'string','enum':['records','request'],'description':'work_evidence only: bounded Core execution records, or its original bound work definition.'},
@@ -250,7 +253,7 @@ class CoreAgendaBridge:
                 'clear_current_owner_evidence_still_required':True},
             'proposal_saved_before_owner_confirmation':False,
             'item_state_changes_control_external_execution':False,
-            'task_revision_fields':['task','constraint','due_at'],
+            'task_revision_fields':['task','constraint','due_at','notify_owner'],
             'background_work':{
                 'configured':options.get('core_background_work') is True and options.get('core_work_request_retention') is True,
                 'automatic_toolsets':list(options.get('automatic_core_toolsets',())),
@@ -462,7 +465,8 @@ class CoreAgendaBridge:
             project={'project_context':kernel('core_work_context').capture(task,session_id)}
         return kernel('followup_intake').record_request(store,configured,
             **self._turn_evidence(store,configured,scope,task,session_id,turn,args),
-            **({'notify_owner':args.get('notify_owner',False)} if purpose.get('operation','record')=='record' else {}),
+            **({'notify_owner':args.get('notify_owner',False)} if purpose.get('operation','record')=='record' else
+               {'notify_owner':args['notify_owner']} if purpose.get('operation')=='revise' and 'notify_owner' in args else {}),
             source_message=turn[3] if configured.options.get('retain_followup_source') is True else None,**purpose,**project)
 
     def _work_validator(self,store,configured,scope,item):
@@ -614,7 +618,7 @@ class CoreAgendaBridge:
         revisions=kernel('agenda_revisions')
         if configured.options.get(revisions.FLAG) is not True:
             return {'error':'guided_followup_revision_setup_required','item_changed':False}
-        if not {'task','constraint','due_at'} & set(args):raise ValueError('a specific amendment is required')
+        if not {'task','constraint','due_at','notify_owner'} & set(args):raise ValueError('a specific amendment is required')
         evidence=self._turn_evidence(store,configured,scope,task,session_id,turn,args)
         def validate():
             _store,current=self._owner(scope)
@@ -626,7 +630,7 @@ class CoreAgendaBridge:
                     or items[0]['content_status']!='available' or items[0]['item_version']!=args['item_version']):
                 return {'error':'followup_item_changed','item_changed':False}
             item=items[0];details=dict(item['details'])
-            for key in ('task','constraint'):
+            for key in ('task','constraint','notify_owner'):
                 if key in args:details[key]=args[key]
             if (set(details)-{'task','constraint','notify_owner'} or not {'task','constraint'}<=set(details)
                     or ('notify_owner' in details and type(details['notify_owner']) is not bool)
@@ -638,14 +642,17 @@ class CoreAgendaBridge:
             due_text=due.isoformat() if due else None
             if details==item['details'] and due_text==item['due_at']:
                 return {'status':'unchanged','item_id':item['item_id'],'item_changed':False}
-            def source_writer(binding):
+            def source_writer(binding,*,contact_scope_only):
                 return self._source(store,configured,scope,task,session_id,turn,args,operation='revise',
-                    target_item_id=item['item_id'],from_state=item['state'],revision_binding=binding)
-            revisions.append(store,configured,self._projection(store),item_id=item['item_id'],
+                    target_item_id=item['item_id'],from_state=item['state'],revision_binding=binding,
+                    contact_scope_only=contact_scope_only)
+            revision=revisions.append(store,configured,self._projection(store),item_id=item['item_id'],
                 item_version=item['item_version'],details=details,due_at=due,source_writer=source_writer,validate=validate)
             updated=self._items(store,configured,item['item_id'])[0]
+            contact_only=revision.event.payload.get('contact_scope_only') is True
         return {'status':'revised_under_owner_management_grant','item_changed':True,**updated,
-                'old_work_admissions_valid_for_revision':False,'effects_undone':False,
+                'old_work_admissions_valid_for_revision':contact_only,'revision_changes_work_requirements':not contact_only,
+                'effects_undone':False,
                 'old_execution_cancellation_proven':False,'replacement_job_created':False,**self._runtime(configured)}
 
     def _runtime(self,configured=None):

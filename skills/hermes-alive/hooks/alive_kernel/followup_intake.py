@@ -57,7 +57,7 @@ def set_permission(store,configured,enabled):
 
 def record_request(store, configured, *, turn_identity, request_fingerprint, evidence_fingerprint, permission_id,
                    operation='record', target_item_id=None, from_state=None, available_at=None, now=None,source_message=None,
-                   revision_binding=None,project_context=None,notify_owner=False):
+                   revision_binding=None,project_context=None,notify_owner=None,contact_scope_only=False):
     """Current configured Core host only, never a public/model-callable API."""
     current = store.configuration()
     if (current is None or current.event_id != configured.event_id
@@ -65,8 +65,13 @@ def record_request(store, configured, *, turn_identity, request_fingerprint, evi
         raise ValueError('current owner intake grant required')
     if operation not in ('record','complete','cancel','snooze','resume','revise'):
         raise ValueError('bounded follow-up purpose required')
-    if type(notify_owner) is not bool or (operation!='record' and notify_owner):
-        raise ValueError('typed owner communication choice is creation-only')
+    if operation=='record' and notify_owner is None:notify_owner=False
+    if (notify_owner is not None and type(notify_owner) is not bool
+            or operation not in ('record','revise') and notify_owner is not None):
+        raise ValueError('typed owner communication choice requires creation or revision')
+    if (type(contact_scope_only) is not bool
+            or contact_scope_only and (operation!='revise' or type(notify_owner) is not bool)):
+        raise ValueError('host contact-only classification requires a typed revision choice')
     if operation=='revise':
         from .agenda_revisions import FLAG,FIELDS
         if (configured.options.get(FLAG) is not True or configured.options.get('retain_followup_source') is not True
@@ -101,7 +106,8 @@ def record_request(store, configured, *, turn_identity, request_fingerprint, evi
     event_id = 'followup.request:' + store.protector.authenticate_json(DOMAIN, identity)
     existing = store.journal.get(event_id)
     if existing is not None:
-        if existing.event.payload.get('notify_owner',False) is not notify_owner:
+        if (existing.event.payload.get('notify_owner',False if operation=='record' else None) is not notify_owner
+                or existing.event.payload.get('contact_scope_only',False) is not contact_scope_only):
             raise ValueError('an intake replay cannot change its owner communication scope')
         return existing
     expiry=now+timedelta(days=configured.options['outbound_retention_days'])
@@ -118,7 +124,8 @@ def record_request(store, configured, *, turn_identity, request_fingerprint, evi
             'retention_until':expiry.isoformat(),
             'interpretation':'main_model_under_owner_grant', 'literal_owner_confirmation':False,
             'raw_content_stored':retain, 'external_action_authorized':False,
-            **({'notify_owner':notify_owner} if operation=='record' else {}),
+            **({'notify_owner':notify_owner} if notify_owner is not None else {}),
+            **({'contact_scope_only':True} if contact_scope_only else {}),
             **({'revision_binding':revision_binding} if revision_binding is not None else {}),
             **({'core_project_context_retained':True,'core_project_context_fingerprint':context_fingerprint}
                if context_fingerprint is not None else {}),
@@ -148,8 +155,12 @@ def _validated_source(journal,source_id,subject,observed_at):
             or grant.event.observed_at>event.observed_at or not _verified(store,event)):
         raise ValueError('source grant unavailable')
     payload=_thaw_json(event.payload)
-    if 'notify_owner' in payload and type(payload['notify_owner']) is not bool:
+    if 'notify_owner' in payload and (type(payload['notify_owner']) is not bool
+            or payload.get('operation','record') not in ('record','revise')):
         raise ValueError('owner communication scope changed')
+    if 'contact_scope_only' in payload and (payload['contact_scope_only'] is not True
+            or payload.get('operation')!='revise' or type(payload.get('notify_owner')) is not bool):
+        raise ValueError('host contact-only classification changed')
     if (permission(store,configured,before_sequence=source.sequence)!=(True,payload.get('permission_event_id'))
             or payload.get('interpretation')!='main_model_under_owner_grant'
             or payload.get('literal_owner_confirmation') is not False
@@ -193,7 +204,7 @@ def _source_message(store,event,expiry):
 def item_source_view(store,item_id,*,subject,include_message=False):
     """Separate original admitted source from the interpreted agenda description."""
     missing={'original_source_available':False,'original_owner_message_included':False,
-             'owner_updates_allowed':False}
+             'original_owner_updates_allowed':False,'owner_contact_source_verified':False}
     proposal=store.journal.get('agenda.proposal:'+item_id)
     if proposal is None or proposal.event.subject!=subject:return missing
     ids=proposal.event.payload.get('source_event_ids',())
@@ -203,7 +214,8 @@ def item_source_view(store,item_id,*,subject,include_message=False):
         if source.event.payload.get('raw_content_stored') is not True:
             # A separate signed contact choice does not require consent to keep
             # the literal request body. Never reconstruct that absent body.
-            return {**missing,'owner_updates_allowed':source.event.payload.get('notify_owner',False) is True}
+            return {**missing,'original_owner_updates_allowed':source.event.payload.get('notify_owner',False) is True,
+                    'owner_contact_source_verified':True}
         message=_source_message(store,source.event,expiry)
     except (ValueError,TypeError,KeyError,OSError,RuntimeError,ContentVaultError):return missing
     project={}
@@ -242,7 +254,8 @@ def item_source_view(store,item_id,*,subject,include_message=False):
     except (ValueError,TypeError,KeyError,OSError,RuntimeError,ContentVaultError):
         history={'owner_history_available':False,'owner_history_scope':'retained amendment history unavailable or exceeds its bounded view'}
     return {'original_source_available':True,'original_owner_message_included':include_message,
-            'owner_updates_allowed':source.event.payload.get('notify_owner',False) is True,
+            'original_owner_updates_allowed':source.event.payload.get('notify_owner',False) is True,
+            'owner_contact_source_verified':history.get('owner_history_available') is not False,
             'source_event_id':source.event.event_id,'original_source_retention_until':expiry.isoformat(),
             'source_recorded_at':source.event.observed_at.isoformat(),
             'source_timestamp_kind':'intake_recorded_at_not_sender_timestamp',

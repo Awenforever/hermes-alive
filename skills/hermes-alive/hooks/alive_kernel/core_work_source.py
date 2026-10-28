@@ -57,7 +57,7 @@ class OwnedWorkSource:
         return result
 
     def existing(self,item_id,configured,version,*,include_source=False):
-        """Attention-only transitions do not revoke already admitted work.
+        """Attention/contact-only transitions do not revoke already admitted work.
 
         The complete current chain is verified by item/_commitment first. Never
         cross completion, cancellation, expiry or reopening into a new task life.
@@ -77,7 +77,9 @@ class OwnedWorkSource:
             if candidate==version:return current
             # A same-state goal/deadline amendment is not an attention transition.
             event=self.store.journal.get(row['caused_by_event_id'])
-            if event is None or event.event.event_type=='agenda.revised':break
+            if event is None:break
+            if (event.event.event_type=='agenda.revised'
+                    and event.event.payload.get('contact_scope_only') is not True):break
         return None
 
     def same_lifetime(self,item_id,configured,version):

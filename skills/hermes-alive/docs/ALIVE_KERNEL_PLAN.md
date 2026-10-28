@@ -5,6 +5,15 @@ Last reviewed: 2026-10-29 (Asia/Shanghai).
 
 ## Current product state
 
+ADR0273 now has bounded controlled qualification: current-owner contact changes
+cannot revive prepared messages, and the actual queued Core task still finishes
+its file effect after contact regrant/stop. Ordinary goal/deadline changes retain
+their work fences. Core351 and broad portable352 passed; private execution,
+original retention and global contact permission remain separate. These tests
+do not change fleet, longitudinal-memory or sharing acceptance. Work now returns
+to real public discovery, natural sharing and grounded conversation continuity;
+do not keep expanding the authorization subsystem without new evidence.
+
 Recovery checkpoint: r327's real task remains FAIL. The planner received memory,
 but the worker rejected its provenance and later communication attempted to
 cross the task's no-messages restriction (zero sends). ADR0272 separates typed
@@ -47,17 +56,19 @@ Real r318 showed why recall is not sufficient: ordinary cognition received the
 fact but autonomous work planning did not, and actual Core work incorrectly
 reported it unknown. ADR0270's current candidate connects the existing bounded
 private reader to work planning without turning advice into task authority.
-Controlled grant/context/cache and Core task controls now pass. The unchanged
-real r323 assignment still fails: its first compound query returned no context;
-a later focused query found the fact after the work had completed. Bounded
-model-guided retrieval recovery is the next prerequisite; do not mark the real
-task gate passed, relax the provider threshold or insert the expected fact.
+Controlled grant/context/cache and Core task controls passed. Historical real
+r323 still fails: its first compound query returned no context and a later
+query found the fact after work completed. Bounded model-guided query recovery
+and typed worker context subsequently passed real r332's unchanged task. Keep
+the earlier failure, do not relax provider thresholds or insert the expected
+fact, and do not generalize one useful task into longitudinal memory acceptance.
 
 ADR0271 is the current bounded retrieval candidate: the configured model can
 reformulate once after no usable context, or stop. An unchanged context does not
 repeat model planning. Core retains provider/timeout/fallback ownership; no
 fixture-specific keywords, threshold changes or new memory backend are added.
-Qualify the new path and the unchanged real task before claiming useful recall.
+That bounded qualification is recorded in ADR0272; broader useful-memory and
+longitudinal feedback gates remain open.
 
 ### Owner decision — 2026-10-26
 

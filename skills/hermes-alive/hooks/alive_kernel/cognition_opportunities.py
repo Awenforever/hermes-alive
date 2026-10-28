@@ -11,7 +11,7 @@ import json
 import re
 
 from .agenda import AgendaProjection, AgendaAuthority, AgendaState, _ALLOWED_TRANSITIONS
-from .content_vault import ContentReference, ContentUnavailableError, ContentIntegrityError
+from .content_vault import ContentReference, ContentUnavailableError, ContentIntegrityError, ContentVaultError
 from .discovery_opportunities import DiscoveryOpportunityIngestor, OpportunityEvidence
 from .events import Sensitivity, _freeze_json
 
@@ -64,6 +64,7 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
         effective_due=payload.get('due_at')
         last_sequence = origin.sequence
         last_transition_event_id=event.event_id
+        contact_choice=None;contact_epoch=None
         with closing(self.journal._connect()) as connection:
             transitions = connection.execute('SELECT * FROM agenda_transitions_v1 WHERE item_id=? ORDER BY transition_id LIMIT 65',
                 (row['item_id'],)).fetchall()
@@ -88,6 +89,21 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
                             prior_transition_event_id=last_transition_event_id)):
                     return None
                 effective_content=amendment['content'];effective_due=amendment['due_at']
+                if 'notify_owner' in change.payload:
+                    # The complete revision and exact prior version were
+                    # authenticated above. A descriptor alone cannot widen
+                    # contact scope. Missing retained amendment text fails
+                    # closed for contact without erasing private task state.
+                    contact_epoch=change.event_id;contact_choice=False
+                    from .followup_intake import _validated_source,_source_message
+                    from .kernel_setup import KernelSetupStore
+                    try:
+                        setup=KernelSetupStore(self.journal.path.parent,journal=self.journal)
+                        receipt,_grant,until=_validated_source(self.journal,change.event_id,subject,now)
+                        _source_message(setup,receipt.event,until)
+                        contact_choice=receipt.event.payload['notify_owner'] is True
+                    except (ValueError,TypeError,KeyError,OSError,RuntimeError,ContentVaultError):
+                        pass
                 last_sequence=command.sequence;last_transition_event_id=change.event_id
                 continue
             target = AgendaState(transition['to_state'])
@@ -150,14 +166,22 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
             row['item_id'],subject=subject,include_message=True)
             if payload.get('authority')==AgendaAuthority.USER_DELEGATED.value else
             {'original_source_available':False,'original_owner_message_included':False,
-             'owner_updates_allowed':details.get('notify_owner',True) is True})
+             'owner_updates_allowed':details.get('notify_owner',True) is True,
+             'owner_contact_source_verified':True})
+        if payload.get('authority')==AgendaAuthority.USER_DELEGATED.value:
+            source_view={**source_view,'owner_updates_allowed':source_view.get('original_owner_updates_allowed') is True}
+        if contact_choice is not None:
+            source_view={**source_view,
+                'owner_updates_allowed':contact_choice and source_view.get('owner_contact_source_verified') is True,
+                'owner_contact_revision_event_id':contact_epoch}
         # Private work remains available to task and memory reasoning. Only the
         # communication reader excludes it, including recovery before dispatch.
         # Historical explicitly confirmed reminders retain their confirmation;
         # old delegated records without a signed choice do not gain contact scope.
         if self.communication_only and source_view.get('owner_updates_allowed') is not True:
             return None
-        return OpportunityEvidence(row['item_id'],event.event_id,expiry,event.sensitivity,
+        observation_id=contact_epoch if self.communication_only and contact_epoch is not None else event.event_id
+        return OpportunityEvidence(row['item_id'],observation_id,expiry,event.sensitivity,
             _freeze_json(dict(source='user-admitted agenda commitment',title='Current commitment',url='',
                 summary=summary,published_at=None,origin_kind='commitment',
                 details_origin='agenda_description_not_verified_verbatim',**source_view,
@@ -226,6 +250,14 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
                 observation=work.current_observation(row['item_id'],subject=subject)
                 if observation is None:continue  # Never ask the user to do handed-off work.
                 event_id,status=observation
+                if self.communication_only and value.content.get('owner_contact_revision_event_id'):
+                    # Bind both the current work observation and latest owner
+                    # contact epoch. Regranting contact must not resurrect an
+                    # old prepared message merely because work is unchanged.
+                    contact_record=self.journal.get(value.content['owner_contact_revision_event_id'])
+                    work_record=self.journal.get(event_id)
+                    if contact_record is None or work_record is None:continue
+                    if contact_record.sequence>work_record.sequence:event_id=contact_record.event.event_id
                 review=work.review_evidence(status,subject=subject)
                 configured=work.store.configuration()
                 from .core_work_outcomes import CoreWorkOutcomes

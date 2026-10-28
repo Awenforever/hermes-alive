@@ -75,6 +75,11 @@ keep it false for private work or an explicit no-messages instruction. The
 default is false, and the existing global contact grant is still required.
 Background execution continues for private items; it must not send clarifications
 or progress updates about them. Never change this choice by replaying intake.
+When the owner clearly changes this choice for an existing item and guided
+revision is available, use `revise` with its current item version, current owner
+evidence and `notify_owner`. Omission preserves the choice. Stopping updates
+does not stop private work; permitting updates again does not revive old drafts.
+Messages already submitted to a platform are outside that pre-send boundary.
 
 Explain that the current built-in USER profile becomes advisory private context
 for the configured models and protected generation records; it is not imported

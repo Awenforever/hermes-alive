@@ -35,13 +35,17 @@ if __name__=='__main__' and os.environ.get('ALIVE_AUTOWORK_CHILD')!='1':
         env={**os.environ,'HOME':root,'HERMES_HOME':str(Path(root)/'profile'),
             'ALIVE_AUTOWORK_CHILD':'1','PYTHONDONTWRITEBYTECODE':'1'}
         modes=os.environ.get('ALIVE_AUTOWORK_CASES','execute,wait,revoked,erased,off,restart').split(',')
-        assert set(modes)<=set(('execute','wait','revoked','erased','off','restart','outcome-complete','outcome-partial','outcome-forged','outcome-revoked','outcome-recover','outcome-manual-long','outcome-wrong-result','outcome-window','outcome-malformed','outcome-attention','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover','project-pinned','project-manual','project-missing','project-replaced','project-restart','continuation','decision-malformed','decision-outside-scope'))
+        assert set(modes)<=set(('revision-contact','execute','wait','revoked','erased','off','restart','outcome-complete','outcome-partial','outcome-forged','outcome-revoked','outcome-recover','outcome-manual-long','outcome-wrong-result','outcome-window','outcome-malformed','outcome-attention','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover','project-pinned','project-manual','project-missing','project-replaced','project-restart','continuation','decision-malformed','decision-outside-scope'))
         try:
             for mode in modes:
                 case={**env,'HERMES_HOME':str(Path(root)/mode),'ALIVE_AUTOWORK_CASE':mode}
                 result=subprocess.run([sys.executable,'-B',__file__,*sys.argv[1:]],env=case,
                     capture_output=True,text=True,timeout=300)
                 assert result.returncode==0,mode+'\n'+result.stdout+'\n'+result.stderr
+                if mode=='revision-contact':
+                    proof=[line for line in result.stdout.splitlines() if line.startswith('CONTACT_ONLY_ACTUAL_CORE_WORK_CONTINUED ')]
+                    assert len(proof)==1,result.stdout
+                    print(proof[0],flush=True)
                 if os.environ.get('ALIVE_WORK_MODEL_ONLY_TEST')=='1':
                     proof=json.loads((Path(case['HERMES_HOME'])/'autonomous-expected.json').read_text(encoding='utf-8'))['scope_proof']
                     assert proof['model_only'] is True and proof['automatic_toolsets']==[]
@@ -294,7 +298,7 @@ async def exercise(home):
                 sources=execution.kernel('core_work_source').OwnedWorkSource(store)
                 cfg=store.configuration()
                 assert sources.same_lifetime(saved['item_id'],cfg,current['item_version'])
-                assert sources.existing(saved['item_id'],cfg,current['item_version']) is None
+                if mode!='revision-contact':assert sources.existing(saved['item_id'],cfg,current['item_version']) is None
                 count=len(list(store.journal.read(event_type='agenda.revised')))
                 assert 'error' in apply(args),'stale old version cannot apply another amendment'
                 assert len(list(store.journal.read(event_type='agenda.revised')))==count
@@ -469,7 +473,7 @@ async def exercise(home):
             first=await binding.native.step(binding.arguments['build_parameters']())
             assert first.disposition in ('silence','evidence_changed')
         work=execution.kernel('core_work').CoreWorkStore(store)
-        if mode in ('execute','revoked','restart','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover','project-pinned','project-manual','project-replaced','project-restart') or mode.startswith('outcome-') or mode=='continuation':
+        if mode in ('revision-contact','execute','revoked','restart','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover','project-pinned','project-manual','project-replaced','project-restart') or mode.startswith('outcome-') or mode=='continuation':
             state=work.previous(saved['item_id'],subject=store.configuration().subject);assert state is not None
             assert len(jobs.list_jobs(include_disabled=True))==1
             request=work._read(state['work_id'],'requested',store.configuration().subject)
@@ -515,6 +519,12 @@ async def exercise(home):
                         (forged.event_id,)).fetchone()
                 assert rejected[0]=='rejected'
                 assert not work.status(state['work_id'],subject=store.configuration().subject).get('later_owner_amendment')
+            if mode=='revision-contact':
+                await amend({'notify_owner':True},'允许后续给我发进度，但已经交办的工作、权限和文件目标保持不变。')
+                await amend({'notify_owner':False},'现在停止给我发进度，已经交办的工作继续私下执行，其他要求不变。')
+                assert not execution.kernel('cognition_opportunities').CognitionOpportunityReader(
+                    store.journal,communication_only=True).active_evidence(subject=store.configuration().subject,
+                    clearance=execution.kernel('events').Sensitivity.PRIVATE)
             if mode in ('revision-after','revision-manual','revision-recover'):
                 await amend({'task':'Write NEW_REVISION_ONLY to '+str(home/'new-revision-target.txt')},
                     '原来的目标不再适用；这项任务改为写 NEW_REVISION_ONLY 到 '+str(home/'new-revision-target.txt')+'，其他要求不变。')
@@ -560,6 +570,12 @@ async def exercise(home):
                 await asyncio.sleep(.1);state=work.status(state['work_id'],subject=store.configuration().subject)
             assert state['core_execution_state']=='completed'
             assert not artifact.exists() if model_only or mode in ('revoked','attention-cancel','attention-reopen','revision-after','revision-manual','revision-recover','project-replaced') else artifact.read_text(encoding='utf-8')==actual_body
+            if mode=='revision-contact':
+                assert not state.get('later_owner_amendment'),'contact-only changes falsely marked the work goal changed'
+                assert execution.kernel('core_work_source').OwnedWorkSource(store).existing(
+                    saved['item_id'],store.configuration(),request['item_version']) is not None
+                print('CONTACT_ONLY_ACTUAL_CORE_WORK_CONTINUED '+json.dumps({'artifact_verified':True,
+                    'original_work_authority_kept':True,'no_owner_messages':True}),flush=True)
             assert len(work_requests)==(1 if model_only else 4 if mode=='outcome-window' else 3) and state['task_success_proven'] is False
             if model_only:
                 evidence=execution.kernel('core_work_evidence').CoreWorkEvidence(work).window(state['work_id'],subject=store.configuration().subject)
@@ -634,7 +650,7 @@ async def exercise(home):
             if mode in ('project-missing','project-replaced'):assert not (moved/'relative-result.txt').exists()
         if mode=='revision-before':assert not original_artifact.exists()
         if mode in ('revision-after','revision-manual','revision-recover'):assert not (home/'new-revision-target.txt').exists()
-        assert counts['start']==(0 if mode in ('erased','off','outcome-manual-long','revision-manual','project-manual') else 2 if mode.startswith('decision-') else 1) and len(jobs.list_jobs(include_disabled=True))==(1 if mode in ('execute','revoked','restart','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover','project-pinned','project-manual','project-replaced','project-restart','continuation') or mode.startswith('outcome-') else 0)
+        assert counts['start']==(0 if mode in ('erased','off','outcome-manual-long','revision-manual','project-manual') else 2 if mode.startswith('decision-') else 1) and len(jobs.list_jobs(include_disabled=True))==(1 if mode in ('revision-contact','execute','revoked','restart','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover','project-pinned','project-manual','project-replaced','project-restart','continuation') or mode.startswith('outcome-') else 0)
         from contextlib import closing
         with closing(store.journal._connect()) as c:
             assert c.execute('SELECT state FROM agenda_items_v1 WHERE item_id=?',(saved['item_id'],)).fetchone()[0]==('snoozed' if mode=='attention-snooze' else 'dismissed' if mode=='attention-cancel' else 'active')

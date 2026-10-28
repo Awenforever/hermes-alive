@@ -1942,3 +1942,24 @@ tasks from communication reasoning as well as checking recovered send intent.
 Do not repair this with topic filters, forbidden-phrase lists or deleting the
 specific clarification trigger. A refusal containing the expected fact is not
 evidence that the worker applied it. Full task and lifecycle gates stay open.
+
+## 2026-10-29 — Task updates must follow current owner contact scope
+
+Creation-only contact choice is insufficient for a long-lived assistant. The
+owner can stop updates, amend unrelated requirements, then allow updates again.
+Use the existing versioned current-owner revision boundary (ADR0273), sign an
+explicit contact choice, and preserve it on omission. A fresh grant must not
+revive an old prepared message. Test actual final adapter-launch validation
+with a previously valid start and a controlled lease clock, not only candidate
+filtering or a refusal caused by expiration. Keep task state and private work;
+do not claim cancellation of messages already submitted to a platform queue.
+
+Actual queued Core test349 showed why ACTIVE agenda and a completed worker are
+not proof: notification changes fenced the work, and the required output file
+was missing. Host classification of unchanged work semantics now keeps only
+contact-only revisions from revoking execution; the model cannot supply that
+classification. Actual file write/readback and ordinary goal/deadline fences
+passed351 with cold checks, followed by broad portable352. Keep349's failure.
+This closes a bounded authorization task, not the whole product. Return to
+useful real discovery, conversational followup and longitudinal memory rather
+than inventing further permission features without an observed need.

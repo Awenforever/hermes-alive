@@ -28,9 +28,10 @@ def content_identifier(store,configured,binding,digest):
 def after_submission(store,work_id,request):
     """Metadata-only fence, including a valid event awaiting projection.
 
-    Never open unrelated chats or body content. A valid owner amendment fences
+    Never open unrelated chats or body content. A valid owner task amendment fences
     old work even if its body cannot be materialised. This is not a claim that
-    the projection succeeded. Unknown excess history fails closed for effects.
+    the projection succeeded. A signed host-classified contact-only change does
+    not change work authority. Unknown excess history fails closed for effects.
     """
     admitted=store.journal.get(work_id+':requested')
     if admitted is None:raise ValueError('owned work admission unavailable')
@@ -47,6 +48,7 @@ def after_submission(store,work_id,request):
         if validates(store.journal,event,subject=admitted.event.subject,
                 from_state=binding.get('from_state'),
                 prior_transition_event_id=binding.get('prior_transition_event_id')):
+            if event.payload.get('contact_scope_only') is True:continue
             return True
     return False
 
@@ -152,6 +154,13 @@ def append(store,configured,projection,*,item_id,item_version,details,due_at,sou
             or row['available_at'] and due_at<datetime.fromisoformat(row['available_at'])):
         raise ValueError('deadline conflicts with follow-up availability/retention')
     commitment_summary(details,state=row['state'],available_at=row['available_at'],due_at=due,expires_at=row['expires_at'])
+    previous_details=json.loads(evidence.content['summary'])['commitment']
+    contact_only=(isinstance(previous_details,Mapping) and isinstance(details,Mapping)
+        and type(details.get('notify_owner')) is bool
+        and previous_details.get('notify_owner') is not details['notify_owner']
+        and due==row['due_at']
+        and {k:v for k,v in previous_details.items() if k!='notify_owner'}==
+            {k:v for k,v in details.items() if k!='notify_owner'})
     binding={'item_id':item_id,'prior_transition_event_id':prior[0],'item_version':version,
         'from_state':row['state'],'due_at':due,'available_at':row['available_at'],'expires_at':row['expires_at']}
     # Content identity is independent of the new source ID; no circular receipt.
@@ -162,7 +171,9 @@ def append(store,configured,projection,*,item_id,item_version,details,due_at,sou
     binding['content']=ref.to_event_payload()
     # The protected intake receipt IS the revision event: no two-event crash gap.
     # Core's current-turn precondition runs inside the journal writer transaction.
-    source=source_writer(binding)
+    # This classification comes from authenticated old/new task contents, not
+    # a model argument or a claim in the owner's natural-language message.
+    source=source_writer(binding,contact_scope_only=contact_only)
     projection.project_new()
     with closing(projection._connect()) as c:
         decision=c.execute('SELECT outcome FROM agenda_decisions_v1 WHERE event_id=?',(source.event.event_id,)).fetchone()
