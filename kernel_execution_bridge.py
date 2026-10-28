@@ -241,10 +241,12 @@ def assemble(binding):
                 return parameters
             return await discovery(cycle=cycle,parameters=parameters,call=call,read_binding=read_binding)
     context_reads=(kernel('core_context_read').CoreContextRead(binding.context)
-        if configured.options.get('use_hermes_user_profile') is True else None)
+        if any(configured.options.get(key) is True for key in ('use_hermes_user_profile','use_hermes_external_memory')) else None)
+    private_context=(kernel('core_memory_preparation').CoreMemoryPreparation(binding.context,store,configured,
+        validate=validate) if configured.options.get('use_hermes_external_memory') is True else None)
     native=kernel('core_shadow_assembly').native_for_host(binding.context,host,home=binding.home,
         preparation=Preparation() if discovery is not None else AgendaPreparation(),
-        validate_consent=validate,context_reads=context_reads)
+        validate_consent=validate,context_reads=context_reads,private_context=private_context)
     def parameters():
         if not runtime.reconciliation._owner_policy(configured.subject).enabled:
             # A cross-process operator pause must enter the existing paused

@@ -84,6 +84,8 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
     setup.add_argument('--interests',help='Optional interests in the owner\'s words; soft preferences, privately retained after confirmation')
     setup.add_argument('--confirm-hermes-profile-memory',action='store_true',
         help='Confirm this Hermes profile is personal and allow its curated user profile as advice in the private target conversation')
+    setup.add_argument('--confirm-hermes-external-memory',action='store_true',
+        help='Separately allow semantic reads of this personal profile\'s configured external memory as private advice; inherits Core backend behavior')
     setup.add_argument('--public-query',action='append',default=[])
     setup.add_argument('--confirm-public-reads',action='store_true')
     setup.add_argument('--confirm-cited-reads',action='store_true')
@@ -295,7 +297,9 @@ def alive_command(args: argparse.Namespace) -> int:
             **({'interest_preferences':args.interests}
                if getattr(args,'interests',None) else {}),
             **({'use_hermes_user_profile':True}
-               if getattr(args,'confirm_hermes_profile_memory',False) else {})},replace=args.replace)
+               if getattr(args,'confirm_hermes_profile_memory',False) else {}),
+            **({'use_hermes_external_memory':True}
+               if getattr(args,'confirm_hermes_external_memory',False) else {})},replace=args.replace)
         from hermes_cli.plugins_state import save_plugin_setting
         save_plugin_setting('hermes-alive',('kernel_setup',),{'pending_intent_id':intent.event.event_id})
         print(json.dumps({'ok':True,'confirmation_command':'/alive confirm '+code,
@@ -332,7 +336,7 @@ def alive_command(args: argparse.Namespace) -> int:
                 'interest_preferences':getattr(args,'interests',None),
                 'explicit_interest_memory_until_updated_or_forgotten':bool(getattr(args,'interests',None)),
                 'use_personal_hermes_curated_user_profile':bool(getattr(args,'confirm_hermes_profile_memory',False)),
-                'external_memory_provider_recall_enabled':False,
+                'external_memory_provider_recall_enabled':bool(getattr(args,'confirm_hermes_external_memory',False)),
                 'explicit_communication_memory_until_updated_or_forgotten':bool(getattr(args,'communication_preference',None))},
             'phase':'awaiting_authorized_conversation_confirmation'}))
         return 0

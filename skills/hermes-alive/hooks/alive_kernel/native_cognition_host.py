@@ -5,6 +5,7 @@ profile scope, loaded model configuration, credential grants and scheduling.
 """
 import asyncio
 import hashlib
+from contextlib import nullcontext
 from datetime import datetime,timezone
 
 from .native_core_acquisition import CoreScopedModelAcquirer
@@ -18,7 +19,7 @@ class NativeCognitionHost:
     def __init__(self,host,*,profile_id,profile_home,read_configuration,
                  read_credential_names,interpreter,core,private_root,environment,
                  resolve_domain,identity='',entrypoint=None,timeout_seconds=90,max_calls=16,
-                 profile_scope=None,caller_factory=None,preparation=None,context_reads=None):
+                 profile_scope=None,caller_factory=None,preparation=None,context_reads=None,private_context=None):
         if not callable(resolve_domain):
             raise NativeWorkerError('host model family resolver required')
         self.host=host
@@ -43,6 +44,10 @@ class NativeCognitionHost:
                 or not callable(getattr(context_reads,'reap_pending',None))):
             raise NativeWorkerError('context reads must retain and settle physical work')
         self.context_reads=context_reads
+        if private_context is not None and (not callable(getattr(private_context,'open_cycle',None))
+                or not callable(getattr(private_context,'prepare',None)) or context_reads is None):
+            raise NativeWorkerError('private context requires a scoped Core-owned read capability')
+        self.private_context=private_context
         self._caller=None
         self._lock=asyncio.Lock()
         self.last_call_count=0
@@ -139,7 +144,7 @@ class NativeCognitionHost:
                 async def read_context(operation):
                     return await self.context_reads.invoke(operation,read_binding=read_binding)
                 if self.context_reads is not None:bound['expression_parameters']['read_context']=read_context
-                if (self.preparation is None
+                if (self.preparation is None and self.private_context is None
                         or not self.host.runtime.reconciliation._owner_policy(self.host.subject).enabled):return bound
                 async def prepare():
                     nonlocal bound
@@ -151,6 +156,11 @@ class NativeCognitionHost:
                                 or self.context_reads is not None and prepared['expression_parameters'].get('read_context') is not read_context):
                             raise NativeWorkerError('cycle preparation changed current native authority')
                         return prepared
+                    if self.private_context is not None:
+                        await self.private_context.prepare(cycle=cycle,parameters=bound,
+                            call=self._caller,read_binding=read_binding,read_context=read_context)
+                        if read_binding()!=expected:raise NativeWorkerError('private read changed current Native authority')
+                    if self.preparation is None:return bound
                     binder=getattr(self.preparation,'bind_parameters',None)
                     if callable(binder):
                         # Bind current operation metadata before phased reading,
@@ -238,7 +248,8 @@ class NativeCognitionHost:
                         'reuse_reconsideration':restored is not None})
                 return prepare()
             try:
-                return await self.host.step_bound(build)
+                with self.private_context.open_cycle() if self.private_context is not None else nullcontext():
+                    return await self.host.step_bound(build)
             finally:
                 active[0]=False
                 if self._caller is not None: self.last_call_count=self._caller.calls

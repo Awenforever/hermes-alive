@@ -25,9 +25,12 @@ Alive-to-Core worker recall still fails and remains an independent open gate.
 
 ADR0267 records an isolated causal counterexample: Core cron framing alone turns
 two successful natural/semantic recalls into empty results for both tested public
-provider versions. Next implement a separately guided Native semantic-read
-capability using Core's existing provider lifecycle, without expanding old USER
-consent or duplicating memory. The automatic worker boundary remains open; do not
+provider versions. ADR0268 now implements a separately guided Native semantic-read
+capability using Core's existing provider lifecycle and a private cycle context,
+with bounded controlled full-chain qualification. Old USER consent is not
+expanded and recall is not imported as permanent memory. Real-model semantics
+and long-term noisy-input/feedback behavior still need qualification.
+The automatic worker boundary remains open; do not
 substitute this Native capability for its missing end-to-end evidence. Continue
 independent distribution/lifecycle preparation alongside this memory work.
 

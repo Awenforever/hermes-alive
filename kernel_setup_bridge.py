@@ -159,6 +159,8 @@ def register_setup_command(context,binding):
                 intake_summary+='另已允许按你的明确要求修订已有任务及截止时间，保留原交办和修改原文；修订会阻止旧版本继续调用工具，但不撤销已发生效果、不保证进程已取消，也不自动重跑。'
             if configured.options.get('observe_core_tools') is True:
                 intake_summary+='已授权记录本会话的工具名称、时长和终止状态，不保存参数、结果正文或错误正文；诊断有效期按所选保留期，结构化账本保留至移除。这不授权执行工具，也不自动认定任务成功。'
+            if configured.options.get('use_hermes_external_memory') is True:
+                intake_summary+='另已允许按语义问题读取此私人Hermes配置已有的外部记忆，供私下思考参考；沿用Core后端及其服务，相关生成记录按所选期限保护，不另建永久记忆副本，也不据此授予操作权限。'
             if configured.options.get('core_background_work') is True:
                 intake_summary+='已授权原生Hermes后台工作，使用Core已有模型及画像/记忆，任务记录按Core自身规则保留；自动工具范围为'+str(configured.options.get('automatic_core_toolsets',[]))+'，范围外逐项确认。该范围不代表文件系统隔离；任务结束仍须另核实成果。'
                 if configured.options.get('core_work_context_version')==1:

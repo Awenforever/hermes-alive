@@ -26,7 +26,10 @@ class DiscoveryInquiryContext:
         self.journal = reader.journal
         self.vault = reader.vault
         from .cognition_context import CognitionContextReader
-        self.owner_context = CognitionContextReader(self.journal,content_vault=context_vault)
+        # Public discovery may use its separately guided curated preferences,
+        # but never the new private external recall context or its query.
+        self.owner_context = CognitionContextReader(self.journal,content_vault=context_vault,
+            include_external_recall=False)
 
     def context_digest(self, *, subject, clearance=Sensitivity.PRIVATE):
         return self.vault.digest_json([c.to_prompt() for c in

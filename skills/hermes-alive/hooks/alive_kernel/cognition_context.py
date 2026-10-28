@@ -31,9 +31,11 @@ class CognitionContextEvidence:
 class CognitionContextReader:
     """Explicit memories plus separately consented, current Core profile advice."""
 
-    def __init__(self, journal, *, content_vault=None):
+    def __init__(self, journal, *, content_vault=None,include_external_recall=True):
+        if type(include_external_recall) is not bool:raise ValueError('explicit context audience required')
         self.journal = journal
         self.memory = MemoryProjection(journal, content_vault=content_vault)
+        self.include_external_recall=include_external_recall
 
     def read(self, *, subject: str, clearance: Sensitivity, limit: int = 8):
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}", subject) or not 1 <= limit <= 16:
@@ -86,4 +88,9 @@ class CognitionContextReader:
             profile = read_core_profile_evidence(self.journal, subject=subject)
             if profile is not None:
                 accepted.append(CognitionContextEvidence(**profile))
+        if (self.include_external_recall and len(accepted)<limit
+                and Sensitivity(clearance) in (Sensitivity.PRIVATE,Sensitivity.RESTRICTED)):
+            from .core_memory_context import current_core_memory_evidence
+            recalled=current_core_memory_evidence(self.journal,subject=subject)
+            if recalled is not None:accepted.append(CognitionContextEvidence(**recalled))
         return tuple(accepted)

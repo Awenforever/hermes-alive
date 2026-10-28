@@ -3,6 +3,23 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## 2026-10-28 — Native recall is a scoped context, not imported memory
+
+ADR0268 separates a model's semantic question, Core's retrieval, and the
+temporary use of provisional advice. Old curated grants stay unchanged. Retain
+only fingerprints in observation events; generation snapshots use the existing
+protected retention boundary. Exclude external recall from public-discovery
+inputs, and preserve explicit preferences in their existing independent vault.
+
+ContextVars set in a child async task do not automatically modify the parent's
+context. Open the cycle slot in its owner, publish verified results into that
+slot, and close it for captured contexts as well. Test actual cognition input,
+public tool arguments, copied contexts and a later ordinary read. A missing
+source pool can avoid a cognition call entirely; it cannot certify delivery into
+that call. Controlled r298 covers new/old grants, declined/invalid questions and
+unchanged subsequent input; real-model semantics remain open. The separate Core
+cron-framing failure remains a failure, not evidence this new path fixes it.
+
 ## 2026-10-28 — Unload is not a task-cancellation contract
 
 The actual Core characterization continued a queued file task after Alive's

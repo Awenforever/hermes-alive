@@ -36,7 +36,7 @@ def validate_options(options):
     required={'model_calls','delivery','outbound_retention_days','outbound_retention_confirmed',
               'model','public_queries','cited_reads'}
     if (not isinstance(options, dict) or not required<=set(options)
-            or set(options)-required-{'language','communication_preference','interest_preferences','use_hermes_user_profile',
+            or set(options)-required-{'language','communication_preference','interest_preferences','use_hermes_user_profile','use_hermes_external_memory',
                                      'refine_public_sources','accept_explicit_followups','manage_explicit_followups','revise_explicit_followups','observe_core_tools',
                                      'core_background_work','core_work_request_retention','core_work_context_version','core_work_continuation_version','automatic_core_toolsets','retain_followup_source','review_core_work_results','inspect_core_work_files','autonomous_core_work','manage_core_work_outcomes'}
             or options['model_calls'] is not True or options['delivery'] is not True
@@ -45,7 +45,7 @@ def validate_options(options):
             or not 1 <= options['outbound_retention_days'] <= 365
             or type(options['cited_reads']) is not bool
             or any(key in options and type(options[key]) is not bool
-                   for key in ('use_hermes_user_profile','refine_public_sources','accept_explicit_followups','manage_explicit_followups','revise_explicit_followups','observe_core_tools','core_background_work','core_work_request_retention','retain_followup_source','review_core_work_results','inspect_core_work_files','autonomous_core_work','manage_core_work_outcomes'))
+                   for key in ('use_hermes_user_profile','use_hermes_external_memory','refine_public_sources','accept_explicit_followups','manage_explicit_followups','revise_explicit_followups','observe_core_tools','core_background_work','core_work_request_retention','retain_followup_source','review_core_work_results','inspect_core_work_files','autonomous_core_work','manage_core_work_outcomes'))
             or (options.get('manage_explicit_followups') is True or options.get('retain_followup_source') is True)
                 and options.get('accept_explicit_followups') is not True):
         raise KernelSetupError('explicit model/delivery/retention choices required')
@@ -365,7 +365,7 @@ class KernelSetupStore:
         if self.vault.digest_json(options) != reference.digest:
             raise KernelSetupError('setup choices changed')
         options = validate_options(options)
-        if options.get('use_hermes_user_profile') is True and document['chat_type'] != 'dm':
+        if any(options.get(key) is True for key in ('use_hermes_user_profile','use_hermes_external_memory')) and document['chat_type'] != 'dm':
             raise KernelSetupError('personal Core profile memory requires a private target conversation')
         content = self.vault.put_json({'scope':document, 'options':options}, subject=owner,
             purpose='setup.configuration', sensitivity=Sensitivity.PRIVATE,

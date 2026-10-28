@@ -180,6 +180,8 @@ class GatewayHostBinding:
             status['mode']='execution' if self.native.host.execute else 'shadow'
             status['pending_work_count']=len(getattr(self.native,'pending',()))
             status['status']='ready'
+            private_context=getattr(self.native,'private_context',None)
+            if private_context is not None:status['private_memory_context']=private_context.last_status
         if self.task is not None:
             if not self.task.done():
                 stopping=self.closed or self.arguments is not None and self.arguments['stop'].is_set()

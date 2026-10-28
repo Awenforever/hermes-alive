@@ -82,6 +82,20 @@ the old read grant and does not delete Core's separately owned memory; any later
 opt-in requires a new owner confirmation. Do not infer this permission from an
 interest, a sharing grant or outbound-history retention.
 
+If Hermes already has an external memory provider configured, offer an additional
+default-off personal-memory read choice. Only after the private target owner
+allows semantic recall, add `--confirm-hermes-external-memory`. This uses Core's
+selected provider and existing backend configuration, including any configured
+remote retrieval service; it does not choose a provider, copy credentials or
+install one. Retrieved context is advisory input to the configured models and
+protected generation records under the selected retention period, not a new
+permanent Alive memory or execution grant. External recall is excluded from
+public discovery-planning inputs. Existing curated-USER consent does not imply
+this grant. Groups and shared profiles must not use either personal read choice.
+When there is no usable returned context, preserve that uncertainty; do not claim
+the person has no memories. Revoking or forgetting the old grant requires a new
+confirmation before later reads.
+
 After approval, stage configuration with the confirmed values:
 
 ```text

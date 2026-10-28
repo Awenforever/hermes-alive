@@ -67,7 +67,7 @@ def normalize_settings(settings):
     return normalized
 
 
-def native_for_host(context,host,*,home,preparation,validate_consent,context_reads=None):
+def native_for_host(context,host,*,home,preparation,validate_consent,context_reads=None,private_context=None):
     """Shared Core-owned model slot/caller; no policy, route or enablement."""
     from hermes_constants import get_hermes_home
     from hermes_cli.config import load_config_readonly
@@ -98,7 +98,7 @@ def native_for_host(context,host,*,home,preparation,validate_consent,context_rea
         interpreter=sys.executable,core=Path(hermes_cli.__file__).resolve().parent.parent,
         private_root=root,environment={},resolve_domain=lambda *labels:'unverified-family',
         profile_scope=lambda:core_profile_cycle_scope(home),preparation=preparation,
-        context_reads=context_reads,
+        context_reads=context_reads,private_context=private_context,
         caller_factory=lambda *,cycle,read_binding:CorePluginModelCaller(context,read_binding=read_binding,refresh_task=refresh_task))
 
 
