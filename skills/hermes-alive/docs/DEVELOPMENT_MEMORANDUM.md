@@ -1976,6 +1976,14 @@ before importing Core. Do not patch the consumer's installed files or Core to
 hide this failure. Requalify from the committed remote Git revision, preserving
 the earlier failures and distinguishing this fixture correction from behavior.
 
+The next native run reached the sibling fixture, then exposed the second half
+of the entry contract: Core's selected store interpreter does not itself carry
+the application's third-party imports. The shared Core fixture now requires an
+explicit isolated HERMES_HOME and imports hermes_bootstrap before Core application
+modules, just as official entry points do. A sibling-path correction alone does
+not qualify native startup. Preserve both failures and qualify this shared entry
+before spending on another complete native task run.
+
 Audited vault reads also change SQLite bytes. A no-op upgrade's byte comparison
 and a functional run's preservation check serve different purposes. For the
 latter, verify unchanged authenticated events, keys and retained payloads;

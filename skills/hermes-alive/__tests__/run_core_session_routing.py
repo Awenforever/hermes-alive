@@ -18,6 +18,11 @@ parser=argparse.ArgumentParser()
 parser.add_argument('--core',type=Path,required=True)
 args=parser.parse_args()
 sys.path.insert(0,str(args.core.resolve()))
+if not os.environ.get('HERMES_HOME'):
+    raise RuntimeError('Core integration tests require an explicit isolated HERMES_HOME')
+# Native Core relaunches onto its store interpreter, whose third-party
+# dependencies must be activated before importing any Core application modules.
+import hermes_bootstrap
 from hermes_constants import set_hermes_home_override,reset_hermes_home_override
 from hermes_cli.plugins import get_plugin_manager,PluginContext,PluginManifest,LoadedPlugin
 from gateway.config import GatewayConfig,Platform,PlatformConfig
