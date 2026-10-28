@@ -23,6 +23,14 @@ schedule or cancellation acknowledgment with observed termination. External
 Holographic provider migration has a bounded synthetic library proof; its actual
 Alive-to-Core worker recall still fails and remains an independent open gate.
 
+ADR0267 records an isolated causal counterexample: Core cron framing alone turns
+two successful natural/semantic recalls into empty results for both tested public
+provider versions. Next implement a separately guided Native semantic-read
+capability using Core's existing provider lifecycle, without expanding old USER
+consent or duplicating memory. The automatic worker boundary remains open; do not
+substitute this Native capability for its missing end-to-end evidence. Continue
+independent distribution/lifecycle preparation alongside this memory work.
+
 Normal use must accept clearly assigned ongoing work directly after the first
 guided authorization. Casual remarks, quotations and ambiguous intentions require
 semantic distinction; ask when uncertain. Per-item preview/confirmation is an
