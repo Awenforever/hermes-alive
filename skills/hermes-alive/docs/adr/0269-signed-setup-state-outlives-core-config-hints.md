@@ -40,3 +40,24 @@ foreign-owner, repeat, retention and inactive-delivery checks. A separate native
 Git consumer must confirm after a real Core remove/reinstall, within the new
 challenge's lifetime. It must not be replaced by a same-process simulated flag.
 No real account, model, transport or daemon acceptance is implied.
+
+## Verification addendum — 2026-10-29
+
+The bounded implementation is qualified. Frozen r312 passed the actual-Core
+guided regression in two cases after removing the config hint, plus the pure
+setup regression. The original process exited zero and its disposable container
+was destroyed; the Core supplier remained clean.
+
+The Ubuntu native consumer then installed immutable development commit
+`cb7c0a5dcd040cdfbae58f17e724702ccc483a9a` through Core's public Git installer.
+After fresh explicit setup, actual runtime uninstall, Core plugin removal, Git
+reinstallation and runtime installation, the real installed Core command handler
+confirmed the retained intent using a synthetic authorized adapter/session.
+Explicit interests remained readable from protected state; no external-memory
+grant appeared and delivery remained inactive. Consumer r313 exited zero.
+
+The earlier before-expiry r310 failure remains recorded. The successful run used
+a fresh explicit replacement after the earlier intent expired; it did not bypass
+expiry or revive the old challenge. No real model, account, message or daemon
+was used by this lifecycle check. Full four-platform and active-task lifecycle
+acceptance remain separate gates.

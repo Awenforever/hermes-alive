@@ -19,6 +19,15 @@ fixtures as substitutes for the already installed consumer: Core may provision
 each fresh profile and exceed a fixture's short subprocess timeout. Preserve
 those harness failures and verify their background processes have ended.
 
+2026-10-29 result: r312's actual-Core guided regression passes with the hint
+absent; Ubuntu r313 confirms through the installed handler after actual Core
+remove/Git reinstall. Configuration remains protected, external-memory consent
+is unchanged, and delivery is inactive. The original r310 attempt failed before
+expiry; a later expired-token observation cannot explain it. Preserve both
+timings and the failed record. The positive consumer used a fresh explicit setup
+after expiry, without weakening challenge validity. Active work, daemon and
+other-platform lifecycle gates remain open.
+
 ## 2026-10-28 — Native recall is a scoped context, not imported memory
 
 ADR0268 separates a model's semantic question, Core's retrieval, and the
@@ -35,6 +44,17 @@ source pool can avoid a cognition call entirely; it cannot certify delivery into
 that call. Controlled r298 covers new/old grants, declined/invalid questions and
 unchanged subsequent input; real-model semantics remain open. The separate Core
 cron-framing failure remains a failure, not evidence this new path fixes it.
+
+2026-10-29 r315 used the real Core model caller rather than replacing query or
+candidate replies. The model formulated two different concise questions; both
+retrieved the synthetic external fact, which reached private cognition as
+advisory context. It correctly abstained on a placeholder public listing. Six
+successful logical calls reported `deepseek-flash`; model labels alone do not
+prove the provider hop. Public search arguments stayed clear of the recall and
+query, the third unchanged wake did not replan, and completed context closed.
+Original execution/container terminal and absence, clean six-file credential
+audit and removed auth projection preceded response review. This one synthetic
+case does not qualify longitudinal learning or add a sharing acceptance round.
 
 ## 2026-10-28 — Unload is not a task-cancellation contract
 

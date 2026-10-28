@@ -14,9 +14,15 @@ not a completion measure for the entire agent.
 
 Native Ubuntu Git consumer installation, update and remove/reinstall have
 preserved pending state, but actual confirmation exposed a removable config-hint
-dependency before challenge expiry. ADR0269 is the current recovery candidate;
-requalify the real installed command after actual removal, not just file hashes.
-Core/environment fixture failures remain distinct from product behavior.
+dependency before challenge expiry. ADR0269's recovery now passes actual-Core
+regressions and Ubuntu r313's real Git remove/reinstall/native confirmation.
+Configuration is usable after reinstall and delivery stays inactive; this does
+not qualify active-task, daemon or four-platform behavior. Core/environment
+fixture failures remain distinct from product behavior. The inherited real-model
+Native semantic-memory chain has now passed one synthetic recall/no-share case
+(r315, six logical Core calls). Longitudinal feedback, noisy observations and
+memory-informed useful behavior remain current gates; this does not change
+the sharing-quality counter or the automatic Core-worker framing failure.
 
 ### Owner decision — 2026-10-26
 

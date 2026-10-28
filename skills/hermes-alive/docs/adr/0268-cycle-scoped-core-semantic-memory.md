@@ -65,3 +65,25 @@ replies do not qualify real-model judgment or natural usefulness. No real
 messages, accounts or model credentials were used. The actual automatic
 Core-worker recall counterexample remains failing and unchanged. No Core or
 provider source was patched; production configuration was not changed.
+
+## Real-model addendum — 2026-10-29
+
+Isolated r315 exercised the installed Native chain using Core's inherited model
+configuration and official fallback configuration, a public unmodified external
+provider, and a synthetic fact stored only in that provider's database. The
+model chose its own semantic questions without receiving the answer. Both
+private cognition inputs contained the recalled fact and its advisory kind;
+the model declined to share the deliberately uninformative synthetic listing.
+Six logical Core model calls completed, reporting `deepseek-flash`. The probe
+did not independently identify the actual provider hop from that model label.
+
+The unchanged third wake did not repeat semantic planning. Three public search
+calls contained neither private query nor recalled fact, the completed cycle
+exposed no recall to later ordinary readers, and no adapter sends or jobs
+occurred. The original process exited zero; the actual container exited zero,
+was destroyed and was absent. Before reading responses, the six-file credential
+audit was clean and the read-only authentication projection had been removed.
+
+This is one synthetic semantic-recall/no-share case, not longitudinal interest
+learning, real sharing usefulness, provider failover qualification or a fresh
+sharing round. The separate automatic Core-worker framing failure remains open.
