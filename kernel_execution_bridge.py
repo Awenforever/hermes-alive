@@ -197,7 +197,8 @@ def assemble(binding):
                 if configured.options.get('autonomous_core_work') is True:
                     await kernel('core_autonomous_work').CoreAutonomousWork(store).run(
                         configured,call=parameters['expression_parameters']['call'],
-                        validate=current_work_authority,operation_id=cycle.operation_id)
+                        validate=current_work_authority,operation_id=cycle.operation_id,
+                        read_context=parameters['expression_parameters'].get('read_context'))
                     kernel('core_work').CoreWorkStore(store).refresh_observations(configured,validate=current_work_authority)
                 if configured.options.get('inspect_core_work_files') is True:
                     from .core_work_inspection_scope import NAME,effective_tools
@@ -241,7 +242,8 @@ def assemble(binding):
                 return parameters
             return await discovery(cycle=cycle,parameters=parameters,call=call,read_binding=read_binding)
     context_reads=(kernel('core_context_read').CoreContextRead(binding.context)
-        if any(configured.options.get(key) is True for key in ('use_hermes_user_profile','use_hermes_external_memory')) else None)
+        if any(configured.options.get(key) is True for key in (
+            'use_hermes_user_profile','use_hermes_external_memory','core_background_work')) else None)
     private_context=(kernel('core_memory_preparation').CoreMemoryPreparation(binding.context,store,configured,
         validate=validate) if configured.options.get('use_hermes_external_memory') is True else None)
     native=kernel('core_shadow_assembly').native_for_host(binding.context,host,home=binding.home,

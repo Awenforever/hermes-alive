@@ -9,6 +9,27 @@ from pathlib import Path
 from types import SimpleNamespace
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 
+
+async def stop_after_completed_cycle(binding):
+    """A rejection receipt precedes remaining IO; wait for the actual cycle."""
+    from unittest.mock import patch
+    completed=asyncio.Event();stop=asyncio.Event();original=binding.native.step
+    async def observed(parameters):
+        result=await original(parameters)
+        completed.set()
+        return result
+    with patch.object(binding.native,'step',observed):
+        task=binding.native.start(binding.context,build_parameters=binding.arguments['build_parameters'],
+            stop=stop,max_cycles=None,interval_seconds=600,continuous=True)
+        try:
+            await asyncio.wait_for(completed.wait(),timeout=60)
+            assert not task.done(),'a rejected proposal terminated the continuous host'
+        finally:
+            stop.set()
+            summary=await task
+    assert summary['exit_reason']=='stopped' and summary['completed_cycles']>=1,summary
+    return summary
+
 if __name__=='__main__' and os.environ.get('ALIVE_AUTOWORK_CHILD')!='1':
     with tempfile.TemporaryDirectory(prefix='alive-core-autonomous-') as root:
         env={**os.environ,'HOME':root,'HERMES_HOME':str(Path(root)/'profile'),
@@ -559,30 +580,12 @@ async def exercise(home):
                 except RuntimeError:pass
             assert len(list(store.journal.read(event_type='work.outcome_decided')))==1
         elif mode=='outcome-malformed':
-            stop=asyncio.Event()
-            task=binding.native.start(binding.context,build_parameters=binding.arguments['build_parameters'],
-                stop=stop,max_cycles=None,interval_seconds=600,continuous=True)
-            deadline=asyncio.get_running_loop().time()+60
-            while not list(store.journal.read(event_type='work.outcome_rejected')) or not binding.native.last_call_count:
-                assert not task.done() and asyncio.get_running_loop().time()<deadline
-                await asyncio.sleep(.05)
-            assert not task.done(),'one bad model proposal must not terminate the host'
-            stop.set();summary=await task
-            assert summary['exit_reason']=='stopped' and summary['completed_cycles']>=1
+            await stop_after_completed_cycle(binding)
             assert len(list(store.journal.read(event_type='work.outcome_rejected')))==1
             assert not list(store.journal.read(event_type='work.outcome_decided'))
         elif mode.startswith('decision-'):
             assert len(list(store.journal.read(event_type='work.start_rejected')))==1
-            stop=asyncio.Event()
-            task=binding.native.start(binding.context,build_parameters=binding.arguments['build_parameters'],
-                stop=stop,max_cycles=None,interval_seconds=600,continuous=True)
-            deadline=asyncio.get_running_loop().time()+60
-            while len(list(store.journal.read(event_type='work.start_rejected')))<2:
-                assert not task.done() and asyncio.get_running_loop().time()<deadline
-                await asyncio.sleep(.05)
-            assert not task.done(),'an invalid action proposal terminated the host'
-            stop.set();summary=await task
-            assert summary['exit_reason']=='stopped' and summary['completed_cycles']>=1
+            await stop_after_completed_cycle(binding)
             assert len(list(store.journal.read(event_type='work.start_rejected')))==2
             assert not list(store.journal.read(event_type='work.requested'))
             assert not list(store.journal.read(event_type='work.start_decided'))

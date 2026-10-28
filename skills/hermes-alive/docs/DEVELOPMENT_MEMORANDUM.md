@@ -3,6 +3,33 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## 2026-10-29 — A memory that work cannot use is not an assistant capability
+
+Real r318 passed recall into ordinary cognition but failed its actual teaching
+task: the separate autonomous planner received no recalled context and explicitly
+instructed Core that the aid was unknown. Preserve this failure. ADR0270 makes
+work planning consume the existing typed private reader through Core-owned IO,
+without replacing the owner request or widening tools/approval. The generated
+step is still a model proposal, never a newly attributed user message.
+
+Cache a waiting decision on semantic evidence, not changing query/observation
+identifiers. Re-read after reasoning before dispatch; record fingerprints and
+evidence IDs without raw advice in the structural journal. Test old grants,
+unchanged advice under a new query, and actual Core task results. Parent-process
+API hooks do not prove worker HTTP tool inventory across a subprocess boundary.
+
+Controlled r320/r322/r324 qualify context consumption, old-grant isolation,
+semantic wait caching and existing task controls. The rejection liveness fixture
+must observe a completed cycle before requesting stop: a rejection receipt is
+earlier than the remaining IO, so stopping at that receipt can legitimately
+report zero completed cycles. Keep strict liveness/completion assertions.
+
+Real r323 is a separate retained failure: a compound initial query returned
+nothing, so there was no advice to forward. A focused later query succeeded
+after work had completed. Empty retrieval is not absent knowledge. Improve the
+bounded retrieval deliberation, without provider-specific query stripping,
+fixture-fact injection, repeated transport calls or database/config changes.
+
 ## 2026-10-28 — Preserved state must remain reachable after real reinstall
 
 The Ubuntu Git consumer preserved five state files across update/remove/reinstall

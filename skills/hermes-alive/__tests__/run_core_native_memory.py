@@ -18,7 +18,7 @@ from unittest.mock import patch
 
 if __name__=='__main__' and not os.environ.get('ALIVE_NATIVE_MEMORY_CASE'):
     with tempfile.TemporaryDirectory(prefix='alive-native-memory-') as directory:
-        for mode in ('granted','old-grant','declined','invalid-query'):
+        for mode in ('granted','old-grant','declined','invalid-query','work','old-grant-work'):
             env={**os.environ,'HOME':directory,'HERMES_HOME':str(Path(directory)/mode),
                 'ALIVE_NATIVE_MEMORY_CASE':mode,'PYTHONDONTWRITEBYTECODE':'1'}
             result=subprocess.run([sys.executable,'-B',__file__,*sys.argv[1:]],env=env,
@@ -34,7 +34,8 @@ from run_core_guided_setup import cli
 
 
 async def exercise(home):
-    mode=os.environ['ALIVE_NATIVE_MEMORY_CASE'];granted=mode!='old-grant';has_context=mode=='granted';home.mkdir(exist_ok=True)
+    mode=os.environ['ALIVE_NATIVE_MEMORY_CASE'];granted=mode not in ('old-grant','old-grant-work')
+    has_context=mode in ('granted','work');work_case=mode in ('work','old-grant-work');home.mkdir(exist_ok=True)
     shutil.copytree(core.repo,home/'plugins/hermes-alive')
     shutil.copytree('/holo-catalog',home/'plugins/holographic',ignore=shutil.ignore_patterns('.git','__pycache__'))
     cfg={'model':{'provider':'auto','default':'synthetic-owner-model'},'memory':{'provider':'holographic'},
@@ -47,6 +48,7 @@ async def exercise(home):
     try:legacy.add_fact('Sable uses amber counters for classroom arithmetic.','preference','public synthetic')
     finally:legacy.close()
     rc,staged=cli(home,'setup','--confirm-model-calls','--confirm-delivery','--confirm-outbound-retention',
+        *(('--confirm-followup-management','--confirm-core-background-work','--confirm-autonomous-core-work') if work_case else ()),
         '--interests','Sable classroom arithmetic','--communication-preference','Prefer brief grounded explanations.',
         '--public-query','public synthetic science','--confirm-public-reads',
         '--confirm-hermes-external-memory' if granted else '--confirm-hermes-profile-memory')
@@ -75,6 +77,28 @@ async def exercise(home):
         assert native._caller is None,'background model started before controlled caller admission'
         binding.arguments['stop'].set();await binding.task
         assert native.private_context is not None if granted else native.private_context is None
+        if work_case:
+            from agent.turn_context import _collect_pre_llm_call_context
+            import model_tools
+            original=('Keep following up preparation of a classroom arithmetic activity for Sable. '
+                'From the next background wake use her usual teaching aid if known. '
+                'This turn only records the assignment. No tools, files or messages.')
+            variables=core.set_session_vars(platform='telegram',chat_id=source.chat_id,user_id=source.user_id,
+                session_key=entry.session_key,session_id=entry.session_id)
+            try:
+                _collect_pre_llm_call_context(SimpleNamespace(session_id=entry.session_id,model='configured-primary',
+                    platform='telegram',_user_id=source.user_id),effective_task_id='memory-work-record',
+                    turn_id='memory-work-record',original_user_message=original,
+                    messages=[{'role':'user','content':original}],conversation_history=[])
+                saved=json.loads(model_tools.handle_function_call('alive_agenda',{'operation':'record',
+                    'task':'Prepare a classroom arithmetic activity for Sable using her usual teaching aid.',
+                    'constraint':original,'evidence_span':original},task_id='memory-work-record',
+                    session_id=entry.session_id,turn_id='memory-work-record',
+                    tool_call_id='memory-work-record-call',enabled_tools=['alive_agenda']))
+                assert saved['status']=='recorded_under_owner_intake_grant',saved
+            finally:core.clear_session_vars(variables)
+            with binding._agenda.lock:
+                binding._agenda.turns.clear();binding._agenda.latest_turn.clear()
         from tools.registry import registry
         def public_search(arguments,**kwargs):
             searches.append(arguments)
@@ -94,7 +118,18 @@ async def exercise(home):
                     assert granted and 'Sable' in text
                     assert 'amber counters' not in text,'query planner received the answer before retrieval'
                     document=({'query':None} if mode=='declined' else {'unexpected':'not an admitted question'}
-                              if mode=='invalid-query' else {'query':'Sable classroom arithmetic'})
+                              if mode=='invalid-query' else {'query':'Sable classroom arithmetic teaching'
+                                  if mode=='work' and calls.count('alive_private_memory_query')>1 else 'Sable classroom arithmetic'})
+                elif kwargs['task']=='alive_core_autonomous_work':
+                    assert work_case
+                    supplied=json.loads(kwargs['messages'][-1]['content'])
+                    advice=supplied['advisory_owner_context']
+                    assert ('amber counters' in json.dumps(advice)) is has_context,advice
+                    assert any(item['kind']=='core_recalled_advisory' for item in advice) is has_context
+                    assert 'recalled advice may be stale' in kwargs['messages'][0]['content'].lower()
+                    assert supplied['automatic_toolsets']==[]
+                    document={'decision':'wait','toolsets':[],'step':None,
+                        'reason':'Hold execution while qualifying private context.','reconsider_after_seconds':3600}
                 elif kwargs['task']=='alive_discovery_reading':
                     assert 'amber counters' not in text,'private recall entered public reading planner'
                     document={'source_refs':[],'question':None,'value_hypothesis':'No new material in this public synthetic search.'}
@@ -123,7 +158,8 @@ async def exercise(home):
         assert 1<=calls.count('alive_private_memory_query')<=2 if granted else calls.count('alive_private_memory_query')==0,calls
         store=importlib.import_module(loaded.module.__name__+'.kernel_setup_bridge').setup_store(binding)
         records=store.journal.read(event_type='memory.core_recall_observed')
-        assert len(records)==(1 if has_context else 0)
+        assert len(records)==(2 if mode=='work' else 1 if has_context else 0),len(records)
+        if work_case:assert calls.count('alive_core_autonomous_work')==1,calls
         if mode in ('declined','invalid-query'):
             assert native.private_context.last_status==('no_question_selected' if mode=='declined' else 'query_not_admitted')
         from cron.jobs import list_jobs

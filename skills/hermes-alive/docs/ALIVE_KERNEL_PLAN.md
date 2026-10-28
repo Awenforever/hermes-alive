@@ -24,6 +24,16 @@ Native semantic-memory chain has now passed one synthetic recall/no-share case
 memory-informed useful behavior remain current gates; this does not change
 the sharing-quality counter or the automatic Core-worker framing failure.
 
+Real r318 showed why recall is not sufficient: ordinary cognition received the
+fact but autonomous work planning did not, and actual Core work incorrectly
+reported it unknown. ADR0270's current candidate connects the existing bounded
+private reader to work planning without turning advice into task authority.
+Controlled grant/context/cache and Core task controls now pass. The unchanged
+real r323 assignment still fails: its first compound query returned no context;
+a later focused query found the fact after the work had completed. Bounded
+model-guided retrieval recovery is the next prerequisite; do not mark the real
+task gate passed, relax the provider threshold or insert the expected fact.
+
 ### Owner decision — 2026-10-26
 
 2026-10-28 lifecycle decision: explicit disable/uninstall stops unstarted owned
