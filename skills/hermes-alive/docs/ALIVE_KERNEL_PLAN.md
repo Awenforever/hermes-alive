@@ -1,9 +1,22 @@
 # Hermes Alive Kernel — Living Development Plan
 
 Status: active; development branch only, no production acceptance.
-Last reviewed: 2026-10-28 (Asia/Shanghai).
+Last reviewed: 2026-10-29 (Asia/Shanghai).
 
 ## Current product state
+
+Recovery checkpoint: r327's real task remains FAIL. The planner received memory,
+but the worker rejected its provenance and later communication attempted to
+cross the task's no-messages restriction (zero sends). ADR0272 separates typed
+worker advice and signed per-task owner-contact scope. These are candidates,
+not production acceptance. r328's broad suite stopped at a stale contract
+assertion; the targeted correction does not make the broad suite pass.
+
+r330's actual-Core controls and r333's focused task-contact tests now pass.
+r332's unchanged real synthetic task also passes direct review: the actual
+worker uses the recalled aid in two activity lines, with no owner message over
+three wakes. This is one task, not whole outcome verification or sharing quality.
+The broader portable suite is still running; see ADR0272 for exact limits.
 
 The objective remains a useful, continuous proactive assistant with durable
 experience, layered memory, an agenda, attributable learning, natural followup,
@@ -33,6 +46,12 @@ real r323 assignment still fails: its first compound query returned no context;
 a later focused query found the fact after the work had completed. Bounded
 model-guided retrieval recovery is the next prerequisite; do not mark the real
 task gate passed, relax the provider threshold or insert the expected fact.
+
+ADR0271 is the current bounded retrieval candidate: the configured model can
+reformulate once after no usable context, or stop. An unchanged context does not
+repeat model planning. Core retains provider/timeout/fallback ownership; no
+fixture-specific keywords, threshold changes or new memory backend are added.
+Qualify the new path and the unchanged real task before claiming useful recall.
 
 ### Owner decision — 2026-10-26
 

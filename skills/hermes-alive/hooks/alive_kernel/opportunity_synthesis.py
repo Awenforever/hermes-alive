@@ -453,7 +453,7 @@ class OpportunitySynthesizer:
                  context_vault: Any = None) -> None:
         self.journal = journal
         self.context_vault = context_vault
-        self.reader = CognitionOpportunityReader(journal, content_vault=content_vault)
+        self.reader = CognitionOpportunityReader(journal, content_vault=content_vault, communication_only=True)
         self.vault = self.reader.vault
         from .discovery_inquiry import DiscoveryInquiryContext
         self.inquiries = DiscoveryInquiryContext(self.reader,context_vault=context_vault)

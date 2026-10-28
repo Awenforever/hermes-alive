@@ -30,6 +30,14 @@ after work had completed. Empty retrieval is not absent knowledge. Improve the
 bounded retrieval deliberation, without provider-specific query stripping,
 fixture-fact injection, repeated transport calls or database/config changes.
 
+ADR0271 gives the model actual retrieval feedback and one bounded opportunity
+to reformulate. Test declined, malformed and repeated proposals as well as the
+positive path; preserve the difference between no usable context and absence of
+knowledge. Cache the final question transiently, not a permanent negative fact.
+Scope and physical provider concurrency remain Core's responsibility. Record
+advisory fingerprints/IDs before Core handoff IO, rather than relying solely on
+a later work-decision record to explain the generated step.
+
 ## 2026-10-28 — Preserved state must remain reachable after real reinstall
 
 The Ubuntu Git consumer preserved five state files across update/remove/reinstall
@@ -1923,3 +1931,14 @@ the current finite history/body bounds can require review. Empty automatic scope
 still conflicts with the model-only setup description and needs its own actual
 case. Real inherited-model intent/dependency decisions, uncertain effects,
 interrupted/pending handoff, lifecycle/erasure/migration and fleet gates remain.
+# 2026-10-29 — Recovery and task contact boundary
+
+r327 is a real failure: planner memory access is insufficient if the actual
+worker cannot distinguish host-recalled context from a generated suggestion.
+It also tried to contact the owner about an explicitly private task. Zero sends
+resulted from a fixture route mismatch, not a qualified no-contact decision.
+Keep execution and communication scopes separate (ADR0272); exclude private
+tasks from communication reasoning as well as checking recovered send intent.
+Do not repair this with topic filters, forbidden-phrase lists or deleting the
+specific clarification trigger. A refusal containing the expected fact is not
+evidence that the worker applied it. Full task and lifecycle gates stay open.

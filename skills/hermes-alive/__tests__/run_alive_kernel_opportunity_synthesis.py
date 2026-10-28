@@ -78,6 +78,7 @@ async def exercise(root: Path) -> None:
         data=json.loads(kwargs['messages'][1]['content'])
         assert data['stage_contract']['host_authority'] in ('none', 'user_delegated')
         assert data['stage_contract'] == dict(stage='internal_candidate_interpretation',
+            current_owner_turn_supplied=False, retained_owner_sources_are_current_turn=False,
             routes_or_sends=False, authorizes_execution=False,
             host_authority=data['stage_contract']['host_authority'],
             source_link_binding='canonical_source_v1',

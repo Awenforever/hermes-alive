@@ -111,7 +111,7 @@ async def test(home,*,direct_intake=False,management=False):
      original_user_message='记下核对实验记录这件事，只提醒，不代为提交。',
      messages=[{'role':'user','content':'记下核对实验记录这件事，只提醒，不代为提交。'}],conversation_history=[])
     assert 'alive_agenda' in collector
-    drafted=tool({'operation':'propose','task':'核对实验记录','constraint':'只提醒，不代为提交','due_at':due})
+    drafted=tool({'operation':'propose','task':'核对实验记录','constraint':'只提醒，不代为提交','due_at':due,'notify_owner':True})
     assert drafted['status']=='temporary_proposal_not_saved' and not drafted['external_action_authorized']
     assert 'error' in tool({'operation':'list'},task='foreign-main-task')
     assert 'error' in tool({'operation':'propose','task':'ambiguous time','due_at':'2026-12-01T09:00:00'})
@@ -123,7 +123,7 @@ async def test(home,*,direct_intake=False,management=False):
    finally:core.clear_session_vars(variables)
    accept=drafted['confirmation_command'].removeprefix('/alive ')
    preview=json.loads(await command(drafted['preview_command'].removeprefix('/alive ')))
-   assert preview['proposal']=={'task':'核对实验记录','constraint':'只提醒，不代为提交'}
+   assert preview['proposal']=={'task':'核对实验记录','constraint':'只提醒，不代为提交','notify_owner':True}
    with patch.object(binding._agenda,'DRAFT_TTL',-1):
     assert '已失效' in await command(accept)
    assert len(store.journal.read())==before
@@ -147,7 +147,7 @@ async def test(home,*,direct_intake=False,management=False):
     variables=core.set_session_vars(platform='telegram',chat_id=source.chat_id,user_id=source.user_id,
      session_key=entry.session_key,session_id=entry.session_id)
     try:
-     args={'operation':'record','task':'核对实验记录','constraint':'只提醒，不代为提交','due_at':due,
+     args={'operation':'record','task':'核对实验记录','constraint':'只提醒，不代为提交','due_at':due,'notify_owner':True,
       'evidence_span':'记下核对实验记录这件事，只提醒，不代为提交。'}
      def record(turn_id='intake-turn',payload=None):
       return json.loads(model_tools.handle_function_call('alive_agenda',payload or args,

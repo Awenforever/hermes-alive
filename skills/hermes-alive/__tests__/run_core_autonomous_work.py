@@ -475,6 +475,9 @@ async def exercise(home):
             request=work._read(state['work_id'],'requested',store.configuration().subject)
             if manual is None:
                 assert request['authority']=='guided_autonomous_initial_work' and request['current_owner_turn'] is False
+                assert request['advisory_context']['raw_content_copied_to_journal'] is False
+                assert request['advisory_context']['owner_instruction_or_permission'] is False
+                assert request['advisory_context']['record_ids']==[]
                 assert 'turn_evidence' not in request and request['historical_owner_request_retained_by_core'] is True
             else:
                 assert request['authority']=='user_delegated' and request['turn_evidence']

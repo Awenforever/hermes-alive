@@ -30,9 +30,10 @@ def commitment_summary(details,*,state,available_at,due_at,expires_at):
 
 
 class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
-    def __init__(self, journal, *, content_vault=None, commitment_vault=None):
+    def __init__(self, journal, *, content_vault=None, commitment_vault=None, communication_only=False):
         super().__init__(journal,content_vault=content_vault)
         self.commitment_vault = commitment_vault or AgendaProjection(journal).content_vault
+        self.communication_only = communication_only
 
     def _commitment(self, row, *, subject, now):
         origin = self.journal.get(row['proposal_event_id'])
@@ -148,7 +149,14 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
         source_view=(item_source_view(KernelSetupStore(self.journal.path.parent,journal=self.journal),
             row['item_id'],subject=subject,include_message=True)
             if payload.get('authority')==AgendaAuthority.USER_DELEGATED.value else
-            {'original_source_available':False,'original_owner_message_included':False})
+            {'original_source_available':False,'original_owner_message_included':False,
+             'owner_updates_allowed':details.get('notify_owner',True) is True})
+        # Private work remains available to task and memory reasoning. Only the
+        # communication reader excludes it, including recovery before dispatch.
+        # Historical explicitly confirmed reminders retain their confirmation;
+        # old delegated records without a signed choice do not gain contact scope.
+        if self.communication_only and source_view.get('owner_updates_allowed') is not True:
+            return None
         return OpportunityEvidence(row['item_id'],event.event_id,expiry,event.sensitivity,
             _freeze_json(dict(source='user-admitted agenda commitment',title='Current commitment',url='',
                 summary=summary,published_at=None,origin_kind='commitment',

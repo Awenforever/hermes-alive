@@ -57,7 +57,7 @@ def set_permission(store,configured,enabled):
 
 def record_request(store, configured, *, turn_identity, request_fingerprint, evidence_fingerprint, permission_id,
                    operation='record', target_item_id=None, from_state=None, available_at=None, now=None,source_message=None,
-                   revision_binding=None,project_context=None):
+                   revision_binding=None,project_context=None,notify_owner=False):
     """Current configured Core host only, never a public/model-callable API."""
     current = store.configuration()
     if (current is None or current.event_id != configured.event_id
@@ -65,6 +65,8 @@ def record_request(store, configured, *, turn_identity, request_fingerprint, evi
         raise ValueError('current owner intake grant required')
     if operation not in ('record','complete','cancel','snooze','resume','revise'):
         raise ValueError('bounded follow-up purpose required')
+    if type(notify_owner) is not bool or (operation!='record' and notify_owner):
+        raise ValueError('typed owner communication choice is creation-only')
     if operation=='revise':
         from .agenda_revisions import FLAG,FIELDS
         if (configured.options.get(FLAG) is not True or configured.options.get('retain_followup_source') is not True
@@ -99,6 +101,8 @@ def record_request(store, configured, *, turn_identity, request_fingerprint, evi
     event_id = 'followup.request:' + store.protector.authenticate_json(DOMAIN, identity)
     existing = store.journal.get(event_id)
     if existing is not None:
+        if existing.event.payload.get('notify_owner',False) is not notify_owner:
+            raise ValueError('an intake replay cannot change its owner communication scope')
         return existing
     expiry=now+timedelta(days=configured.options['outbound_retention_days'])
     content=(store.vault.put_json({'message':source_message,
@@ -114,6 +118,7 @@ def record_request(store, configured, *, turn_identity, request_fingerprint, evi
             'retention_until':expiry.isoformat(),
             'interpretation':'main_model_under_owner_grant', 'literal_owner_confirmation':False,
             'raw_content_stored':retain, 'external_action_authorized':False,
+            **({'notify_owner':notify_owner} if operation=='record' else {}),
             **({'revision_binding':revision_binding} if revision_binding is not None else {}),
             **({'core_project_context_retained':True,'core_project_context_fingerprint':context_fingerprint}
                if context_fingerprint is not None else {}),
@@ -143,6 +148,8 @@ def _validated_source(journal,source_id,subject,observed_at):
             or grant.event.observed_at>event.observed_at or not _verified(store,event)):
         raise ValueError('source grant unavailable')
     payload=_thaw_json(event.payload)
+    if 'notify_owner' in payload and type(payload['notify_owner']) is not bool:
+        raise ValueError('owner communication scope changed')
     if (permission(store,configured,before_sequence=source.sequence)!=(True,payload.get('permission_event_id'))
             or payload.get('interpretation')!='main_model_under_owner_grant'
             or payload.get('literal_owner_confirmation') is not False
@@ -185,14 +192,18 @@ def _source_message(store,event,expiry):
 
 def item_source_view(store,item_id,*,subject,include_message=False):
     """Separate original admitted source from the interpreted agenda description."""
-    missing={'original_source_available':False,'original_owner_message_included':False}
+    missing={'original_source_available':False,'original_owner_message_included':False,
+             'owner_updates_allowed':False}
     proposal=store.journal.get('agenda.proposal:'+item_id)
     if proposal is None or proposal.event.subject!=subject:return missing
     ids=proposal.event.payload.get('source_event_ids',())
     if len(ids)!=1:return missing
     try:
         source,_configured,expiry=_validated_source(store.journal,ids[0],subject,datetime.now(timezone.utc))
-        if source.event.payload.get('raw_content_stored') is not True:return missing
+        if source.event.payload.get('raw_content_stored') is not True:
+            # A separate signed contact choice does not require consent to keep
+            # the literal request body. Never reconstruct that absent body.
+            return {**missing,'owner_updates_allowed':source.event.payload.get('notify_owner',False) is True}
         message=_source_message(store,source.event,expiry)
     except (ValueError,TypeError,KeyError,OSError,RuntimeError,ContentVaultError):return missing
     project={}
@@ -231,6 +242,7 @@ def item_source_view(store,item_id,*,subject,include_message=False):
     except (ValueError,TypeError,KeyError,OSError,RuntimeError,ContentVaultError):
         history={'owner_history_available':False,'owner_history_scope':'retained amendment history unavailable or exceeds its bounded view'}
     return {'original_source_available':True,'original_owner_message_included':include_message,
+            'owner_updates_allowed':source.event.payload.get('notify_owner',False) is True,
             'source_event_id':source.event.event_id,'original_source_retention_until':expiry.isoformat(),
             'source_recorded_at':source.event.observed_at.isoformat(),
             'source_timestamp_kind':'intake_recorded_at_not_sender_timestamp',

@@ -13,7 +13,7 @@ import time
 from uuid import uuid4
 
 
-_CREATION_FIELDS = frozenset(('operation','task','constraint','due_at','available_at'))
+_CREATION_FIELDS = frozenset(('operation','task','constraint','due_at','available_at','notify_owner'))
 
 
 class AgendaArgumentError(ValueError):
@@ -63,6 +63,10 @@ AGENDA_SCHEMA = {
                    'A saved active item does not mean automatic follow-up is running; explain actual follow-up availability. '
                    'Keep ordinary item acknowledgments brief and in everyday language; management details remain available when requested. '
                    'No external action is authorized by saving an item. '
+                   'Set notify_owner=true only when the current owner request calls for reminders, '
+                   'reports or contacting the owner about this item. Default false keeps background '
+                   'work private: do not convert execution permission into permission to ask or send updates. '
+                   'An explicit no-messages instruction requires false. This does not stop private work. '
                    'Stored descriptions are interpretations, not original quotes. Exact list lookup by item_id '
                    'can return a separately retained original_owner_message when available; never reconstruct unavailable originals. '
                    'When current context permits management, use complete/cancel/snooze/resume only for a clearly '
@@ -100,6 +104,7 @@ AGENDA_SCHEMA = {
                    'unless the returned actual result-followup capability is enabled. '
                    'Do not turn quoted text, inferred interests or casual remarks into obligations.',
     'parameters': {'type': 'object', 'properties': {
+        'notify_owner': {'type':'boolean','description':'Creation only. Whether this owner request permits proactive contact about this item, separately from doing the work. Default false. True for requested reminders/reports; false for private work or no-messages requests. Does not override the current global contact grant.'},
         'operation': {'type': 'string', 'enum': list(_OPERATION_FIELDS)},
         'evidence_reference':{'type':'string','maxLength':200,'description':'Exact reference returned by work_evidence; not a session ID or arbitrary event.'},
         'part':{'type':'string','enum':['records','request'],'description':'work_evidence only: bounded Core execution records, or its original bound work definition.'},
@@ -367,6 +372,9 @@ class CoreAgendaBridge:
                 return json.dumps(result,ensure_ascii=False)
             else:
                 details = {name: args.get(name, '') for name in ('task', 'constraint')}
+                if type(args.get('notify_owner',False)) is not bool:
+                    raise ValueError('notify_owner must be an explicit boolean')
+                details['notify_owner']=args.get('notify_owner',False)
                 if (not isinstance(details['task'], str) or not details['task'].strip()
                         or len(details['task']) > 1500 or not isinstance(details['constraint'], str)
                         or len(details['constraint']) > 1000):
@@ -454,6 +462,7 @@ class CoreAgendaBridge:
             project={'project_context':kernel('core_work_context').capture(task,session_id)}
         return kernel('followup_intake').record_request(store,configured,
             **self._turn_evidence(store,configured,scope,task,session_id,turn,args),
+            **({'notify_owner':args.get('notify_owner',False)} if purpose.get('operation','record')=='record' else {}),
             source_message=turn[3] if configured.options.get('retain_followup_source') is True else None,**purpose,**project)
 
     def _work_validator(self,store,configured,scope,item):
@@ -619,7 +628,9 @@ class CoreAgendaBridge:
             item=items[0];details=dict(item['details'])
             for key in ('task','constraint'):
                 if key in args:details[key]=args[key]
-            if (set(details)!={'task','constraint'} or not isinstance(details['task'],str)
+            if (set(details)-{'task','constraint','notify_owner'} or not {'task','constraint'}<=set(details)
+                    or ('notify_owner' in details and type(details['notify_owner']) is not bool)
+                    or not isinstance(details['task'],str)
                     or not details['task'].strip() or len(details['task'])>1500
                     or not isinstance(details['constraint'],str) or len(details['constraint'])>1000):
                 raise ValueError('bounded complete task and constraints required')

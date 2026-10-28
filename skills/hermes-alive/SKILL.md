@@ -69,6 +69,13 @@ confirmation summary. Only the target owner's confirmation creates explicit
 Offer a separate, default-off choice to consult Hermes' existing curated personal
 profile. Only if the user confirms that this Hermes profile belongs to them and
 allows its curated memory to be processed, add `--confirm-hermes-profile-memory`.
+When recording an ongoing item, distinguish doing the work from proactively
+contacting its owner. Set `notify_owner=true` for a requested reminder/report;
+keep it false for private work or an explicit no-messages instruction. The
+default is false, and the existing global contact grant is still required.
+Background execution continues for private items; it must not send clarifications
+or progress updates about them. Never change this choice by replaying intake.
+
 Explain that the current built-in USER profile becomes advisory private context
 for the configured models and protected generation records; it is not imported
 as a new user-explicit fact or used to construct public searches. Core's standard
@@ -93,7 +100,15 @@ permanent Alive memory or execution grant. External recall is excluded from
 public discovery-planning inputs. Existing curated-USER consent does not imply
 this grant. Groups and shared profiles must not use either personal read choice.
 When there is no usable returned context, preserve that uncertainty; do not claim
-the person has no memories. Revoking or forgetting the old grant requires a new
+the person has no memories. On a fresh reasoning context, the model may choose
+one further focused query after an empty retrieval, up to two provider reads;
+unchanged contexts reuse the transient question rather than repeatedly spending
+model calls. Core retains provider, timeout and fallback ownership. No transport
+retry or alternative memory service is introduced.
+If background work is also selected, relevant advice can accompany that work
+as reference data in Core's retained task context, under the selected task-record
+retention. It never becomes an owner instruction or additional tool permission.
+Revoking or forgetting the old grant requires a new
 confirmation before later reads.
 
 After approval, stage configuration with the confirmed values:

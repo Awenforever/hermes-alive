@@ -18,7 +18,8 @@ from unittest.mock import patch
 
 if __name__=='__main__' and not os.environ.get('ALIVE_NATIVE_MEMORY_CASE'):
     with tempfile.TemporaryDirectory(prefix='alive-native-memory-') as directory:
-        for mode in ('granted','old-grant','declined','invalid-query','work','old-grant-work'):
+        for mode in ('granted','old-grant','declined','invalid-query','work','old-grant-work',
+                'refine','refine-stop','refine-repeat','refine-invalid'):
             env={**os.environ,'HOME':directory,'HERMES_HOME':str(Path(directory)/mode),
                 'ALIVE_NATIVE_MEMORY_CASE':mode,'PYTHONDONTWRITEBYTECODE':'1'}
             result=subprocess.run([sys.executable,'-B',__file__,*sys.argv[1:]],env=env,
@@ -35,7 +36,8 @@ from run_core_guided_setup import cli
 
 async def exercise(home):
     mode=os.environ['ALIVE_NATIVE_MEMORY_CASE'];granted=mode not in ('old-grant','old-grant-work')
-    has_context=mode in ('granted','work');work_case=mode in ('work','old-grant-work');home.mkdir(exist_ok=True)
+    has_context=mode in ('granted','work','refine');work_case=mode in ('work','old-grant-work','refine')
+    home.mkdir(exist_ok=True)
     shutil.copytree(core.repo,home/'plugins/hermes-alive')
     shutil.copytree('/holo-catalog',home/'plugins/holographic',ignore=shutil.ignore_patterns('.git','__pycache__'))
     cfg={'model':{'provider':'auto','default':'synthetic-owner-model'},'memory':{'provider':'holographic'},
@@ -117,9 +119,22 @@ async def exercise(home):
                 if kwargs['task']=='alive_private_memory_query':
                     assert granted and 'Sable' in text
                     assert 'amber counters' not in text,'query planner received the answer before retrieval'
-                    document=({'query':None} if mode=='declined' else {'unexpected':'not an admitted question'}
-                              if mode=='invalid-query' else {'query':'Sable classroom arithmetic teaching'
-                                  if mode=='work' and calls.count('alive_private_memory_query')>1 else 'Sable classroom arithmetic'})
+                    if mode.startswith('refine'):
+                        miss="What is Sable's usual teaching aid for classroom arithmetic, and what arithmetic topics or activity formats work best for her?"
+                        supplied=json.loads(kwargs['messages'][-1]['content'])
+                        if 'previous_retrieval' in supplied:
+                            assert supplied['remaining_queries']==1
+                            assert supplied['previous_retrieval']['status']=='no_usable_context_returned'
+                            assert supplied['previous_retrieval']['absence_of_memory_proven'] is False
+                        count=calls.count('alive_private_memory_query')
+                        document=({'query':miss} if count==1 or mode=='refine-repeat' else
+                            {'query':None} if mode=='refine-stop' else
+                            {'unexpected':'unadmitted refinement'} if mode=='refine-invalid' else
+                            {'query':'Sable classroom arithmetic'})
+                    else:
+                        document=({'query':None} if mode=='declined' else {'unexpected':'not an admitted question'}
+                                  if mode=='invalid-query' else {'query':'Sable classroom arithmetic teaching'
+                                      if mode=='work' and calls.count('alive_private_memory_query')>1 else 'Sable classroom arithmetic'})
                 elif kwargs['task']=='alive_core_autonomous_work':
                     assert work_case
                     supplied=json.loads(kwargs['messages'][-1]['content'])
@@ -144,8 +159,14 @@ async def exercise(home):
                     message=SimpleNamespace(content=json.dumps(document)))])
         native.caller_factory=lambda **kwargs:Caller(**kwargs)
         execution=importlib.import_module(loaded.module.__name__+'.kernel_execution_bridge')
+        capability=execution.kernel('core_memory_context').CoreMemoryRecall
+        original_read=capability.read;read_queries=[]
+        def observed_read(self,query):
+            read_queries.append(query)
+            return original_read(self,query)
         async def allow(self,url):return url=='https://example.invalid/memory-context'
-        with patch.object(execution.kernel('core_discovery_tools').CoreDiscoveryTools,'allow_url',allow):
+        with patch.object(execution.kernel('core_discovery_tools').CoreDiscoveryTools,'allow_url',allow), \
+                patch.object(capability,'read',observed_read):
             first=await native.step(binding.arguments['build_parameters']())
             second=await native.step(binding.arguments['build_parameters']())
             before_third=calls.count('alive_private_memory_query')
@@ -155,11 +176,17 @@ async def exercise(home):
         assert second.disposition in ('silence','waiting_for_change'),second.disposition
         assert cognition and searches,{'calls':calls,'first':first.disposition,'second':second.disposition,'third':third.disposition,
             'memory':native.private_context.last_status if granted else None,'searches':len(searches)}
-        assert 1<=calls.count('alive_private_memory_query')<=2 if granted else calls.count('alive_private_memory_query')==0,calls
+        assert 1<=calls.count('alive_private_memory_query')<=(4 if mode.startswith('refine') else 2) if granted else calls.count('alive_private_memory_query')==0,calls
         store=importlib.import_module(loaded.module.__name__+'.kernel_setup_bridge').setup_store(binding)
         records=store.journal.read(event_type='memory.core_recall_observed')
         assert len(records)==(2 if mode=='work' else 1 if has_context else 0),len(records)
         if work_case:assert calls.count('alive_core_autonomous_work')==1,calls
+        if mode.startswith('refine'):
+            assert len(read_queries)==(4 if mode=='refine' else 3 if mode=='refine-repeat' else 1),read_queries
+            assert calls.count('alive_private_memory_query')==(4 if mode=='refine-repeat' else 3),calls
+            assert native.private_context.last_status==('recalled' if mode=='refine' else
+                'no_usable_context_returned' if mode=='refine-repeat' else
+                'query_not_admitted' if mode=='refine-invalid' else 'no_question_selected')
         if mode in ('declined','invalid-query'):
             assert native.private_context.last_status==('no_question_selected' if mode=='declined' else 'query_not_admitted')
         from cron.jobs import list_jobs

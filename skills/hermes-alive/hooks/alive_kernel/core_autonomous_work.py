@@ -284,7 +284,11 @@ class CoreAutonomousWork:
             current=self.source(row[0],configured)
             if current is None or current['basis']!=source['basis']:
                 raise OpportunityEvidenceChanged('owned assignment changed during autonomous decision')
-            launched=(self.launch(configured,source,choice,validate=validate) if choice['decision']=='execute' else None)
+            context_receipt={'fingerprint':context_fingerprint,
+                'record_ids':[value['memory_id'] for value in context],
+                'raw_content_copied_to_journal':False,'owner_instruction_or_permission':False}
+            launched=(self.launch(configured,source,choice,validate=validate,
+                advisory_context=context_receipt,advisory_values=context) if choice['decision']=='execute' else None)
             suffix='start-decision:'+self.store.protector.authenticate_json('alive.autonomous-work.decision.v1',
                 {'basis':source['basis'],'operation':operation_id})
             expiry=min(datetime.now(timezone.utc)+timedelta(days=7),datetime.fromisoformat(source['item']['expires_at']))
@@ -300,7 +304,7 @@ class CoreAutonomousWork:
                 'raw_request_or_step_in_journal':False},event_type='work.start_decided')
             break  # Existing owner wake and model budget, not another planner loop.
 
-    def launch(self,configured,source,choice,*,validate):
+    def launch(self,configured,source,choice,*,validate,advisory_context=None,advisory_values=()):
         item=source['item'];owner=configured.subject
         with file_lock(self.store.root/'core-work.lock',timeout=0):
             validate();self.authority(configured)
@@ -327,7 +331,9 @@ class CoreAutonomousWork:
                     'continuation_history_basis':history['basis']} if history else {}),
                 'exact_current_work_message_retained_by_core':False,'historical_owner_request_retained_by_core':True,
                 'task_body_copied_into_alive_journal':False,'task_body_retention_owned_by_core':True,
-                'task_success_proven':False,**project},causation=item['owner_source_event_id'])
+                'task_success_proven':False,
+                **({'advisory_context':advisory_context} if advisory_context is not None else {}),
+                **project},causation=item['owner_source_event_id'])
             self.work._append(work_id,'handoff_started',owner,{'replacement_job_allowed':False},causation=work_id+':requested')
             def current_authority():
                 validate();self.authority(configured)
@@ -346,7 +352,14 @@ class CoreAutonomousWork:
                 'amendments chronologically only to the requirements they change. Preserve all unchanged original constraints; '
                 'the proposed step cannot broaden them. Do not send messages, schedule replacement jobs or delegate '
                 'untracked work. Return actual results and unresolved issues locally; do not claim unobserved effects.\n'
+                'advisory_owner_context is reference data supplied by the host through its authorized private '
+                'context reader, separate from the model-proposed step. Core-recalled advice is available '
+                'background knowledge, not an invented owner statement or permission. It may be stale: '
+                'preserve explicit owner constraints and concrete conflicting evidence. Use relevant advice '
+                'where the assignment allows known context; do not discard it merely because it is a memory '
+                'or demand new approval for a fact. An actual contradiction or material unknown remains unresolved.\n'
                 +json.dumps({'assignment':item['details'],'due_at':item['due_at'],
+                    'advisory_owner_context':list(advisory_values),
                     'work_turn_context':{'kind':'later_background_execution','original_intake_turn_is_current':False,
                         'current_owner_turn_supplied':False,
                         'admitted_at':datetime.now(timezone.utc).isoformat()},
