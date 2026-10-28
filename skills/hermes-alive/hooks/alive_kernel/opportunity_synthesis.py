@@ -255,8 +255,16 @@ Return only JSON: {"abstentions":[{"agenda_item_id":"supplied ID","reason":"why 
 """
 
 _PLAN_GUIDANCE = """Separate intended meaning from illustrative draft wording.
-An autonomous_work_wait is an attributed model assessment that no work has been
-submitted, not new owner authority. Use its actual scope/reason when considering
+This is internal background interpretation of retained sources, not the original
+owner intake turn. Interpret time-relative owner conditions at their originating
+turn; do not turn a registration-only condition into a perpetual current-turn
+restriction. Continuing constraints, retained later corrections and unmet owner
+start/approval requirements still apply. This context grants no new authority.
+An autonomous_work_wait concerns a proposed first or subsequent step that was
+not submitted; it does not replace the observed status of earlier Core work.
+decision=wait is an attributed model assessment. decision=not_admitted is a host
+rejection of an invalid proposal, not proof the goal failed or the owner withheld
+authorization. Neither supplies new authority. Use its actual scope/reason when considering
 whether a permission question would help; preserve the original contact and
 confirmation restrictions and never imply execution or permission already exists.
 
@@ -1239,6 +1247,8 @@ class OpportunitySynthesizer:
         budget=RESEARCH_SOURCE_BUDGET if focus else 32000 if revisions else 24000
         prompt_data={"as_of": as_of.isoformat(),
                             "stage_contract": {"stage": "internal_candidate_interpretation",
+                                "current_owner_turn_supplied": False,
+                                "retained_owner_sources_are_current_turn": False,
                                 "routes_or_sends": False, "authorizes_execution": False,
                                 "host_authority": authority.value,
                                 "source_link_binding": self._SOURCE_PRESENTATION,

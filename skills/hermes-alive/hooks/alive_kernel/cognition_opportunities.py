@@ -228,7 +228,7 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
                     'title':'Ongoing delegated work','core_work':status,
                     **({'core_work_outcome':assessment} if assessment is not None else {}),
                     **({'core_work_record_review':review} if review is not None else {})}))
-            elif value is not None:
+            if value is not None:
                 from .kernel_setup import KernelSetupStore
                 try:setup=KernelSetupStore(self.journal.path.parent,journal=self.journal)
                 except (ValueError,OSError,RuntimeError):setup=None

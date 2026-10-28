@@ -14,7 +14,7 @@ if __name__=='__main__' and os.environ.get('ALIVE_AUTOWORK_CHILD')!='1':
         env={**os.environ,'HOME':root,'HERMES_HOME':str(Path(root)/'profile'),
             'ALIVE_AUTOWORK_CHILD':'1','PYTHONDONTWRITEBYTECODE':'1'}
         modes=os.environ.get('ALIVE_AUTOWORK_CASES','execute,wait,revoked,erased,off,restart').split(',')
-        assert set(modes)<=set(('execute','wait','revoked','erased','off','restart','outcome-complete','outcome-partial','outcome-forged','outcome-revoked','outcome-recover','outcome-manual-long','outcome-wrong-result','outcome-window','outcome-malformed','outcome-attention','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover','project-pinned','project-manual','project-missing','project-replaced','project-restart','continuation'))
+        assert set(modes)<=set(('execute','wait','revoked','erased','off','restart','outcome-complete','outcome-partial','outcome-forged','outcome-revoked','outcome-recover','outcome-manual-long','outcome-wrong-result','outcome-window','outcome-malformed','outcome-attention','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover','project-pinned','project-manual','project-missing','project-replaced','project-restart','continuation','decision-malformed','decision-outside-scope'))
         try:
             for mode in modes:
                 case={**env,'HERMES_HOME':str(Path(root)/mode),'ALIVE_AUTOWORK_CASE':mode}
@@ -163,11 +163,39 @@ async def exercise(home):
             _collect_pre_llm_call_context(SimpleNamespace(session_id=entry.session_id,model='configured-primary',
                 platform='telegram',_user_id=source.user_id),effective_task_id='register-autonomous',turn_id='register-autonomous',
                 original_user_message=original,messages=[{'role':'user','content':original}],conversation_history=[])
+            if os.environ.get('ALIVE_WORK_ARGUMENT_FEEDBACK_TEST')=='1' and mode=='execute':
+                from datetime import datetime,timedelta,timezone
+                before_arguments=store.journal.last_sequence()
+                base={'operation':'record','task':'Keep this ongoing explicit assignment',
+                    'constraint':'No messages.','evidence_span':original}
+                future=datetime.now(timezone.utc)+timedelta(days=2)
+                invalid=[({'evidence_span':'NOT_AN_EXACT_OWNER_FRAGMENT'},'alive_agenda_evidence_span_invalid','evidence_span'),
+                    ({'available_at':'not-a-timestamp'},'alive_agenda_time_invalid','available_at'),
+                    ({'due_at':future.replace(tzinfo=None).isoformat()},'alive_agenda_time_invalid','due_at'),
+                    ({'due_at':future.isoformat(),'available_at':(future+timedelta(days=1)).isoformat()},'alive_agenda_time_order_invalid','available_at'),
+                    ({'available_at':(future-timedelta(days=3)).isoformat()},'alive_agenda_time_outside_retention','available_at')]
+                for index,(patch,code,field) in enumerate(invalid):
+                    rejected=json.loads(model_tools.handle_function_call('alive_agenda',{**base,**patch},
+                        task_id='register-autonomous',session_id=entry.session_id,turn_id='register-autonomous',
+                        tool_call_id='invalid-owner-argument-'+str(index),enabled_tools=['alive_agenda']))
+                    assert rejected['error']==code and rejected['field']==field,rejected
+                    assert not rejected['request_admitted'] and not rejected['mutation_admitted'] and not rejected['new_job_created']
+                    assert store.journal.last_sequence()==before_arguments and not jobs.list_jobs(include_disabled=True)
             saved=json.loads(model_tools.handle_function_call('alive_agenda',{'operation':'record',
                 'task':'Write '+body.strip()+' plus newline into '+('relative-result.txt' if mode.startswith('project-') else str(artifact))+' and read it back.',
                 'constraint':'No messages. '+original,'evidence_span':original},task_id='register-autonomous',
                 session_id=entry.session_id,turn_id='register-autonomous',tool_call_id='register-autonomous-call',enabled_tools=['alive_agenda']))
             assert saved['status']=='recorded_under_owner_intake_grant' and not jobs.list_jobs(include_disabled=True)
+            if os.environ.get('ALIVE_WORK_ARGUMENT_FEEDBACK_TEST')=='1' and mode=='execute':
+                catalog=json.loads(model_tools.handle_function_call('alive_agenda',{'operation':'list'},
+                    task_id='register-autonomous',session_id=entry.session_id,turn_id='register-autonomous',
+                    tool_call_id='argument-feedback-catalog',enabled_tools=['alive_agenda']))['items']
+                assert len(catalog)==1 and catalog[0]['available_at'] is None and catalog[0]['due_at'] is None
+                lookup=catalog[0]['original_request_lookup'];assert lookup['tool']=='alive_agenda'
+                exact=json.loads(model_tools.handle_function_call(lookup['tool'],lookup['arguments'],
+                    task_id='register-autonomous',session_id=entry.session_id,turn_id='register-autonomous',
+                    tool_call_id='argument-feedback-original',enabled_tools=['alive_agenda']))['items'][0]
+                assert exact['original_source_available'] and exact['original_owner_message']==original
             if mode.startswith('project-'):
                 view=execution.kernel('followup_intake').item_source_view(store,saved['item_id'],subject=store.configuration().subject,include_message=True)
                 assert view['core_project_context']['source']=='core_task'
@@ -293,6 +321,9 @@ async def exercise(home):
                 if kw['task']=='alive_core_autonomous_work':
                     counts['start']+=1;supplied=json.loads(kw['messages'][-1]['content'])
                     assert supplied['item']['original_owner_request']==original
+                    assert supplied['decision_context_version']==2
+                    frame=supplied['work_turn_context'];assert frame['kind']=='later_background_decision'
+                    assert not frame['current_owner_turn_supplied'] and not frame['original_intake_turn_is_current'] and not frame['new_owner_authorization']
                     if mode.startswith('project-'):
                         assert supplied['item']['core_project_context']['declared_cwd']==str(project)
                         if mode=='project-missing':
@@ -318,6 +349,8 @@ async def exercise(home):
                         else:
                             assert len(history['steps'])==2
                             answer={'decision':'wait','toolsets':[],'step':None,'reason':'Both steps have actual retained results. No third work.', 'reconsider_after_seconds':86400}
+                    if mode=='decision-outside-scope':
+                        answer['toolsets']=['terminal'];answer['step']='MODEL_PROPOSAL_MUST_NOT_BE_RETAINED'
                 elif kw['task']=='alive_core_work_outcome':
                     counts['outcome']+=1;supplied=json.loads(kw['messages'][-1]['content'])
                     assert supplied['item']['original_owner_request']==original
@@ -345,9 +378,11 @@ async def exercise(home):
                         execution.pause(binding,scope)
                 else:
                     assert kw['task']=='alive_opportunity_candidates' ,kw['task'];counts['cognition']+=1
+                    stage=json.loads(kw['messages'][-1]['content'])['stage_contract']
+                    assert not stage['current_owner_turn_supplied'] and not stage['retained_owner_sources_are_current_turn']
                     if mode=='wait':assert 'autonomous_work_wait' in str(kw['messages'])
                     answer={'candidates':[],'abstentions':[]}
-                return SimpleNamespace(model='synthetic-model',choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps(answer)))])
+                return SimpleNamespace(model='synthetic-model',choices=[SimpleNamespace(message=SimpleNamespace(content=('MODEL_PROPOSAL_MUST_NOT_BE_RETAINED: not JSON' if mode=='decision-malformed' and kw['task']=='alive_core_autonomous_work' else json.dumps(answer))))])
         binding.native.caller_factory=lambda **kw:Caller(**kw)
         if mode=='execute':
             auto=execution.kernel('core_autonomous_work').CoreAutonomousWork(store);cfg=store.configuration()
@@ -355,6 +390,22 @@ async def exercise(home):
                 validate=lambda:auto.authority(cfg),operation_id='synthetic-projection-page')
             assert counts['start']==0 and not jobs.list_jobs(include_disabled=True)
             assert saved['item_id'] in [row['item_id'] for row in auto.scan(cfg)[1]]
+        if mode=='wait' and os.environ.get('ALIVE_WORK_TEMPORAL_CACHE_TEST')=='1':
+            from datetime import datetime,timedelta,timezone
+            auto=execution.kernel('core_autonomous_work').CoreAutonomousWork(store);cfg=store.configuration()
+            current=auto.source(saved['item_id'],cfg);old={k:v for k,v in current.items() if k not in ('basis','decision_context_version')}
+            old_basis=store.protector.authenticate_json('alive.autonomous-work.source.v1',old)
+            assert old_basis!=current['basis']
+            anchor='core-work:'+store.protector.authenticate_json('alive.autonomous-work.decisions.v1',{'owner':cfg.subject,'item':saved['item_id']})
+            suffix='start-decision:legacy-context-fixture'
+            expiry=min(datetime.now(timezone.utc)+timedelta(days=7),datetime.fromisoformat(current['item']['expires_at']))
+            legacy={'decision':'wait','toolsets':[],'step':None,'reason':'LEGACY_REGISTRATION_CONTEXT_MISREAD','reconsider_after_seconds':86400}
+            ref=store.vault.put_json(legacy,subject=cfg.subject,purpose='core-work.autonomous-decision',
+                sensitivity=execution.kernel('events').Sensitivity.PRIVATE,retention_until=expiry,content_id=anchor+':'+suffix)
+            auto.work._append(anchor,suffix,cfg.subject,{'item_id':saved['item_id'],'basis':old_basis,
+                'operation_id':'legacy-context-fixture','decision':'wait','actual_model':'synthetic-legacy-context',
+                'reconsider_at':(datetime.now(timezone.utc)+timedelta(days=1)).isoformat(),
+                'decision_content':ref.to_event_payload(),'work_id':None,'raw_request_or_step_in_journal':False},event_type='work.start_decided')
         if mode=='erased':
             proposal=store.journal.get('agenda.proposal:'+saved['item_id']).event
             intake=store.journal.get(proposal.payload['source_event_ids'][0]).event
@@ -489,6 +540,26 @@ async def exercise(home):
             assert summary['exit_reason']=='stopped' and summary['completed_cycles']>=1
             assert len(list(store.journal.read(event_type='work.outcome_rejected')))==1
             assert not list(store.journal.read(event_type='work.outcome_decided'))
+        elif mode.startswith('decision-'):
+            assert len(list(store.journal.read(event_type='work.start_rejected')))==1
+            stop=asyncio.Event()
+            task=binding.native.start(binding.context,build_parameters=binding.arguments['build_parameters'],
+                stop=stop,max_cycles=None,interval_seconds=600,continuous=True)
+            deadline=asyncio.get_running_loop().time()+60
+            while len(list(store.journal.read(event_type='work.start_rejected')))<2:
+                assert not task.done() and asyncio.get_running_loop().time()<deadline
+                await asyncio.sleep(.05)
+            assert not task.done(),'an invalid action proposal terminated the host'
+            stop.set();summary=await task
+            assert summary['exit_reason']=='stopped' and summary['completed_cycles']>=1
+            assert len(list(store.journal.read(event_type='work.start_rejected')))==2
+            assert not list(store.journal.read(event_type='work.requested'))
+            assert not list(store.journal.read(event_type='work.start_decided'))
+            assert not jobs.list_jobs(include_disabled=True) and not artifact.exists() and not work_requests
+            diagnostics=execution.kernel('core_autonomous_work').CoreAutonomousWork(store).wait_evidence(saved['item_id'],store.configuration())
+            assert diagnostics['decision']=='not_admitted' and not diagnostics['work_submitted']
+            assert not diagnostics['owner_authorization_missing_proven'] and not diagnostics['goal_failure_proven']
+            assert 'MODEL_PROPOSAL_MUST_NOT_BE_RETAINED' not in '\n'.join(r.event.canonical_json() for r in store.journal.read())
         elif mode=='outcome-forged':
             result=await binding.native.step(binding.arguments['build_parameters']())
             assert result.disposition in ('silence','evidence_changed')
@@ -526,7 +597,7 @@ async def exercise(home):
             if mode in ('project-missing','project-replaced'):assert not (moved/'relative-result.txt').exists()
         if mode=='revision-before':assert not original_artifact.exists()
         if mode in ('revision-after','revision-manual','revision-recover'):assert not (home/'new-revision-target.txt').exists()
-        assert counts['start']==(0 if mode in ('erased','off','outcome-manual-long','revision-manual','project-manual') else 1) and len(jobs.list_jobs(include_disabled=True))==(1 if mode in ('execute','revoked','restart','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover','project-pinned','project-manual','project-replaced','project-restart','continuation') or mode.startswith('outcome-') else 0)
+        assert counts['start']==(0 if mode in ('erased','off','outcome-manual-long','revision-manual','project-manual') else 2 if mode.startswith('decision-') else 1) and len(jobs.list_jobs(include_disabled=True))==(1 if mode in ('execute','revoked','restart','attention-snooze','attention-resume','attention-cancel','attention-reopen','revision-before','revision-after','revision-legacy','revision-deadline','revision-manual','revision-recover','project-pinned','project-manual','project-replaced','project-restart','continuation') or mode.startswith('outcome-') else 0)
         from contextlib import closing
         with closing(store.journal._connect()) as c:
             assert c.execute('SELECT state FROM agenda_items_v1 WHERE item_id=?',(saved['item_id'],)).fetchone()[0]==('snoozed' if mode=='attention-snooze' else 'dismissed' if mode=='attention-cancel' else 'active')
@@ -565,6 +636,23 @@ async def exercise(home):
             assert counts['start']==4 and len(jobs.list_jobs(include_disabled=True))==2
             assert artifact.stat().st_mtime_ns==first_stat
             assert not list(store.journal.read(event_type='work.outcome_decided')), 'continuation must not require or grant automatic closure'
+            reader=execution.kernel('cognition_opportunities').CognitionOpportunityReader(store.journal,content_vault=store.vault)
+            available=reader.commitments(subject=cfg.subject,clearance=execution.kernel('events').Sensitivity.PRIVATE)
+            assert any(v.content.get('autonomous_work_wait',{}).get('decision')=='wait' for v in available)
+            question='查询这项工作的状态和后续等待原因，不要执行或修改。'
+            variables=core.set_session_vars(platform='telegram',chat_id=source.chat_id,user_id=source.user_id,
+                session_key=entry.session_key,session_id=entry.session_id)
+            _collect_pre_llm_call_context(SimpleNamespace(session_id=entry.session_id,model='configured-primary',
+                platform='telegram',_user_id=source.user_id),effective_task_id='continued-status',turn_id='continued-status',
+                original_user_message=question,messages=[{'role':'user','content':question}],conversation_history=[])
+            observed=json.loads(model_tools.handle_function_call('alive_agenda',{'operation':'work_status','item_id':saved['item_id']},
+                task_id='continued-status',session_id=entry.session_id,turn_id='continued-status',
+                tool_call_id='continued-status-call',enabled_tools=['alive_agenda']))
+            core.clear_session_vars(variables);variables=None
+            assert observed['work_id']==second['work_id'] and observed['core_execution_state']=='completed'
+            assert observed['autonomous_work_wait']['decision']=='wait'
+            assert 'Both steps' in observed['autonomous_work_wait']['reason']
+            assert len(jobs.list_jobs(include_disabled=True))==2
             state=second
         keys=('identity.key','content-vault/content.key','experience-content-vault/content.key')
         (home/'autonomous-expected.json').write_text(json.dumps({'work_id':state['work_id'] if state else None,

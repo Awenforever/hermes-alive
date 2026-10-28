@@ -16,6 +16,9 @@ READ_REFERENCE_SCHEMA = {
                    'Use a reference handle from Alive context. Paged fragments must be read in order; '
                    'text recovers what Alive prepared, not independent verification. Use source pages to inspect '
                    'the collected evidence; its catalog identifies source indices. An excerpt is not a full source. '
+                   'These handles belong to prepared proactive shares, not agenda request events or Core jobs. '
+                   'For a retained task original, use the original_request_lookup returned by alive_agenda. '
+                   'A provenance source_event_id is not a read_reference handle. '
                    'This cannot send, search files or access other sessions.',
     'parameters': {'type': 'object', 'properties': {
         'reference': {'type': 'string'},

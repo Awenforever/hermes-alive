@@ -3,6 +3,34 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## 2026-10-28 — Delegation requires input roles as well as permission checks
+
+Real continued-work trials exposed three different boundaries; do not collapse
+them into provider failure or repair them with owner-language keyword rules.
+An invalid literal evidence span received a generic time hint, prompting an
+unrequested future deferral (r258). A provenance event ID was mistaken for a
+share-reader handle. After typed field feedback and an explicit original-request
+lookup corrected intake, a later wake still interpreted the retained registration
+message as the current turn (r260). Both full workflow failures remain failures.
+
+An error must identify the argument that actually failed without inventing a
+missing prerequisite. A retained source must expose its supported reader rather
+than require the model to guess a tool from an opaque ID. A background invocation
+must distinguish its present execution context from the historical owner turn;
+that distinction must reach planning, cognition and execution consistently.
+Later time alone never satisfies an explicit requirement for a new owner start
+signal. Context-versioned decision caches preserve that distinction without
+upgrading old grants or recreating uncertain work.
+
+Malformed or out-of-scope model proposals must leave a useful host alive while
+submitting no work. Observe the rejected next proposal separately from earlier
+Core execution; rejection proves neither task failure nor withheld permission.
+The actual-Core controls for these boundaries passed (ADRs0262–0264). Real
+continued-work and explicit-start counterexample checks remain separate gates.
+Do not claim broad autonomous competence from a pair of controlled file tasks,
+and do not replace Core's model fallback, executor or scheduler with plugin-owned
+alternatives while repairing these contracts.
+
 ## 2026-10-25 — Inspect actual writer inputs before changing the genre contract
 
 The r84 actual request has meaning, presentation, language and expression_context.

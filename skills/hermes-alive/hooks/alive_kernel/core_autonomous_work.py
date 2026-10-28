@@ -49,7 +49,8 @@ class CoreAutonomousWork:
         scope=self.work.toolsets(list(configured.options.get('automatic_core_toolsets',())))
         if not scope:return None
         self.work.native_toolsets(scope)
-        value={'item':item,'automatic_toolsets':scope,'configuration_event_id':configured.event_id}
+        value={'item':item,'automatic_toolsets':scope,'configuration_event_id':configured.event_id,
+            'decision_context_version':2}
         if previous is not None:value['continuation_history']=self.history(item_id,configured)
         value['basis']=self.store.protector.authenticate_json('alive.autonomous-work.source.v1',value)
         return value
@@ -124,7 +125,8 @@ class CoreAutonomousWork:
         except (ValueError,OSError,RuntimeError):return None
         if source is None:return None
         with closing(self.store.journal._connect()) as c:
-            row=c.execute("SELECT event_id FROM experience_events WHERE subject=? AND event_type='work.start_decided' "
+            row=c.execute("SELECT event_id,event_type FROM experience_events WHERE subject=? "
+                "AND event_type IN ('work.start_decided','work.start_rejected') "
                 "AND json_extract(canonical_json,'$.payload.item_id')=? "
                 "AND json_extract(canonical_json,'$.payload.basis')=? ORDER BY sequence DESC LIMIT 1",
                 (configured.subject,item_id,source['basis'])).fetchone()
@@ -132,7 +134,13 @@ class CoreAutonomousWork:
         from .content_vault import ContentReference,ContentVaultError
         anchor='core-work:'+self.store.protector.authenticate_json('alive.autonomous-work.decisions.v1',
             {'owner':configured.subject,'item':item_id})
-        saved=self.work._read(anchor,row[0].removeprefix(anchor+':'),configured.subject,event_type='work.start_decided')
+        saved=self.work._read(anchor,row[0].removeprefix(anchor+':'),configured.subject,event_type=row[1])
+        if row[1]=='work.start_rejected':
+            return {'decision':'not_admitted','reason':'The model proposal did not meet the current work contract.',
+                'applies_to':'next unsubmitted work for the current item, not an earlier Core execution',
+                'reconsider_at':None,'automatic_toolsets':source['automatic_toolsets'],'source_event_id':row[0],
+                'work_submitted':False,'owner_authorization_missing_proven':False,'goal_failure_proven':False,
+                'authority':'host rejection of a model proposal; the existing owner grant is unchanged'}
         if saved['decision']!='wait':return None
         ref=ContentReference.from_event_payload(saved['decision_content'])
         try:
@@ -141,11 +149,48 @@ class CoreAutonomousWork:
         except ContentVaultError:return None
         if self.store.vault.digest_json(choice)!=ref.digest:raise ValueError('autonomous waiting evidence changed')
         return {'decision':'wait','reason':choice['reason'],'reconsider_at':saved['reconsider_at'],
+            'applies_to':'next unsubmitted work for the current item, not an earlier Core execution',
             'automatic_toolsets':source['automatic_toolsets'],'source_event_id':row[0],
             'work_submitted':False,'authority':'model assessment under existing owner scope, not a new permission'}
 
     def scan(self,configured):
         return self.sources.page(configured)
+
+    @staticmethod
+    def normalize(text,source):
+        choice=parse_model_json(text,max_chars=10000)
+        if (not isinstance(choice,dict) or set(choice)!={'decision','toolsets','step','reason','reconsider_after_seconds'}
+                or choice['decision'] not in ('execute','wait') or not isinstance(choice['reason'],str)
+                or not 0<len(choice['reason'])<=1500):raise ValueError('bounded autonomous work decision required')
+        sets=CoreWorkStore.toolsets(choice['toolsets'])
+        if (choice['decision']=='execute' and (not sets or not set(sets)<=set(source['automatic_toolsets'])
+                or source.get('continuation_history',{}).get('blocked_reason')
+                or not isinstance(choice['step'],str) or not 0<len(choice['step'])<=1500
+                or choice['reconsider_after_seconds'] is not None)
+                or choice['decision']=='wait' and (sets or choice['step'] is not None
+                    or type(choice['reconsider_after_seconds']) is not int
+                    or not 600<=choice['reconsider_after_seconds']<=86400)):
+            raise ValueError('autonomous step exceeds its guided scope or wait bounds')
+        return {**choice,'toolsets':sets}
+
+    def rejection_id(self,source,operation_id):
+        return 'start-rejection:'+self.store.protector.authenticate_json('alive.autonomous-work.rejection.v1',
+            {'basis':source['basis'],'operation':operation_id})
+
+    def reject(self,configured,source,operation_id,model,*,validate):
+        validate();self.authority(configured)
+        current=self.source(source['item']['item_id'],configured)
+        if current is None or current['basis']!=source['basis']:
+            raise OpportunityEvidenceChanged('owned work changed before proposal rejection')
+        anchor='core-work:'+self.store.protector.authenticate_json('alive.autonomous-work.decisions.v1',
+            {'owner':configured.subject,'item':source['item']['item_id']})
+        suffix=self.rejection_id(source,operation_id)
+        if self.work._read(anchor,suffix,configured.subject,event_type='work.start_rejected') is not None:return
+        self.work._append(anchor,suffix,configured.subject,{'item_id':source['item']['item_id'],
+            'configuration_event_id':configured.event_id,'basis':source['basis'],'operation_id':operation_id,
+            'actual_model':model,'reason_code':'invalid_work_proposal','raw_model_body_retained':False,
+            'work_submitted':False,'owner_authorization_missing_proven':False,'goal_failure_proven':False},
+            event_type='work.start_rejected')
 
     async def run(self,configured,*,call,validate,operation_id):
         if configured.options.get('autonomous_core_work') is not True:return
@@ -167,9 +212,15 @@ class CoreAutonomousWork:
                 event_type='work.start_decided') if prior else None)
             if previous and (previous['operation_id']==operation_id or previous['decision']!='wait'
                     or datetime.fromisoformat(previous['reconsider_at'])>datetime.now(timezone.utc)):continue
+            if self.work._read(anchor,self.rejection_id(source,operation_id),configured.subject,
+                    event_type='work.start_rejected') is not None:continue
             response=await call(task='alive_core_autonomous_work',model=configured.options['model'],
                 messages=[{'role':'system','content':
                     'Decide whether to begin this existing owner-assigned ongoing work on this host wake, or wait. '
+                    'This invocation is a later background decision, not the original owner intake turn. '
+                    'Interpret turn-relative conditions at their originating owner turn: a registration-only '
+                    'restriction does not by itself forbid later work the owner already authorized. Preserve '
+                    'continuing constraints and still-unmet owner-start/approval requirements. '
                     'The independently guided automatic scope authorizes Core work only within the supplied toolsets '
                     'and the original assignment. The retained original_owner_request is historical owner intent, '
                     'not a new user turn. The agenda description is an interpretation; preserve exact original '
@@ -193,21 +244,18 @@ class CoreAutonomousWork:
                     'execute, [] for wait), step (nonempty for execute, null for wait), reason (brief), '
                     'reconsider_after_seconds (600 to 86400 for wait, null for execute). '
                     'If needed tools or permission are outside scope, wait and explain the missing owner decision.'},
-                    {'role':'user','content':json.dumps({k:v for k,v in source.items() if k!='basis'},ensure_ascii=False)}],
+                    {'role':'user','content':json.dumps({**{k:v for k,v in source.items() if k!='basis'},
+                        'work_turn_context':{'kind':'later_background_decision',
+                            'current_owner_turn_supplied':False,'original_intake_turn_is_current':False,
+                            'observed_at':datetime.now(timezone.utc).isoformat(),
+                            'host_operation_id':operation_id,'new_owner_authorization':False}},ensure_ascii=False)}],
                 temperature=.2,max_tokens=1200,timeout=DEFAULT_STAGE_SECONDS)
-            text,model=DeliberationSynthesizer._response(response);choice=parse_model_json(text,max_chars=10000)
-            if (not isinstance(choice,dict) or set(choice)!={'decision','toolsets','step','reason','reconsider_after_seconds'}
-                    or choice['decision'] not in ('execute','wait') or not isinstance(choice['reason'],str)
-                    or not 0<len(choice['reason'])<=1500):raise ValueError('bounded autonomous work decision required')
-            sets=self.work.toolsets(choice['toolsets'])
-            if (choice['decision']=='execute' and (not sets or not set(sets)<=set(source['automatic_toolsets'])
-                    or source.get('continuation_history',{}).get('blocked_reason')
-                    or not isinstance(choice['step'],str) or not 0<len(choice['step'])<=1500
-                    or choice['reconsider_after_seconds'] is not None)
-                    or choice['decision']=='wait' and (sets or choice['step'] is not None
-                        or type(choice['reconsider_after_seconds']) is not int
-                        or not 600<=choice['reconsider_after_seconds']<=86400)):
-                raise ValueError('autonomous step exceeds its guided scope or wait bounds')
+            model=None
+            try:
+                text,model=DeliberationSynthesizer._response(response);choice=self.normalize(text,source)
+            except (ValueError,TypeError):
+                self.reject(configured,source,operation_id,model,validate=validate)
+                break  # An unadmitted proposal neither executes nor kills the host.
             validate();current=self.source(row[0],configured)
             if current is None or current['basis']!=source['basis']:
                 raise OpportunityEvidenceChanged('owned assignment changed during autonomous decision')
@@ -273,6 +321,7 @@ class CoreAutonomousWork:
                 'untracked work. Return actual results and unresolved issues locally; do not claim unobserved effects.\n'
                 +json.dumps({'assignment':item['details'],'due_at':item['due_at'],
                     'work_turn_context':{'kind':'later_background_execution','original_intake_turn_is_current':False,
+                        'current_owner_turn_supplied':False,
                         'admitted_at':datetime.now(timezone.utc).isoformat()},
                     'retained_original_owner_request':item['original_owner_request'],
                     **({'retained_owner_amendments':item['owner_amendments']} if 'owner_amendments' in item else {}),

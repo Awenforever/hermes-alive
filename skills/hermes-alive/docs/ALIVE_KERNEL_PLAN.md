@@ -130,6 +130,13 @@ records and ADRs0241–0256. Historical detail is retained in
    from cancelled/reopened task life. Broader negative/lifecycle cases, empty
    automatic scope and real inherited-model judgment remain unqualified.
    Old first-work grants and automatic closure stay separate.
+   Real r258/r260 workflows failed before any useful work: misleading generic
+   argument feedback induced an unrequested date, then a later wake was mistaken
+   for the historical intake turn. ADRs0262–0264 add proposal-rejection liveness,
+   observable next-step waiting, typed argument/lookup capabilities and consistent
+   turn roles. Their installed-Core/cold controls pass; unchanged real positive
+   and explicit-start-wait scenarios still require qualification. Neither failure
+   advances the sharing counter or establishes a missing owner permission.
 2. **Close memory and adaptation.** Use Core's existing memory/provider ownership.
    Distinguish durable preferences, tentative conversation, quotations and noise;
    retain attributed, reversible feedback rather than permanent labels inferred
