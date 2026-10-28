@@ -49,6 +49,31 @@ controls pass. A controlled provider result is scope evidence, not real-model
 reasoning competence. The next useful work is broader lifecycle and memory
 integration, not another rewrite of these same synthetic tasks.
 
+### 2026-10-28 correction — prove that the intended branch actually ran
+
+The preceding zero-scope qualification claim was wrong. Audit of the immutable
+r265 launcher found no ALIVE_WORK_MODEL_ONLY_TEST=1: a broad name replacement
+changed a temporal-cache variable, so the subsequent exact replacement failed
+silently. All four purported zero-scope cases actually had the ordinary file
+scope. Preserve their reports as file-scope results and withdraw the stronger
+claim. The two real work runs remain independent evidence and are unaffected.
+
+The corrected fixture retains and independently checks the selected branch,
+actual signed setup toolsets, actual stored Core job toolsets, worker HTTP tool
+counts and artifact absence, with an explicit proof line per case. The launcher
+must also assert the intended environment before running. Broad replacements
+that can quietly miss an intended setting are not adequate test preparation;
+inspect the final command and observed scope. A successful process alone proves
+neither a selected branch nor the claim that branch was meant to verify.
+
+r273 subsequently passes with four explicit zero-scope proof lines, cold checks
+and three ordinary controls. The old r265 result remains withdrawn for that
+scope. Carry actual runtime and configuration boundaries into the claim: an
+empty-tool request under builtin memory does not establish the same result under
+every externally configured memory provider. Qualify the inherited provider
+before asserting that broader integration, using public synthetic data rather
+than copying a production memory database.
+
 ## 2026-10-25 — Inspect actual writer inputs before changing the genre contract
 
 The r84 actual request has meaning, presentation, language and expression_context.

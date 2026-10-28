@@ -143,10 +143,15 @@ records and ADRs0241–0256. Historical detail is retained in
    waiting across two wakes with zero jobs/effects. Main replies remain verbose
    and unnecessarily frame retained project binding as a further alignment point;
    these dialogue limitations remain open. ADR0265 also corrects the
-   empty-scope contradiction: actual Core preserves [] through its native job
-   and worker request. Model-only execute/wait/outside-scope/off and ordinary
-   file/continuation controls pass, including cold readers; no additional tool
-   authority or plugin executor was introduced.
+   empty-scope contradiction without adding tool authority or an executor.
+   Audit found that r265's launcher did not actually select its model-only
+   branch; that part of the earlier qualification claim is withdrawn. Its
+   file-scope controls remain evidence only for file scope. Requalification must
+   assert the launch flag and retain observed configuration/job/request scope
+   for each zero-scope case and its cold reader, not merely a green exit code.
+   Corrected r273 now supplies those proofs: four genuine zero-scope cases and
+   three ordinary controls/cold readers pass. This is the tested builtin-memory
+   profile; external-provider configurations remain separate qualification.
 2. **Close memory and adaptation.** Use Core's existing memory/provider ownership.
    Distinguish durable preferences, tentative conversation, quotations and noise;
    retain attributed, reversible feedback rather than permanent labels inferred

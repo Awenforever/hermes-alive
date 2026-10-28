@@ -21,6 +21,15 @@ if __name__=='__main__' and os.environ.get('ALIVE_AUTOWORK_CHILD')!='1':
                 result=subprocess.run([sys.executable,'-B',__file__,*sys.argv[1:]],env=case,
                     capture_output=True,text=True,timeout=300)
                 assert result.returncode==0,mode+'\n'+result.stdout+'\n'+result.stderr
+                if os.environ.get('ALIVE_WORK_MODEL_ONLY_TEST')=='1':
+                    proof=json.loads((Path(case['HERMES_HOME'])/'autonomous-expected.json').read_text(encoding='utf-8'))['scope_proof']
+                    assert proof['model_only'] is True and proof['automatic_toolsets']==[]
+                    assert proof['artifact_absent'] is True
+                    if mode=='execute':
+                        assert proof['job_enabled_toolsets']==[] and proof['worker_request_tool_counts']==[0]
+                    else:
+                        assert proof['job_enabled_toolsets'] is None and proof['worker_request_tool_counts']==[]
+                    print('MODEL_ONLY_ACTUAL_CORE_PROOF '+json.dumps({'mode':mode,**proof}),flush=True)
                 if mode in ('restart','project-restart'):
                     resumed=subprocess.run([sys.executable,'-B',__file__,*sys.argv[1:]],env={**case,'ALIVE_AUTOWORK_RESUME':'1'},
                         capture_output=True,text=True,timeout=300)
@@ -672,7 +681,11 @@ async def exercise(home):
             state=second
         keys=('identity.key','content-vault/content.key','experience-content-vault/content.key')
         (home/'autonomous-expected.json').write_text(json.dumps({'work_id':state['work_id'] if state else None,
-            'owner':store.configuration().subject,'work_count':2 if mode=='continuation' else 1,'second_artifact':str(second_artifact) if mode=='continuation' else None,'artifact':str(artifact),'body':actual_body,'revoked':model_only or mode in ('revoked','attention-cancel','attention-reopen','revision-after','revision-manual','revision-recover','project-replaced'),'outcomes':mode.startswith('outcome-'),'pending_closure':mode=='outcome-recover','manual':manual is not None,'revision_item':saved['item_id'] if mode.startswith('revision-') else None,
+            'owner':store.configuration().subject,'work_count':2 if mode=='continuation' else 1,'second_artifact':str(second_artifact) if mode=='continuation' else None,'artifact':str(artifact),'body':actual_body,'artifact_expected_absent':model_only or mode in ('revoked','attention-cancel','attention-reopen','revision-after','revision-manual','revision-recover','project-replaced'),'outcomes':mode.startswith('outcome-'),'pending_closure':mode=='outcome-recover','manual':manual is not None,'revision_item':saved['item_id'] if mode.startswith('revision-') else None,
+            'scope_proof':{'model_only':model_only,'automatic_toolsets':list(store.configuration().options.get('automatic_core_toolsets',())),
+                'job_enabled_toolsets':jobs.get_job(state['job_id'])['enabled_toolsets'] if state else None,
+                'worker_request_tool_counts':[len(request.get('tools') or []) for request in work_requests],
+                'artifact_absent':not artifact.exists()},
             'project_dir':str(project) if mode.startswith('project-') else None,'project_missing':mode in ('project-missing','project-replaced'),
             'revision_due':json.loads(await command('agenda list'))['items'][0]['due_at'] if mode.startswith('revision-') and mode!='revision-recover' else None,
             'revision_expected_task':'Write NEW_REVISION_ONLY to '+str(home/'new-revision-target.txt') if mode=='revision-recover' else None,
@@ -731,7 +744,10 @@ if __name__=='__main__':
         if expected['work_id']:
             state=execution.kernel('core_work').CoreWorkStore(store).status(expected['work_id'],subject=expected['owner'])
             assert state['core_execution_state']=='completed' and state['historical_owner_request_retained_by_core'] is (not expected['manual'])
-            assert not Path(expected['artifact']).exists() if expected['revoked'] else Path(expected['artifact']).read_text(encoding='utf-8')==expected['body']
+            assert not Path(expected['artifact']).exists() if expected['artifact_expected_absent'] else Path(expected['artifact']).read_text(encoding='utf-8')==expected['body']
+            if expected['scope_proof']['model_only']:
+                from cron.jobs import get_job
+                assert get_job(state['job_id'])['enabled_toolsets']==[]
         assert len(list_jobs(include_disabled=True))==(expected.get('work_count',1) if expected['work_id'] else 0)
         if expected.get('second_artifact'):assert Path(expected['second_artifact']).read_text(encoding='utf-8')==expected['body']
     else:asyncio.run(exercise(Path(os.environ['HERMES_HOME'])))
