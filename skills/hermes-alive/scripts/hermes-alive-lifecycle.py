@@ -1234,8 +1234,46 @@ def _hub_uninstall(paths: Paths) -> tuple[bool, str]:
     return result.returncode == 0, result.stdout or ""
 
 
+def _retire_kernel_work(home):
+    """Stop authenticated Core work before removing code; retain all results.
+
+    Legacy-only installations do not load a Core/kernel dependency. Existing
+    kernel data requires its existing keys; uninstall must never recreate them.
+    """
+    root=home/'plugin-data/hermes-alive/runtime/kernel'
+    if not (root/'experience.sqlite3').is_file():return None
+    from hermes_constants import get_hermes_home
+    if Path(get_hermes_home()).resolve()!=home.resolve():
+        raise LifecycleError('Run uninstall in the owning Hermes profile')
+    import asyncio
+    import hashlib
+    import types
+    from importlib import import_module
+    kernel=Path(__file__).resolve().parent.parent/'hooks/alive_kernel'
+    digest=hashlib.sha256()
+    for file in sorted(kernel.glob('*.py')):
+        digest.update(file.name.encode());digest.update(file.read_bytes())
+    name='hermes_alive_retirement_'+digest.hexdigest()[:16]
+    if name not in sys.modules:
+        package=types.ModuleType(name);package.__path__=[str(kernel)];sys.modules[name]=package
+    store=import_module(name+'.kernel_setup').KernelSetupStore(root)
+    authority={'kind':'operator_plugin_deactivation','cause':'explicit_runtime_uninstall',
+        'evidence_fingerprint':store.protector.authenticate_json('alive.core-work.deactivation.v1',
+            {'profile':str(home.resolve()),'operation':'uninstall'}),'not_a_fabricated_owner_turn':True}
+    def validate():
+        if Path(get_hermes_home()).resolve()!=home.resolve():raise LifecycleError('Hermes profile changed')
+    control=import_module(name+'.core_work_retirement').CoreWorkRetirement(store)
+    prepared=control.prepare(authority=authority,validate=validate)
+    result=asyncio.run(control.settle(prepared,validate=validate))
+    print('HERMES_ALIVE_CORE_WORK_RETIREMENT='+json.dumps(result,sort_keys=True))
+    if result['needs_attention']:
+        raise LifecycleError('Core work stop outcome unresolved; code and results retained for reconciliation')
+    return result
+
+
 def uninstall(args: argparse.Namespace, *, purge: bool) -> int:
     paths = _paths(args)
+    _retire_kernel_work(paths.hermes_home)
     manifest = _read_json(paths.manifest_file, {})
     source_owner = (
         manifest.get("source_owner")

@@ -203,6 +203,11 @@ class GatewayHostBinding:
         if self.closed:
             status['binding_unloaded']=True
             if not status['runtime_active']:status['status']='unloaded'
+        retirement=getattr(self,'_core_retirement_status',None)
+        if retirement is not None:
+            status['core_work_retirement']=dict(retirement)
+            cleanup=getattr(self,'_core_retirement_task',None)
+            status['core_work_retirement']['cancellation_io_pending']=cleanup is not None and not cleanup.done()
         return status
 
     async def startup(self):
@@ -230,7 +235,16 @@ class GatewayHostBinding:
         return {'status':'started','legacy_allowed':False,'external_delivery_proven':False}
 
     def close(self):
+        if self.closed:return
         self.closed=True
+        if self.arguments is not None:self.arguments['stop'].set()
+        try:
+            from .core_retirement_bridge import retire_if_deselected
+            self._core_retirement_status=retire_if_deselected(self)
+        except Exception as error:
+            self._core_retirement_status={'status':'stop_outcome_unknown','needs_attention':True,
+                'error_class':type(error).__name__,'effects_undone':False,'results_deleted':False}
+            logging.getLogger(__name__).warning('Alive Core work deactivation unavailable: %s',type(error).__name__)
         if self._agenda is not None:self._agenda.close()
         if self._continuity is not None:self._continuity.close()
         for router in self._session_routers.values():router.close()

@@ -107,13 +107,20 @@ def register_setup_command(context,binding):
                     if parts[0]=='status':
                         active=store.activation()
                         observed=binding.runtime_status()
+                        retirement=observed.get('core_work_retirement') or {}
                         return ('Alive 状态：'+observed['status']+'；当前发送授权：'
                             +('有效' if active else '未启用、已暂停或已到期')+'。'
                             +'待收拢工作：'+str(observed.get('pending_work_count',0))+' 项。'
-                            '运行状态不代表消息已送达。')
+                            '运行状态不代表消息已送达。'
+                            +('有任务停止结果尚未确认，请核查 Hermes 任务状态。' if retirement.get('needs_attention')
+                                or retirement.get('cancellation_io_pending') else ''))
                     if parts[0]=='pause':
                         execution.pause(binding,scope)
-                        return 'Alive 已暂停。不会发起新的分享；已提交给消息渠道的内容由该渠道继续处理。'
+                        from .core_retirement_bridge import retire_current_owner
+                        retired=await retire_current_owner(binding,scope)
+                        detail=('部分任务的停止结果尚未确认，请查看 /alive status。' if retired['needs_attention'] else
+                            '未开始的任务已停止后续执行；运行中的任务已请求停止，已有结果保留。')
+                        return 'Alive 已暂停。'+detail+'已提交给消息渠道的内容由该渠道继续处理。'
                     if binding.task is not None and not binding.task.done():
                         return 'Alive 后台任务仍在运行或停止中，请先查看 /alive status。'
                     if execution.runtime_engine(binding)!='kernel':

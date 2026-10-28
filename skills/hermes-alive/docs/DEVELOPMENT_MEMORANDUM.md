@@ -3,6 +3,31 @@
 Internal engineering notes. User-facing README files describe the product;
 failure history and non-regression constraints live here.
 
+## 2026-10-28 — Unload is not a task-cancellation contract
+
+The actual Core characterization continued a queued file task after Alive's
+binding had unloaded. The owner chose to stop future execution on explicit
+deactivation, retain previous results, and preserve progress on ordinary upgrade.
+ADR0266 separates these operations. Do not remove Core jobs: Core removal also
+removes outputs/notepads. Names are not ownership evidence; cancellation requires
+signed work association and matching Core definition. Pause is a schedule fence,
+not proof a running operation terminated. Lost cancellation answers must remain
+unknown, including across repeated pause requests and cold recovery.
+
+The first retirement test used a nonexistent Core `paused` field. Its KeyError
+was a test assertion defect, not evidence of a failed or successful product.
+Use the actual `state == paused` and `enabled == false` fields, preserve the
+failed case, and qualify actual execution absence with a subsequent Core tick.
+
+Retirement's guard must qualify positive ordinary producer work as well as stop
+cases. The previous inspection helper returned None for both an unrelated job
+and an authenticated manual producer. Extending fail-closed handling to producer
+names would conflate them. Return an affirmative verification only after signed
+ownership, Core definition, revision and stop checks; None remains unowned.
+Final r284 includes actual manual and inspection executions, six queued/cold
+lifecycle actions, running cancellation/lost-answer controls and portable CLI.
+These bounded controls passed; distribution and production gates remain open.
+
 ## 2026-10-28 — Delegation requires input roles as well as permission checks
 
 Real continued-work trials exposed three different boundaries; do not collapse

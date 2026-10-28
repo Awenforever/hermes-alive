@@ -240,7 +240,7 @@ class CoreFileInspection:
 
 
     def guard(self,execution,tool_name,args):
-        """Restrict only a proven owned inspector in Core's pre-tool pipeline."""
+        """Verify owned work before applying inspection or retirement fences."""
         from cron.execution_identity import current_cron_execution
         from cron.executions import get_execution
         from cron.jobs import get_job
@@ -255,6 +255,9 @@ class CoreFileInspection:
         if not rows:return None
         if len(rows)!=1:raise ValueError('ambiguous inspection owner')
         child=rows[0][0].removesuffix(':core_bound');request=self.work._read(child,'requested',configured.subject)
+        bound=self.work._read(child,'core_bound',configured.subject);job=get_job(execution.job_id)
+        if job is None or self.work._definition(job)!=bound['definition_fingerprint']:
+            raise InspectionDenied('owned Core work definition changed')
         if 'project_context_reference' in request:
             from .core_work_context import expected_workdir
             try:
@@ -276,7 +279,9 @@ class CoreFileInspection:
                 return CoreAutonomousWork(self.store).guard(configured,execution,child,request)
             except Exception:
                 raise InspectionDenied('autonomous work authorization changed') from None
-        if request.get('work_kind')!='inspection':return None
+        # Distinguish a verified ordinary producer from an unrelated job. None
+        # means no ownership proof; it must not describe valid manual work.
+        if request.get('work_kind')!='inspection':return True
         try:
             return self.guard_owned(configured,execution,child,request,tool_name,args)
         except Exception:

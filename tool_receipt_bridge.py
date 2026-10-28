@@ -7,6 +7,7 @@ import importlib.util
 from importlib.machinery import ModuleSpec
 import hashlib
 import logging
+import re
 import os
 from pathlib import Path
 import sys
@@ -144,7 +145,9 @@ def register_inspection_guard(ctx,binding):
         if not callable(current):return
         execution=current()
         if execution is None:return
-        reserved=execution.job_name.startswith('alive-inspect-')
+        # A reserved name is never ownership proof or permission. If provenance
+        # cannot be checked, deny tools rather than let a retired owned task run.
+        reserved=bool(re.fullmatch(r'alive-(?:inspect-)?[a-f0-9]{32}',execution.job_name))
         try:
             if binding.closed:raise ValueError('inspection binding closed')
             binding._require_home()

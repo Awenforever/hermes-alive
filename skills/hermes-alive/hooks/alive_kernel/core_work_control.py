@@ -40,13 +40,31 @@ class CoreWorkControl:
         self.work._home();validate()
         if self.store.configuration()!=configured:raise ValueError('current configured owner required')
         owner=configured.subject
+        return self._stop_owned(owner,work_id,authority=authority,validate=validate)
+
+    def stop_for_deactivation(self,subject,work_id,*,authority,validate):
+        """Trusted profile-operator retirement, not a fabricated owner chat turn.
+
+        Preparing the stop performs only local Core schedule control. Its caller
+        settles any required owner cancellation asynchronously before claiming it.
+        """
+        if (not callable(validate) or not isinstance(authority,dict)
+                or authority.get('kind')!='operator_plugin_deactivation'):
+            raise ValueError('trusted explicit plugin deactivation required')
+        self.work._home();validate()
+        return self._stop_owned(subject,work_id,authority=authority,validate=validate,dispatch_owner=False)
+
+    def _attempt_id(self,authority):
         attempt_authority=dict(authority)
         if authority.get('kind')=='current_owner_interpretation':
             # A different valid excerpt is still the same Core owner request,
             # not permission to dispatch another cancellation attempt.
             turn=authority.get('turn',{})
             attempt_authority['turn']={k:turn.get(k) for k in ('turn_identity','permission_id','request_fingerprint')}
-        attempt_id=self.store.protector.authenticate_json('alive.core-work.stop-attempt.v1',attempt_authority)
+        return self.store.protector.authenticate_json('alive.core-work.stop-attempt.v1',attempt_authority)
+
+    def _stop_owned(self,owner,work_id,*,authority,validate,dispatch_owner=True):
+        attempt_id=self._attempt_id(authority)
         with file_lock(self.store.root/'core-work.lock',timeout=0):
             targets=self.group(work_id,subject=owner)
             # Mark the entire exact group first. A crash or an unavailable owner
@@ -61,14 +79,14 @@ class CoreWorkControl:
             observations=[]
             for target in targets:
                 validate();self.work._home()
-                observations.append(self._stop_one(target,owner,validate,attempt_id))
+                observations.append(self._stop_one(target,owner,validate,attempt_id,dispatch_owner=dispatch_owner))
             return {'work_id':work_id,'status':'stop_requested','targets':observations,
                 'new_work_submitted':False,'effects_undone':False,'agenda_completed':False,
                 'physical_channel_send_requested':False,
                 'hint':'A stop request prevents further authorized work; inspect Core execution state for termination. '
                        'Earlier or already in-flight effects are not rolled back.'}
 
-    def _stop_one(self,work_id,owner,validate,attempt_id):
+    def _stop_one(self,work_id,owner,validate,attempt_id,*,dispatch_owner=True):
         from cron.jobs import get_job,pause_job,is_terminal_job
         from cron.executions import latest_execution
         request=self.work._read(work_id,'requested',owner)
@@ -88,14 +106,17 @@ class CoreWorkControl:
                 'execution_stopped_proven':terminal,'schedule_already_terminal':True,'needs_attention':not terminal}
         validate();self.work._home()
         try:
-            paused=pause_job(job['id'],reason='Alive owner requested stop of this owned work')
+            stop=self.work._read(work_id,'stop_requested',owner)
+            deactivated=(stop or {}).get('owner_authority',{}).get('kind')=='operator_plugin_deactivation'
+            paused=pause_job(job['id'],reason=('Alive deactivated: automatic execution stopped; existing records retained'
+                if deactivated else 'Alive owner requested stop of this owned work'))
         except ValueError:
             current=get_job(job['id'])
             if (current is None or self.work._definition(current)!=bound['definition_fingerprint']
                     or not is_terminal_job(current)):raise
             # Core may finish between the read and pause. Re-enter only to
             # observe that terminal state, not to reactivate or repeat anything.
-            return self._stop_one(work_id,owner,validate,attempt_id)
+            return self._stop_one(work_id,owner,validate,attempt_id,dispatch_owner=dispatch_owner)
 
         if paused is None or self.work._definition(paused)!=bound['definition_fingerprint']:
             return {**result,'status':'schedule_pause_unverified','needs_attention':True}
@@ -115,6 +136,8 @@ class CoreWorkControl:
             observed=self.work._read(work_id,observation,owner,event_type='work.stop_owner_observed')
             return {**result,'status':'stop_dispatch_previously_attempted',
                 'owner_observation':observed,'needs_attention':observed is None or observed.get('needs_attention',False)}
+        if not dispatch_owner:
+            return {**result,'status':'owner_cancellation_pending','stop_dispatch_required':True,'needs_attention':True}
         try:asyncio.get_running_loop()
         except RuntimeError:pass
         else:raise ValueError('blocking Core stop must run outside the Gateway event loop')
@@ -130,6 +153,42 @@ class CoreWorkControl:
         self.work._append(work_id,observation,owner,observed,
             causation=work_id+':'+dispatch,event_type='work.stop_owner_observed')
         return {**result,**observed}
+
+    async def dispatch_deactivation(self,subject,prepared,*,authority,validate):
+        """One bounded canonical cancellation request per prepared owned work.
+
+        No replacement job, timer or automatic redispatch. The Core IO happens
+        outside the profile lock; reservation and observations remain durable.
+        """
+        if (not callable(validate) or not isinstance(authority,dict)
+                or authority.get('kind')!='operator_plugin_deactivation'
+                or not isinstance(prepared,dict) or not isinstance(prepared.get('targets'),list)):
+            raise ValueError('prepared deactivation required')
+        attempt_id=self._attempt_id(authority);observations=[]
+        for saved in prepared['targets']:
+            target=saved['work_id']
+            if not saved.get('stop_dispatch_required'):
+                observations.append(saved);continue
+            validate();self.work._home()
+            with file_lock(self.store.root/'core-work.lock',timeout=0):
+                current=self._stop_one(target,subject,validate,attempt_id,dispatch_owner=False)
+                if not current.get('stop_dispatch_required'):
+                    observations.append(current);continue
+                bound=self.work._read(target,'core_bound',subject)
+                dispatch='stop-dispatch:'+attempt_id;observation='stop-observed:'+attempt_id
+                self.work._append(target,dispatch,subject,{
+                    'job_id':bound['job_id'],'execution_id':current['execution_id'],
+                    'automatic_redispatch_allowed':False},causation=target+':stop_requested',
+                    event_type='work.stop_dispatch_started')
+            try:
+                result=await self._cancel_owner(bound['job_id'],current['execution_id'],bound,validate)
+            except Exception as error:
+                result={'status':'owner_stop_outcome_unknown','error_class':type(error).__name__,
+                    'cancel_acknowledged':False,'execution_stopped_proven':False,'needs_attention':True}
+            self.work._append(target,observation,subject,result,
+                causation=target+':'+dispatch,event_type='work.stop_owner_observed')
+            observations.append({**current,**result,'stop_dispatch_required':False})
+        return {**prepared,'targets':observations}
 
     async def _cancel_owner(self,job_id,execution_id,bound,validate):
         from hermes_cli.gateway_client import connect_gateway

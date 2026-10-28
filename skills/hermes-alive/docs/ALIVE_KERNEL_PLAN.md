@@ -14,6 +14,15 @@ not a completion measure for the entire agent.
 
 ### Owner decision — 2026-10-26
 
+2026-10-28 lifecycle decision: explicit disable/uninstall stops unstarted owned
+work, requests cancellation of running work and retains existing results.
+Ordinary upgrades preserve work and progress. ADR0266 has bounded actual-Core
+queued/running/cold qualification; full lifecycle distribution is still open.
+Do not equate an unload callback, paused
+schedule or cancellation acknowledgment with observed termination. External
+Holographic provider migration has a bounded synthetic library proof; its actual
+Alive-to-Core worker recall still fails and remains an independent open gate.
+
 Normal use must accept clearly assigned ongoing work directly after the first
 guided authorization. Casual remarks, quotations and ambiguous intentions require
 semantic distinction; ask when uncertain. Per-item preview/confirmation is an

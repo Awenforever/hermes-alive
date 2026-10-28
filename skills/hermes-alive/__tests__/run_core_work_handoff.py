@@ -22,6 +22,10 @@ if __name__=='__main__' and os.environ.get('ALIVE_WORK_TEST_CHILD')!='1':
                 capture_output=True,text=True,timeout=300)
             assert result.returncode==0,result.stdout+'\n'+result.stderr
             assert 'HERMES_ALIVE_CORE_WORK_HANDOFF_OK' in result.stdout,result.stdout
+            if os.environ.get('ALIVE_RETIRE_RUNNING'):
+                proof='CORE_RUNNING_RETIREMENT_PROVEN '+os.environ['ALIVE_RETIRE_RUNNING']+' '
+                assert proof in result.stdout,result.stdout
+                print(next(line for line in result.stdout.splitlines() if line.startswith(proof)),flush=True)
             cold=subprocess.run([sys.executable,'-B',__file__,*sys.argv[1:]],
                 env={**env,'ALIVE_WORK_CHECK':'1'},capture_output=True,text=True,timeout=60)
             assert cold.returncode==0,cold.stdout+'\n'+cold.stderr
@@ -305,6 +309,13 @@ async def test(home):
             if stop_mode in ('running','fenced','retry'):
                 clock=asyncio.create_task(asyncio.to_thread(tick,verbose=False,sync=True,headless=False))
                 assert await asyncio.to_thread(stop_entered.wait,20),'Core worker did not enter its model request'
+            if os.environ.get('ALIVE_RETIRE_RUNNING'):
+                from run_core_work_retirement import qualify_running
+                await qualify_running(binding=binding,manager=manager,home=home,store=store,
+                    execution=execution,command=command,started=started,configured=configured,
+                    stop_release=stop_release,clock=clock,artifact=artifact,work_store=work_store)
+                print('HERMES_ALIVE_CORE_WORK_HANDOFF_OK')
+                return
             text='停止这项合成文件工作，不要再执行。'
             stop_tool=turn('owner-stop-work',text)
             count=len(list(store.journal.read()))

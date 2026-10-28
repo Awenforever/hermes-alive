@@ -377,25 +377,12 @@ def alive_command(args: argparse.Namespace) -> int:
         from hermes_cli.config import load_config_readonly
         settings=(((load_config_readonly().get('plugins') or {}).get('entries') or {}).get('hermes-alive') or {}).get('settings',{})
         if settings.get('kernel_setup') or _installed_engine()=='kernel':
-            from .tool_receipt_bridge import _kernel_module
-            from uuid import uuid4
-            if not settings.get('kernel_setup') and not (_shared_target()/'kernel').exists():
-                print(json.dumps({'ok':True,'enabled':False,'new_work_authority_revoked':True,
-                                  'live_runtime_verified':False,'transport_queue_drained':False}))
-                return 0
-            store=_kernel_module('kernel_setup').KernelSetupStore(_shared_target()/'kernel')
-            configured=store.configuration()
-            if configured:
-                from importlib import import_module
-                policies=import_module(store.__class__.__module__.rsplit('.',1)[0]+'.autonomy_policy').AutonomyPolicyProjection(store.journal)
-                current=policies.current(configured.subject)
-                if current and current.enabled:
-                    policies.apply(policies.append_update(subject=configured.subject,actor=configured.subject,
-                        expected_revision=current.revision,enabled=False,context=current.context,
-                        operation_id='operator-pause:'+uuid4().hex))
-            print(json.dumps({'ok':True,'enabled':False,'new_work_authority_revoked':True,
-                              'live_runtime_verified':False,'transport_queue_drained':False}))
-            return 0
+            from .core_retirement_bridge import retire_operator_profile
+            retired=retire_operator_profile(_home())
+            attention=bool(retired and retired['needs_attention'])
+            print(json.dumps({'ok':not attention,'enabled':False,'new_work_authority_revoked':True,
+                'core_work_retirement':retired,'live_runtime_verified':False,'transport_queue_drained':False}))
+            return 2 if attention else 0
         _set_enabled(False)
         print(json.dumps({"ok": True, "enabled": False, "restart_required": True}))
         return 0

@@ -470,6 +470,12 @@ async def exercise(home):
                 assert retained['current_owner_message']==manual
                 if mode=='outcome-manual-long':assert len(job['prompt'])>4096
             assert job['enabled_toolsets']==([] if model_only else ['file','no_mcp']) and job['deliver']=='local'
+            if os.environ.get('ALIVE_RETIREMENT_ACTION'):
+                from run_core_work_retirement import qualify
+                await qualify(binding=binding,manager=manager,home=home,work=work,state=state,
+                    store=store,command=command,jobs=jobs,tick=tick,artifact=artifact,
+                    actual_body=actual_body,work_requests=work_requests,cli=cli)
+                return
             if mode=='revision-before' and os.environ.get('ALIVE_REVISION_FORGED_TEST')=='1':
                 from dataclasses import replace
                 from contextlib import closing
