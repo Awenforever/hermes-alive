@@ -1984,6 +1984,14 @@ modules, just as official entry points do. A sibling-path correction alone does
 not qualify native startup. Preserve both failures and qualify this shared entry
 before spending on another complete native task run.
 
+Qualification: actual Git consumer upgrade385 preserved logical tables and keys;
+386 passed the fixture and third-party import from bare Core store Python with
+isolation enabled. Native387 then passed the actual contact-only-revision task
+file effect, cold reader and share-context suite. Thirty-five logical table/key
+fingerprints were retained and the prefix had no remaining test processes. These
+are synthetic model/transport checks of a real native installation, not real-model
+quality, an in-flight upgrade, service/daemon operation or all-platform acceptance.
+
 Audited vault reads also change SQLite bytes. A no-op upgrade's byte comparison
 and a functional run's preservation check serve different purposes. For the
 latter, verify unchanged authenticated events, keys and retained payloads;

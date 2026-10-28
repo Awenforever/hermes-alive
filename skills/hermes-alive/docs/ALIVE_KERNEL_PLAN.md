@@ -11,8 +11,10 @@ naturalness or reliable inference: verbose product framing, a bare long source
 link and overstrong followup interpretations remain observed failures. Keep the
 quality counter at zero. Native Ubuntu Git upgrade preserved its existing state;
 subsequent functional checks exposed a test-launch issue when Core re-enters a
-script through runpy. The sibling-import correction is test-only and still needs
-qualification through a new actual Git consumer update; it is not a Core patch.
+script through runpy. The test-only correction now passes the shared fixture
+from Core's bare store interpreter, followed by actual Git-installed native
+file-effect/cold-reader and share-context checks. It is not a Core patch or a
+real-model, active-job upgrade, daemon or whole-platform acceptance claim.
 
 ADR0273 now has bounded controlled qualification: current-owner contact changes
 cannot revive prepared messages, and the actual queued Core task still finishes
