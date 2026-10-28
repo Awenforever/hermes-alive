@@ -16,7 +16,13 @@ r330's actual-Core controls and r333's focused task-contact tests now pass.
 r332's unchanged real synthetic task also passes direct review: the actual
 worker uses the recalled aid in two activity lines, with no owner message over
 three wakes. This is one task, not whole outcome verification or sharing quality.
-The broader portable suite is still running; see ADR0272 for exact limits.
+The broader portable suite r329 has now passed. Actual Ubuntu Git upgrade r335
+preserved all eight existing state files; installed startup/tool/confirmation
+r342 and actual remove/reinstall r344 preserved both agenda items, the one
+contact-eligible item, authority key, setup, interests and all ten original
+events. This inactive-profile journey made no model calls or sends. It does
+not qualify active Core jobs, a daemon or the other fleet platforms. See
+ADR0272 for the full bounded result.
 
 The objective remains a useful, continuous proactive assistant with durable
 experience, layered memory, an agenda, attributable learning, natural followup,

@@ -1,6 +1,6 @@
 # ADR 0272 — Private task execution and owner contact are separate scopes
 
-Date: 2026-10-29. Status: candidate; full Native and real-task checks pending.
+Date: 2026-10-29. Status: bounded Native/real-task checks pass; full acceptance pending.
 
 ## Failure that must remain visible
 
@@ -80,5 +80,25 @@ unverified and agenda not completed; the fixture does not establish general
 autonomous outcome verification. The inherited console summary's `jobs:0` is a
 stale no-work-template field: the work status/evidence explicitly identifies the
 one actual Core job. Do not use that counter as job evidence. Broad portable
-qualification, explicit contact-scope changes on existing tasks, and all wider
+qualification r329 passed after correction of a stale exact-contract assertion;
+all listed portable scripts completed, with the explicit runtime-only limit
+intact. Explicit contact-scope changes on existing tasks and all wider
 acceptance gates remain open.
+
+Ubuntu actual Git consumer r335 upgraded cb7 to development3506252 while all
+eight existing state files stayed byte-identical. Installed Core startup hook,
+tool dispatch and owner confirmation r342 admitted a default-private task and
+an explicitly requested reminder. Actual CLI runtime uninstall, Core plugin
+remove, immutable Git reinstall and runtime installation r344 then preserved
+the key, original setup/interests, all ten existing immutable events and both
+agenda items. The private reasoning view still sees both; the contact view sees
+only the reminder. Core jobs were unchanged and delivery stayed inactive.
+These are synthetic sessions without model calls or external sends, not a full
+daemon, in-flight-task migration or Windows/Desktop/WSL/Docker fleet claim.
+
+Earlier consumer drivers336/338 failed because they loaded the plugin manager
+without emitting the installed Gateway startup event; the agenda tool was
+therefore not registered. Driver340 then expected the wrong hook manifest name.
+Failures remain recorded. The corrected test uses the real Core HookRegistry
+and installed kernel startup hook; no Core or product patch masks those fixture
+errors. Loading code alone is not the complete startup contract.
