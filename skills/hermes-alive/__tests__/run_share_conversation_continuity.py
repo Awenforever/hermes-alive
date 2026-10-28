@@ -9,11 +9,14 @@ from datetime import datetime, timedelta, timezone
 import importlib
 import json
 from pathlib import Path
+import sys
 import tempfile
 import time
 from types import SimpleNamespace
 from unittest.mock import patch
 
+# Core's runpy relaunch does not prepend this script's directory.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import run_core_session_routing as core
 from run_alive_kernel_expression_runtime import scenario
 from alive_kernel import AutonomyPolicyProjection, EventEnvelope, ExperienceJournal, PolicyContext, ReceiptLevel, Sensitivity

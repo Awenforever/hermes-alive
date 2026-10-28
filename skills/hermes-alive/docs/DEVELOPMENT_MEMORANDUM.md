@@ -1963,3 +1963,22 @@ passed351 with cold checks, followed by broad portable352. Keep349's failure.
 This closes a bounded authorization task, not the whole product. Return to
 useful real discovery, conversational followup and longitudinal memory rather
 than inventing further permission features without an observed need.
+
+## 2026-10-29 — Native Core relaunch is part of the test entry contract
+
+Actual native execution can select a managed dependency environment and re-enter
+the original script through runpy. That entry does not prepend the script's
+directory to sys.path. The autonomous-work parent also launches this same file
+for its worker and cold reader; an external wrapper therefore fixed only the
+first process. Its child still failed before exercising the product. Each of
+the affected standalone tests now installs its own sibling-fixture import path
+before importing Core. Do not patch the consumer's installed files or Core to
+hide this failure. Requalify from the committed remote Git revision, preserving
+the earlier failures and distinguishing this fixture correction from behavior.
+
+Audited vault reads also change SQLite bytes. A no-op upgrade's byte comparison
+and a functional run's preservation check serve different purposes. For the
+latter, verify unchanged authenticated events, keys and retained payloads;
+account for explicit erasures and separate ContextVault from ContentVault.
+Do not delete WAL/SHM files or mistake successful metadata checks for a complete
+active-job migration or daemon acceptance.

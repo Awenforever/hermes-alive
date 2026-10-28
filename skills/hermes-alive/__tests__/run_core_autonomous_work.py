@@ -9,6 +9,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 
+# Core may relaunch this file with runpy after selecting another profile's
+# managed environment. runpy does not restore the script directory on sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 
 async def stop_after_completed_cycle(binding):
     """A rejection receipt precedes remaining IO; wait for the actual cycle."""

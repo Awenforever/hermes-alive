@@ -1,7 +1,10 @@
 """Actual Core intake/revision tool under a guided grant; no models or sending."""
-import asyncio,importlib,json,shutil,tempfile
+import asyncio,importlib,json,shutil,sys,tempfile
 from pathlib import Path
 from types import SimpleNamespace
+
+# Keep sibling fixtures importable after Core's managed-environment relaunch.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import run_core_session_routing as core
 from run_core_guided_setup import cli
 

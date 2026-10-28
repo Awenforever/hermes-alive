@@ -5,6 +5,15 @@ Last reviewed: 2026-10-29 (Asia/Shanghai).
 
 ## Current product state
 
+Real public-discovery trials now reach actual main-agent continuation through
+Core's progressive tool bridge. This proves bounded context continuity, not
+naturalness or reliable inference: verbose product framing, a bare long source
+link and overstrong followup interpretations remain observed failures. Keep the
+quality counter at zero. Native Ubuntu Git upgrade preserved its existing state;
+subsequent functional checks exposed a test-launch issue when Core re-enters a
+script through runpy. The sibling-import correction is test-only and still needs
+qualification through a new actual Git consumer update; it is not a Core patch.
+
 ADR0273 now has bounded controlled qualification: current-owner contact changes
 cannot revive prepared messages, and the actual queued Core task still finishes
 its file effect after contact regrant/stop. Ordinary goal/deadline changes retain
