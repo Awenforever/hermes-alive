@@ -10,31 +10,51 @@ remain pending, including the ten consecutive fresh complete quality rounds.
 
 ## Regression suites
 
+Kernel-3 reading-depth checks distinguish three scopes:
+
+- `__tests__/run_public_source_refinement.py` checks the bounded decision,
+  historical-cycle preservation, current/expanded source identity, revocation,
+  erased evidence, oversized results and recovery without repeated IO.
+- `__tests__/run_core_source_reading_depth.py --core /absolute/read-only-core`
+  exercises actual guided setup, conversation confirmation, activation, Core
+  model SDK and tool dispatch, and the local adapter. Run it with an explicit
+  disposable `HERMES_HOME` and the intended Core-managed Python. Its public
+  pages, HTTP model responses and URL-safety answers are synthetic; it proves
+  wiring and preserved evidence, not factual quality or external delivery.
+- A separately authorized inherited-model trial must establish useful source
+  selection, faithful interpretation and natural continuation on actual public
+  material. Neither a larger extract nor a model-endorsed draft proves this.
+
+The older `kernel-setup`/`kernel-shadow` diagnostic surface cannot qualify a
+feature of the ordinary configured/confirmed/activated kernel. Inspect the
+actual observed mode, decisions and IO rather than assuming a CLI exit code
+means an experimental flag was consumed.
+
 From the skill root:
 
 ```bash
-bash tests/run_all.sh
+bash __tests__/run_all.sh
 ```
 
 Focused suites:
 
 ```bash
-python3 tests/run_circadian.py
-python3 tests/run_circadian_shadow.py
-python3 tests/run_circadian_intent_bridge.py
-python3 tests/run_circadian_sleep_quiet_policy.py
-python3 tests/run_proactive_quality_governor.py
-python3 tests/run_location_weather_onboarding.py
-python3 tests/run_joint_shadow_replay.py
-python3 tests/run_isolated_enforcement.py
-python3 tests/run_production_enforcement.py
-python3 tests/run_discovery_quality_pivot_v3.py
-python3 tests/run_rich_content_model_attribution_v1.py
-python3 tests/run_runtime_disable_contract.py
-python3 tests/run_topic_dedup_contracts.py
-python3 tests/run_context_visibility_contracts.py
-python3 tests/run_matrix.py
-python3 tests/run_stress.py
+python3 __tests__/run_circadian.py
+python3 __tests__/run_circadian_shadow.py
+python3 __tests__/run_circadian_intent_bridge.py
+python3 __tests__/run_circadian_sleep_quiet_policy.py
+python3 __tests__/run_proactive_quality_governor.py
+python3 __tests__/run_location_weather_onboarding.py
+python3 __tests__/run_joint_shadow_replay.py
+python3 __tests__/run_isolated_enforcement.py
+python3 __tests__/run_production_enforcement.py
+python3 __tests__/run_discovery_quality_pivot_v3.py
+python3 __tests__/run_rich_content_model_attribution_v1.py
+python3 __tests__/run_runtime_disable_contract.py
+python3 __tests__/run_topic_dedup_contracts.py
+python3 __tests__/run_context_visibility_contracts.py
+python3 __tests__/run_matrix.py
+python3 __tests__/run_stress.py
 ```
 
 `run_stress.py` uses contractual full scale by default. Reduced scale is a

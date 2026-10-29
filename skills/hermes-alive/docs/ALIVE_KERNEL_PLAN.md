@@ -34,6 +34,29 @@ adding more prose instructions or declaring a semantic reviewer sufficient.
 Do not solve this by hardcoding the example topic, demanding full papers for
 every casual share, or crediting refusals as useful outcomes.
 
+ADR0276 is the resulting bounded candidate: the existing optional public followup
+may deepen one currently supplied page instead of searching or following another
+citation. No extra model stage or followup allowance is added. Expanded source
+text is retained under a distinct window identity and a recorded excerpt policy;
+the old short read stays valid. Initial controls cover past-window qualifications,
+fresh-instance recovery without IO/inference, revocation and erasure. The ordinary
+Core setup/confirmation/activation path now reaches actual SDK and registry
+dispatch, preserves a qualification past the old window and submits it through
+the local adapter using controlled HTTP/model/page answers. The combined portable
+suite passed on the frozen runtime. A Windows timeout fixture originally armed
+the deadline before its intended held read; the corrected fault scope and the
+remaining configured-discovery cases now pass as targeted checks. Neither result
+qualifies a native Windows consumer installation. Real-model usefulness remains
+pending. A failed real public search with zero model calls is neither a quality
+pass nor a model failure.
+
+Reading admission has another generic residual: Core can return an untitled
+resource with valid content, while the current host boundary requires a nonempty
+title. The observed model-card response therefore merits admission/provenance
+review; optional presentation metadata must not silently determine whether useful
+evidence is retained. Do not generalize the current reading-depth qualification
+into a claim that all valid source forms are already supported.
+
 Real public-discovery trials now reach actual main-agent continuation through
 Core's progressive tool bridge. This proves bounded context continuity, not
 naturalness or reliable inference: verbose product framing, a bare long source

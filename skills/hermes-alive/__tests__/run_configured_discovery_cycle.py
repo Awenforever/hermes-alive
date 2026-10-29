@@ -277,7 +277,17 @@ async def exercise(root,mode,*,primary_url=None):
     baseline_memory_proposals=len(journal.read(event_type='memory.proposed'))
     async def allow(self,target):return target in (url,primary,*backgrounds)
     original_tools=CoreDiscoveryTools
-    def bounded_tools(*args,**kw):return original_tools(*args,**kw,timeout_seconds=.03 if mode=='uncertain-read' else 2)
+    def bounded_tools(*args,**kw):
+        value=original_tools(*args,**kw,timeout_seconds=2)
+        if mode=='uncertain-read':
+            original_extract=value.extract
+            async def held_extract(*args,**kwargs):
+                # The intended fault is the held page read, not a scheduling
+                # race while the preceding search opens its journal/lock.
+                value.timeout_seconds=1
+                return await original_extract(*args,**kwargs)
+            value.extract=held_extract
+        return value
     with patch.dict(sys.modules,hermes_constants=NS(get_hermes_home=lambda:root)),patch.object(CoreDiscoveryTools,'allow_url',allow),patch(
             'alive_kernel.configured_discovery_cycle.CoreDiscoveryTools',side_effect=bounded_tools):
         runner=native()

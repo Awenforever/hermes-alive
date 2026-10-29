@@ -2046,3 +2046,26 @@ topic or treating a valid citation as factual correctness cannot close the gap.
 Old-but-interesting material can be useful, but a new-progress inquiry must not
 silently turn missing dates or search ranking into recency evidence. Continue
 to retain failed originals and keep the fresh-round counter honest.
+
+### Match integration fixtures to the actual installed entry point
+
+The older experimental `kernel-setup` surface does not configure every option of
+the ordinary confirmed kernel. Adding an attribute to a fixture's argument
+namespace does not mean that the command consumed it. A deeper-reading fixture
+initially exercised the old citation path, and its assertion was wrapped by the
+SDK as a provider connection failure. Preserve that failure and inspect the
+actual request/decision path before blaming providers or changing fallback.
+The replacement exercises ordinary setup, confirmation, activation, Core SDK,
+registry and the local adapter. Its controlled decisions prove wiring only;
+source fidelity, useful initiative and natural conversation still require real
+outputs. Do not extend an obsolete diagnostic entry merely to make a new-feature
+test green.
+
+Fault-injection deadlines must apply to the intended action. A configured-read
+fixture used a 30 ms deadline for both the preceding search and its deliberately
+held extraction. On Windows it could fail at the search, return no evidence and
+never reach the intended fault. Keep normal search timing and arm the short
+deadline for the held extraction; require the actual entered/pending/reaped
+signals. Increasing a global timeout or accepting silence would not test the
+intended uncertain-read contract. Preserve the failure and qualify the suffix
+without pretending that an interrupted full run printed its final pass marker.

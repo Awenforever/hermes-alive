@@ -994,7 +994,8 @@ class OpportunitySynthesizer:
                 validator=(reading_assessment.validate_references if start.event.payload['interpreter_method']['reading_assessment']
                     ==reading_assessment.REFERENCE_METHOD else reading_assessment.validate)
                 validator(bundle['reading_assessment'],inquiries=inquiries,
-                    excerpts={e.observation_event_id:source_prompt_excerpt(e.content,policy=SOURCE_EXCERPT_POLICY)
+                    excerpts={e.observation_event_id:source_prompt_excerpt(e.content,
+                        policy=start.event.payload.get('interpreter_method',{}).get('source_excerpt_policy'))
                               for e in focus})
                 if (receipt.event.payload.get('reading_unassessed_count')!=len(bundle['reading_assessment']['unassessed_item_ids'])
                         or receipt.event.payload.get('reading_rejected_count')!=bundle['reading_assessment']['rejected_count']):

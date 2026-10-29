@@ -15,6 +15,7 @@ from .discovery_opportunities import DiscoveryCandidate, canonicalize_discovery_
 from .events import EventEnvelope, Sensitivity, _thaw_json
 from .native_worker_protocol import identifier
 from .model_json import parse_model_json
+from . import source_reading_depth
 
 
 class HostDiscoveryError(ValueError):
@@ -38,6 +39,10 @@ def read_scope_metadata(content):
         representation=attrs['content_representation']
         metadata['reported_content_representation']=(representation if representation in
             ('source_extract','operator_paraphrase','machine_summary') else 'unspecified')
+    if attrs.get('read_window_policy')==source_reading_depth.WINDOW:
+        metadata.update(read_window_policy=source_reading_depth.WINDOW,
+            requested_extract_chars=attrs.get('requested_extract_chars'),
+            returned_extract_chars=attrs.get('returned_extract_chars'),whole_resource_read_proven=False)
     return metadata
 
 
@@ -55,7 +60,8 @@ def provenance_metadata(content):
     return metadata
 
 
-SOURCE_EXCERPT_POLICY = 'retained-web-extract-v1'
+LEGACY_SOURCE_EXCERPT_POLICY = 'retained-web-extract-v1'
+SOURCE_EXCERPT_POLICY = source_reading_depth.EXCERPT_POLICY
 
 
 def source_prompt_excerpt(content, *, policy=None):
@@ -65,7 +71,7 @@ def source_prompt_excerpt(content, *, policy=None):
     verification. Ordinary listings and admitted commitments keep their existing
     window. Old operation receipts without a policy retain their exact scope.
     """
-    if policy not in (None, SOURCE_EXCERPT_POLICY):
+    if policy not in (None, LEGACY_SOURCE_EXCERPT_POLICY, SOURCE_EXCERPT_POLICY):
         raise HostDiscoveryError('unknown source excerpt policy')
     if 'core_work' in content or 'autonomous_work_wait' in content or content.get('original_owner_message_included') is True:
         # Preserve the same lifecycle qualifications for interpretation, factual
@@ -85,9 +91,11 @@ def source_prompt_excerpt(content, *, policy=None):
             **({'core_work_outcome':dict(content['core_work_outcome'])} if 'core_work_outcome' in content else {}),
             **({'core_work_record_review':dict(content['core_work_record_review'])}
                if 'core_work_record_review' in content else {})}),ensure_ascii=False)
-    depth = (policy == SOURCE_EXCERPT_POLICY
+    depth = (policy in (LEGACY_SOURCE_EXCERPT_POLICY,SOURCE_EXCERPT_POLICY)
              and read_scope_metadata(content).get('reported_read_scope') == 'webpage_extract')
-    return content['summary'][:8192 if depth else 1800]
+    expanded=(policy==SOURCE_EXCERPT_POLICY and depth and
+        content.get('attributes',{}).get('read_window_policy')==source_reading_depth.WINDOW)
+    return content['summary'][:source_reading_depth.RETURNED_CHARS if expanded else 8192 if depth else 1800]
 
 
 @dataclass(frozen=True)
@@ -133,13 +141,14 @@ class HostDiscoveryReader:
         if not isinstance(value,dict): raise HostDiscoveryError('invalid host read output')
         return value
 
-    async def _admit(self, item, *, kind, observed, expected_url=None, search_query=None):
+    async def _admit(self, item, *, kind, observed, expected_url=None, search_query=None, read_depth=None):
         if not isinstance(item,dict): raise HostDiscoveryError('invalid source observation')
         url=item.get('url')
         title=item.get('title')
         content=item.get('description','') if kind=='search' else item.get('content')
         if (not isinstance(url,str) or len(url)>4096 or not isinstance(title,str)
-                or not 1<=len(title)<=512 or not isinstance(content,str) or len(content)>8192
+                or not 1<=len(title)<=512 or not isinstance(content,str)
+                or len(content)>(source_reading_depth.RETURNED_CHARS if read_depth else 8192)
                 or (kind=='extract' and not content)):
             raise HostDiscoveryError('invalid bounded source observation')
         try:
@@ -159,6 +168,11 @@ class HostDiscoveryReader:
         # Different queries can describe the same page differently without a
         # material change to the page. Keep those search views separate too.
         view={}
+        if read_depth:
+            # A deeper window complements the old one; it must not supersede
+            # evidence already pinned by the same research group.
+            view['external_id']='read-window:'+self.ingestor.vault.digest_json(dict(
+                url=canonicalize_discovery_url(url),policy=read_depth))
         if kind=='search' and self.scope_search_views:
             if not isinstance(search_query,str) or not search_query.strip():
                 raise HostDiscoveryError('public search view lacks its owning query')
@@ -170,6 +184,9 @@ class HostDiscoveryReader:
                 attributes=dict(read_scope='search_listing' if kind=='search' else 'webpage_extract',
                     publication_date_unresolved=True,independently_verified=False,
                     video_watched=False,page_may_contain_navigation=kind=='extract',
+                    **(dict(read_window_policy=read_depth,
+                        requested_extract_chars=source_reading_depth.EXTRACT_CHARS,
+                        returned_extract_chars=len(content)) if read_depth else {}),
                     **({'content_representation':item['content_representation']
                         if isinstance(item['content_representation'],str) and item['content_representation'] in
                         ('source_extract','operator_paraphrase','machine_summary') else 'unspecified'}
@@ -184,7 +201,7 @@ class HostDiscoveryReader:
         return ingested.observation_event_id
 
     async def collect(self, *, operation_id, queries=(), read_urls=(), limit=3,
-                      inquiry_item_ids=()):
+                      inquiry_item_ids=(), read_depth=None):
         identifier(operation_id)
         if (not isinstance(queries,tuple) or not isinstance(read_urls,tuple)
                 or len(queries)>3 or len(read_urls)>2 or not queries and not read_urls
@@ -192,10 +209,13 @@ class HostDiscoveryReader:
                 or any(not isinstance(u,str) or not 1<=len(u)<=4096 for u in read_urls)
                 or type(limit) is not int or not 1<=limit<=5):
             raise HostDiscoveryError('invalid bounded host discovery request')
+        if read_depth is not None and (read_depth!=source_reading_depth.WINDOW or queries or not 1<=len(read_urls)<=2):
+            raise HostDiscoveryError('expanded read requires bounded public resources')
         if self._busy or self._uncertain:
             raise HostDiscoveryError('owned host read is busy or uncertain')
         self._current()
         request=dict(queries=list(queries),read_urls=list(read_urls),limit=limit)
+        if read_depth is not None:request['read_window_policy']=read_depth
         if queries and self.scope_search_views:request['search_view_identity']='query-v1'
         from .discovery_inquiry import DiscoveryInquiryContext
         inquiry_context = DiscoveryInquiryContext(self.ingestor,context_vault=self.context_vault)
@@ -259,7 +279,7 @@ class HostDiscoveryReader:
                                 raise HostDiscoveryError('host refused extraction URL')
                             self._current()
                         raw=await (self.search(value,limit=limit) if kind=='search'
-                                   else self.extract([value],char_limit=6000))
+                                   else self.extract([value],char_limit=source_reading_depth.EXTRACT_CHARS if read_depth else 6000))
                         self._current()
                         check_inquiries()
                         document=self._document(raw)
@@ -295,7 +315,7 @@ class HostDiscoveryReader:
                                 if view_url and view_url in seen_search_urls:continue
                             observations.append(await self._admit(item,kind=kind,observed=datetime.now(timezone.utc),
                                 expected_url=value if kind=='extract' else None,
-                                search_query=value if kind=='search' else None))
+                                search_query=value if kind=='search' else None,read_depth=read_depth))
                             if view_url:seen_search_urls.add(view_url)
                         except HostDiscoveryError:
                             self._current(); failures+=1

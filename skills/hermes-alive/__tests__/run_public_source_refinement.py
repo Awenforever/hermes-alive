@@ -20,9 +20,22 @@ from alive_kernel.host_discovery import HostDiscoveryError, HostDiscoveryReader
 from alive_kernel.kernel_setup import validate_options, KernelSetupError
 from alive_kernel.research_evidence import resolve_research_reads
 from alive_kernel import public_source_refinement as selection
+from alive_kernel import source_reading_depth as depth
+from alive_kernel.host_discovery import source_prompt_excerpt, SOURCE_EXCERPT_POLICY
 
 
 def contracts():
+    eligible={'page1':'https://example.invalid/page'}
+    deeper=depth.normalize(dict(search_query=None,read_targets=[],deepen_source_ref='page1',reason='Read the qualification.'),{},(),eligible)
+    assert depth.validate(deeper,{},(),eligible)==deeper
+    for raw in (dict(deepen_source_ref='foreign',reason='unknown'),
+                dict(deepen_source_ref='page1',search_query='another',reason='two actions'),
+                dict(deepen_source_ref='page1',read_targets=[{}],reason='two actions'),
+                dict(deepen_source_ref='/etc/passwd',reason='not a source reference')):
+        assert depth.normalize(raw,{},(),eligible)['decision_status']=='invalid'
+    try:depth.validate(deeper,{},(),{})
+    except HostDiscoveryError:pass
+    else:raise AssertionError('withdrawn reading source still selected')
     good=selection.normalize({'search_query':' public original project ','read_targets':[],
         'reason':'Find the original.','future_non_action_metadata':True},{})
     assert good['search_query']=='public original project'
@@ -85,8 +98,16 @@ async def exercise(root,mode):
         assert name=='web_extract' and args['urls'] in ([seed],[original])
         url=args['urls'][0]
         if url==original and mode=='refined-page-failed':return {'results':[dict(url=url,error='unavailable')]}
-        if url==seed and mode not in ('cited','overlap','only-overlap'):
+        if url==seed and mode not in ('cited','overlap','only-overlap','deeper','deeper-revoked','deeper-erased','deeper-oversized'):
             return {'results':[dict(url=url,error='unavailable')]}
+        if mode.startswith('deeper'):
+            assert url==seed
+            content=('A short introduction; the important qualification is outside this window.'
+                if args['char_limit']==6000 else 'Public source context. '*420+'AFTER_8192_QUALIFICATION: the observed demonstration used a previously trained component.')
+            assert args['char_limit'] in (6000,depth.EXTRACT_CHARS)
+            if mode=='deeper-oversized' and args['char_limit']==depth.EXTRACT_CHARS:
+                content='x'*(depth.RETURNED_CHARS+1)
+            return {'results':[dict(url=url,title='Public observations',content=content)]}
         content=('PUBLIC_PRIMARY_BODY: The method compares two observation conditions.' if url==original else
                  'Public material. [Original]('+original+')')
         return {'results':[dict(url=url,title='Public observations',content=content)]}
@@ -107,7 +128,17 @@ async def exercise(root,mode):
             extract=legacy_tools.extract,allow_url=legacy_tools.allow_url,is_current=lambda:True)
         await legacy.collect(operation_id=cycle.operation_id+':search',queries=('public seed',))
         legacy_tools.close()
-    observed=await preparation.observe(cycle=cycle,parameters=parameters,read_binding=binding)
+    if mode=='old-depth-cycle':
+        original_mode=preparation._cycle_mode
+        def before_depth(*args,**kwargs):
+            return False if kwargs['prefix']=='discovery.reading-depth:' else original_mode(*args,**kwargs)
+        with patch.object(preparation,'_cycle_mode',side_effect=before_depth):
+            observed=await preparation.observe(cycle=cycle,parameters=parameters,read_binding=binding)
+        preparation.close();preparation=make(True)
+        observed=await preparation.observe(cycle=cycle,parameters=parameters,read_binding=binding)
+        assert observed.public_refinement and not observed.deeper_reading
+    else:
+        observed=await preparation.observe(cycle=cycle,parameters=parameters,read_binding=binding)
     assert observed.reader.scope_search_views is (mode!='legacy-search')
     if mode=='old-cycle':
         preparation.close();preparation=make(True)
@@ -115,13 +146,23 @@ async def exercise(root,mode):
         assert not observed.public_refinement
     async def call(**kw):
         data=json.loads(kw['messages'][1]['content']);models.append(kw['task'])
-        if data['method']==selection.METHOD:
+        if data['method'] in (selection.METHOD,depth.METHOD):
+            if mode=='old-depth-cycle':
+                assert data['method']==selection.METHOD and 'deeper_read_sources' not in data
             assert 'PRIVATE_OWNER_PREFERENCE' not in json.dumps(kw['messages'])
             assert 'PRIVATE_INQUIRY' not in json.dumps(kw['messages'])
             assert 'user_context' not in data and 'owner_context_digest' not in data
             assert data['already_queried']==['public seed']
             assert data['collection_as_of'] and data['collection_clock_is_not_publication_date'] is True
-            if mode=='cited':
+            if mode.startswith('deeper'):
+                source=next(s for s in data['sources'] if s['source_ref'] in
+                    {row['source_ref'] for row in data['deeper_read_sources']})
+                value=dict(search_query=None,read_targets=[],deepen_source_ref=source['source_ref'],reason='Read the missing qualification.')
+                if mode=='deeper-revoked':state['consent']=False
+                if mode=='deeper-erased':
+                    event=journal.get(source['source_ref'])
+                    ingestor.vault.erase_item(event.event.payload['content']['content_id'])
+            elif mode=='cited':
                 source=next(s for s in data['sources'] if s.get('citations'))
                 value=dict(search_query=None,read_targets=[dict(source_ref=source['source_ref'],
                     citation_ref=source['citations'][0]['citation_ref'])],reason='Read the original link.')
@@ -166,12 +207,41 @@ async def exercise(root,mode):
         preparation.close();replacement.close()
         return
     except HostDiscoveryError:
-        assert mode in ('revoked','erased')
+        assert mode in ('revoked','erased','deeper-revoked','deeper-erased')
         assert len(network)==2 and len(models)==2
         assert not preparation.pending
         return
     assert mode not in ('revoked','erased')
-    if mode in ('off','old-cycle','legacy-search'):
+    if mode=='deeper':
+        assert len(network)==3 and len(models)==2
+        assert network[-1]==('web_extract',dict(urls=[seed],char_limit=depth.EXTRACT_CHARS))
+        expression=result['expression_parameters']
+        inquiries=preparation.inquiries.read(subject='user:test',clearance=Sensitivity.PRIVATE,
+            item_ids=expression['inquiry_item_ids'])
+        retained=resolve_research_reads(ingestor,subject='user:test',clearance=Sensitivity.PRIVATE,
+            receipt_ids=expression['research_read_receipt_ids'],inquiries=inquiries)
+        assert len(retained)==2 and len({e.content['url'] for e in retained})==1
+        rich=next(e for e in retained if len(e.content['summary'])>8192)
+        assert 'AFTER_8192_QUALIFICATION' in source_prompt_excerpt(rich.content,policy=SOURCE_EXCERPT_POLICY)
+        assert 'AFTER_8192_QUALIFICATION' not in source_prompt_excerpt(rich.content,policy='retained-web-extract-v1')
+        before=list(network)
+        async def forbidden(**kw):raise AssertionError('deeper-read replay repeated inference')
+        assert await preparation.reason(observed,cycle=cycle,parameters=parameters,call=forbidden,read_binding=binding)==result
+        assert network==before
+        preparation.close()
+        fresh=make(True)
+        reopened=await fresh.observe(cycle=cycle,parameters=parameters,read_binding=binding)
+        assert await fresh.reason(reopened,cycle=cycle,parameters=parameters,call=forbidden,read_binding=binding)==result
+        assert network==before
+        fresh.close()
+    elif mode=='deeper-oversized':
+        assert len(network)==3 and len(models)==2
+        assert len(result['expression_parameters']['research_read_receipt_ids'])==1
+        done=journal.read(event_type='discovery.host_read_completed')[-1]
+        assert done.event.payload['failures']==1 and not done.event.payload['observations']
+        assert not any(e.content.get('attributes',{}).get('read_window_policy')==depth.WINDOW
+            for e in ingestor.active_evidence(subject='user:test',clearance=Sensitivity.PRIVATE,limit=32))
+    elif mode in ('off','old-cycle','legacy-search'):
         assert len(network)==2 and len(models)==1
     elif mode=='malformed':
         assert len(network)==2 and len(models)==2
@@ -209,6 +279,13 @@ async def exercise(root,mode):
         material=resolve_research_reads(ingestor,subject='user:test',clearance=Sensitivity.PRIVATE,
             receipt_ids=receipts,inquiries=inquiries)
         assert len(material)==len(receipts)
+    if mode=='deeper':
+        rich_event=journal.get(rich.observation_event_id)
+        ingestor.vault.erase_item(rich_event.event.payload['content']['content_id'])
+        try:resolve_research_reads(ingestor,subject='user:test',clearance=Sensitivity.PRIVATE,
+            receipt_ids=receipts,inquiries=inquiries)
+        except HostDiscoveryError:pass
+        else:raise AssertionError('erased expanded source remained in research group')
     if mode in ('overlap','only-overlap'):
         before=list(network)
         preparation.close()
@@ -242,7 +319,7 @@ async def allow_synthetic_url(self,url):
 contracts()
 with tempfile.TemporaryDirectory(prefix='alive-public-refinement-') as folder:
     parent=Path(folder)
-    for mode in ('off','old-cycle','legacy-search','on','overlap','only-overlap','cited','malformed','revoked','erased','search-failed','refined-page-failed','uncertain-search'):
+    for mode in ('off','old-cycle','old-depth-cycle','legacy-search','on','overlap','only-overlap','cited','deeper','deeper-revoked','deeper-erased','deeper-oversized','malformed','revoked','erased','search-failed','refined-page-failed','uncertain-search'):
         home=parent/mode
         with patch.dict(sys.modules,hermes_constants=NS(get_hermes_home=lambda:home)):
             with patch.object(CoreDiscoveryTools,'allow_url',allow_synthetic_url):

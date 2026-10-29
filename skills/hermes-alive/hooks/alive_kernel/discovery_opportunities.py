@@ -149,7 +149,10 @@ class DiscoveryCandidate:
     def __post_init__(self) -> None:
         object.__setattr__(self, "source", _bounded(self.source, "source", 256, required=True))
         object.__setattr__(self, "title", _bounded(self.title, "title", 1_024, required=True))
-        object.__setattr__(self, "summary", _bounded(self.summary, "summary", 8_192))
+        from .source_reading_depth import WINDOW, RETURNED_CHARS
+        expanded = (self.source == 'hermes.web.extract' and isinstance(self.attributes, Mapping)
+                    and self.attributes.get('read_window_policy') == WINDOW)
+        object.__setattr__(self, "summary", _bounded(self.summary, "summary", RETURNED_CHARS if expanded else 8_192))
         object.__setattr__(self, "external_id", _bounded(self.external_id, "external_id", 1_024))
         object.__setattr__(self, "url", canonicalize_discovery_url(self.url))
         observed = _utc(self.observed_at, "observed_at")

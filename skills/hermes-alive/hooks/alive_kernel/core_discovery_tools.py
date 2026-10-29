@@ -130,8 +130,9 @@ class CoreDiscoveryTools:
         return await self._dispatch('web_search',dict(query=query,limit=limit),validate_request=validate_query)
 
     async def extract(self,urls,*,char_limit):
+        from .source_reading_depth import EXTRACT_CHARS
         if (not isinstance(urls,list) or len(urls)!=1 or not isinstance(urls[0],str)
-                or not 1<=len(urls[0])<=4096 or type(char_limit) is not int or not 1<=char_limit<=6000):
+                or not 1<=len(urls[0])<=4096 or type(char_limit) is not int or not 1<=char_limit<=EXTRACT_CHARS):
             raise HostDiscoveryError('bounded single public URL required')
         # Core web_extract repeats URL/secret/SSRF checks immediately before IO.
         return await self._dispatch('web_extract',dict(urls=urls,char_limit=char_limit))

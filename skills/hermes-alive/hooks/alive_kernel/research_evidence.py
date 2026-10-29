@@ -8,6 +8,7 @@ from .events import Sensitivity
 from .host_discovery import HostDiscoveryError, read_scope_metadata
 from .discovery_opportunities import canonicalize_discovery_url
 from urllib.parse import urlsplit
+from . import source_reading_depth
 
 
 RESEARCH_SOURCE_BUDGET = 64000  # <=4 retained8192-char reads plus bounded context/background.
@@ -54,8 +55,11 @@ def resolve_research_reads(reader, *, subject, clearance, receipt_ids, inquiries
         ref=ContentReference.from_event_payload(start.event.payload['request'])
         request=vault.resolve_json(ref.content_id,expected_subject=subject,
             expected_purpose='discovery.host-request',expected_sensitivity=start.event.sensitivity)
+        expanded=request.get('read_window_policy')==source_reading_depth.WINDOW
+        keys={'queries','read_urls','limit','tentative_discovery_tasks'}
+        if expanded:keys.add('read_window_policy')
         if (ref.digest!=vault.digest_json(request)
-                or set(request)!={'queries','read_urls','limit','tentative_discovery_tasks'}
+                or set(request)!=keys
                 or request['queries']!=[] or not isinstance(request['read_urls'],list)
                 or not 1<=len(request['read_urls'])<=2
                 or request['tentative_discovery_tasks']!=inquiries):
@@ -79,6 +83,7 @@ def resolve_research_reads(reader, *, subject, clearance, receipt_ids, inquiries
             raise HostDiscoveryError('research read request has invalid resource identity') from None
         for item in evidence:
             if (read_scope_metadata(item.content).get('reported_read_scope')!='webpage_extract'
+                    or (item.content.get('attributes',{}).get('read_window_policy')==source_reading_depth.WINDOW)!=expanded
                     # Observations store canonical identities. Transport/citation
                     # authorization still uses exact original URLs in HostReader;
                     # never use this identity comparison to permit another fetch.
