@@ -156,6 +156,7 @@ run_and_require run_source_excerpt_scope.py '^HERMES_ALIVE_SOURCE_EXCERPT_SCOPE_
 run_and_require run_conversation_source_packing.py '^CONVERSATION_SOURCE_PACKING_OK$'
 run_and_require run_final_value_dimensions.py '^FINAL_VALUE_DIMENSIONS_OK$'
 run_and_require run_final_value_recovery.py '^FINAL_VALUE_RECOVERY_OK$'
+run_and_require run_source_led_revision.py '^SOURCE_LED_REVISION_OK$'
 run_and_require run_core_discovery_tools.py '^HERMES_ALIVE_CORE_DISCOVERY_TOOLS_OK$'
 run_and_require run_public_source_refinement.py '^HERMES_ALIVE_PUBLIC_SOURCE_REFINEMENT_OK$'
 run_and_require run_configured_discovery_cycle.py '^HERMES_ALIVE_CONFIGURED_DISCOVERY_CYCLE_OK$'

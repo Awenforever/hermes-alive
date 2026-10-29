@@ -209,16 +209,18 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
             raise SourceSupportError('correction runtime evidence changed')
         method=start.event.payload.get('correction_method')
         if method is not None:
-            self._verify_local_correction(expression,context,method,subject,selection_event_id,start)
+            self._verify_correction_evidence(expression,context,method,subject,selection_event_id,start)
         return {'runtime_start_event_id':start_id, 'review_event_id':context['review_event_id'],
                 'context_digest':self.vault.digest_json(context)}
 
-    def _verify_local_correction(self,expression,context,method,subject,selection_event_id,start):
+    def _verify_correction_evidence(self,expression,context,method,subject,selection_event_id,start):
         from .localized_correction import METHOD, apply_correction, text_digest
-        if method != METHOD:
+        from .source_revision import METHOD as SOURCE_METHOD, eligible, revised_text
+        revision=method == SOURCE_METHOD
+        if method not in (METHOD, SOURCE_METHOD) or revision and not eligible(context):
             raise SourceSupportError('unknown retained local correction method')
         operation=expression.renderer_execution_id.removeprefix('execution:').removesuffix(':render')
-        proof=self.journal.get('message.local_correction:'+operation)
+        proof=self.journal.get(('message.source_revision:' if revision else 'message.local_correction:')+operation)
         if proof is None:
             raise SourceSupportError('local correction proof unavailable')
         event=proof.event;data=event.payload
@@ -226,12 +228,12 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
             previous=self.expressions.resolve_model_candidate(context['previous_expression_event_id'])
             ref=ContentReference.from_event_payload(data['content'])
             if (previous is None or previous.text!=context['grounding_context']['candidate']['text']
-                    or event.event_type!='expression.local_correction_completed'
+                    or event.event_type!=('expression.source_revision_completed' if revision else 'expression.local_correction_completed')
                     or event.source!='alive.semantic-comparator' or event.actor!='system:alive-shadow-comparator'
                     or event.subject!=subject or event.sensitivity is not start.event.sensitivity
                     or event.causation_id!=expression.event_id or event.expires_at!=expression.expires_at
                     or not start.event.observed_at<=event.observed_at
-                    or data.get('method')!=METHOD or data.get('delivery_authority_granted') is not False
+                    or data.get('method')!=method or data.get('delivery_authority_granted') is not False
                     or data.get('previous_expression_event_id')!=previous.event_id
                     or data.get('review_event_id')!=context['review_event_id']
                     or data.get('correction_digest')!=self.vault.digest_json(context)
@@ -243,12 +245,14 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
                     or data['provider'] in ('auto','default') or ref.retention_until!=expression.expires_at):
                 raise SourceSupportError('local correction proof differs from current expression')
             proposal=self.vault.resolve_json(ref.content_id,expected_subject=subject,
-                expected_purpose='semantic.local-correction',expected_sensitivity=event.sensitivity)
+                expected_purpose='semantic.source-revision' if revision else 'semantic.local-correction',expected_sensitivity=event.sensitivity)
             _,document,_,_=self.expressions._selection_context(selection_event_id=selection_event_id,
                 meaning_event_id=expression.meaning_event_id,subject=subject,observed_at=event.observed_at)
-            if (self.vault.digest_json(proposal)!=ref.digest or apply_correction(previous.text,
-                    expected_digest=previous.digest,findings=context['findings'],response=proposal,
-                    protected_literals=tuple(literal for atom in document.atoms for literal in atom.protected_literals))!=expression.text):
+            literals=tuple(literal for atom in document.atoms for literal in atom.protected_literals)
+            reconstructed=(revised_text(proposal,protected_literals=literals) if revision else
+                apply_correction(previous.text,expected_digest=previous.digest,
+                    findings=context['findings'],response=proposal,protected_literals=literals))
+            if self.vault.digest_json(proposal)!=ref.digest or reconstructed!=expression.text:
                 raise SourceSupportError('local correction reconstruction changed')
         except (KeyError,TypeError,ValueError,ContentVaultError) as exc:
             raise SourceSupportError('local correction evidence unavailable or invalid') from exc

@@ -95,7 +95,7 @@ def proposal(item_id,plan):
             for n in ('user_value','urgency','novelty','confidence','risk','interruption_cost')})])
 
 
-async def exercise(root,mode,*,historical=False):
+async def exercise(root,mode,*,historical=False,fit_revision=False):
     journal=ExperienceJournal(root/'journal.sqlite3')
     ingestor=DiscoveryOpportunityIngestor(journal)
     source=ingestor.ingest(DiscoveryCandidate(source='synthetic public source',title='Observation design',
@@ -149,13 +149,21 @@ async def exercise(root,mode,*,historical=False):
             # A selected sourced fact absent from required atoms is allowed; an
             # unused source specification and operational caveat need not appear.
             if mode=='repair' and data.get('correction'):
+                if fit_revision:
+                    from alive_kernel.source_revision import PROMPT
+                    assert PROMPT in kw['messages'][0]['content'] and 'issues' not in data
+                    if fit_revision=='abstain':return response(json.dumps({'abstain':True}))
+                    if fit_revision=='erase':
+                        ingestor.vault.erase_item(journal.get(source.observation_event_id).event.payload['content']['content_id'])
+                    return response(json.dumps({'text':'A concrete observation: the project keeps watching '
+                        'when evidence is insufficient. [Design](https://example.invalid/design)'}))
                 return response(json.dumps({'edits':[dict(exact_text='I shared this yesterday. ',
                     claim_index=0,replacement='')]}))
             if mode in ('bare-citation','legacy-bare'):
                 return response('The project keeps watching when evidence is insufficient. https://example.invalid/design')
             if mode=='code-citation':
                 return response('The project keeps watching. `[source](https://example.invalid/design)`')
-            return response(('I shared this yesterday. ' if mode=='repair' else '')+
+            return response(('DENSE_FIRST_OPENING. ' if fit_revision else 'I shared this yesterday. ' if mode=='repair' else '')+
                 'The project describes keeping watch when evidence is insufficient: '
                 '[observation design](https://example.invalid/design).')
         if task=='alive_semantic_review':
@@ -185,11 +193,14 @@ async def exercise(root,mode,*,historical=False):
                 assert 'Keep two judgments distinct' in kw['messages'][0]['content']
             else:
                 assert 'ACTUAL final discovery message' in kw['messages'][0]['content']
-            unsupported=mode=='unsupported' or mode=='repair' and 'I shared this yesterday.' in data['candidate']['text']
+            unsupported=(mode=='unsupported' or mode=='repair' and
+                ('I shared this yesterday.' in data['candidate']['text'] or
+                 fit_revision and ('DENSE_FIRST_OPENING.' in data['candidate']['text'] or fit_revision=='reject-again')))
             return response(controlled_final_findings(data,
-                factual='unsupported' if unsupported and mode=='repair' else 'supported',
-                fit='conflicts' if unsupported and mode!='repair' else 'fits',
-                reason='I shared this yesterday. is unsupported prior conversation.'
+                factual='unsupported' if unsupported and mode=='repair' and not fit_revision else 'supported',
+                fit='conflicts' if unsupported and (mode!='repair' or fit_revision) else 'fits',
+                reason='The opening and overall structure conflict with this conversational situation.'
+                    if unsupported and fit_revision else 'I shared this yesterday. is unsupported prior conversation.'
                     if unsupported and mode=='repair' else 'Synthetic purpose assessment, not satisfaction.'))
         raise AssertionError(task)
     runtime=SendPreparationRuntime(journal,content_vault=ingestor.vault)
@@ -229,7 +240,13 @@ async def exercise(root,mode,*,historical=False):
         else:
             assert mode not in ('bare-citation','code-citation'),'malformed citation reached review/dispatch'
     expressed=assessed.expression
-    assert assessed.quality_disposition==('final_unsupported' if mode=='unsupported' else 'supported')
+    if fit_revision in ('abstain','erase'):
+        assert assessed.quality_disposition=='final_repair_unavailable'
+        assert calls.count('alive_source_support')==1 and calls.count('alive_semantic_render')==2
+        assert not journal.read(event_type='expression.source_revision_completed')
+        assert not journal.read(event_type='action.attempted') and not journal.read(event_type='dispatch.started')
+        return
+    assert assessed.quality_disposition==('final_unsupported' if mode=='unsupported' or fit_revision=='reject-again' else 'supported')
     assert 'FAMILY_SPEC_OPTIONAL' not in expressed.text and not expressed.delivery_authorized
     semantic=journal.get(expressed.review_event_id)
     assert (semantic.event.payload.get('assessment_scope')=='required-boundaries-v1') is (not historical)
@@ -251,7 +268,10 @@ async def exercise(root,mode,*,historical=False):
         assert assessed.repair_disposition=='completed' and assessed.initial_final_review_event_id!=assessed.final_review_event_id
         assert 'I shared this yesterday.' not in expressed.text
         assert calls.count('alive_semantic_render')==calls.count('alive_semantic_review')==2
-        assert len(journal.read(event_type='expression.local_correction_completed'))==1
+        assert len(journal.read(event_type='expression.source_revision_completed' if fit_revision else 'expression.local_correction_completed'))==1
+        if fit_revision:
+            assert 'DENSE_FIRST_OPENING.' not in expressed.text
+            assert not journal.read(event_type='expression.local_correction_completed')
     generated=interpreter.load_completed(subject='user:test',operation_id=expressed.planning.interpretation_event_id.removeprefix(
         'opportunity.synthesis:').removesuffix(':completed'))
     saved=interpreter.retained_proposal(receipt_event_id=generated.receipt_event_id,
@@ -278,7 +298,7 @@ async def exercise(root,mode,*,historical=False):
         interpretation_id=expressed.planning.interpretation_event_id.removeprefix(
             'opportunity.synthesis:').removesuffix(':completed'),require_independence=False)
     decision=runtime.authorizer.evaluate(operation_id='with-final',final_wording_witness=witness,**args)
-    assert decision.authorized is (mode!='unsupported'),decision.reasons
+    assert decision.authorized is (mode!='unsupported' and fit_revision!='reject-again'),decision.reasons
     if decision.authorized:
         outbox=DispatchOutbox(journal,content_vault=ingestor.vault)
         authorized=journal.get(decision.event_id)

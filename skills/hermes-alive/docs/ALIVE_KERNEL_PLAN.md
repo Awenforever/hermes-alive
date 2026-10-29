@@ -5,6 +5,19 @@ Last reviewed: 2026-10-29 (Asia/Shanghai).
 
 ## Current product state
 
+ADR0281 is an unqualified source-led correction candidate for ADR0280's remaining
+global-fit issue. It reuses the one correction slot, permits a complete sourced
+revision only for an explicit v2 discovery fit conflict, and retains exact
+response/reconstruction evidence. Old local/pending/protected-purpose semantics
+remain separate. Controlled success, cold recovery, altered proof, a second
+rejection, abstention and source erasure pass alongside local repair and v1
+recovery. The installed current Core chain explicitly exercises a global-fit
+rejection, source-led revision, repeated meaning/final assessments and one
+corrected local adapter submission, with no actual models or external sends.
+A Core fixture indentation error was retained and corrected; its initial broad
+run stopped at compilation. Complete current regression and fresh actual-model
+quality remain pending. There is no new reviewer or retry loop.
+
 ADR0280 is now an unqualified development candidate. It separates factual
 support and communication fit inside the existing final discovery review call,
 retains both advisory findings and derives the existing lifecycle verdict.

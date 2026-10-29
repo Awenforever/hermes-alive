@@ -18,6 +18,8 @@ from .content_vault import ContentReference
 from .presentation import PresentationProjection
 from .model_json import parse_model_json
 from .localized_correction import METHOD as LOCAL_CORRECTION_METHOD, CORRECTION_PROMPT, apply_correction, text_digest
+from .source_revision import (METHOD as SOURCE_REVISION_METHOD, PROMPT as SOURCE_REVISION_PROMPT,
+    eligible as source_revision_eligible, revised_text)
 from .semantic_rendering import deterministic_text, serialize_meaning
 from .semantic_review import (
     AtomReview, IndependentSemanticReview, ReviewerKind, SemanticReviewError,
@@ -423,7 +425,7 @@ class SemanticComparator:
             raise SemanticReviewError('invalid independence mode')
         if type(protocol_recovery) is not bool:
             raise SemanticReviewError('invalid protocol recovery mode')
-        if correction_method is not None and (correction_method != LOCAL_CORRECTION_METHOD
+        if correction_method is not None and (correction_method not in (LOCAL_CORRECTION_METHOD, SOURCE_REVISION_METHOD)
                 or correction_review_event_id is None):
             raise SemanticReviewError('unknown or unbound local correction method')
         operation = str(operation_id or uuid4())
@@ -451,6 +453,8 @@ class SemanticComparator:
                               if context_reader is not None else None)
         discovery = bool(expression_context and expression_context.get('method') in (
             'discovery-source-authoring-v1','discovery-source-authoring-v2','discovery-source-authoring-v3'))
+        if correction_method == SOURCE_REVISION_METHOD and (not discovery or not source_revision_eligible(correction)):
+            raise SemanticReviewError('source-led revision needs a current discovery fit conflict')
         # Durable start still precedes inference. Its clock cannot slide during
         # recovery, and an old unclocked start never acquires a new prompt.
         authoring_as_of=self._start_authoring(operation,subject,selection_event_id,
@@ -462,7 +466,7 @@ class SemanticComparator:
                              **({'correction':correction} if correction else {}),
                              **({'issues':correction['findings']['unsupported_claims']+
                                   correction['findings']['uncertainties']}
-                                if correction_method is not None else {})},
+                                if correction_method == LOCAL_CORRECTION_METHOD else {})},
                             ensure_ascii=False, separators=(",", ":"))
         from .research_evidence import RESEARCH_MESSAGE_BUDGET
         budget=(RESEARCH_MESSAGE_BUDGET if expression_context and expression_context.get('method')
@@ -481,8 +485,10 @@ class SemanticComparator:
             render_system=((_DISCOVERY_RENDER_PROMPT_V2 if authoring_as_of else _DISCOVERY_RENDER_PROMPT_V1)+
                 (_READING_ASSESSMENT_GUIDANCE if expression_context.get('reading_assessment') else '')
                 if discovery else _RENDER_PROMPT)
-            if correction_method is not None:
+            if correction_method == LOCAL_CORRECTION_METHOD:
                 render_system=CORRECTION_PROMPT
+            elif correction_method == SOURCE_REVISION_METHOD:
+                render_system += '\n' + SOURCE_REVISION_PROMPT
             response = await asyncio.wait_for(call(
                 task="alive_semantic_render", model=renderer_model,
                 messages=[{"role": "system", "content": render_system},
@@ -499,9 +505,10 @@ class SemanticComparator:
                 previous=self.store.resolve_model_candidate(correction['previous_expression_event_id'])
                 if previous is None or previous.text != correction['grounding_context']['candidate']['text']:
                     raise SemanticReviewError('local correction original is no longer available')
-                text=apply_correction(previous.text,expected_digest=previous.digest,
-                    findings=correction['findings'],response=proposal,
-                    protected_literals=tuple(literal for atom in document.atoms for literal in atom.protected_literals))
+                literals=tuple(literal for atom in document.atoms for literal in atom.protected_literals)
+                text=(revised_text(proposal,protected_literals=literals) if correction_method == SOURCE_REVISION_METHOD else
+                    apply_correction(previous.text,expected_digest=previous.digest,
+                        findings=correction['findings'],response=proposal,protected_literals=literals))
             domain = resolve_domain(provider, actual_model)
             if domain is None:
                 raise SemanticReviewError("renderer independence domain is unknown")
@@ -514,12 +521,13 @@ class SemanticComparator:
             if proposal is not None:
                 # Retain reconstruction evidence in the existing encrypted vault
                 # and journal, not a new backend, reviewer or delivery mechanism.
+                revision=correction_method == SOURCE_REVISION_METHOD
                 ref=self.store.content_vault.put_json(proposal,subject=subject,
-                    purpose='semantic.local-correction',sensitivity=source.event.sensitivity,
-                    retention_until=candidate.expires_at,content_id='semantic-local-correction:'+operation)
+                    purpose='semantic.source-revision' if revision else 'semantic.local-correction',sensitivity=source.event.sensitivity,
+                    retention_until=candidate.expires_at,content_id=('semantic-source-revision:' if revision else 'semantic-local-correction:')+operation)
                 self.store.journal.append(EventEnvelope(
-                    event_id='message.local_correction:'+operation,
-                    event_type='expression.local_correction_completed',source='alive.semantic-comparator',
+                    event_id=('message.source_revision:' if revision else 'message.local_correction:')+operation,
+                    event_type='expression.source_revision_completed' if revision else 'expression.local_correction_completed',source='alive.semantic-comparator',
                     actor='system:alive-shadow-comparator',subject=subject,
                     sensitivity=source.event.sensitivity,causation_id=candidate.event_id,
                     expires_at=candidate.expires_at,payload=dict(method=correction_method,

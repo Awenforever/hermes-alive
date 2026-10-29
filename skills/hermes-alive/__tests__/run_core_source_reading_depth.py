@@ -12,7 +12,7 @@ import run_core_session_routing as core
 from run_core_guided_setup import cli
 
 
-async def test(home):
+async def test(home,*,fit_revision=False):
     import httpx
     home.mkdir(exist_ok=True)
     assert not any(home.iterdir()),'fixture requires its newly reserved empty profile'
@@ -95,7 +95,10 @@ async def test(home):
             elif 'expression_binding' in data:
                 from final_review_fixture import controlled_final_findings
                 assert data['expression_binding']['final_assessment_scope'] == 'factual-support-and-communication-fit-v1'
-                stage='final';value=controlled_final_findings(data)
+                conflict=fit_revision and 'DENSE_TEST_OPENING' in data['candidate']['text']
+                stage='final';value=controlled_final_findings(data,
+                    fit='conflicts' if conflict else 'fits',
+                    reason='Synthetic whole-form mismatch.' if conflict else 'Synthetic form fits the situation.')
             elif 'meaning' in data and 'candidate' in data:
                 stage='semantic';value=dict(atom_reviews=[dict(atom_id=x['atom_id'],preserved=True,risks=[])
                     for x in data['meaning']['atoms']],added_claims_detected=False,speech_act_preserved=True,protected_literals_preserved=True)
@@ -104,6 +107,11 @@ async def test(home):
                 assert any(e['provenance_metadata'].get('title_is_placeholder') is True
                     for e in data['expression_context']['source_evidence'])
                 value=qualifier+' [Source](<'+url+'>)'
+                if fit_revision:
+                    if data.get('correction'):
+                        assert 'may change the opening, focus, ordering and depth' in body['messages'][0]['content']
+                        stage='revision';value={'text':'One concrete finding: '+value}
+                    else:value='DENSE_TEST_OPENING. '+value
             elif 'candidate' in data and 'evidence' in data:
                 stage='source';assert qualifier in raw
                 value=dict(verdict='supported',unsupported_claims=[],uncertainties=[],reason='Synthetic source verdict')
@@ -129,12 +137,15 @@ async def test(home):
         assert reads==[('web_search',dict(query='synthetic public observation',limit=3)),
             ('web_extract',dict(urls=[url],char_limit=6000)),('web_extract',dict(urls=[url],char_limit=15000))]
         assert len(sent)==1 and qualifier in sent[0][1]
+        assert stages.count('final')==(2 if fit_revision else 1)
+        assert stages.count('revision')==int(fit_revision)
+        if fit_revision:assert 'DENSE_TEST_OPENING' not in sent[0][1]
         assert stages.count('reading')==stages.count('deepen')==1
         assert all(stage in stages for stage in ('interpret','select','author','semantic','final'))
         print('HERMES_ALIVE_CORE_SOURCE_READING_DEPTH_OK '+json.dumps(dict(stages=stages,
             requested_windows=[6000,15000],local_adapter_submissions=1,physical_sends=0,actual_model_inference=False,
             qualification_after_old_window_preserved=True,untitled_extracts_retained=True,
-            final_facts_and_fit_exercised=True,quality_rounds=0)),flush=True)
+            final_facts_and_fit_exercised=True,source_led_revision_exercised=fit_revision,quality_rounds=0)),flush=True)
     finally:
         if manager is not None:manager.unload()
         core.reset_hermes_home_override(token)
@@ -153,7 +164,7 @@ if __name__=='__main__':
     directory=Path(tempfile.mkdtemp(prefix='alive-core-source-depth-',dir=parent))
     succeeded=False
     try:
-        asyncio.run(test(directory));succeeded=True
+        asyncio.run(test(directory,fit_revision=os.environ.get('HERMES_ALIVE_TEST_FIT_REVISION')=='1'));succeeded=True
     finally:
         from hermes_state_registry import close_all_under
         close_all_under(directory)
