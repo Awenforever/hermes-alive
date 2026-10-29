@@ -5,6 +5,17 @@ Last reviewed: 2026-10-29 (Asia/Shanghai).
 
 ## Current product state
 
+ADR0279 is a conversation-grounding candidate, not a quality pass. In both
+ordinary Core followups of the latest owner-context trial, an older background
+article occupied 3453 excerpt characters while the actual cited article's
+excerpt was omitted. A regression reproduces collection-order starvation.
+Reserve source catalogs first, prioritize actual citations for whole excerpts,
+and preserve original read-tool indices under the unchanged context budget.
+The separate final-review comparison remains running; no generated body may be
+read before its terminal/container/credential-cleanup gate. It uses newly
+assembled authorized QA input, not an expired encrypted review or historical
+authorization replay. No new review layer or production change is adopted.
+
 The installed native source-reading chain now passes one bounded Git-consumer
 qualification after ADR0277's source-service reuse. It reaches the actual Core
 SDK/registry, deeper reading, interpretation, authoring, review and one local
