@@ -661,11 +661,11 @@ class SemanticReviewStore:
             return None
 
     def _assessment_scope(self,candidate,subject):
-        from .review_contracts import SPLIT_SOURCE_REVIEW,BOUNDARY_ASSESSMENT
+        from .review_contracts import SPLIT_SOURCE_REVIEW_CONTRACTS,BOUNDARY_ASSESSMENT
         reader=getattr(self,'expression_context_for_selection',None)
         context=reader(candidate.selection_event_id,subject) if reader else None
         if (context and context.get('method') in ('discovery-source-authoring-v2','discovery-source-authoring-v3')
-                and context.get('semantic_source_contract')==SPLIT_SOURCE_REVIEW):
+                and context.get('semantic_source_contract') in SPLIT_SOURCE_REVIEW_CONTRACTS):
             return BOUNDARY_ASSESSMENT
         return None
 

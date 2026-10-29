@@ -202,9 +202,9 @@ class SemanticComparator:
     @staticmethod
     def _review_contract(meaning, text, context):
         original = dict(meaning=meaning,candidate=text)
-        from .review_contracts import SPLIT_SOURCE_REVIEW,BOUNDARY_ASSESSMENT
+        from .review_contracts import SPLIT_SOURCE_REVIEW_CONTRACTS,BOUNDARY_ASSESSMENT
         if (context and context.get('method') in ('discovery-source-authoring-v2','discovery-source-authoring-v3')
-                and context.get('semantic_source_contract')==SPLIT_SOURCE_REVIEW):
+                and context.get('semantic_source_contract') in SPLIT_SOURCE_REVIEW_CONTRACTS):
             return original,_BOUNDARY_REVIEW_PROMPT,BOUNDARY_ASSESSMENT
         if context and (context.get('method') in ('discovery-source-authoring-v1','discovery-source-authoring-v2')
                 or context.get('method')=='discovery-source-authoring-v3'

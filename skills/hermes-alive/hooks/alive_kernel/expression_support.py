@@ -104,7 +104,10 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
             content_vault=self.vault, context_vault=context_vault)
 
     def prompt_for_snapshot(self, snapshot):
-        from .review_contracts import BOUNDARY_ASSESSMENT
+        from .review_contracts import BOUNDARY_ASSESSMENT, FACTS_AND_FIT_ASSESSMENT
+        if snapshot.get('expression_binding',{}).get('final_assessment_scope') == FACTS_AND_FIT_ASSESSMENT:
+            from .final_value_findings import PROMPT
+            return PROMPT
         if snapshot.get('expression_binding',{}).get('semantic_assessment_scope')==BOUNDARY_ASSESSMENT:
             return _DISCOVERY_FINAL_PROMPT_V2
         if snapshot.get('expression_binding',{}).get('assessment_mode') == 'protected-source-and-purpose-v1':
@@ -113,6 +116,26 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
                 'discovery-source-and-value-v1','discovery-source-and-value-v2','discovery-source-and-value-v3'):
             return _DISCOVERY_FINAL_PROMPT_V1
         return super().prompt_for_snapshot(snapshot)
+
+    def parse_findings(self, text, snapshot):
+        from .review_contracts import FACTS_AND_FIT_ASSESSMENT
+        if snapshot.get('expression_binding',{}).get('final_assessment_scope') == FACTS_AND_FIT_ASSESSMENT:
+            from .final_value_findings import parse
+            try:
+                return parse(text)
+            except ValueError as error:
+                raise SourceSupportError('invalid factual-support/communication-fit assessment') from error
+        return super().parse_findings(text, snapshot)
+
+    def validate_stored_findings(self, findings, snapshot):
+        from .review_contracts import FACTS_AND_FIT_ASSESSMENT
+        if snapshot.get('expression_binding',{}).get('final_assessment_scope') == FACTS_AND_FIT_ASSESSMENT:
+            from .final_value_findings import validate_retained
+            try:
+                return validate_retained(findings)
+            except ValueError as error:
+                raise SourceSupportError('invalid retained factual-support/communication-fit assessment') from error
+        return super().validate_stored_findings(findings, snapshot)
 
     def _review_window_enabled(self,snapshot):
         if not super()._review_window_enabled(snapshot):return False
@@ -304,9 +327,12 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
             data['expression_binding']['assessment_mode'] = 'discovery-source-and-value-v1'
             data['assessment_scope']['kind'] = 'final_discovery_source_and_value'
             context = self.expressions.expression_context_for_selection(expression.selection_event_id,subject)
-            from .review_contracts import SPLIT_SOURCE_REVIEW,BOUNDARY_ASSESSMENT
-            if context.get('semantic_source_contract')==SPLIT_SOURCE_REVIEW:
+            from .review_contracts import (SPLIT_SOURCE_REVIEW, SPLIT_SOURCE_REVIEW_CONTRACTS,
+                BOUNDARY_ASSESSMENT, FACTS_AND_FIT_ASSESSMENT)
+            if context.get('semantic_source_contract') in SPLIT_SOURCE_REVIEW_CONTRACTS:
                 data['expression_binding']['semantic_assessment_scope']=BOUNDARY_ASSESSMENT
+                if context['semantic_source_contract'] == SPLIT_SOURCE_REVIEW:
+                    data['expression_binding']['final_assessment_scope']=FACTS_AND_FIT_ASSESSMENT
             if context['method'] in ('discovery-source-authoring-v2','discovery-source-authoring-v3'):
                 # Evaluate actual source/context/text, not whether the author
                 # carried out the generating model's proposed research purpose.

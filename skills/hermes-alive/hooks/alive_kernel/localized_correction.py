@@ -12,6 +12,9 @@ METHOD = 'review-anchored-edits-v1'
 # Match the existing model-candidate UTF-8 boundary, not a length preference.
 MAX_TEXT = 256000
 MAX_SPANS = 8
+# New final assessments retain their exact reason, whose existing outer bound
+# is 1500 characters. This is diagnostic input, not outward message wording.
+MAX_FINDING = 1500
 
 # Replaces the existing corrective author invocation, not an additional judge.
 CORRECTION_PROMPT = '''Repair the supplied original message against its retained
@@ -60,7 +63,7 @@ def bind_spans(text, *, expected_digest, unsupported_claims, targets):
     if text_digest(text) != expected_digest:
         raise LocalCorrectionError('correction base differs from the reviewed text')
     if (not isinstance(unsupported_claims,(list,tuple)) or not 1 <= len(unsupported_claims) <= 32
-            or any(not isinstance(c,str) or not 1 <= len(c) <= 500 for c in unsupported_claims)
+            or any(not isinstance(c,str) or not 1 <= len(c) <= MAX_FINDING for c in unsupported_claims)
             or not isinstance(targets,(list,tuple)) or not 1 <= len(targets) <= MAX_SPANS):
         raise LocalCorrectionError('negative findings have no bounded correction locations')
     intervals=[];covered=set();spans=[]

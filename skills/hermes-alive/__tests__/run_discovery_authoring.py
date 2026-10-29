@@ -21,7 +21,7 @@ from alive_kernel.send_preparation_runtime import SendPreparationRuntime
 from alive_kernel.dispatch_outbox import DispatchOutbox,DispatchOutboxError
 from alive_kernel.events import _thaw_json
 from alive_kernel.semantic_review import SemanticReviewError
-from alive_kernel_testkit import install_terminal_route
+from alive_kernel_testkit import install_terminal_route, controlled_final_findings
 from alive_kernel.agenda import AgendaProjection,AgendaProposal,AgendaItemKind,AgendaAuthority
 from alive_kernel.discovery_inquiry import DiscoveryInquiryContext
 from alive_kernel.semantic_comparator import SemanticComparator
@@ -181,12 +181,16 @@ async def exercise(root,mode,*,historical=False):
                 assert (marker in json.dumps(data)) is historical
             assert data['candidate']['id'].startswith('message.model_candidate:')
             assert data['assessment_scope']['kind']=='final_discovery_source_and_value'
-            assert 'ACTUAL final discovery message' in kw['messages'][0]['content']
+            if data['expression_binding'].get('final_assessment_scope'):
+                assert 'Keep two judgments distinct' in kw['messages'][0]['content']
+            else:
+                assert 'ACTUAL final discovery message' in kw['messages'][0]['content']
             unsupported=mode=='unsupported' or mode=='repair' and 'I shared this yesterday.' in data['candidate']['text']
-            return response(dict(verdict='unsupported' if unsupported else 'supported',
-                unsupported_claims=(['I shared this yesterday. is unsupported prior conversation.']
-                    if mode=='repair' else ['Synthetic purpose mismatch']) if unsupported else [],uncertainties=[],
-                reason='Synthetic final assessment, not world truth or user satisfaction.'))
+            return response(controlled_final_findings(data,
+                factual='unsupported' if unsupported and mode=='repair' else 'supported',
+                fit='conflicts' if unsupported and mode!='repair' else 'fits',
+                reason='I shared this yesterday. is unsupported prior conversation.'
+                    if unsupported and mode=='repair' else 'Synthetic purpose assessment, not satisfaction.'))
         raise AssertionError(task)
     runtime=SendPreparationRuntime(journal,content_vault=ingestor.vault)
     params=dict(subject='user:test',operation_id='one',call=call,

@@ -93,7 +93,9 @@ async def test(home):
                     dimensions={n:dict(value=.05 if n in ('risk','urgency','interruption_cost') else .9,reason='Synthetic judgment')
                         for n in ('user_value','urgency','novelty','confidence','risk','interruption_cost')})]}
             elif 'expression_binding' in data:
-                stage='final';value=dict(verdict='supported',unsupported_claims=[],uncertainties=[],reason='Synthetic verdict')
+                from final_review_fixture import controlled_final_findings
+                assert data['expression_binding']['final_assessment_scope'] == 'factual-support-and-communication-fit-v1'
+                stage='final';value=controlled_final_findings(data)
             elif 'meaning' in data and 'candidate' in data:
                 stage='semantic';value=dict(atom_reviews=[dict(atom_id=x['atom_id'],preserved=True,risks=[])
                     for x in data['meaning']['atoms']],added_claims_detected=False,speech_act_preserved=True,protected_literals_preserved=True)
@@ -131,7 +133,8 @@ async def test(home):
         assert all(stage in stages for stage in ('interpret','select','author','semantic','final'))
         print('HERMES_ALIVE_CORE_SOURCE_READING_DEPTH_OK '+json.dumps(dict(stages=stages,
             requested_windows=[6000,15000],local_adapter_submissions=1,physical_sends=0,actual_model_inference=False,
-            qualification_after_old_window_preserved=True,untitled_extracts_retained=True,quality_rounds=0)),flush=True)
+            qualification_after_old_window_preserved=True,untitled_extracts_retained=True,
+            final_facts_and_fit_exercised=True,quality_rounds=0)),flush=True)
     finally:
         if manager is not None:manager.unload()
         core.reset_hermes_home_override(token)

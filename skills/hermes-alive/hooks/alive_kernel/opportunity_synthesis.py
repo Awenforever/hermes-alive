@@ -36,7 +36,7 @@ from . import reading_assessment
 
 _DISCOVERY_AUTHORING = 'source-led-v2'
 _DISCOVERY_AUTHORING_MODES = ('source-led-v1','source-led-v2','source-led-v3')
-from .review_contracts import SPLIT_SOURCE_REVIEW
+from .review_contracts import SPLIT_SOURCE_REVIEW, SPLIT_SOURCE_REVIEW_CONTRACTS
 
 
 class OpportunitySynthesisError(ValueError):
@@ -1106,9 +1106,9 @@ class OpportunitySynthesizer:
                 or authoring != bundle.get('discovery_authoring')
                 or authoring not in (None,*_DISCOVERY_AUTHORING_MODES)
                 or source_review!=bundle.get('discovery_source_review')
-                or source_review not in (None,'bounded-group-source-v1',SPLIT_SOURCE_REVIEW)
+                or source_review not in (None,'bounded-group-source-v1',*SPLIT_SOURCE_REVIEW_CONTRACTS)
                 or source_review=='bounded-group-source-v1' and authoring!='source-led-v3'
-                or source_review==SPLIT_SOURCE_REVIEW and authoring not in ('source-led-v2','source-led-v3')
+                or source_review in SPLIT_SOURCE_REVIEW_CONTRACTS and authoring not in ('source-led-v2','source-led-v3')
                 or (authoring=='source-led-v3') != bool(start.event.payload.get('research_read_receipt_ids'))
                 or (authoring is not None and output != 'intent-only-v1')
                 or (editorial is not None and output != 'intent-only-v1')

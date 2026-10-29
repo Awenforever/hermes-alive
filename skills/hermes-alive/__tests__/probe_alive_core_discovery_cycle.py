@@ -101,7 +101,8 @@ async def main():
         elif 'expression_binding' in data:
             stage='final';assert data['expression_binding']['assessment_mode']=='discovery-source-and-value-v3'
             assert 'communication_plan' not in data['candidate']
-            value=dict(verdict='supported',unsupported_claims=[],uncertainties=[],reason='Synthetic finding, not satisfaction.')
+            from final_review_fixture import controlled_final_findings
+            value=controlled_final_findings(data)
         elif 'meaning' in data and 'candidate' in data:
             assert 'source_context' not in data
             assert 'only the explicitly required meaning boundaries' in body['messages'][0]['content']

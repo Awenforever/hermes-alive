@@ -5,6 +5,23 @@ Last reviewed: 2026-10-29 (Asia/Shanghai).
 
 ## Current product state
 
+ADR0280 is now an unqualified development candidate. It separates factual
+support and communication fit inside the existing final discovery review call,
+retains both advisory findings and derives the existing lifecycle verdict.
+New interpretation starts persist a v2 contract; v1 starts, prompts and findings
+retain their original recovery semantics. No new model, reviewer layer, retry
+loop, topic rule or outward word limit is introduced. Pure dimension/retained-
+consistency and actual persisted legacy recovery controls pass. Controlled
+authoring, configured discovery, one correction, source history, current Core
+continuity and current Core depth with an explicit new-contract assertion pass.
+A fixture namespace import failure was corrected without changing Core or models.
+The initial candidate's complete portable run is still pending; a later narrow
+correction-input bound alignment has targeted controls only. Global communication-
+fit repair remains open: the current exact-span editor deliberately preserves
+opening, structure and depth. An overall form mismatch cannot be assumed fixed
+by that editor. Do not claim good autonomous authoring from a rejection or
+abstention. The last fully qualified runtime remains the ADR0279 candidate below.
+
 ADR0279 has bounded conversation-grounding qualification, not a quality pass. In both
 ordinary Core followups of the latest owner-context trial, an older background
 article occupied 3453 excerpt characters while the actual cited article's
@@ -21,7 +38,9 @@ authorization replay. Separating factual support from communication fit within
 one call distinguishes a dense unsolicited opener from requested detail in the
 tested scenarios. This is limited hypothesis evidence: provider routes differ,
 one earlier detail control was malformed, and the short control was human-authored.
-No runtime review change, fresh quality pass or production change is adopted.
+Those diagnostics alone did not adopt a runtime change; ADR0280 above is the
+subsequent development candidate. No fresh quality pass or production change
+follows from these comparisons.
 
 The installed native source-reading chain now passes one bounded Git-consumer
 qualification after ADR0277's source-service reuse. It reaches the actual Core

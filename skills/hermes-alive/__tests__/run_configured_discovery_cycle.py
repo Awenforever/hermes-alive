@@ -264,7 +264,8 @@ async def exercise(root,mode,*,primary_url=None):
             elif task=='alive_source_support':
                 assert data['expression_binding']['assessment_mode']==('discovery-source-and-value-v2'
                     if mode in ('page-failed','legacy-replay','unconsented-followup','historical-followup-replay') else 'discovery-source-and-value-v3')
-                value=dict(verdict='supported',unsupported_claims=[],uncertainties=[],reason='Synthetic, not recipient satisfaction.')
+                from alive_kernel_testkit import controlled_final_findings
+                value=controlled_final_findings(data)
             else:raise AssertionError(task)
             if 'route_info' in kw:kw['route_info']['provider']='synthetic'
             return NS(model='synthetic-model',choices=[NS(message=NS(content=value if isinstance(value,str) else json.dumps(value)))])

@@ -223,9 +223,9 @@ class OpportunityExpressionStore(SemanticReviewStore):
             context['method'] = 'discovery-source-authoring-v3' if mode=='source-led-v3' else 'discovery-source-authoring-v2'
             for field in ('recipient_goal','behavior_constraints','tentative_reading_tasks','brief_is_advisory'):
                 context.pop(field, None)
-        from .review_contracts import SPLIT_SOURCE_REVIEW
+        from .review_contracts import SPLIT_SOURCE_REVIEW_CONTRACTS
         review_contract=start.event.payload.get('interpreter_method',{}).get('discovery_source_review')
-        if review_contract in ('bounded-group-source-v1',SPLIT_SOURCE_REVIEW):
+        if review_contract in ('bounded-group-source-v1',*SPLIT_SOURCE_REVIEW_CONTRACTS):
             context['semantic_source_contract']=review_contract
         if start.event.payload.get('interpreter_method',{}).get('reading_assessment'):
             context['reading_assessment']=interpreter.reading_assessment_context(
