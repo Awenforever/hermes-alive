@@ -44,3 +44,26 @@ unchanged source indices, exact text, whole excerpts and serialization bounds.
 Run the existing actual-Core continuity/retention/route controls before adoption.
 These checks do not establish natural conversation, factual judgment, real
 delivery, fleet compatibility or production acceptance.
+
+## 2026-10-29 — Bounded qualification update
+
+The regression failed against the preceding runtime, then passed the candidate.
+The current installed Core passed source controls, continuity across success,
+failure, consent/route/retention changes, budget limits and reference-tool reads,
+plus the untitled/deeper-reading chain and one local adapter submission. The
+combined candidate passed the complete portable CI, with its reduced stress
+configuration explicitly retained as a test limit.
+
+An existing inactive Ubuntu consumer upgraded through normal Git installation
+and runtime refresh. All 35 logical state/key fingerprints remained unchanged;
+packing, current Core continuity and complete source-depth controls passed from
+the actual installed tree and Core-managed interpreter/dependencies. Core and
+plugin working trees remain clean; no prefixed worker remains. There were no
+real models or external sends in these qualification controls. A prior isolated
+real trial identified the omission, but no new real main-agent continuation has
+yet qualified this repair. Whole-platform, active-job, daemon, fresh semantic
+quality and production gates remain open.
+
+Clarification of the earlier unchanged-context statement: complete share/source
+representation is unchanged when it fits. The reference-tool instruction header
+also gains the explicit omitted-excerpt reading instruction in those contexts.

@@ -5,16 +5,23 @@ Last reviewed: 2026-10-29 (Asia/Shanghai).
 
 ## Current product state
 
-ADR0279 is a conversation-grounding candidate, not a quality pass. In both
+ADR0279 has bounded conversation-grounding qualification, not a quality pass. In both
 ordinary Core followups of the latest owner-context trial, an older background
 article occupied 3453 excerpt characters while the actual cited article's
 excerpt was omitted. A regression reproduces collection-order starvation.
 Reserve source catalogs first, prioritize actual citations for whole excerpts,
 and preserve original read-tool indices under the unchanged context budget.
-The separate final-review comparison remains running; no generated body may be
-read before its terminal/container/credential-cleanup gate. It uses newly
-assembled authorized QA input, not an expired encrypted review or historical
-authorization replay. No new review layer or production change is adopted.
+The current Core continuity/source controls, complete portable suite and actual
+Ubuntu Git-installed continuity/depth checks pass; 35 existing logical state/key
+fingerprints remain unchanged and sending stays inactive. Larger cited excerpts
+still require the existing scoped read tool; priority alone cannot fit them.
+Two final-review comparisons are now terminal and credential-audited. They use
+newly assembled authorized QA input, not an expired encrypted review or historical
+authorization replay. Separating factual support from communication fit within
+one call distinguishes a dense unsolicited opener from requested detail in the
+tested scenarios. This is limited hypothesis evidence: provider routes differ,
+one earlier detail control was malformed, and the short control was human-authored.
+No runtime review change, fresh quality pass or production change is adopted.
 
 The installed native source-reading chain now passes one bounded Git-consumer
 qualification after ADR0277's source-service reuse. It reaches the actual Core
@@ -87,8 +94,9 @@ missing-title provenance retains the unmodified body without inventing metadata
 or making another model/read call. The new local regression first reproduced
 the failure and now passes. Four source controls and the current Core complete
 depth-reading/local-adapter chain also pass, with placeholder provenance
-asserted at interpretation and authoring. Native Git-consumer and broader
-qualification of this particular delta remain open.
+asserted at interpretation and authoring. The combined ADR0279 candidate now also
+passes the complete portable suite and native Git-installed depth controls.
+That does not qualify all extraction forms, cold installs or active daemons.
 This is not a claim that every valid source form or extraction is supported.
 
 The latest live public trial used explicitly authorized private preferences,
