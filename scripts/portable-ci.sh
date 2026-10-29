@@ -180,6 +180,7 @@ grep -q '^HERMES_ALIVE_STRESS_RESULT=PASS$' \
   }
 
 run_and_require run_markdown_citations.py '^HERMES_ALIVE_MARKDOWN_CITATIONS_OK$'
+run_and_require run_sqlite_operation_scope.py '^HERMES_ALIVE_SQLITE_OPERATION_SCOPE_OK$'
 run_and_require run_alive_kernel_opportunity_source_presentation.py '^HERMES_ALIVE_KERNEL_OPPORTUNITY_SOURCE_PRESENTATION_OK$'
 run_and_require run_alive_kernel_semantic_review_store.py '^HERMES_ALIVE_KERNEL_SEMANTIC_REVIEW_STORE_OK$'
 run_and_require run_comparison_operation_claim.py '^HERMES_ALIVE_COMPARISON_OPERATION_CLAIM_OK$'

@@ -58,6 +58,8 @@ class ExperienceJournal:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys=ON")
         connection.execute("PRAGMA busy_timeout=10000")
+        from .sqlite_operation_scope import hold_sqlite_resource
+        hold_sqlite_resource(self.path)
         return connection
 
     def _initialize(self) -> None:

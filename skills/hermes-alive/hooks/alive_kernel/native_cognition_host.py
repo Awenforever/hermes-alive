@@ -102,10 +102,12 @@ class NativeCognitionHost:
                     remaining=model['remaining']+reads['remaining']+local['remaining'])
 
     async def step(self,parameters):
-        if self.profile_scope is None:
-            return await self._step(parameters)
-        async with self.profile_scope():
-            return await self._step(parameters)
+        from .sqlite_operation_scope import sqlite_operation_scope
+        with sqlite_operation_scope():
+            if self.profile_scope is None:
+                return await self._step(parameters)
+            async with self.profile_scope():
+                return await self._step(parameters)
 
     async def _step(self,parameters):
         if self._lock.locked():

@@ -220,6 +220,8 @@ class ContentVault:
                     time.sleep(0.01)
             connection.execute("PRAGMA synchronous=FULL")
             connection.execute("PRAGMA secure_delete=ON")
+            from .sqlite_operation_scope import hold_sqlite_resource
+            hold_sqlite_resource(self.path)
             return connection
         except Exception:
             connection.close()

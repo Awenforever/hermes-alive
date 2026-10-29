@@ -5,6 +5,15 @@ Last reviewed: 2026-10-29 (Asia/Shanghai).
 
 ## Current product state
 
+Native installed-consumer launch currently fails despite the reading-depth
+container controls. A retained trace proves the authorization deadline elapsed
+during local preparation; an actual profile shows repeated source recovery and
+heavy SQLite access. ADR0277 tests scoped idle WAL resources while retaining all
+ordinary reads, audits, live checks and real deadlines. Do not widen TTLs or
+declare the native platform passed. The previous cold-CLI test fixture was
+separately corrected to use Core's normal profile namespace; that correction
+exposed this later genuine product failure.
+
 ADR0274 is a current presentation candidate: new recipient authoring receives a
 host-compiled canonical citation example and resolves only with an actual labelled
 Markdown source link. It preserves arbitrary useful labels and historical v1
