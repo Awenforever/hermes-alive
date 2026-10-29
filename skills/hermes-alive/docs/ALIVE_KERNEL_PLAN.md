@@ -17,8 +17,9 @@ and heavy SQLite access, and idle WAL keepers alone still let authorization
 expire. Reusing stateless source services and removing an immediate duplicate
 selection read retains ordinary fresh queries, audits, erasure, withdrawal and
 all later boundary checks. No TTL was widened. Four focused controls and the
-actual installed Core chain pass; full portable qualification is currently for
-the preceding keeper-only runtime. Cold dependency preparation also exceeded a
+actual installed Core chain pass; its complete portable suite subsequently
+passed as well. This broader result precedes the optional-title delta below.
+Cold dependency preparation also exceeded a
 test CLI's 120-second bound once. Neither a subsequent warm setup nor the final
 controlled cycle qualifies all cold installations, active tasks or daemons.
 
@@ -79,11 +80,30 @@ asserted at interpretation and authoring. Native Git-consumer and broader
 qualification of this particular delta remain open.
 This is not a claim that every valid source form or extraction is supported.
 
-Real public-discovery trials now reach actual main-agent continuation through
-Core's progressive tool bridge. This proves bounded context continuity, not
-naturalness or reliable inference: verbose product framing, a bare long source
-link and overstrong followup interpretations remain observed failures. Keep the
-quality counter at zero. Native Ubuntu Git upgrade preserved its existing state;
+The latest live public trial used explicitly authorized private preferences,
+normal Core context/soul/memory and returned conversation history across two
+fresh main-agent instances. Actual search, a cited deeper read, configured
+fallback, one local submission and two followups completed without external
+delivery. This improves the continuity evidence, but its conversation still
+fails: the opening became a dense benchmark inventory and the followup promoted
+particular observations into overstrong explanations. Keep the quality counter
+at zero. Primary reported figures being supported does not establish usefulness
+or conversational fit.
+
+This is not a missing-preference or missing-review case. Offline inspection
+confirms the exact communication preference reached the retained final review,
+and the selected brief already called for one coherent point. The existing
+final-review prompt also explicitly asks about recipient value and preferences,
+yet its positive reasoning justified factual fidelity and topic relevance.
+Measure a better intervention rather than appending the same instruction or
+another reviewer. Candidate comparisons should distinguish factual support from
+actual communication fit within the existing call and test a lighter opening
+authoring contract. Preserve useful depth when requested, outside-interest
+discoveries, old operation semantics and the limits of model judgment; do not
+substitute word quotas, topic-specific rules or provider changes. Ordinary main
+continuation remains independently unqualified; do not patch Core to disguise it.
+
+Native Ubuntu Git upgrade preserved its existing state;
 subsequent functional checks exposed a test-launch issue when Core re-enters a
 script through runpy. The test-only correction now passes the shared fixture
 from Core's bare store interpreter, followed by actual Git-installed native
@@ -273,6 +293,11 @@ records and ADRs0241–0256. Historical detail is retained in
 [the earlier archive](ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-25.md).
 
 ## Next work in order
+
+Immediate focus: use the retained failed opening and unchanged private preferences
+for a bounded comparison before changing runtime. Distinguish a positive factual
+assessment from observed conversational success. Then return to the memory and
+ongoing-work journeys below; sharing is one subgate, not the product definition.
 
 1. **Finish the useful task lifecycle.** Advance genuinely unfinished work and
    necessary dependencies within the guided range using Core, carrying actual
