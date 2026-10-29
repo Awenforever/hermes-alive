@@ -13,6 +13,7 @@ from typing import Any, Awaitable, Callable, Mapping
 from uuid import uuid4
 
 from .events import EventEnvelope
+from .event_store import EventConflictError
 from .content_vault import ContentReference
 from .presentation import PresentationProjection
 from .model_json import parse_model_json
@@ -234,10 +235,10 @@ class SemanticComparator:
         self, operation: str, stage: str, subject: str, selection_id: str,
         sensitivity: Any, *, status: str, model: str = "", error: str = "",
         authoring_clock: str | None = None,
-    ) -> None:
+    ):
         if authoring_clock is not None and (stage != 'started' or authoring_clock != _AUTHORING_CLOCK):
             raise SemanticReviewError('invalid authoring clock contract')
-        self.store.journal.append(EventEnvelope(
+        return self.store.journal.append(EventEnvelope(
             event_id=f"semantic.comparison:{operation}:{stage}",
             event_type="semantic.comparison_stage",
             source="alive.semantic-comparator",
@@ -249,14 +250,21 @@ class SemanticComparator:
                      **({'authoring_clock':authoring_clock} if authoring_clock is not None else {})},
         ))
 
-    def _start_authoring(self, operation, subject, selection_id, sensitivity, *, discovery):
+    def _start_authoring(self, operation, subject, selection_id, sensitivity, *, discovery, claim=False):
         """One immutable context clock; old starts retain their original input."""
         identity=f'semantic.comparison:{operation}:started'
         existing=self.store.journal.get(identity)
+        already_started=existing is not None
         if existing is None:
-            self._receipt(operation,'started',subject,selection_id,sensitivity,status='started',
-                authoring_clock=_AUTHORING_CLOCK if discovery else None)
+            try:
+                result=self._receipt(operation,'started',subject,selection_id,sensitivity,status='started',
+                    authoring_clock=_AUTHORING_CLOCK if discovery else None)
+                already_started=not result.created
+            except EventConflictError:
+                already_started=True
             existing=self.store.journal.get(identity)
+        if existing is None or claim and already_started:
+            raise SemanticReviewError('comparison operation already started or unresolved; inspect retained outcome')
         event=existing.event
         expected=dict(stage='started',status='started',actual_model='',error_class='',
             raw_prompt_stored=False,raw_response_stored=False,delivery_authority_granted=False)
@@ -446,7 +454,7 @@ class SemanticComparator:
         # Durable start still precedes inference. Its clock cannot slide during
         # recovery, and an old unclocked start never acquires a new prompt.
         authoring_as_of=self._start_authoring(operation,subject,selection_event_id,
-            source.event.sensitivity,discovery=discovery)
+            source.event.sensitivity,discovery=discovery,claim=True)
         prompt = json.dumps({"meaning": meaning, "presentation": style,
                              "language": language,
                              **({'authoring_as_of':authoring_as_of} if authoring_as_of else {}),

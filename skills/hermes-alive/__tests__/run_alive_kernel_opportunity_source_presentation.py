@@ -77,6 +77,7 @@ async def exercise(root):
         assert not meaning.atoms[0].protected_literals
         assert meaning.atoms[1].kind is SemanticAtomKind.LINK
         assert meaning.atoms[1].protected_literals == (url,)
+        assert meaning.atoms[1].text == ('[来源](<'+url+'>)' if planned else url)
         assert journal.get(selected.frame_event_id).event.canonical_json() == frame
     await verify_meaning(result, 'short-source', 'https://example.invalid/recording_(public)')
     # Exact model drafts containing the source remain unchanged, not double-linked.
@@ -95,8 +96,9 @@ async def exercise(root):
         contents=[dict(kind='fact',text='这是公开的合成学习资料。')],behavior_constraints=[])
     async def semantic_generate(**kw):
         prompt=json.loads(kw['messages'][1]['content'])
-        assert prompt['stage_contract']['source_link_binding']=='canonical_source_v1'
-        assert 'canonical URL in a separate plan content' in kw['messages'][0]['content']
+        assert prompt['stage_contract']['source_link_binding']=='canonical_source_inline_v2'
+        # The host-owned link is proved below from retained proposals/meaning,
+        # not by requiring an obsolete sentence in an internal prompt.
         response=await generate(**kw)
         document=json.loads(response.choices[0].message.content)
         document['candidates'][0]['communication_plan']=plan
@@ -105,7 +107,9 @@ async def exercise(root):
     planned=await interpreter.run(subject='user:test',operation_id='meaning-source',
         call=semantic_generate,recipient_meaning=True)
     assert planned.rejected_count==0 and len(planned.candidates)==1
-    assert long_url in planned.candidates[0].content['operation']['text']
+    assert planned.candidates[0].content['source_url']==long_url
+    assert planned.candidates[0].content['recipient_intent_version']==1
+    assert 'operation' not in planned.candidates[0].content,'internal intent became a send contract'
     await verify_meaning(planned,'meaning-source-cycle',long_url,planned=True)
     retained=interpreter.vault.resolve_json('opportunity-proposals:meaning-source',
         expected_subject='user:test',expected_purpose='opportunity.candidates')
@@ -116,6 +120,24 @@ async def exercise(root):
     assert journal.last_sequence()==checkpoint
     assert _present_source(original, 'https://example.invalid/a>b', 'canonical_source_v1') == (
         original + '\n\n来源：https://example.invalid/a>b')
+    # An old URL-only meaning must not be parsed as a new Markdown obligation.
+    # The previous policy explicitly allowed exact plain-text destinations that
+    # cannot be represented by the new angle-destination citation compiler.
+    legacy_url='https://example.invalid/a>b'
+    source=reader.ingest(DiscoveryCandidate(source='synthetic',title='Legacy exact destination',
+        summary='Public synthetic provenance',url=legacy_url,observed_at=datetime.now(timezone.utc)),subject='user:test')
+    legacy=await interpreter.run(subject='user:test',operation_id='legacy-angle',call=generate)
+    async def select_legacy(**_):
+        return SimpleNamespace(model='synthetic/selector',choices=[SimpleNamespace(message=SimpleNamespace(
+            content=json.dumps({'candidate_id':legacy.candidates[0].action.candidate_id,'rationale':'Retained legacy provenance'})))])
+    selected=await coordinator.plan_with_model(cycle_id='legacy-angle',subject='user:test',candidates=legacy.candidates,
+        policy_context=PolicyContext(can_interrupt=True),call=select_legacy)
+    expressions=OpportunityExpressionStore(journal,content_vault=reader.vault)
+    meaning=expressions.define_for_selection(selection_event_id=selected.selection_event_id,subject='user:test')
+    saved=expressions.record_model_candidate(selection_event_id=selected.selection_event_id,
+        meaning_event_id=meaning.event.event_id,subject='user:test',text=legacy.candidates[0].content['operation']['text'],
+        renderer_execution_id='execution:legacy-angle',renderer_model='synthetic/renderer',renderer_independence_domain='synthetic')
+    assert OpportunityExpressionStore(ExperienceJournal(journal.path),content_vault=reader.vault).resolve_model_candidate(saved.event_id)==saved
     try:
         _present_source(original, long_url, 'unknown-policy')
     except OpportunitySynthesisError:

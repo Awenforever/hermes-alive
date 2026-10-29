@@ -115,7 +115,7 @@ class SemanticAtom:
             raise SemanticRenderingError("invalid atom_id")
         # Discovery accepts canonical source URLs up to 4096 characters. Keeping
         # source provenance must not quietly truncate a valid long URL.
-        maximum_text = (4096 if kind is SemanticAtomKind.LINK else
+        maximum_text = (4096 + len('[来源](<>)') if kind is SemanticAtomKind.LINK else
                         1600 if kind is SemanticAtomKind.PROPOSED_CONTENT else _MAX_ATOM_CHARS)
         if not text or len(text) > maximum_text:
             raise SemanticRenderingError("semantic atom text is empty or too long")

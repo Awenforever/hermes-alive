@@ -302,6 +302,19 @@ def main() -> int:
             else:
                 raise AssertionError("duplicate comparison operation reran")
             assert len(calls) == spent
+            # A fresh store must not repeat inference either. The
+            # committed operation start is the boundary, not an in-memory flag.
+            cold_store=SemanticReviewStore(ExperienceJournal(journal.path),content_vault=store.content_vault)
+            duplicate_calls=[]
+            async def forbidden_duplicate(**_):
+                duplicate_calls.append(True)
+                raise AssertionError('cold duplicate reached model IO')
+            try:
+                await SemanticComparator(cold_store).run(**{**args,'call':forbidden_duplicate},
+                    operation_id='compare-success')
+            except SemanticReviewError:pass
+            else:raise AssertionError('cold duplicate comparison was admitted')
+            assert not duplicate_calls,'a wrapped model error hid duplicate inference'
             for failure_mode in (
                 "malformed", "self_review", "provider_error", "timeout", "missing_route",
                 "unknown_domain", "shared_family",

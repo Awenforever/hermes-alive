@@ -17,6 +17,7 @@ python_dependencies:
   - "cryptography>=50.0.0,<51"
   - "PyYAML>=6.0.3,<7"
   - "tzdata>=2025.2"
+  - "markdown-it-py>=4.0,<5"
 config_schema:
   enabled:
     type: bool

@@ -28,6 +28,7 @@ from .events import EventEnvelope, Sensitivity, _thaw_json
 from .expression_history import ExpressionHistoryReader
 from .action_history import ActionHistoryReader
 from .host_discovery import read_scope_metadata, source_prompt_excerpt, SOURCE_EXCERPT_POLICY, provenance_metadata
+from .markdown_citations import INLINE_CITATION_POLICY
 from .model_timeouts import MAX_STAGE_SECONDS
 from .core_context_read import context_value
 from . import reading_assessment
@@ -90,7 +91,7 @@ class OpportunitySynthesisResult:
 
 _DIMENSIONS = ("user_value", "urgency", "novelty", "confidence", "interruption_cost", "risk")
 _MAX_DIMENSION_REASON = 512  # Align with DimensionAssessment; do not truncate explanation.
-_SOURCE_PRESENTATIONS = {"model_text_v1", "canonical_source_v1"}
+_SOURCE_PRESENTATIONS = {"model_text_v1", "canonical_source_v1", "canonical_source_inline_v2"}
 _PROTOCOL_RECOVERY_PROMPT = """The previous response could not be admitted as strict
 finite JSON or under the original proposal/recipient-plan contract. Reconsider
 the original evidence and return one complete JSON object
@@ -310,7 +311,7 @@ natural expression. You may abstain if no useful faithful plan exists.
 Source attribution means an evidenced public author/publisher when useful to the
 recipient, not the internal collector's identity, workflow or collection log.
 Responsibility boundary: when stage_contract.source_link_binding is
-canonical_source_v1, the host binds the discovery opportunity's canonical source
+canonical_source_v1 or canonical_source_inline_v2, the host binds the discovery opportunity's canonical source
 URL from original evidence before selection and preserves a source-link atom
 during expression. You need not
 duplicate that canonical URL in a separate plan content merely to keep a link.
@@ -443,6 +444,7 @@ class OpportunitySynthesizer:
     """Unscheduled interpretation with an explicit, trusted host model capability."""
 
     _SOURCE_PRESENTATION = "canonical_source_v1"
+    _RECIPIENT_SOURCE_PRESENTATION = INLINE_CITATION_POLICY
     # One response can include four bounded recipient plans, dimensions and
     # source-linked non-actions. Provider allowances may also include reasoning.
     # 4000 repeatedly truncated this actual task. Stay within the existing native
@@ -1208,6 +1210,7 @@ class OpportunitySynthesizer:
                   record_reading_assessment=False) -> OpportunitySynthesisResult:
         if type(recipient_meaning) is not bool or type(protocol_recovery) is not bool:
             raise OpportunitySynthesisError('invalid recipient meaning mode')
+        source_presentation=(self._RECIPIENT_SOURCE_PRESENTATION if recipient_meaning else self._SOURCE_PRESENTATION)
         if type(record_reading_assessment) is not bool:
             raise OpportunitySynthesisError('explicit reading assessment mode required')
         if read_context is not None and not callable(read_context):
@@ -1251,7 +1254,7 @@ class OpportunitySynthesizer:
                                 "retained_owner_sources_are_current_turn": False,
                                 "routes_or_sends": False, "authorizes_execution": False,
                                 "host_authority": authority.value,
-                                "source_link_binding": self._SOURCE_PRESENTATION,
+                                "source_link_binding": source_presentation,
                                 "candidate_is_not_a_sent_message": True},
                             "corrective_reviews": revisions,
                             "recent_expression_history": [c.to_prompt() for c in history],
@@ -1353,7 +1356,7 @@ class OpportunitySynthesizer:
             requested_model=requested_model if candidate_evidence else None,
             protocol_recovery=protocol_recovery,
             structure_recovery='proposal-shape-v3' if protocol_recovery and recipient_meaning else None,
-            source_presentation=self._SOURCE_PRESENTATION,
+            source_presentation=source_presentation,
             source_excerpt_policy=SOURCE_EXCERPT_POLICY,
             recovery_prompt_digest=hashlib.sha256(_PROTOCOL_RECOVERY_PROMPT.encode()).hexdigest())
         receipt_id = f"opportunity.synthesis:{operation_id}:completed"
@@ -1448,7 +1451,7 @@ class OpportunitySynthesizer:
                             assessment_raw=document.pop('reading_assessments',None)
                         if protocol_recovery and recipient_meaning:
                             findings=self._structure_findings_v1(document,candidate_evidence,operation_id,receipt_id,authority,
-                                recipient_meaning=recipient_meaning,source_presentation=self._SOURCE_PRESENTATION,
+                                recipient_meaning=recipient_meaning,source_presentation=source_presentation,
                                 as_of=as_of,require_assessment=structural_failure,intent_only=True,
                                 allow_editorial_brief=True)
                             if findings: raise OpportunityStructureError(findings)
@@ -1490,7 +1493,7 @@ class OpportunitySynthesizer:
                 if assess_reading else None)
             candidates, drafts, rejected, indices = self._candidates(
                 document, candidate_evidence, operation_id, receipt_id, authority, context, learning=learning,
-                source_presentation=self._SOURCE_PRESENTATION,
+                source_presentation=source_presentation,
                 feedback=feedback,
                 recipient_meaning=recipient_meaning,
                 intent_only=recipient_meaning,
@@ -1509,7 +1512,7 @@ class OpportunitySynthesizer:
                  **({'discovery_source_review':method['discovery_source_review']} if method.get('discovery_source_review') else {}),
                  **({'reading_assessment_method':reading_assessment.REFERENCE_METHOD,
                      'reading_assessment':assessment} if assess_reading else {}),
-                 "source_presentation": self._SOURCE_PRESENTATION,
+                 "source_presentation": source_presentation,
                  "reconsiderations":[{'agenda_item_id':r.agenda_item_id,'after_seconds':r.after_seconds,
                                       'reason':r.reason} for r in reconsiderations],
                  "abstentions": [{"agenda_item_id": a.agenda_item_id, "reason": a.reason}

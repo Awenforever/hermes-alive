@@ -151,6 +151,10 @@ async def exercise(root,mode,*,historical=False):
             if mode=='repair' and data.get('correction'):
                 return response(json.dumps({'edits':[dict(exact_text='I shared this yesterday. ',
                     claim_index=0,replacement='')]}))
+            if mode in ('bare-citation','legacy-bare'):
+                return response('The project keeps watching when evidence is insufficient. https://example.invalid/design')
+            if mode=='code-citation':
+                return response('The project keeps watching. `[source](https://example.invalid/design)`')
             return response(('I shared this yesterday. ' if mode=='repair' else '')+
                 'The project describes keeping watch when evidence is insufficient: '
                 '[observation design](https://example.invalid/design).')
@@ -200,8 +204,26 @@ async def exercise(root,mode,*,historical=False):
     # Generate a historical fixture through actual old scoped mode; after the
     # patch ends, reopening under today's defaults must still reconstruct v1.
     with patch('alive_kernel.opportunity_synthesis._DISCOVERY_AUTHORING',
-               'source-led-v1' if historical else 'source-led-v2'):
-        assessed=await runtime.assess(allow_repair=mode=='repair',**params)
+               'source-led-v1' if historical else 'source-led-v2'), \
+         patch.object(OpportunitySynthesizer,'_RECIPIENT_SOURCE_PRESENTATION',
+               'canonical_source_v1' if historical or mode=='legacy-bare' else 'canonical_source_inline_v2'):
+        try:
+            assessed=await runtime.assess(allow_repair=mode=='repair',**params)
+        except SemanticReviewError:
+            if mode not in ('bare-citation','code-citation'):raise
+            records=journal.read(event_type='message.model_candidate')
+            assert len(records)==1,'rejected original render must remain retained'
+            raw=ingestor.vault.resolve_json(records[0].event.payload['content']['content_id'],
+                expected_subject='user:test',expected_purpose='message.model_candidate')
+            assert 'https://example.invalid/design' in raw['text']
+            assert runtime.expression.store.resolve_model_candidate(records[0].event.event_id) is None
+            reopened=SendPreparationRuntime(ExperienceJournal(journal.path),content_vault=ingestor.vault)
+            assert reopened.expression.store.resolve_model_candidate(records[0].event.event_id) is None
+            assert calls==['alive_opportunity_candidates','alive_deliberation','alive_semantic_render']
+            assert not journal.read(event_type='action.attempted') and not journal.read(event_type='dispatch.started')
+            return
+        else:
+            assert mode not in ('bare-citation','code-citation'),'malformed citation reached review/dispatch'
     expressed=assessed.expression
     assert assessed.quality_disposition==('final_unsupported' if mode=='unsupported' else 'supported')
     assert 'FAMILY_SPEC_OPTIONAL' not in expressed.text and not expressed.delivery_authorized
@@ -289,7 +311,8 @@ async def strict_scope(root):
 
 if __name__=='__main__':
     import argparse
-    cases=('supported','unsupported','recovery','proposal-recovery','no-grounding','source-withdrawn','repair')
+    cases=('supported','unsupported','recovery','proposal-recovery','no-grounding','source-withdrawn','repair',
+           'bare-citation','code-citation','legacy-bare')
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--case',choices=cases)
     selected=parser.parse_args().case

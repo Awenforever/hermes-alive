@@ -1998,3 +1998,51 @@ latter, verify unchanged authenticated events, keys and retained payloads;
 account for explicit erasures and separate ContextVault from ContentVault.
 Do not delete WAL/SHM files or mistake successful metadata checks for a complete
 active-job migration or daemon acceptance.
+
+## 2026-10-29 — Source identity does not prove usable citation markup
+
+The real dataset share retained the canonical URL yet exposed a long bare PDF
+address. Existing prompts already requested an inline link. ADR0274 moves that
+obligation into the versioned host-authored source atom and a CommonMark parse,
+leaving label choice and prose to the author. Do not shorten destinations,
+rewrite model prose after review or introduce a topic-specific formatting regex.
+Keep rejected originals and v1 cold recovery. A rejected draft is not a passed
+quality round; validate actual useful output as well as refusal controls.
+
+Scope the parser to the citation's actual role: a usable labelled source link
+must exist, but a meaningful URL literal in a command or code example is not
+another citation to prohibit. Do not turn a presentation check into a blanket
+URL filter or delete otherwise useful code. Historical URL-only source atoms
+must also bypass the new citation compiler, including destinations that the old
+plain-text policy allowed but the new Markdown compiler cannot represent.
+
+The investigation also withdrew an unnecessary plugin error-schema proposal:
+the original Core result already described the invalid reference arguments and
+did not invoke the plugin. Check the actual tool output before adding another
+validation layer. Untrusted extraction footers and main-agent overinterpretation
+remain separate unresolved behavior, not proof that the citation candidate fixes
+all continuation or Markdown issues.
+
+## 2026-10-29 — A late duplicate conflict does not prevent duplicate inference
+
+An additional semantic-review-store check failed because a repeated comparison
+operation reached the model before the journal rejected it. This is a genuine
+lower-level replay defect, not a stale fixture or a citation failure. ADR0275
+claims the existing durable start before IO, including cross-process races;
+reading an old authoring clock does not grant another attempt. Keep the original
+failure and qualify the combined runtime again rather than inheriting the earlier
+citation-only broad pass.
+### Reading a returned extract is not reading the whole resource
+
+A real inherited-model trial exposed a layered failure: broad introductory
+language survived factual review, an omitted methods section qualified that
+language, and main-agent continuation amplified the original interpretation.
+The source tool had returned a short head/tail window plus a cache-reading
+footer; the methods passage was not in the retained evidence. That footer is a
+Core tool affordance, not publisher prose or authority to read an arbitrary path.
+The useful next experiment must distinguish acquisition coverage, claim scope
+and ordinary followup behavior. Merely increasing reviewers, rewriting this one
+topic or treating a valid citation as factual correctness cannot close the gap.
+Old-but-interesting material can be useful, but a new-progress inquiry must not
+silently turn missing dates or search ranking into recency evidence. Continue
+to retain failed originals and keep the fresh-round counter honest.

@@ -5,6 +5,35 @@ Last reviewed: 2026-10-29 (Asia/Shanghai).
 
 ## Current product state
 
+ADR0274 is a current presentation candidate: new recipient authoring receives a
+host-compiled canonical citation example and resolves only with an actual labelled
+Markdown source link. It preserves arbitrary useful labels and historical v1
+wording. This is a syntax/reading affordance, not a new semantic judge, source
+truth proof or solution to main-agent overinterpretation. Rejected drafts remain
+failures; do not improve the quality counter by silently withholding them.
+
+ADR0275 addresses a separate observed low-level replay defect: a duplicate
+comparison could spend on inference before failing. The existing durable start
+is now an atomic execution claim, while clock inspection remains read-only.
+The combined candidate passed actual multi-process claim controls, cold-store
+duplicate checks, actual Core context/agenda controls and a full portable run.
+A subsequent narrow change preserves legacy URL-only meanings and permits useful
+URL literals outside the required primary citation; qualify that delta separately.
+These runtime checks do not establish real-model semantic quality.
+
+The next inherited-model public-discovery trial produced a labelled source link
+and reached two actual Core followups. The configured official fallback was
+observed after primary timeouts, without changing model settings. Its content
+still fails: old material was selected for a new-progress inquiry, and broad
+abstract wording was promoted into an architectural explanation not established
+by the supplied extracts. The followup expanded that explanation further.
+Inspection found the host-requested short Core extract omitted the relevant
+methods section and retained a cache-reading footer as source text. Investigate
+the acquisition-to-reading boundary and ordinary conversation context before
+adding more prose instructions or declaring a semantic reviewer sufficient.
+Do not solve this by hardcoding the example topic, demanding full papers for
+every casual share, or crediting refusals as useful outcomes.
+
 Real public-discovery trials now reach actual main-agent continuation through
 Core's progressive tool bridge. This proves bounded context continuity, not
 naturalness or reliable inference: verbose product framing, a bare long source

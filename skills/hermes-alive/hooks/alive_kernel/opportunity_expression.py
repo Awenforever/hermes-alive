@@ -12,6 +12,7 @@ from .opportunity_synthesis import OpportunitySynthesizer
 from .semantic_rendering import (MeaningDocument, MessageSpeechAct, SemanticAtom,
                                  SemanticAtomKind, SemanticRenderingError)
 from .semantic_review import SemanticReviewError, SemanticReviewStore
+from .markdown_citations import INLINE_CITATION_POLICY, citation_markup, has_inline_citation
 
 
 class OpportunityExpressionStore(SemanticReviewStore):
@@ -104,13 +105,32 @@ class OpportunityExpressionStore(SemanticReviewStore):
                 raise SemanticReviewError('legacy proposal has no original draft')
             atoms = (SemanticAtom('proposed-message', SemanticAtomKind.PROPOSED_CONTENT,
                                  text, evidence, literals),)
-        if original_url and not any(original_url in a.protected_literals for a in atoms):
+        inline_policy=original_start.event.payload.get('interpreter_method',{}).get('source_presentation')==INLINE_CITATION_POLICY
+        if original_url and (inline_policy or not any(original_url in a.protected_literals for a in atoms)):
             # Immutable selected wording remains the first atom. Provenance is
             # supplied by the host from canonical evidence, never guessed by the
             # renderer or conditional on the drafting model remembering a link.
             atoms += (SemanticAtom('source-link', SemanticAtomKind.LINK,
-                                   original_url, evidence, (original_url,)),)
+                                   citation_markup(original_url) if inline_policy else original_url,
+                                   evidence, (original_url,)),)
         return source, stored, atoms, expiry, plan
+
+    def resolve_model_candidate(self,event_id,*,as_of=None):
+        candidate=super().resolve_model_candidate(event_id,as_of=as_of)
+        if candidate is None:return None
+        try:
+            # Base resolution has already authenticated this exact document
+            # against the original selection/recorded presentation policy.
+            # Old URL-only atoms keep their original meaning and replay behavior.
+            document=self.meanings.resolve(candidate.meaning_event_id)
+            for atom in document.atoms:
+                if atom.atom_id!='source-link' or atom.kind is not SemanticAtomKind.LINK:continue
+                for url in atom.protected_literals:
+                    if atom.text!=url and atom.text==citation_markup(url) and not has_inline_citation(candidate.text,url):
+                        return None
+            return candidate
+        except (ValueError,KeyError,TypeError):
+            return None
 
     def continuity_sources_for_selection(self, selection_event_id, subject):
         """Original, currently validated source references for a share snapshot.
