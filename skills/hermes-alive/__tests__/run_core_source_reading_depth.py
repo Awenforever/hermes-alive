@@ -1,7 +1,8 @@
 """Current Core guided setup -> authorized native cycle -> deeper source -> share.
 
 Core SDK/registry/session/adapter paths are real; HTTP, pages, model decisions and
-URL safety are controlled. No actual provider call, physical message or quality
+URL safety are controlled. Extracts deliberately have no source title, to prove
+that optional display metadata cannot discard usable evidence. No actual provider call, physical message or quality
 round. In particular this does not use the old kernel-shadow setup surface.
 """
 import asyncio,importlib,json,os,shutil,sys,tempfile
@@ -57,7 +58,7 @@ async def test(home):
                 assert args['urls']==[url] and args['char_limit'] in (6000,15000)
                 text=('An introduction describes observing before intervention.' if args['char_limit']==6000
                     else 'Public background. '*510+qualifier)
-                return json.dumps({'results':[dict(url=url,title='Public trial',content=text)]})
+                return json.dumps({'results':[dict(url=url,title='',content=text)]})
             return operation
         for name in ('web_search','web_extract'):
             registry.register(name=name,toolset='web',schema=dict(name=name,description='Synthetic public source',
@@ -85,6 +86,8 @@ async def test(home):
             elif 'opportunities' in data:
                 stage='interpret';assert any(qualifier in excerpt(e) for e in data['opportunities'])
                 item=next(e for e in data['opportunities'] if qualifier in excerpt(e))
+                assert item['provenance_metadata']['source_title_available'] is False
+                assert item['provenance_metadata']['title_is_placeholder'] is True
                 value={'candidates':[dict(agenda_item_id=item['agenda_item_id'],kind='share',topic='public trial',
                     communication_plan=dict(version=3,recipient_goal='Synthetic contribution',speech_act='share',contents=[],behavior_constraints=[]),
                     dimensions={n:dict(value=.05 if n in ('risk','urgency','interruption_cost') else .9,reason='Synthetic judgment')
@@ -96,6 +99,8 @@ async def test(home):
                     for x in data['meaning']['atoms']],added_claims_detected=False,speech_act_preserved=True,protected_literals_preserved=True)
             elif 'meaning' in data:
                 stage='author';assert qualifier in raw
+                assert any(e['provenance_metadata'].get('title_is_placeholder') is True
+                    for e in data['expression_context']['source_evidence'])
                 value=qualifier+' [Source](<'+url+'>)'
             elif 'candidate' in data and 'evidence' in data:
                 stage='source';assert qualifier in raw
@@ -126,7 +131,7 @@ async def test(home):
         assert all(stage in stages for stage in ('interpret','select','author','semantic','final'))
         print('HERMES_ALIVE_CORE_SOURCE_READING_DEPTH_OK '+json.dumps(dict(stages=stages,
             requested_windows=[6000,15000],local_adapter_submissions=1,physical_sends=0,actual_model_inference=False,
-            qualification_after_old_window_preserved=True,quality_rounds=0)),flush=True)
+            qualification_after_old_window_preserved=True,untitled_extracts_retained=True,quality_rounds=0)),flush=True)
     finally:
         if manager is not None:manager.unload()
         core.reset_hermes_home_override(token)

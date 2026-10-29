@@ -215,11 +215,75 @@ async def exercise(root):
 async def allow_synthetic_url(url):
     return True  # Synthetic capability; the test above targets exact response binding.
 
+async def optional_titles(root):
+    from alive_kernel import ExperienceJournal,DiscoveryOpportunityIngestor,Sensitivity
+    from alive_kernel.host_discovery import HostDiscoveryReader,HostDiscoveryError,provenance_metadata
+    root.mkdir()
+    journal=ExperienceJournal(root/'experience.sqlite3');ingestor=DiscoveryOpportunityIngestor(journal)
+    replies=[];calls=[]
+    async def extract(urls,*,char_limit):
+        calls.append(urls[0]);return json.dumps({'results':[replies.pop(0)]})
+    async def search(query,*,limit):
+        calls.append(query);return json.dumps({'success':True,'data':{'web':[replies.pop(0)]}})
+    def reader():return HostDiscoveryReader(ingestor,subject='user:test',search=search,
+        extract=extract,allow_url=allow_synthetic_url,is_current=lambda:True)
+    # Title is optional presentation metadata; no particular site/provider or
+    # document format should determine whether valid content is available.
+    for i,fields in enumerate(({},dict(title=None),dict(title=''),dict(title=' \n '),
+                              dict(title=7),dict(title={'untrusted':'PRIVATE_BAD_TITLE'}),dict(title='x'*513))):
+        url='https://example.invalid/untitled-'+str(i)
+        raw=dict(url=url,content='Exact public evidence.',**fields);replies.append(raw)
+        result=await reader().collect(operation_id='untitled-'+str(i),read_urls=(url,))
+        assert result.failures==0 and len(result.observation_ids)==1
+        material=ingestor.active_evidence(subject='user:test',clearance=Sensitivity.PRIVATE,
+            observation_event_ids=result.observation_ids,limit=32)[0]
+        assert material.content['summary']=='Exact public evidence.' and material.content['url']==url
+        assert material.content['title']=='Untitled public resource'
+        assert provenance_metadata(material.content)['source_title_available'] is False
+        assert provenance_metadata(material.content)['title_is_placeholder'] is True
+        count=len(calls)
+        assert await reader().collect(operation_id='untitled-'+str(i),read_urls=(url,))==result
+        assert len(calls)==count
+        assert not ingestor.active_evidence(subject='user:other',clearance=Sensitivity.PRIVATE,
+            observation_event_ids=result.observation_ids,limit=32)
+        if i==0:
+            ref=journal.get(result.observation_ids[0]).event.payload['content']
+            ingestor.vault.erase_item(ref['content_id'])
+            try:await reader().collect(operation_id='untitled-0',read_urls=(url,))
+            except HostDiscoveryError:pass
+            else:raise AssertionError('untitled resource bypassed erasure')
+    # Listings may have useful text without a headline; a URL alone is not
+    # evidence. A title-only legacy listing remains valid.
+    for i,(fields,accepted) in enumerate(((dict(description='Useful public listing.'),True),
+                                        (dict(title='Actual supplied title'),True),({},False))):
+        replies.append(dict(url='https://example.invalid/listing-'+str(i),**fields))
+        result=await reader().collect(operation_id='listing-'+str(i),queries=('public '+str(i),))
+        assert bool(result.observation_ids)==accepted and result.failures==int(not accepted)
+        if accepted and 'title' in fields:
+            item=ingestor.active_evidence(subject='user:test',clearance=Sensitivity.PRIVATE,
+                observation_event_ids=result.observation_ids,limit=32)[0]
+            assert item.content['title']==fields['title']
+            assert 'title_is_placeholder' not in provenance_metadata(item.content)
+    # Presentation tolerance must not weaken exact transport binding, content
+    # bounds or source validity. No inference or extra read repairs these.
+    for i,fields in enumerate((dict(content=''),dict(content=' \n '),dict(content='x'*8193),
+                              dict(content=['not source text']),dict(url='http://127.0.0.1/private'),
+                              dict(url='https://example.invalid/substituted'))):
+        url='https://example.invalid/invalid-'+str(i)
+        replies.append(dict(dict(url=url,content='Public body.'),**fields))
+        result=await reader().collect(operation_id='invalid-title-case-'+str(i),read_urls=(url,))
+        assert result.failures==1 and not result.observation_ids
+    assert not replies
+
+async def main(root):
+    await exercise(root)
+    await optional_titles(root/'optional-titles')
+
 with tempfile.TemporaryDirectory(prefix='alive-host-discovery-') as folder:
     previous={key:os.environ.get(key) for key in ('HERMES_HOME','HERMES_ALIVE_SHARED_DIR')}
     os.environ['HERMES_HOME']=str(Path(folder)/'profile')
     os.environ['HERMES_ALIVE_SHARED_DIR']=str(Path(folder)/'runtime')
-    try: asyncio.run(exercise(Path(folder)))
+    try: asyncio.run(main(Path(folder)))
     finally:
         for key,value in previous.items():
             if value is None: os.environ.pop(key,None)

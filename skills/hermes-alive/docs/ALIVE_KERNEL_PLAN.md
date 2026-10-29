@@ -67,12 +67,17 @@ qualifies a native Windows consumer installation. Real-model usefulness remains
 pending. A failed real public search with zero model calls is neither a quality
 pass nor a model failure.
 
-Reading admission has another generic residual: Core can return an untitled
-resource with valid content, while the current host boundary requires a nonempty
-title. The observed model-card response therefore merits admission/provenance
-review; optional presentation metadata must not silently determine whether useful
-evidence is retained. Do not generalize the current reading-depth qualification
-into a claim that all valid source forms are already supported.
+ADR0278 addresses a generic reading-admission failure: Core can return an
+untitled resource with valid content, while the former host boundary discarded
+it. The current candidate separates optional titles from mandatory source
+identity, permission and bounded body checks. An explicit placeholder with
+missing-title provenance retains the unmodified body without inventing metadata
+or making another model/read call. The new local regression first reproduced
+the failure and now passes. Four source controls and the current Core complete
+depth-reading/local-adapter chain also pass, with placeholder provenance
+asserted at interpretation and authoring. Native Git-consumer and broader
+qualification of this particular delta remain open.
+This is not a claim that every valid source form or extraction is supported.
 
 Real public-discovery trials now reach actual main-agent continuation through
 Core's progressive tool bridge. This proves bounded context continuity, not

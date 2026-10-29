@@ -35,6 +35,8 @@ def read_scope_metadata(content):
         return {}
     metadata=dict(reported_read_scope=attrs['read_scope'],independent_verification_proven=False,
         video_consumption_proven=False,page_may_contain_navigation=attrs['read_scope']=='webpage_extract')
+    if attrs.get('title_is_placeholder') is True:
+        metadata.update(source_title_available=False,title_is_placeholder=True)
     if 'content_representation' in attrs:
         representation=attrs['content_representation']
         metadata['reported_content_representation']=(representation if representation in
@@ -146,11 +148,15 @@ class HostDiscoveryReader:
         url=item.get('url')
         title=item.get('title')
         content=item.get('description','') if kind=='search' else item.get('content')
-        if (not isinstance(url,str) or len(url)>4096 or not isinstance(title,str)
-                or not 1<=len(title)<=512 or not isinstance(content,str)
+        supplied_title=isinstance(title,str) and 1<=len(title)<=512 and bool(title.strip())
+        if (not isinstance(url,str) or len(url)>4096 or not isinstance(content,str)
                 or len(content)>(source_reading_depth.RETURNED_CHARS if read_depth else 8192)
-                or (kind=='extract' and not content)):
+                or ((kind=='extract' or not supplied_title) and not content.strip())):
             raise HostDiscoveryError('invalid bounded source observation')
+        # Missing/unusable display metadata is not missing evidence. Keep the
+        # body verbatim and label the absence explicitly rather than inventing
+        # an article headline or making another IO/model call to repair it.
+        if not supplied_title:title='Untitled public resource'
         try:
             parts=urlsplit(url)
             parts.port  # Reject an invalid port before invoking a read capability.
@@ -184,6 +190,7 @@ class HostDiscoveryReader:
                 attributes=dict(read_scope='search_listing' if kind=='search' else 'webpage_extract',
                     publication_date_unresolved=True,independently_verified=False,
                     video_watched=False,page_may_contain_navigation=kind=='extract',
+                    **(dict(title_is_placeholder=True) if not supplied_title else {}),
                     **(dict(read_window_policy=read_depth,
                         requested_extract_chars=source_reading_depth.EXTRACT_CHARS,
                         returned_extract_chars=len(content)) if read_depth else {}),
