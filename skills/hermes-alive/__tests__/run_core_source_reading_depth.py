@@ -4,7 +4,7 @@ Core SDK/registry/session/adapter paths are real; HTTP, pages, model decisions a
 URL safety are controlled. No actual provider call, physical message or quality
 round. In particular this does not use the old kernel-shadow setup surface.
 """
-import asyncio,importlib,json,shutil,tempfile
+import asyncio,importlib,json,os,shutil,sys,tempfile
 from pathlib import Path
 from unittest.mock import patch
 import run_core_session_routing as core
@@ -13,7 +13,9 @@ from run_core_guided_setup import cli
 
 async def test(home):
     import httpx
-    home.mkdir();shutil.copytree(core.repo,home/'plugins/hermes-alive')
+    home.mkdir(exist_ok=True)
+    assert not any(home.iterdir()),'fixture requires its newly reserved empty profile'
+    shutil.copytree(core.repo,home/'plugins/hermes-alive')
     (home/'config.yaml').write_text(json.dumps({'plugins':{'enabled':['hermes-alive']},
         'model':{'provider':'custom:owner','default':'configured-primary'},
         'custom_providers':[{'name':'owner','model':'configured-primary','base_url':'https://provider.invalid/v1',
@@ -131,8 +133,21 @@ async def test(home):
 
 
 if __name__=='__main__':
-    with tempfile.TemporaryDirectory(prefix='alive-core-source-depth-') as directory:
-        try:asyncio.run(test(Path(directory)/'profile'))
-        finally:
-            from hermes_state_registry import close_all_under
-            close_all_under(directory)
+    from hermes_constants import get_default_hermes_root
+    from pm.environments import install_state_dir
+    owner=Path(os.environ['HERMES_HOME']).resolve()
+    parent=None
+    if (owner/'config.yaml').is_file() and (install_state_dir(core.args.core)/'facts.json').is_file():
+        # A real installed Core owns its environment at the home root. Use its
+        # ordinary profile namespace, not an unrelated data root that asks Core
+        # to bootstrap a fresh dependency environment for every test invocation.
+        parent=get_default_hermes_root()/'profiles';parent.mkdir(exist_ok=True)
+    directory=Path(tempfile.mkdtemp(prefix='alive-core-source-depth-',dir=parent))
+    succeeded=False
+    try:
+        asyncio.run(test(directory));succeeded=True
+    finally:
+        from hermes_state_registry import close_all_under
+        close_all_under(directory)
+        if succeeded:shutil.rmtree(directory)
+        else:print('preserved failed synthetic profile: '+str(directory),file=sys.stderr)
