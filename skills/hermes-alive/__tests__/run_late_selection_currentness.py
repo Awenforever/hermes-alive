@@ -10,7 +10,7 @@ from alive_kernel.action_delegation import ActionDelegationStore
 from alive_kernel.send_preparation_runtime import SendPreparationRuntime
 from alive_kernel.expression_support import ExpressionSourceSupportReviewer
 from alive_kernel.source_support import SourceSupportReviewer
-from alive_kernel_testkit import install_terminal_route
+from alive_kernel_testkit import install_terminal_route, controlled_final_findings
 from run_discovery_authoring import proposal,response
 
 async def exercise(root,*,historical=False,protected=False,window=False,review_seconds=0,supported=True,
@@ -63,9 +63,10 @@ async def exercise(root,*,historical=False,protected=False,window=False,review_s
                 assert data['assessment_scope']['kind']=='final_source_and_recipient_purpose'
                 assert 'protected recipient meaning' in kw['messages'][0]['content']
         final='expression_binding' in data
-        return response(dict(verdict='unsupported' if final and not supported else 'supported',
-            unsupported_claims=['Synthetic interval does not support recipient purpose.'] if final and not supported else [],
-            uncertainties=[],reason='Synthetic source/value assessment.'))
+        return response(controlled_final_findings(data,
+            fit='conflicts' if final and not supported else 'fits',
+            reason='Synthetic interval does not support recipient purpose.'
+                if final and not supported else 'Synthetic source/value assessment.'))
     expressed=await runtime.expression.run(subject='user:test',operation_id='synthetic-expression',call=call,
         policy_context=policy.current('user:test').context,authority=ActionAuthority.USER_DELEGATED,
         recipient_meaning=True,grounding=True,require_independent_grounding=False,

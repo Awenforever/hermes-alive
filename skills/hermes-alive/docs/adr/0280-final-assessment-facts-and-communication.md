@@ -87,3 +87,15 @@ one-correction budget before claiming that detecting a form mismatch produces a
 useful share. Preserve required meaning and source attribution, and re-review
 the complete revised text. Do not replace this open work with more judges or
 count abstention as a successful quality round.
+
+## 2026-10-29 — Late-selection fixture qualification update
+
+The initial complete portable run stopped at the late-selection currentness
+fixture: its synthetic response still used the previous single-verdict format
+under a new v2 interpretation. Retain that failed result; it is not a complete
+portable pass. Update only the controlled response according to the actual
+retained contract. Keep the original review-clock, assessment-window, protected-
+purpose, changed-input and stale-authorization assertions. The late-selection,
+shadow-quality/no-send and persisted v1 recovery tests then pass together.
+This fixture correction changes no runtime code. Complete current broad and
+fresh real-model qualification remain open alongside the global fit revision.

@@ -15,8 +15,11 @@ consistency and actual persisted legacy recovery controls pass. Controlled
 authoring, configured discovery, one correction, source history, current Core
 continuity and current Core depth with an explicit new-contract assertion pass.
 A fixture namespace import failure was corrected without changing Core or models.
-The initial candidate's complete portable run is still pending; a later narrow
-correction-input bound alignment has targeted controls only. Global communication-
+The initial complete portable run stopped at a late-selection fixture that still
+returned the legacy response shape. Its corrected time-window, shadow-quality
+and old-record recovery controls now pass; this is not a complete current broad
+qualification. A later narrow correction-input bound alignment has targeted
+controls only. Global communication-
 fit repair remains open: the current exact-span editor deliberately preserves
 opening, structure and depth. An overall form mismatch cannot be assumed fixed
 by that editor. Do not claim good autonomous authoring from a rejection or
