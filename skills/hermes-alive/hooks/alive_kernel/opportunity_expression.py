@@ -26,6 +26,23 @@ class OpportunityExpressionStore(SemanticReviewStore):
     def __init__(self, journal, *, content_vault=None, context_vault=None, protector=None):
         super().__init__(journal, content_vault=content_vault, protector=protector)
         self.context_vault = context_vault
+        # Retain readers, never their results. Every method still re-reads the
+        # current journal/vault; constructing a reader repeatedly also rebuilds
+        # all its SQLite projections and is not an authority boundary.
+        self._source_validator = None
+        self._source_interpreter = None
+
+    def _validator(self):
+        if self._source_validator is None:
+            self._source_validator = DeliberationSynthesizer(self.journal,
+                content_vault=self.content_vault, context_vault=self.context_vault)
+        return self._source_validator
+
+    def _interpreter(self):
+        if self._source_interpreter is None:
+            self._source_interpreter = OpportunitySynthesizer(self.journal,
+                content_vault=self.content_vault, context_vault=self.context_vault)
+        return self._source_interpreter
 
     def _selected_draft(self, selection_event_id, subject):
         source = self.journal.get(selection_event_id)
@@ -45,8 +62,7 @@ class OpportunityExpressionStore(SemanticReviewStore):
                 or not candidate.candidate_id.startswith('opportunity-candidate:')):
             raise SemanticReviewError('selection is not a generated communication draft')
         try:
-            DeliberationSynthesizer(self.journal, content_vault=self.content_vault,
-                context_vault=self.context_vault).validate_candidate_sources(
+            self._validator().validate_candidate_sources(
                     (candidate,), dict(stored.candidate_contents), subject, source.event.sensitivity)
             selected_content = _thaw_json(dict(stored.candidate_contents)[candidate.content_id])
             if 'recipient_intent_version' in selected_content:
@@ -65,8 +81,7 @@ class OpportunityExpressionStore(SemanticReviewStore):
                     or original_start.event.event_type != 'opportunity.synthesis_started'):
                 raise SemanticReviewError('original interpretation input is unavailable')
             # Current ranking is for new search, not revalidation of retained intent.
-            active = OpportunitySynthesizer(self.journal, content_vault=self.content_vault,
-                context_vault=self.context_vault).reader.active_evidence(
+            active = self._interpreter().reader.active_evidence(
                     subject=subject, clearance=source.event.sensitivity, limit=32,
                     observation_event_ids=tuple(original_start.event.payload['observation_event_ids']))
             original_url = next(item.content['url'] for item in active
@@ -145,8 +160,7 @@ class OpportunityExpressionStore(SemanticReviewStore):
             for e in getattr(candidate.dimensions, name).evidence_event_ids
             if e.startswith('opportunity.synthesis:') and e.endswith(':completed'))
         start = self.journal.get(self.journal.get(completion).event.causation_id)
-        original = OpportunitySynthesizer(self.journal, content_vault=self.content_vault,
-            context_vault=self.context_vault).reader.active_evidence(subject=subject,
+        original = self._interpreter().reader.active_evidence(subject=subject,
                 clearance=source.event.sensitivity, limit=32,
                 observation_event_ids=tuple(start.event.payload['observation_event_ids']))
         selected = {e.observation_event_id for e in original
@@ -166,17 +180,15 @@ class OpportunityExpressionStore(SemanticReviewStore):
         return references
 
     def expression_context_for_selection(self, selection_event_id, subject):
-        *_, plan = self._selected_draft(selection_event_id, subject)
+        source, stored, _atoms, _expiry, plan = self._selected_draft(selection_event_id, subject)
         if plan is None or plan['version'] != 3:
             return expression_context(plan) if plan is not None else None
-        source, stored, _atoms, _expiry, _plan = self._selected_draft(selection_event_id,subject)
         candidate = stored.selection.candidate
         # Recover only the immutable original evidence window, not today's pool.
         completion = next(e for e in candidate.dimensions.user_value.evidence_event_ids
                           if e.startswith('opportunity.synthesis:') and e.endswith(':completed'))
         start = self.journal.get(self.journal.get(completion).event.causation_id)
-        interpreter = OpportunitySynthesizer(self.journal,content_vault=self.content_vault,
-            context_vault=self.context_vault)
+        interpreter = self._interpreter()
         interpreter.load_completed(subject=subject,operation_id=completion.removeprefix(
             'opportunity.synthesis:').removesuffix(':completed'),clearance=source.event.sensitivity)
         original = interpreter.reader.active_evidence(subject=subject,clearance=source.event.sensitivity,

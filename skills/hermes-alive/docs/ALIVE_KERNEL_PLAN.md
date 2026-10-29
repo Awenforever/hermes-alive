@@ -14,6 +14,13 @@ declare the native platform passed. The previous cold-CLI test fixture was
 separately corrected to use Core's normal profile namespace; that correction
 exposed this later genuine product failure.
 
+The scoped-resource Git consumer still reproduced expiry after Core dependency
+preparation, with no adapter call. Keep the hypothesis bounded: idle connections
+alone are insufficient. The next candidate reuses stateless source services and
+removes a duplicate immediate selection read, preserving fresh method calls and
+all later boundary checks. Qualify erasure, withdrawal, supersession and actual
+native launch again; do not convert a warm preparation retry into acceptance.
+
 ADR0274 is a current presentation candidate: new recipient authoring receives a
 host-compiled canonical citation example and resolves only with an actual labelled
 Markdown source link. It preserves arbitrary useful labels and historical v1

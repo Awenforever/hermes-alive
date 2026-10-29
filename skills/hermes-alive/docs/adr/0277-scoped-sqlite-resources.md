@@ -47,3 +47,26 @@ release. Then use the current installed Core SDK/registry/adapter pipeline and a
 actual immutable Git consumer. Keep real deadlines, source-erasure/revocation
 and final-launch checks intact. A faster synthetic result is not whole product,
 model quality, daemon or fleet acceptance.
+
+## Native result and next bounded change
+
+The first Git consumer update preserved all 35 logical state/key fingerprints.
+The next native attempt timed out during Core's dependency preparation, before
+the cycle; a distinct attempt observed Core's normal frozen dependency sync and
+bytecode compilation complete, then reproduced launch expiry. Authorization was
+recorded at 08:20:59Z, dispatch started at 08:21:23Z, execute-by was 08:21:29Z,
+and the first final-launch check failed at 08:21:39Z. No adapter was invoked.
+Idle WAL keepers therefore do not by themselves solve the performance failure.
+
+The next candidate reuses stateless source-reader/validator objects owned by each
+store, rather than repeatedly constructing their SQLite projection graphs. It
+still invokes their current-state authentication methods on every call and does
+not retain decoded sources, permissions or validation results. One expression
+context method also stops validating the same selection twice back-to-back: its
+single authenticated return supplies both the plan and selected source. There
+is no intervening await, external callback or operation between those two old
+calls. Every later boundary continues its own fresh validation.
+
+Existing erase-during-render, owner withdrawal, superseded selection and final
+launch controls must qualify this separately; the prior keeper controls or a
+successful warm setup cannot be credited as native readiness for this candidate.

@@ -90,6 +90,16 @@ class DeliberationSynthesizer:
         self.deliberation = DeliberationProjection(journal, content_vault=self.vault)
         self.exploration = ExplorationProjection(journal, content_vault=self.vault)
         self.context_vault = context_vault
+        self._source_interpreter = None
+
+    def _interpreter(self):
+        # A reader owns projections, not a cached source/permission decision.
+        # Its public methods still authenticate current state on every call.
+        if self._source_interpreter is None:
+            from .opportunity_synthesis import OpportunitySynthesizer
+            self._source_interpreter = OpportunitySynthesizer(self.journal,
+                content_vault=self.vault, context_vault=self.context_vault)
+        return self._source_interpreter
 
     @staticmethod
     def _response(response: Any) -> tuple[str, str]:
@@ -322,14 +332,12 @@ class DeliberationSynthesizer:
             plans = self.validate_candidate_sources((stored.selection.candidate,),
                 dict(stored.candidate_contents), owner, sensitivity)
             if execution and expression_event_id is None and stored.selection.candidate.candidate_id in plans:
-                from .opportunity_synthesis import OpportunitySynthesizer
                 candidate = stored.selection.candidate
                 receipts = {e for name in (
                     'user_value', 'urgency', 'novelty', 'confidence', 'interruption_cost', 'risk')
                     for e in getattr(candidate.dimensions, name).evidence_event_ids
                     if e.startswith('opportunity.synthesis:') and e.endswith(':completed')}
-                interpreter = OpportunitySynthesizer(self.journal, content_vault=self.vault,
-                                                     context_vault=self.context_vault)
+                interpreter = self._interpreter()
                 if any(interpreter.requires_expression(receipt_event_id=receipt, subject=owner,
                         clearance=sensitivity) for receipt in receipts):
                     raise DeliberationContextChanged('recipient intent requires a validated final expression')
@@ -346,9 +354,6 @@ class DeliberationSynthesizer:
         accepted historical meanings are never rewritten. Legacy candidates keep
         their original content view. No source or permission is inferred here.
         """
-        # Local import avoids the coordinator/interpreter module dependency cycle.
-        from .opportunity_synthesis import OpportunitySynthesizer
-
         interpreter = None
         recovered = {}
         plans = {}
@@ -372,8 +377,7 @@ class DeliberationSynthesizer:
             if receipt.event.subject != owner:
                 raise DeliberationContextChanged("generated candidate provenance owner mismatch")
             if interpreter is None:
-                interpreter = OpportunitySynthesizer(self.journal, content_vault=self.vault,
-                                                       context_vault=self.context_vault)
+                interpreter = self._interpreter()
             key = (receipt_id, candidate.authority)
             if key not in recovered:
                 operation = receipt_id.removeprefix("opportunity.synthesis:").removesuffix(":completed")
