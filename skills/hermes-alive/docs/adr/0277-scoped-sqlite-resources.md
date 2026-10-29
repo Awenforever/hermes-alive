@@ -1,6 +1,6 @@
 # ADR 0277 — Bound SQLite resource lifetime to one native operation
 
-Date: 2026-10-29. Status: development hypothesis; native performance qualification pending.
+Date: 2026-10-29. Status: bounded controlled qualification; broader acceptance pending.
 
 ## Evidence
 
@@ -70,3 +70,23 @@ calls. Every later boundary continues its own fresh validation.
 Existing erase-during-render, owner withdrawal, superseded selection and final
 launch controls must qualify this separately; the prior keeper controls or a
 successful warm setup cannot be credited as native readiness for this candidate.
+
+## Bounded qualification
+
+The revised source services passed the expression erasure/withdrawal controls,
+source-review recovery, late selection currentness, standard-channel execution,
+and the actual current Core source-reading pipeline in an isolated container.
+An actual Ubuntu Git consumer then upgraded from the keeper-only candidate to
+the revised immutable commit, refreshed its runtime and preserved all 35 logical
+state/key fingerprints while delivery stayed inactive. Its installed-source
+Core SDK/registry/native test completed in 178.98 seconds including preparation,
+performed both 6000- and 15000-character source windows, passed every controlled
+model stage and submitted once to the local test adapter. Existing state was
+again unchanged; Core and plugin trees were clean and no test process remained.
+
+This is a successful functional reproduction, not a controlled latency benchmark.
+It uses controlled HTTP/model responses, no actual inference and no external
+delivery. The earlier cold preparation timeout remains recorded separately.
+The broad portable pass belongs to the preceding keeper-only runtime; the revised
+service lifetime still needs its own broad qualification. Fleet/daemon, active
+jobs, real-model usefulness and production acceptance remain open.

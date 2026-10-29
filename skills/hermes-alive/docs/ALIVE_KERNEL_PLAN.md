@@ -5,21 +5,22 @@ Last reviewed: 2026-10-29 (Asia/Shanghai).
 
 ## Current product state
 
-Native installed-consumer launch currently fails despite the reading-depth
-container controls. A retained trace proves the authorization deadline elapsed
-during local preparation; an actual profile shows repeated source recovery and
-heavy SQLite access. ADR0277 tests scoped idle WAL resources while retaining all
-ordinary reads, audits, live checks and real deadlines. Do not widen TTLs or
-declare the native platform passed. The previous cold-CLI test fixture was
-separately corrected to use Core's normal profile namespace; that correction
-exposed this later genuine product failure.
+The installed native source-reading chain now passes one bounded Git-consumer
+qualification after ADR0277's source-service reuse. It reaches the actual Core
+SDK/registry, deeper reading, interpretation, authoring, review and one local
+adapter submission. The inactive consumer's 35 logical state/key fingerprints
+remain unchanged; there are no real model calls or external sends. This closes
+the reproduced launch-expiry case, not the native platform or whole product.
 
-The scoped-resource Git consumer still reproduced expiry after Core dependency
-preparation, with no adapter call. Keep the hypothesis bounded: idle connections
-alone are insufficient. The next candidate reuses stateless source services and
-removes a duplicate immediate selection read, preserving fresh method calls and
-all later boundary checks. Qualify erasure, withdrawal, supersession and actual
-native launch again; do not convert a warm preparation retry into acceptance.
+Retain the earlier failures: a native profile showed repeated source recovery
+and heavy SQLite access, and idle WAL keepers alone still let authorization
+expire. Reusing stateless source services and removing an immediate duplicate
+selection read retains ordinary fresh queries, audits, erasure, withdrawal and
+all later boundary checks. No TTL was widened. Four focused controls and the
+actual installed Core chain pass; full portable qualification is currently for
+the preceding keeper-only runtime. Cold dependency preparation also exceeded a
+test CLI's 120-second bound once. Neither a subsequent warm setup nor the final
+controlled cycle qualifies all cold installations, active tasks or daemons.
 
 ADR0274 is a current presentation candidate: new recipient authoring receives a
 host-compiled canonical citation example and resolves only with an actual labelled

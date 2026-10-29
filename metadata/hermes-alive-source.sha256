@@ -291,7 +291,7 @@ fbabb024702d8394fe6af3f145afb25fcb11b0674369aa0d2ece030b485f9f64  ./__tests__/ru
 c820346cb0721a679f22c1e15a59f23616f6d7a70adf2511e45e4a15a13c0e2c  ./__tests__/run_transport_publisher_withdrawal.py
 6210bc2e2fb0f3c78fe10a87ac68b007982a555a90e5c3245924e2c6c71c372f  ./__tests__/run_transport_reconciliation_runtime.py
 ed5065f1271617efd9df6f0c5ef5473d73e343f122df77f5668aa292abca617e  ./__tests__/run_watcher_retention_maintenance.py
-094bb32d1048d46bce07e4adee4e066ccca0926e16a9420db79c249c02296dd4  ./docs/ALIVE_KERNEL_PLAN.md
+142299a0afea37d9aa08477004e52ea9a4102b533454023eca4f13fde005c68d  ./docs/ALIVE_KERNEL_PLAN.md
 bb1240b8645d5bde807e126c36ee12164e2ad602609064402df28740e0e3b315  ./docs/ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-25.md
 a7115842a8cd05021e657b281efb86655a48bd86294b917a3a324935b8a5383b  ./docs/ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-27.md
 d13a82da104693536b0ce99743014f35f855feba877b5acf08557a5802978677  ./docs/ALIVE_KERNEL_SETUP.md
@@ -585,7 +585,7 @@ fac7554a1236405f8042b4a1ab1868f9003d5ff632332c7f064dcc1b5faa2a5c  ./docs/adr/026
 d72bb905a7a8aa075b3643e2ae17fad9e248dcf23222ef5845c6dbdab3952445  ./docs/adr/0274-inline-source-citation-contract.md
 3c91c8df9a8d48d61ffa0872b3c60d8f5c83225ee1dd74465bc232554248d3fd  ./docs/adr/0275-comparison-operation-claim-before-model-io.md
 06253f9100b03179547ab33fedc5f2e92168352378b690b913c83b71b844cf51  ./docs/adr/0276-model-selected-reading-depth.md
-99b6e0b02d162582bdbafa9f10c960e3a976e5cc49c11d1a11c66e9c0dc6058d  ./docs/adr/0277-scoped-sqlite-resources.md
+09217903a3bf65b3b7cf9b50019e55d51a36fff78b0a0409f2f5103356cfde4d  ./docs/adr/0277-scoped-sqlite-resources.md
 4d6108e5f522390a4f9008265a2681771192c500c4c34a02179e24a238b55332  ./docs/evidence/deepseek-seed-20261012.json
 40941e141314d626c51ad4d22ccc19c76dcf4b770a85daa0881d135089fb75ea  ./docs/evidence/qwen-route-20261012.json
 460cffae94c5494e13515ab9c2dc42331e9fd14260bf4182086d5f3bd9e19114  ./hooks/HOOK.yaml
