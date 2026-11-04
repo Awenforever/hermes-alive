@@ -447,8 +447,9 @@ def continuation_context(shares, *, max_chars=None):
         'usually suffice. Add background only if it changes the answer or the user asks. '
         'Separate what you read, what the source reports, and what the evidence supports. '
         'A schedule alone establishes a plan. Keep an analogy within what it illustrates. '
-        'For a causal explanation, identify supporting evidence or say the cause is unknown. '
-        'Labeling a guess as analysis does not supply evidence.\n')
+        'Match comparisons on what was measured, against what baseline and under what conditions. '
+        'Keep both effects and null results within the conditions actually tested. '
+        'For a causal explanation, identify supporting evidence or say the cause is unknown.\n')
     if any('reference' in item for item in references):
         header = header.rstrip('\n') + (' Where available, alive_read_reference can read the exact retained '
             'text or source excerpts using its reference handle; handles are not delivery proof. '

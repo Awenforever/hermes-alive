@@ -862,8 +862,13 @@ started and stopped cleanly after runtime installs from `7c10b37`,
 `2c844d9`, and `7c10b37` again. Both the CLI and the owner channel
 reported inactive delivery authority on each boot. The final profile
 retained both original keys and all 21 original journal rows. This exercise
-used local source swaps and the stock IRC loopback. Explicit revocation,
-in-flight work, and a production transport remain separate checks.
+used local source swaps and the stock IRC loopback. A second copy enabled
+sending through the owner channel, then recorded an explicit signed
+delegation revocation while leaving the underlying policy enabled. Both
+rollback and restore preserved the configured owner and revocation, and the
+actual Gateway reported inactive delivery authority. This exercise called
+the delegation API directly. In-flight work and a production transport
+remain separate checks.
 
 The repeated archaeology search returned a retrospective article rather
 than the prior event preview. Two real Core follow-up turns recovered the

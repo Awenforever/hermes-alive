@@ -64,3 +64,12 @@ shows where a claim came from. Qualification still requires the wording to
 preserve what the cited material actually establishes. Test this with both
 an observational comparison and a genuine controlled comparison before
 crediting the evidence boundary.
+
+A paired synthetic trial then used the same twofold ratio for a randomized
+cache intervention and uncontrolled service telemetry. The actual Core
+follow-up rejected an equivalence and identified the conditions of the
+intervention. It still expanded a null result in one separate workload
+into a general claim that unique prefixes eliminate any speed effect.
+Keep negative results within their tested scope as well. This fixture
+tests reasoning under known evidence boundaries. It earns no credit
+toward qualification on fresh sources.
