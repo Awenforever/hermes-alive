@@ -807,6 +807,10 @@ For each material change:
 
 ## Change log
 
+November 5 — the first real indexed-passage review selected a nonexistent
+passage. [ADR 0284](adr/0284-source-witnesses-for-final-review.md) records
+the explicit passage IDs and the remaining live qualification.
+
 November 4 — [ADR 0284](adr/0284-source-witnesses-for-final-review.md)
 records the factual grounding gap exposed by a real share and the new
 requirement for inspectable source witnesses.

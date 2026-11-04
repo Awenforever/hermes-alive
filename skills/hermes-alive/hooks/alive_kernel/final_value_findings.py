@@ -4,7 +4,7 @@ The host combines the model's explicit judgments; it does not classify prose or
 infer recipient preferences. Existing lifecycle consumers retain one verdict.
 """
 from .model_json import parse_model_json
-from .review_contracts import PASSAGE_FIT_ASSESSMENT
+from .review_contracts import LABELLED_FIT_ASSESSMENT, PASSAGE_FIT_ASSESSMENT
 
 
 PROMPT = """Assess this actual message under the supplied source evidence,
@@ -86,10 +86,29 @@ def _passages(excerpt):
     return [excerpt[start:start + 500] for start in range(0, len(excerpt), 500)]
 
 
-def passage_request(request):
+LABELLED_PROMPT = CONVERSATIONAL_PROMPT + """
+Add a top-level source_witnesses list with up to eight entries. Each entry has
+exactly claim (verbatim span from the message, at most 600 characters) and
+passage_id (copy the ID printed beside the supporting passage). For supported
+facts include witnesses for material claims, including relationships implied
+between clauses. Unsupported or uncertain facts may have an empty list.
+Match results and demonstrations to their own setup, population, time and measure.
+Two accurate details from different conditions do not establish a claim that joins
+them. If the retained passages leave a material scope unclear, mark it uncertain.
+"""
+
+
+def _labelled_passages(source_number, excerpt):
+    return [{'passage_id': f'P{source_number}.{number}', 'text': text}
+            for number, text in enumerate(_passages(excerpt), 1)]
+
+
+def passage_request(request, *, labelled=False):
     return {**request, 'evidence': [
         {**{key: value for key, value in source.items() if key != 'excerpt'},
-         'passages': _passages(source['excerpt'])} for source in request['evidence']]}
+         'passages': (_labelled_passages(number, source['excerpt']) if labelled
+                      else _passages(source['excerpt']))}
+        for number, source in enumerate(request['evidence'], 1)]}
 
 
 def _reason(value):
@@ -131,18 +150,35 @@ def _validate_witnesses(witnesses, snapshot, assessment, *, retained=False):
         raise ValueError('source witnesses required for supported wording')
     sources = {item['event_id']: item['excerpt'] for item in snapshot['evidence']}
     text = snapshot['candidate']['text']
-    indexed = snapshot.get('expression_binding', {}).get('final_assessment_scope') == PASSAGE_FIT_ASSESSMENT
+    scope = snapshot.get('expression_binding', {}).get('final_assessment_scope')
+    indexed = scope == PASSAGE_FIT_ASSESSMENT
+    labelled = scope == LABELLED_FIT_ASSESSMENT
     fields = {'claim', 'source_event_id'}
-    if indexed:
+    if labelled:
+        fields = {'claim', 'passage_id'}
+        if retained:
+            fields.add('source_event_id')
+        catalog = {row['passage_id']: (source['event_id'], row['text'])
+                   for number, source in enumerate(snapshot['evidence'], 1)
+                   for row in _labelled_passages(number, source['excerpt'])}
+    elif indexed:
         fields.add('passage')
-    if retained or not indexed:
+    if retained or not (indexed or labelled):
         fields.add('quote')
     verified = []
     for witness in witnesses:
         if not isinstance(witness, dict) or set(witness) != fields:
             raise ValueError('invalid source witness')
-        claim, source_id = (witness[key] for key in ('claim', 'source_event_id'))
-        if indexed:
+        claim = witness['claim']
+        source_id = witness.get('source_event_id')
+        if labelled:
+            handle = witness['passage_id']
+            if not isinstance(handle, str) or handle not in catalog:
+                raise ValueError('unknown source passage ID')
+            source_id, quote = catalog[handle]
+            if retained and (witness['source_event_id'], witness['quote']) != (source_id, quote):
+                raise ValueError('retained source passage changed')
+        elif indexed:
             passages = _passages(sources.get(source_id, '')) if isinstance(source_id, str) else []
             number = witness['passage']
             if type(number) is not int or not 1 <= number <= len(passages):
@@ -156,7 +192,7 @@ def _validate_witnesses(witnesses, snapshot, assessment, *, retained=False):
                     for part in (claim, source_id, quote))
                 or claim not in text or quote not in sources.get(source_id, '')):
             raise ValueError('source witness does not match retained wording and excerpt')
-        verified.append({**witness, 'quote': quote})
+        verified.append({**witness, 'source_event_id': source_id, 'quote': quote})
     return verified
 
 

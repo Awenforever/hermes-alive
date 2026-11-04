@@ -34,3 +34,12 @@ The host inserts the exact original text and verifies it on replay.
 This removes source transcription from the response contract. Claim
 spans still match the proposed wording, and the assessor still judges
 whether the evidence supports the claim in its full context.
+
+The next real trial returned all six claim spans verbatim, but selected
+passage 15 from a source with only 13 passages. The host withheld
+submission and the bounded correction expired. A new scope labels
+each visible passage with a unique ID within the review snapshot.
+The assessor selects that single ID. The host resolves and retains both
+the original source event ID and exact passage, then verifies the
+association on replay. Historical index-based receipts keep their
+original validation. The new scope still requires live qualification.

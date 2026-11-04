@@ -114,7 +114,7 @@ def test_source_witness_binding():
                  'source_witnesses': []}
     assert parse(json.dumps(uncertain), witness_snapshot=snapshot)['verdict'] == 'uncertain'
     from alive_kernel.final_value_findings import passage_request
-    from alive_kernel.review_contracts import PASSAGE_FIT_ASSESSMENT
+    from alive_kernel.review_contracts import LABELLED_FIT_ASSESSMENT, PASSAGE_FIT_ASSESSMENT
     snapshot['expression_binding'] = {'final_assessment_scope': PASSAGE_FIT_ASSESSMENT}
     request = passage_request(snapshot)
     assert ''.join(request['evidence'][0]['passages']) == snapshot['evidence'][0]['excerpt']
@@ -128,6 +128,29 @@ def test_source_witness_binding():
                    witness_snapshot=snapshot)
         except ValueError: pass
         else: raise AssertionError('invalid passage reference was accepted')
+
+    snapshot['expression_binding']['final_assessment_scope'] = LABELLED_FIT_ASSESSMENT
+    request = passage_request(snapshot, labelled=True)
+    first, second = [source['passages'][0] for source in request['evidence']]
+    assert first['passage_id'] != second['passage_id']
+    assert first['text'] == snapshot['evidence'][0]['excerpt']
+    labelled = {**response, 'source_witnesses': [
+        {'claim': witness['claim'], 'passage_id': first['passage_id']}]}
+    findings = parse(json.dumps(labelled), witness_snapshot=snapshot)
+    assert findings['source_witnesses'] == [{**labelled['source_witnesses'][0],
+        'source_event_id': 'benchmark', 'quote': first['text']}]
+    assert validate_retained(findings, witness_snapshot=snapshot) == findings
+    bad_response = {**labelled, 'source_witnesses': [
+        {**labelled['source_witnesses'][0], 'passage_id': 'P1.15'}]}
+    bad_receipt = {**findings, 'source_witnesses': [
+        {**findings['source_witnesses'][0], 'passage_id': second['passage_id']}]}
+    for action in (
+        lambda: parse(json.dumps(bad_response), witness_snapshot=snapshot),
+        lambda: validate_retained(bad_receipt, witness_snapshot=snapshot),
+    ):
+        try: action()
+        except ValueError: pass
+        else: raise AssertionError('an absent or rebound passage ID was accepted')
 
 
 if __name__ == '__main__':
