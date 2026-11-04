@@ -807,6 +807,10 @@ For each material change:
 
 ## Change log
 
+November 4 — real-model continuation recovered the share across two Core
+turns. [ADR 0283](adr/0283-conversational-depth-and-attribution.md) records
+the remaining quality issues and the versioned authoring and review change.
+
 November 4 — the isolated Ubuntu native run exposed a send authorization
 deadline failure. [ADR 0282](adr/0282-standard-channel-deadline.md) records the
 submission check and the next installed-runtime acceptance step.

@@ -104,8 +104,12 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
             content_vault=self.vault, context_vault=context_vault)
 
     def prompt_for_snapshot(self, snapshot):
-        from .review_contracts import BOUNDARY_ASSESSMENT, FACTS_AND_FIT_ASSESSMENT
-        if snapshot.get('expression_binding',{}).get('final_assessment_scope') == FACTS_AND_FIT_ASSESSMENT:
+        from .review_contracts import BOUNDARY_ASSESSMENT, FACTS_AND_FIT_ASSESSMENT, CONVERSATIONAL_FIT_ASSESSMENT
+        scope = snapshot.get('expression_binding', {}).get('final_assessment_scope')
+        if scope == CONVERSATIONAL_FIT_ASSESSMENT:
+            from .final_value_findings import CONVERSATIONAL_PROMPT
+            return CONVERSATIONAL_PROMPT
+        if scope == FACTS_AND_FIT_ASSESSMENT:
             from .final_value_findings import PROMPT
             return PROMPT
         if snapshot.get('expression_binding',{}).get('semantic_assessment_scope')==BOUNDARY_ASSESSMENT:
@@ -118,8 +122,8 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
         return super().prompt_for_snapshot(snapshot)
 
     def parse_findings(self, text, snapshot):
-        from .review_contracts import FACTS_AND_FIT_ASSESSMENT
-        if snapshot.get('expression_binding',{}).get('final_assessment_scope') == FACTS_AND_FIT_ASSESSMENT:
+        from .review_contracts import FACTS_AND_FIT_ASSESSMENTS
+        if snapshot.get('expression_binding',{}).get('final_assessment_scope') in FACTS_AND_FIT_ASSESSMENTS:
             from .final_value_findings import parse
             try:
                 return parse(text)
@@ -128,8 +132,8 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
         return super().parse_findings(text, snapshot)
 
     def validate_stored_findings(self, findings, snapshot):
-        from .review_contracts import FACTS_AND_FIT_ASSESSMENT
-        if snapshot.get('expression_binding',{}).get('final_assessment_scope') == FACTS_AND_FIT_ASSESSMENT:
+        from .review_contracts import FACTS_AND_FIT_ASSESSMENTS
+        if snapshot.get('expression_binding',{}).get('final_assessment_scope') in FACTS_AND_FIT_ASSESSMENTS:
             from .final_value_findings import validate_retained
             try:
                 return validate_retained(findings)
@@ -339,10 +343,13 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
             method = start.event.payload.get('interpreter_method', {})
             authoring = method.get('discovery_authoring')
             from .review_contracts import (SPLIT_SOURCE_REVIEW, SPLIT_SOURCE_REVIEW_CONTRACTS,
-                BOUNDARY_ASSESSMENT, FACTS_AND_FIT_ASSESSMENT)
+                FIRST_FACTS_AND_FIT_REVIEW, BOUNDARY_ASSESSMENT, FACTS_AND_FIT_ASSESSMENT,
+                CONVERSATIONAL_FIT_ASSESSMENT)
             if method.get('discovery_source_review') in SPLIT_SOURCE_REVIEW_CONTRACTS:
                 data['expression_binding']['semantic_assessment_scope']=BOUNDARY_ASSESSMENT
                 if method['discovery_source_review'] == SPLIT_SOURCE_REVIEW:
+                    data['expression_binding']['final_assessment_scope']=CONVERSATIONAL_FIT_ASSESSMENT
+                elif method['discovery_source_review'] == FIRST_FACTS_AND_FIT_REVIEW:
                     data['expression_binding']['final_assessment_scope']=FACTS_AND_FIT_ASSESSMENT
             if authoring in ('source-led-v2','source-led-v3'):
                 # Evaluate actual source/context/text, not whether the author

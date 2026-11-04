@@ -2,7 +2,8 @@
 
 
 def controlled_final_findings(snapshot, *, factual='supported', fit='fits', reason='Synthetic assessment.'):
-    if snapshot.get('expression_binding', {}).get('final_assessment_scope') == 'factual-support-and-communication-fit-v1':
+    if snapshot.get('expression_binding', {}).get('final_assessment_scope') in (
+            'factual-support-and-communication-fit-v1', 'factual-support-and-communication-fit-v2'):
         return {'factual_support': {'assessment': factual, 'reason': reason},
                 'communication_fit': {'assessment': fit, 'reason': reason, 'recipient_evidence': []}}
     verdict = ('unsupported' if factual == 'unsupported' or fit == 'conflicts' else

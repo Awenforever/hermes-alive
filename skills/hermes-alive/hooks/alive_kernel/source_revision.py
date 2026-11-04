@@ -5,7 +5,7 @@ authority. Owner, live sources and the negative review are validated by callers.
 """
 from .final_value_findings import validate_retained
 from .localized_correction import text_digest
-from .review_contracts import FACTS_AND_FIT_ASSESSMENT
+from .review_contracts import FACTS_AND_FIT_ASSESSMENTS
 
 METHOD = 'source-led-fit-revision-v1'
 
@@ -41,7 +41,7 @@ def eligible(context):
         return False
     binding, scope = snapshot.get('expression_binding'), snapshot.get('assessment_scope')
     if (not isinstance(binding, dict) or not isinstance(scope, dict)
-            or binding.get('final_assessment_scope') != FACTS_AND_FIT_ASSESSMENT
+            or binding.get('final_assessment_scope') not in FACTS_AND_FIT_ASSESSMENTS
             or scope.get('kind') != 'final_discovery_source_and_value'
             or not snapshot.get('evidence')):
         return False

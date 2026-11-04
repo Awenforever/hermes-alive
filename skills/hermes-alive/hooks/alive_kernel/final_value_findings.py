@@ -42,6 +42,17 @@ known dates or extending authorization. These are advisory judgments only.
 """
 
 
+CONVERSATIONAL_PROMPT = PROMPT + """
+For an unsolicited chat opening, identify the one thing the recipient can
+understand or picture after reading it. Supporting detail should help them
+understand that point. If separate benchmark comparisons or implementation
+details read as a report and bury the point, assess that as a fit conflict even
+when each detail is accurate and the topic matches an interest. Depth is fine
+when the point itself needs it. Consider whether a natural next turn could
+carry optional detail, and judge the actual wording rather than its topic.
+"""
+
+
 def _reason(value):
     if not isinstance(value, str) or not value.strip() or len(value) > 1500:
         raise ValueError('final assessment reason unavailable')

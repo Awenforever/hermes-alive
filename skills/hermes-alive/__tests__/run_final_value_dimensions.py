@@ -6,10 +6,10 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'hooks'))
-from alive_kernel.final_value_findings import combine, parse, validate_retained, PROMPT
+from alive_kernel.final_value_findings import combine, parse, validate_retained, PROMPT, CONVERSATIONAL_PROMPT
 from alive_kernel.expression_support import (ExpressionSourceSupportReviewer,
     _DISCOVERY_FINAL_PROMPT_V2)
-from alive_kernel.review_contracts import BOUNDARY_ASSESSMENT, FACTS_AND_FIT_ASSESSMENT
+from alive_kernel.review_contracts import BOUNDARY_ASSESSMENT, FACTS_AND_FIT_ASSESSMENT, CONVERSATIONAL_FIT_ASSESSMENT
 from alive_kernel.source_support import SourceSupportError
 
 
@@ -57,6 +57,9 @@ def test_old_and_new_contracts():
     legacy = dict(verdict='supported', unsupported_claims=[], uncertainties=[], reason='Legacy assessment.')
     assert reviewer.prompt_for_snapshot(old) == _DISCOVERY_FINAL_PROMPT_V2
     assert reviewer.prompt_for_snapshot(new) == PROMPT
+    conversational = {'expression_binding': {**old['expression_binding'],
+                                              'final_assessment_scope': CONVERSATIONAL_FIT_ASSESSMENT}}
+    assert reviewer.prompt_for_snapshot(conversational) == CONVERSATIONAL_PROMPT
     assert reviewer.parse_findings(json.dumps(legacy), old) == legacy
     assert reviewer.validate_stored_findings(legacy, old) == legacy
     try: reviewer.parse_findings(json.dumps(legacy), new)
@@ -66,6 +69,8 @@ def test_old_and_new_contracts():
            'communication_fit': {'assessment': 'conflicts', 'reason': 'Wrong form for the current request.',
                                  'recipient_evidence': ['Current request.']}}
     findings = reviewer.parse_findings(json.dumps(raw), new)
+    assert reviewer.parse_findings(json.dumps(raw), conversational) == findings
+    assert reviewer.validate_stored_findings(findings, conversational) == findings
     assert findings['verdict'] == 'unsupported' and findings['factual_support']['assessment'] == 'supported'
     assert reviewer.validate_stored_findings(findings, new) == findings
     try: reviewer.validate_stored_findings(findings, old)
