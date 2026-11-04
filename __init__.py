@@ -13,6 +13,7 @@ from .kernel_setup_bridge import register_setup_command,attach_configured_contin
 
 _gateway_host_binding=None
 _STARTUP_CHANNEL_RETRY_SECONDS = 5
+_STARTUP_CHANNEL_WINDOW_SECONDS = 600
 
 
 def configure_kernel_gateway_host(native,**parameters):
@@ -44,7 +45,7 @@ async def kernel_gateway_startup():
             # Core owns reconnection. This task only waits for publication of
             # the already authorized route, within one startup recovery window.
             try:
-                async with asyncio.timeout(600):
+                async with asyncio.timeout(_STARTUP_CHANNEL_WINDOW_SECONDS):
                     while True:
                         await asyncio.sleep(_STARTUP_CHANNEL_RETRY_SECONDS)
                         async with binding.control_lock:
@@ -58,8 +59,10 @@ async def kernel_gateway_startup():
                             return
             except TimeoutError:
                 logging.getLogger(__name__).warning('Alive startup recovery timed out awaiting the owner channel')
+                return 'owner_channel_timeout'
             except Exception as error:
                 logging.getLogger(__name__).warning('Alive startup recovery stopped: %s', type(error).__name__)
+                return 'owner_channel_recovery_failed'
 
         binding.startup_recovery = binding.context.spawn_task(
             wait_for_owner_channel(), name='hermes-alive-startup-recovery')

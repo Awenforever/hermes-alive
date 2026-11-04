@@ -68,6 +68,23 @@ async def exercise_startup_recovery(module, binding):
             assert binding.started is (not revoked)
             binding.startup_recovery = None
         binding.started = False
+        ready = False
+        with patch.object(module, '_STARTUP_CHANNEL_WINDOW_SECONDS', .05):
+            assert (await module.kernel_gateway_startup())['status'] == 'waiting_for_owner_channel'
+            assert await asyncio.wait_for(binding.startup_recovery, timeout=2) == 'owner_channel_timeout'
+            status = binding.runtime_status()
+            assert status['status'] == 'needs_attention' and status['exit_reason'] == 'owner_channel_timeout'
+            assert not status['runtime_active']
+        binding.startup_recovery = None
+        assert (await module.kernel_gateway_startup())['status'] == 'waiting_for_owner_channel'
+        waiting = binding.startup_recovery
+        binding.close()
+        try:
+            await asyncio.wait_for(waiting, timeout=2)
+        except asyncio.CancelledError:
+            pass
+        else:
+            raise AssertionError('plugin close left startup recovery active')
 
 
 async def exercise(home,shadow):

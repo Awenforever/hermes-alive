@@ -108,7 +108,14 @@ def register_setup_command(context,binding):
                         active=store.activation()
                         observed=binding.runtime_status()
                         retirement=observed.get('core_work_retirement') or {}
-                        return ('Alive 状态：'+observed['status']+'；当前发送授权：'
+                        recovery_status = {
+                            'waiting_for_owner_channel': '等待已授权会话恢复连接',
+                            'owner_channel_timeout': '等待已授权会话恢复超时，请检查渠道连接',
+                            'owner_channel_recovery_failed': '无法恢复已授权会话，请检查渠道连接和网关日志',
+                        }
+                        label = recovery_status.get(observed.get('exit_reason'),
+                            recovery_status.get(observed['status'], observed['status']))
+                        return ('Alive 状态：'+label+'；当前发送授权：'
                             +('有效' if active else '未启用、已暂停或已到期')+'。'
                             +'待收拢工作：'+str(observed.get('pending_work_count',0))+' 项。'
                             '运行状态不代表消息已送达。'

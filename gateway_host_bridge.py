@@ -180,8 +180,14 @@ class GatewayHostBinding:
         self._require_home()
         status={'status':'not_configured','legacy_allowed':False,
                 'external_delivery_proven':False,'runtime_active':False}
-        if self.startup_recovery is not None and not self.startup_recovery.done():
-            status['status']='waiting_for_owner_channel'
+        recovery = self.startup_recovery
+        if recovery is not None:
+            if not recovery.done():
+                status['status']='waiting_for_owner_channel'
+            elif not recovery.cancelled() and recovery.exception() is None:
+                reason = recovery.result()
+                if reason in ('owner_channel_timeout', 'owner_channel_recovery_failed'):
+                    status.update(status='needs_attention', exit_reason=reason)
         if self.native is not None:
             status['mode']='execution' if self.native.host.execute else 'shadow'
             status['pending_work_count']=len(getattr(self.native,'pending',()))
