@@ -373,6 +373,14 @@ manufactures them from model output or reviews, nor falls back to another body.
                         or authorization.event.payload.get('expression_event_id')
                         != prepared.expression.expression_event_id):
                     raise DispatchOutboxError('prepared review differs from canonical authorization')
+                from .content_vault import ContentReference
+                review = self.journal.get(prepared.final_review_event_id)
+                try:
+                    reference = ContentReference.from_event_payload(review.event.payload['content']) if review else None
+                except (KeyError, TypeError, ValueError) as exc:
+                    raise DispatchOutboxError('prepared review reference is unavailable') from exc
+                if reference is None or self.vault.explicit_erasure_recorded(reference.content_id):
+                    raise DispatchOutboxError('prepared review reference is unavailable')
                 # Every executor enters the outbox, which verifies this exact
                 # permit-bound witness before consuming the start.
             else:
