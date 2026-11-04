@@ -21,6 +21,9 @@ def test_dimensions():
                                      'recipient_evidence': ['Explicitly requested detail.']}}
         original = copy.deepcopy(raw)
         findings = parse(json.dumps(raw))
+        alternate = copy.deepcopy(raw)
+        alternate['recipient_evidence'] = alternate['communication_fit'].pop('recipient_evidence')
+        assert parse(json.dumps(alternate)) == findings
         expected = ('unsupported' if fact == 'unsupported' or fit == 'conflicts' else
                     'uncertain' if fact == 'uncertain' or fit == 'uncertain' else 'supported')
         assert findings['verdict'] == expected
@@ -38,6 +41,12 @@ def test_dimensions():
         try: combine(bad)
         except ValueError: pass
         else: raise AssertionError('incomplete or invalid model dimensions admitted')
+    for bad in ({**raw, 'recipient_evidence': ['Conflicting source.']},
+                {**alternate, 'recipient_evidence': 'not a list'},
+                {**alternate, 'unrelated': True}):
+        try: parse(json.dumps(bad))
+        except ValueError: pass
+        else: raise AssertionError('ambiguous or invalid wire shape admitted')
 
 
 def test_old_and_new_contracts():

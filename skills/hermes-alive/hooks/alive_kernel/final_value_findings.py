@@ -77,7 +77,18 @@ def combine(value):
 
 
 def parse(text):
-    return combine(parse_model_json(text, max_chars=32000))
+    value = parse_model_json(text, max_chars=32000)
+    # The provider can place the one unambiguous evidence field beside the
+    # dimensions. Normalize that wire shape before the same strict validation.
+    if isinstance(value, dict) and set(value) == {
+            'factual_support', 'communication_fit', 'recipient_evidence'}:
+        fit = value['communication_fit']
+        if isinstance(fit, dict) and set(fit) == {'assessment', 'reason'}:
+            value = {
+                'factual_support': value['factual_support'],
+                'communication_fit': {**fit, 'recipient_evidence': value['recipient_evidence']},
+            }
+    return combine(value)
 
 
 def validate_retained(findings):

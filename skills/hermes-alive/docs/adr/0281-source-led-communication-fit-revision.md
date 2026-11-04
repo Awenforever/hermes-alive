@@ -2,6 +2,16 @@
 
 Date: 2026-10-29. Status: development candidate; qualification pending.
 
+## November 4 provider diagnostic
+
+An isolated live run reached final review and returned both judgments, but
+placed recipient evidence at the top level. Strict parsing rejected the
+response before submission. Normalize this unambiguous wire representation
+before validating both judgments and the evidence. Preserve the canonical
+retained format and reject duplicate, conflicting or incomplete fields.
+Replay of the audited response passed without changing either judgment or
+adding a model call. End-to-end qualification remains open.
+
 ## Problem
 
 ADR0280 distinguishes supported facts from suitable communication. Its existing
