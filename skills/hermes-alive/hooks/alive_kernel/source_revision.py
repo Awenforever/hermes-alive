@@ -5,7 +5,7 @@ authority. Owner, live sources and the negative review are validated by callers.
 """
 from .final_value_findings import validate_retained
 from .localized_correction import text_digest
-from .review_contracts import FACTS_AND_FIT_ASSESSMENTS, GROUNDED_FIT_ASSESSMENT
+from .review_contracts import FACTS_AND_FIT_ASSESSMENTS, WITNESS_ASSESSMENTS
 
 METHOD = 'source-led-fit-revision-v1'
 
@@ -47,7 +47,7 @@ def eligible(context):
         return False
     try:
         findings = validate_retained(context.get('findings'),
-            witness_snapshot=snapshot if binding['final_assessment_scope'] == GROUNDED_FIT_ASSESSMENT else None)
+            witness_snapshot=snapshot if binding['final_assessment_scope'] in WITNESS_ASSESSMENTS else None)
     except ValueError:
         return False
     return findings['communication_fit']['assessment'] == 'conflicts'

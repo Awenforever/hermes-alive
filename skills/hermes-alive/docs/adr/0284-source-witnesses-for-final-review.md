@@ -25,3 +25,12 @@ proves access to a passage, not independent confirmation or authority.
 Verify with a controlled forged-witness regression and real trials where
 correct details can be combined into a misleading claim. Sharing quality
 still requires inspecting the original output and its evidence.
+
+In the first real trial, seven witnesses matched and one source quote
+did not. The strict check withheld submission and the format recovery
+ran out of its stage budget. The next immutable contract presents
+numbered contiguous passages and asks the assessor to select a number.
+The host inserts the exact original text and verifies it on replay.
+This removes source transcription from the response contract. Claim
+spans still match the proposed wording, and the assessor still judges
+whether the evidence supports the claim in its full context.

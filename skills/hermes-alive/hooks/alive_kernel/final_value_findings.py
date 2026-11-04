@@ -4,6 +4,7 @@ The host combines the model's explicit judgments; it does not classify prose or
 infer recipient preferences. Existing lifecycle consumers retain one verdict.
 """
 from .model_json import parse_model_json
+from .review_contracts import PASSAGE_FIT_ASSESSMENT
 
 
 PROMPT = """Assess this actual message under the supplied source evidence,
@@ -68,6 +69,28 @@ excerpts leave a material scope uncertain, assess it as uncertain rather than
 assuming the missing connection. Do not invent or paraphrase a witness quote.
 """
 
+PASSAGE_PROMPT = CONVERSATIONAL_PROMPT + """
+Add a top-level source_witnesses list with up to eight entries. Each entry has
+claim (verbatim span from the message, at most 600 characters), source_event_id
+(the evidence event_id), and passage (the 1-based number in its passages list).
+Select the original passages by number. Do not copy or rewrite their contents.
+Supported facts require witnesses for material claims, including the relationship
+implied between clauses. Unsupported or uncertain facts may have an empty list.
+Match results and demonstrations to their own setup, population, time and measure.
+Two accurate details from different conditions do not establish a claim that joins
+them. If the retained passages leave a material scope unclear, mark it uncertain.
+"""
+
+
+def _passages(excerpt):
+    return [excerpt[start:start + 500] for start in range(0, len(excerpt), 500)]
+
+
+def passage_request(request):
+    return {**request, 'evidence': [
+        {**{key: value for key, value in source.items() if key != 'excerpt'},
+         'passages': _passages(source['excerpt'])} for source in request['evidence']]}
+
 
 def _reason(value):
     if not isinstance(value, str) or not value.strip() or len(value) > 1500:
@@ -103,20 +126,38 @@ def combine(value):
             'communication_fit': {**fit, 'recipient_evidence': list(evidence)}}
 
 
-def _validate_witnesses(witnesses, snapshot, assessment):
+def _validate_witnesses(witnesses, snapshot, assessment, *, retained=False):
     if not isinstance(witnesses, list) or len(witnesses) > 8 or (assessment == 'supported' and not witnesses):
         raise ValueError('source witnesses required for supported wording')
     sources = {item['event_id']: item['excerpt'] for item in snapshot['evidence']}
     text = snapshot['candidate']['text']
+    indexed = snapshot.get('expression_binding', {}).get('final_assessment_scope') == PASSAGE_FIT_ASSESSMENT
+    fields = {'claim', 'source_event_id'}
+    if indexed:
+        fields.add('passage')
+    if retained or not indexed:
+        fields.add('quote')
+    verified = []
     for witness in witnesses:
-        if not isinstance(witness, dict) or set(witness) != {'claim', 'source_event_id', 'quote'}:
+        if not isinstance(witness, dict) or set(witness) != fields:
             raise ValueError('invalid source witness')
-        claim, source_id, quote = (witness[key] for key in ('claim', 'source_event_id', 'quote'))
+        claim, source_id = (witness[key] for key in ('claim', 'source_event_id'))
+        if indexed:
+            passages = _passages(sources.get(source_id, '')) if isinstance(source_id, str) else []
+            number = witness['passage']
+            if type(number) is not int or not 1 <= number <= len(passages):
+                raise ValueError('source passage is outside retained evidence')
+            quote = passages[number - 1]
+            if retained and witness['quote'] != quote:
+                raise ValueError('retained source passage changed')
+        else:
+            quote = witness['quote']
         if (not all(isinstance(part, str) and part.strip() and len(part) <= 600
                     for part in (claim, source_id, quote))
                 or claim not in text or quote not in sources.get(source_id, '')):
             raise ValueError('source witness does not match retained wording and excerpt')
-    return [dict(witness) for witness in witnesses]
+        verified.append({**witness, 'quote': quote})
+    return verified
 
 
 def parse(text, *, witness_snapshot=None):
@@ -148,7 +189,7 @@ def validate_retained(findings, *, witness_snapshot=None):
     rebuilt = combine({key: findings[key] for key in ('factual_support', 'communication_fit')})
     if witness_snapshot is not None:
         rebuilt['source_witnesses'] = _validate_witnesses(
-            findings['source_witnesses'], witness_snapshot, rebuilt['factual_support']['assessment'])
+            findings['source_witnesses'], witness_snapshot, rebuilt['factual_support']['assessment'], retained=True)
     if rebuilt != findings:
         raise ValueError('retained assessment contradicts its dimensions')
     return rebuilt

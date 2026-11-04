@@ -113,6 +113,21 @@ def test_source_witness_binding():
     uncertain = {**response, 'factual_support': {'assessment': 'uncertain', 'reason': 'The setup is missing.'},
                  'source_witnesses': []}
     assert parse(json.dumps(uncertain), witness_snapshot=snapshot)['verdict'] == 'uncertain'
+    from alive_kernel.final_value_findings import passage_request
+    from alive_kernel.review_contracts import PASSAGE_FIT_ASSESSMENT
+    snapshot['expression_binding'] = {'final_assessment_scope': PASSAGE_FIT_ASSESSMENT}
+    request = passage_request(snapshot)
+    assert ''.join(request['evidence'][0]['passages']) == snapshot['evidence'][0]['excerpt']
+    witness = {'claim': '4-bit configuration used 2 GiB', 'source_event_id': 'benchmark', 'passage': 1}
+    indexed = {**response, 'source_witnesses': [witness]}
+    findings = parse(json.dumps(indexed), witness_snapshot=snapshot)
+    assert findings['source_witnesses'] == [{**witness, 'quote': snapshot['evidence'][0]['excerpt']}]
+    assert validate_retained(findings, witness_snapshot=snapshot) == findings
+    for passage in (0, 2, True, '1'):
+        try: parse(json.dumps({**indexed, 'source_witnesses': [{**witness, 'passage': passage}]}),
+                   witness_snapshot=snapshot)
+        except ValueError: pass
+        else: raise AssertionError('invalid passage reference was accepted')
 
 
 if __name__ == '__main__':

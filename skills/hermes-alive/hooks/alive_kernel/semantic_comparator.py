@@ -493,9 +493,9 @@ class SemanticComparator:
             render_system=((_DISCOVERY_RENDER_PROMPT_V2 if authoring_as_of else _DISCOVERY_RENDER_PROMPT_V1)+
                 (_READING_ASSESSMENT_GUIDANCE if expression_context.get('reading_assessment') else '')
                 if discovery else _RENDER_PROMPT)
-            from .review_contracts import FIRST_CONVERSATIONAL_REVIEW, SPLIT_SOURCE_REVIEW
+            from .review_contracts import FIRST_CONVERSATIONAL_REVIEW, FIRST_WITNESS_REVIEW, SPLIT_SOURCE_REVIEW
             if discovery and expression_context.get('semantic_source_contract') in (
-                    FIRST_CONVERSATIONAL_REVIEW, SPLIT_SOURCE_REVIEW):
+                    FIRST_CONVERSATIONAL_REVIEW, FIRST_WITNESS_REVIEW, SPLIT_SOURCE_REVIEW):
                 render_system += _DISCOVERY_CHAT_GUIDANCE
             if correction_method == LOCAL_CORRECTION_METHOD:
                 render_system=CORRECTION_PROMPT

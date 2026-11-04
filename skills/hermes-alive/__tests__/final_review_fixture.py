@@ -4,10 +4,14 @@
 def controlled_final_findings(snapshot, *, factual='supported', fit='fits', reason='Synthetic assessment.'):
     scope = snapshot.get('expression_binding', {}).get('final_assessment_scope')
     if scope in ('factual-support-and-communication-fit-v1', 'factual-support-and-communication-fit-v2',
-                 'factual-support-and-communication-fit-v3'):
+                 'factual-support-and-communication-fit-v3', 'factual-support-and-communication-fit-v4'):
         result = {'factual_support': {'assessment': factual, 'reason': reason},
                 'communication_fit': {'assessment': fit, 'reason': reason, 'recipient_evidence': []}}
-        if scope == 'factual-support-and-communication-fit-v3':
+        if scope == 'factual-support-and-communication-fit-v4':
+            source = next(item for item in snapshot['evidence'] if item['passages'][0].strip())
+            result['source_witnesses'] = [{'claim': snapshot['candidate']['text'][:200],
+                'source_event_id': source['event_id'], 'passage': 1}] if factual == 'supported' else []
+        elif scope == 'factual-support-and-communication-fit-v3':
             source = next(item for item in snapshot['evidence'] if item['excerpt'].strip())
             result['source_witnesses'] = [{'claim': snapshot['candidate']['text'][:200],
                 'source_event_id': source['event_id'], 'quote': source['excerpt'][:200]}] if factual == 'supported' else []

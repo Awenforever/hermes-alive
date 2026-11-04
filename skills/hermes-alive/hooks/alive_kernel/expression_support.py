@@ -105,8 +105,11 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
 
     def prompt_for_snapshot(self, snapshot):
         from .review_contracts import (BOUNDARY_ASSESSMENT, FACTS_AND_FIT_ASSESSMENT,
-            CONVERSATIONAL_FIT_ASSESSMENT, GROUNDED_FIT_ASSESSMENT)
+            CONVERSATIONAL_FIT_ASSESSMENT, GROUNDED_FIT_ASSESSMENT, PASSAGE_FIT_ASSESSMENT)
         scope = snapshot.get('expression_binding', {}).get('final_assessment_scope')
+        if scope == PASSAGE_FIT_ASSESSMENT:
+            from .final_value_findings import PASSAGE_PROMPT
+            return PASSAGE_PROMPT
         if scope == GROUNDED_FIT_ASSESSMENT:
             from .final_value_findings import GROUNDED_PROMPT
             return GROUNDED_PROMPT
@@ -125,25 +128,33 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
             return _DISCOVERY_FINAL_PROMPT_V1
         return super().prompt_for_snapshot(snapshot)
 
+    def _assessment_request(self, snapshot, as_of=None, review_until=None):
+        prompt, request = super()._assessment_request(snapshot, as_of, review_until)
+        from .review_contracts import PASSAGE_FIT_ASSESSMENT
+        if snapshot.get('expression_binding', {}).get('final_assessment_scope') == PASSAGE_FIT_ASSESSMENT:
+            from .final_value_findings import passage_request
+            request = passage_request(request)
+        return prompt, request
+
     def parse_findings(self, text, snapshot):
-        from .review_contracts import FACTS_AND_FIT_ASSESSMENTS, GROUNDED_FIT_ASSESSMENT
+        from .review_contracts import FACTS_AND_FIT_ASSESSMENTS, WITNESS_ASSESSMENTS
         scope = snapshot.get('expression_binding', {}).get('final_assessment_scope')
         if scope in FACTS_AND_FIT_ASSESSMENTS:
             from .final_value_findings import parse
             try:
-                return parse(text, witness_snapshot=snapshot if scope == GROUNDED_FIT_ASSESSMENT else None)
+                return parse(text, witness_snapshot=snapshot if scope in WITNESS_ASSESSMENTS else None)
             except ValueError as error:
                 raise SourceSupportError('invalid factual-support/communication-fit assessment') from error
         return super().parse_findings(text, snapshot)
 
     def validate_stored_findings(self, findings, snapshot):
-        from .review_contracts import FACTS_AND_FIT_ASSESSMENTS, GROUNDED_FIT_ASSESSMENT
+        from .review_contracts import FACTS_AND_FIT_ASSESSMENTS, WITNESS_ASSESSMENTS
         scope = snapshot.get('expression_binding', {}).get('final_assessment_scope')
         if scope in FACTS_AND_FIT_ASSESSMENTS:
             from .final_value_findings import validate_retained
             try:
                 return validate_retained(findings,
-                    witness_snapshot=snapshot if scope == GROUNDED_FIT_ASSESSMENT else None)
+                    witness_snapshot=snapshot if scope in WITNESS_ASSESSMENTS else None)
             except ValueError as error:
                 raise SourceSupportError('invalid retained factual-support/communication-fit assessment') from error
         return super().validate_stored_findings(findings, snapshot)
@@ -351,10 +362,13 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
             authoring = method.get('discovery_authoring')
             from .review_contracts import (SPLIT_SOURCE_REVIEW, SPLIT_SOURCE_REVIEW_CONTRACTS,
                 FIRST_FACTS_AND_FIT_REVIEW, BOUNDARY_ASSESSMENT, FACTS_AND_FIT_ASSESSMENT,
-                CONVERSATIONAL_FIT_ASSESSMENT, FIRST_CONVERSATIONAL_REVIEW, GROUNDED_FIT_ASSESSMENT)
+                CONVERSATIONAL_FIT_ASSESSMENT, FIRST_CONVERSATIONAL_REVIEW, FIRST_WITNESS_REVIEW,
+                GROUNDED_FIT_ASSESSMENT, PASSAGE_FIT_ASSESSMENT)
             if method.get('discovery_source_review') in SPLIT_SOURCE_REVIEW_CONTRACTS:
                 data['expression_binding']['semantic_assessment_scope']=BOUNDARY_ASSESSMENT
                 if method['discovery_source_review'] == SPLIT_SOURCE_REVIEW:
+                    data['expression_binding']['final_assessment_scope']=PASSAGE_FIT_ASSESSMENT
+                elif method['discovery_source_review'] == FIRST_WITNESS_REVIEW:
                     data['expression_binding']['final_assessment_scope']=GROUNDED_FIT_ASSESSMENT
                 elif method['discovery_source_review'] == FIRST_CONVERSATIONAL_REVIEW:
                     data['expression_binding']['final_assessment_scope']=CONVERSATIONAL_FIT_ASSESSMENT
