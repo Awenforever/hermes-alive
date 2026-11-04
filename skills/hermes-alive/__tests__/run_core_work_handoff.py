@@ -164,11 +164,11 @@ async def test(home):
             assert not turn.last_contract['operations']['record']['eligible_for_request_evaluation']
             assert not binding._agenda.operation_contract(configured,current_turn_eligible=False)['operations']['record']['eligible_for_request_evaluation']
             intake.set_permission(store,configured,True)
-        text='持续整理测试记录，并在我要求执行时写到指定结果文件。不要发送消息。'
+        text='持续整理测试记录，并在我要求执行时写到指定结果文件。请在这个会话告诉我进度。'
         tool=turn('work-intake',text)
         assert turn.last_contract['owner_delegation']['clear_current_assignment_mode']=='record_without_per_item_confirmation'
         item=tool({'operation':'record','task':'将测试记录标识 INDEPENDENT_SYNTHETIC_ARTIFACT 原样写入 '+str(artifact),
-            'constraint':'不要发送消息','evidence_span':text})
+            'notify_owner':True,'evidence_span':text})
         assert item.get('status')=='recorded_under_owner_intake_grant',item
         row=tool({'operation':'list','item_id':item['item_id']})['items'][0]
         original_request=text
