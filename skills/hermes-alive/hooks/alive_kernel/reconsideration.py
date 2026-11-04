@@ -73,13 +73,14 @@ class ReconsiderationStore:
                 (subject, 'conversation.inbound')).fetchone()[0]
             ignored=(self.EVENT,'autonomous.host.opened','autonomous.host.closed')
             if listing_fingerprint is not None:
+                from .research_evidence import SEARCH_PURPOSE_EVENT
                 # Only the already-observed listing protocol's control records
                 # are non-semantic. New source versions, failures, inbound,
                 # memory, feedback and unknown events still wake the owner.
                 ignored+=('discovery.host_read_started','discovery.host_read_completed',
                     'discovery.research_cycle_opened','discovery.citation_selection_opened',
                     'discovery.research_group_opened','discovery.reading_assessment_opened',
-                    'discovery.public_refinement_opened','discovery.search_views_opened')
+                    'discovery.public_refinement_opened','discovery.search_views_opened',SEARCH_PURPOSE_EVENT)
             frontier = connection.execute('SELECT MAX(sequence) FROM experience_events WHERE subject=? AND event_type NOT IN ('+
                 ','.join('?' for _ in ignored)+')',(subject,*ignored)).fetchone()[0]
             allowed = tuple(s.value for s in Sensitivity)[:tuple(Sensitivity).index(clearance)+1]

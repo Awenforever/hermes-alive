@@ -79,12 +79,14 @@ async def exercise(root):
         await refused(second,second_cycle,callback=lambda:'foreign-scope')
         # The unchanged source can still be reasoned about explicitly; there is
         # no automatic "unchanged" suppression or fabricated successful draft.
+        expected = {**parameters, 'expression_parameters': {
+            **parameters['expression_parameters'], 'search_purpose_receipt_id': second.found.receipt_id}}
         assert await prep.reason(second,cycle=second_cycle,parameters=parameters,call=model,
-            read_binding=binding)==parameters
+            read_binding=binding)==expected
         assert models==['alive_discovery_reading']
         before=journal.read(event_type='discovery.parameters_retained')[-1].event
         assert await prep.reason(second,cycle=second_cycle,parameters=parameters,call=model,
-            read_binding=binding)==parameters
+            read_binding=binding)==expected
         assert models==['alive_discovery_reading']
         assert journal.read(event_type='discovery.parameters_retained')[-1].event==before
         state['title']='Changed synthetic title'
@@ -121,7 +123,10 @@ async def exercise(root):
         state['binding']='owner-scope-1'
         # The composed legacy entry still runs selection exactly once.
         composed=NS(operation_id='synthetic-composed-cycle')
-        assert await prep(cycle=composed,parameters=parameters,call=model,read_binding=binding)==parameters
+        composed_parameters = await prep(cycle=composed,parameters=parameters,call=model,read_binding=binding)
+        receipt = journal.read(event_type='discovery.parameters_retained')[-1].event
+        assert composed_parameters == {**parameters, 'expression_parameters': {
+            **parameters['expression_parameters'], 'search_purpose_receipt_id': receipt.causation_id}}
         assert len(models)==2
         closed_cycle,closed=await observe()
         for close in unload:close()

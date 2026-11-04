@@ -449,7 +449,8 @@ class ConfiguredDiscoveryCycle:
             observations=sorted(found.observation_ids),research_enabled=research_enabled,
             citation_references=citation_references,group_enabled=group_enabled,
             assessment_enabled=assessment_enabled,**({'public_refinement':True} if public_refinement else {}),
-            **({'scoped_search_views':True} if scoped_search_views else {})))
+            **({'scoped_search_views':True} if scoped_search_views else {}),
+            **({'search_purpose':SEARCH_PURPOSE_METHOD} if search_purpose else {})))
             if found.failures==0 else None)
         result=_DiscoveryObservation(cycle.operation_id,expected,found,tuple(evidence),reader,current,
             research_enabled,citation_references,public_refinement,group_enabled,assessment_enabled,fingerprint,
