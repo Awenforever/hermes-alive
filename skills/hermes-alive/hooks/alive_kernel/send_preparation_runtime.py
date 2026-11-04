@@ -354,18 +354,6 @@ manufactures them from model output or reviews, nor falls back to another body.
 
     def _validate_prepared_lease(self, prepared, lease):
         from .dispatch_outbox import DispatchOutboxError
-        if prepared.expression.planning.grounding_reviews:
-            from .expression_support import ExpressionSourceSupportReviewer
-            subject, origin, clearance = self._expression_origin(prepared.expression)
-            record = self.journal.get(prepared.final_review_event_id) if prepared.final_review_event_id else None
-            findings = ExpressionSourceSupportReviewer(self.journal, content_vault=self.vault,
-                context_vault=self.context_vault).verify_current(prepared.final_review_event_id,
-                    subject=subject, interpretation_id=origin,
-                    candidate_id=prepared.expression.expression_event_id, allow_correlated=True,
-                    clearance=clearance) if record else None
-            if (prepared.quality_disposition != 'supported' or findings is None
-                    or findings['verdict'] != 'supported'):
-                raise DispatchOutboxError('prepared action lacks current final-wording support')
         attempt = self.journal.get(prepared.attempt_event_id) if prepared.attempt_event_id else None
         if (prepared.authorization is None or not prepared.authorization.authorized
                 or attempt is None
@@ -375,6 +363,28 @@ manufactures them from model output or reviews, nor falls back to another body.
         if (attempt.event.payload.get('authorization_event_id') != prepared.authorization.event_id
                 or attempt.event.payload.get('selection_event_id') != prepared.expression.planning.selection_event_id):
             raise DispatchOutboxError('prepared attempt differs from canonical authorization')
+        if prepared.expression.planning.grounding_reviews:
+            authorization = self.journal.get(prepared.authorization.event_id)
+            witness = authorization.event.payload.get('final_wording_witness') if authorization else None
+            if prepared.quality_disposition != 'supported' or not prepared.final_review_event_id:
+                raise DispatchOutboxError('prepared action lacks current final-wording support')
+            if witness is not None:
+                if (witness.get('review_event_id') != prepared.final_review_event_id
+                        or authorization.event.payload.get('expression_event_id')
+                        != prepared.expression.expression_event_id):
+                    raise DispatchOutboxError('prepared review differs from canonical authorization')
+                # Every executor enters the outbox, which verifies this exact
+                # permit-bound witness before consuming the start.
+            else:
+                from .expression_support import ExpressionSourceSupportReviewer
+                subject, origin, clearance = self._expression_origin(prepared.expression)
+                findings = ExpressionSourceSupportReviewer(self.journal, content_vault=self.vault,
+                    context_vault=self.context_vault).verify_current(prepared.final_review_event_id,
+                        subject=subject, interpretation_id=origin,
+                        candidate_id=prepared.expression.expression_event_id,
+                        allow_correlated=True, clearance=clearance)
+                if findings is None or findings['verdict'] != 'supported':
+                    raise DispatchOutboxError('prepared action lacks current final-wording support')
 
     def execute_prepared_with_cli(self, prepared, lease, **host_parameters):
         """Consume this exact attempt through the qualified host CLI seam once."""

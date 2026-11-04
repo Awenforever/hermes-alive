@@ -45,3 +45,11 @@ context once per review snapshot, and pass the already validated original
 source window to authoring and continuity inside their own synchronous call.
 The snapshot shape and stored digest contract stay the same. No recovered
 context crosses a host callback or a separate verification boundary.
+
+The prepared-send wrapper used the authorization window to reconstruct
+the final review immediately before the outbox reconstructed the same
+review at start admission. For permits carrying a final-wording witness,
+the wrapper now checks the exact authorization, review, and expression
+identities. The outbox still verifies current support before consuming
+the start and at the launch boundary. Prepared actions without a bound
+witness retain the wrapper's full verification.
