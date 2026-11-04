@@ -11,6 +11,7 @@ from pathlib import Path
 import shutil
 import sys
 import tempfile
+from unittest.mock import patch
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--core',type=Path,required=True)
@@ -25,6 +26,48 @@ from gateway.platform_registry import platform_registry
 from gateway.platforms.base import BasePlatformAdapter
 
 repo=Path(__file__).resolve().parents[3]
+
+
+async def exercise_startup_recovery(module, binding):
+    from importlib import import_module
+    channel = import_module(module.__name__ + '.gateway_channel_bridge')
+    setup = import_module(module.__name__ + '.kernel_setup_bridge')
+    grant = object()
+    active = [grant]
+    ready = False
+    attempts = []
+
+    class Store:
+        def configuration(self): return 'owner-configuration'
+        def activation(self): return active[0]
+
+    async def start(current):
+        assert current is binding
+        attempts.append(active[0])
+        if not ready:
+            raise channel.ChannelCapabilityUnavailable('synthetic channel unavailable')
+        current.started = True
+
+    with (patch.object(setup, 'setup_store', return_value=Store()),
+          patch.object(module, '_start_kernel_gateway', start),
+          patch.object(module, '_STARTUP_CHANNEL_RETRY_SECONDS', .01)):
+        for revoked in (True, False):
+            attempts.clear()
+            active[0] = grant
+            ready = False
+            result = await module.kernel_gateway_startup()
+            assert result['status'] == 'waiting_for_owner_channel'
+            owned = binding.startup_recovery
+            assert (await module.kernel_gateway_startup()) == result
+            assert binding.startup_recovery is owned and attempts == [grant]
+            if revoked:
+                active[0] = None
+            ready = True
+            await asyncio.wait_for(owned, timeout=2)
+            assert attempts == ([grant] if revoked else [grant, grant])
+            assert binding.started is (not revoked)
+            binding.startup_recovery = None
+        binding.started = False
 
 
 async def exercise(home,shadow):
@@ -59,6 +102,7 @@ async def exercise(home,shadow):
         if not shadow:
             assert not binding.channels
             assert (await loaded.module.kernel_gateway_startup())['status']=='not_configured'
+            await exercise_startup_recovery(loaded.module,binding)
         else:
             expected={p.value for p in Platform}|platform_registry.registered_names()
             assert set(binding.channels)==expected and 'telegram' in expected

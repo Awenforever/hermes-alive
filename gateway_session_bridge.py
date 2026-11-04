@@ -17,6 +17,10 @@ class SessionScopeUnavailable(ValueError):
     pass
 
 
+class ReceivingAdapterUnavailable(SessionScopeUnavailable):
+    pass
+
+
 def _identifier(value,*,optional=False):
     if optional and value is None:return ''
     if (not isinstance(value,str) or (not optional and not value)
@@ -116,7 +120,7 @@ class CoreSessionRouter:
         source=gateway._restored_source(copied)
         adapter=gateway._delivery_adapter_for(source)
         if connected and (adapter is None or getattr(adapter,'is_connected',False) is not True):
-            raise SessionScopeUnavailable('canonical receiving adapter disconnected; no fallback')
+            raise ReceivingAdapterUnavailable('canonical receiving adapter disconnected; no fallback')
         identity=canonical_identity(source,runner=gateway,adapter=adapter)
         if (identity is None or Path(identity.runtime_home).resolve()!=self.home
                 or (multiplexed and (identity.transport_inferred

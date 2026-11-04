@@ -807,6 +807,16 @@ For each material change:
 
 ## Change log
 
+November 5 — an isolated Gateway restart preserved encrypted state and
+refused the unavailable owner channel on both boots. Core connects adapters
+before publishing them to its router. When a confirmed owner route is
+temporarily unavailable at startup, a single Core-owned task waits for up to
+ten minutes and checks the same signed configuration and activation before
+retrying exact route validation. It neither reconnects the adapter nor
+replays delivery. A changed grant or an unloaded plugin ends the attempt.
+Controlled recovery and revocation checks are distinct from an actual
+connected-channel restart, which remains part of release acceptance.
+
 November 5 — the first real indexed-passage review selected a nonexistent
 passage. [ADR 0284](adr/0284-source-witnesses-for-final-review.md) records
 the explicit passage IDs and the remaining live qualification.

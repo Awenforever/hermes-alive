@@ -15,6 +15,7 @@ class GatewayHostBinding:
         self.closed=False
         self.started=False
         self.control_lock=asyncio.Lock()
+        self.startup_recovery=None
         self.channels={}
         self.channel_error_class=None
         self._unsubscribe_channels=None
@@ -56,11 +57,14 @@ class GatewayHostBinding:
     def session_router(self,platform):
         """Gateway-loop capture only; no recipient, memory or sending grant."""
         self._require_home()
-        if self.closed or platform not in self.channels:
+        if self.closed:
             raise ValueError('current connected Core channel required')
+        from .gateway_channel_bridge import ChannelCapabilityUnavailable
+        if platform not in self.channels:
+            raise ChannelCapabilityUnavailable('current connected Core channel required')
         adapter=self.channels[platform].adapter()
         gateway=getattr(adapter,'gateway_runner',None)
-        if gateway is None:raise ValueError('Core Gateway routing capability unavailable')
+        if gateway is None:raise ChannelCapabilityUnavailable('Core Gateway routing capability unavailable')
         from .gateway_session_bridge import CoreSessionRouter
         previous=self._session_routers.get(platform)
         if previous is not None:
@@ -176,6 +180,8 @@ class GatewayHostBinding:
         self._require_home()
         status={'status':'not_configured','legacy_allowed':False,
                 'external_delivery_proven':False,'runtime_active':False}
+        if self.startup_recovery is not None and not self.startup_recovery.done():
+            status['status']='waiting_for_owner_channel'
         if self.native is not None:
             status['mode']='execution' if self.native.host.execute else 'shadow'
             status['pending_work_count']=len(getattr(self.native,'pending',()))
@@ -239,6 +245,8 @@ class GatewayHostBinding:
     def close(self):
         if self.closed:return
         self.closed=True
+        if self.startup_recovery is not None and not self.startup_recovery.done():
+            self.startup_recovery.get_loop().call_soon_threadsafe(self.startup_recovery.cancel)
         if self.arguments is not None:self.arguments['stop'].set()
         try:
             from .core_retirement_bridge import retire_if_deselected
