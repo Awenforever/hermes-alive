@@ -1,7 +1,7 @@
 # Hermes Alive Kernel — Living Development Plan
 
 Status: active; development branch only, no production acceptance.
-Last reviewed: 2026-10-29 (Asia/Shanghai).
+Last reviewed: 2026-11-04 (Asia/Shanghai).
 
 ## Current product state
 
@@ -14,9 +14,19 @@ rejection, abstention and source erasure pass alongside local repair and v1
 recovery. The installed current Core chain explicitly exercises a global-fit
 rejection, source-led revision, repeated meaning/final assessments and one
 corrected local adapter submission, with no actual models or external sends.
-A Core fixture indentation error was retained and corrected; its initial broad
-run stopped at compilation. Complete current regression and fresh actual-model
-quality remain pending. There is no new reviewer or retry loop.
+A Core fixture indentation error stopped the initial broad run at compilation.
+After correction, the complete portable suite passed for the committed runtime.
+Current Core agenda and semantic-memory controls also passed. Ubuntu Git upgrade
+preserved 35 logical state and key-file fingerprints. The installed functional
+run reached a 120-second setup timeout, and the same synthetic setup completed
+in about 163 seconds during preflight. Warm functional verification is pending.
+
+The first new real-model attempt lost its temporary evidence across a NAS
+restart. Its replacement retained audited evidence and reached live search and
+seven logical model calls, then stopped at final source review with a
+`SourceSupportError`. The recorded failure class leaves the cause unresolved.
+An isolated repeat captures the exact review request, response and error for
+diagnosis. The sharing-quality streak remains 0/10.
 
 ADR0280 is now an unqualified development candidate. It separates factual
 support and communication fit inside the existing final discovery review call,

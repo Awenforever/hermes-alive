@@ -82,3 +82,18 @@ reading windows and no actual model/physical send. A later fixture-only adjustme
 makes the positive synthetic explanation agree with its positive fit enum; neither
 fixture response is real semantic-quality evidence. Complete current regression,
 actual-model quality, Git consumers, fleet and production remain open.
+
+## 2026-11-04 — Portable qualification and live review diagnosis
+
+Portable CI passed for `c79ceb3` with the reduced CI stress configuration.
+Current Core controlled agenda and memory checks passed on the same candidate.
+The isolated Ubuntu Git upgrade reached that revision and preserved 35 logical
+state and key-file fingerprints. Installed functional qualification remains
+pending after a setup timeout and a successful slower preflight.
+
+The actual-model replacement trial reached source review after seven logical
+model calls and stopped with `SourceSupportError`. It produced zero submissions.
+The existing failure receipt identifies only the exception class. The follow-up
+isolated diagnosis records exact review inputs and outputs behind the audit gate.
+The audited result archive survives an ordinary host restart. Fresh semantic
+quality and production acceptance remain open.
