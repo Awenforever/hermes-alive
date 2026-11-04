@@ -192,13 +192,13 @@ class SendTimeAuthorizer:
         authorized = payload.get("outcome") == "authorized"
         parsed_until = datetime.fromisoformat(str(valid_until)) if valid_until else None
         reasons = tuple(str(value) for value in payload.get("reasons", ()))
-        if authorized and expression_event_id is not None:
+        if authorized and expression_event_id is not None and final_wording_witness is None:
             try:
                 from .opportunity_expression import OpportunityExpressionStore
                 required = OpportunityExpressionStore(self.journal,
                     content_vault=self.deliberation.content_vault,context_vault=self.context_vault).requires_final_source_review(
                         selection_event_id=selection_event_id,subject=subject)
-                if required and final_wording_witness is None:
+                if required:
                     authorized=False
                     reasons=(*reasons,'final_wording_required')
             except ValueError:
@@ -587,13 +587,12 @@ class SendTimeAuthorizer:
             else:
                 reasons.append("action_authority_invalid")
 
-        if expression_event_id is not None:
+        if expression_event_id is not None and final_wording_witness is None:
             try:
                 from .opportunity_expression import OpportunityExpressionStore
-                if (OpportunityExpressionStore(self.journal,
+                if OpportunityExpressionStore(self.journal,
                         content_vault=self.deliberation.content_vault,context_vault=self.context_vault).requires_final_source_review(
-                            selection_event_id=selection_event_id,subject=owner)
-                        and final_wording_witness is None):
+                            selection_event_id=selection_event_id,subject=owner):
                     reasons.append('final_wording_required')
             except ValueError:
                 reasons.append('final_wording_not_current')

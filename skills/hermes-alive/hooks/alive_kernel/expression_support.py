@@ -170,11 +170,11 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
             findings = self.verify_current(review_event_id, subject=subject,
                 interpretation_id=origin, candidate_id=expression_id,
                 clearance=record.event.sensitivity, allow_correlated=True)
-            expression = self.expressions.resolve_model_candidate(expression_id)
+            expression = self.journal.get(expression_id)
             operation = 'runtime-expression:' + self.vault.digest_json({'selection':selection_event_id})[:40]
             if (findings is None or findings['verdict'] not in ('unsupported', 'uncertain')
-                    or expression is None or expression.selection_event_id != selection_event_id
-                    or expression.renderer_execution_id != 'execution:' + operation + ':render'):
+                    or expression is None or expression.event.payload.get('selection_event_id') != selection_event_id
+                    or expression.event.payload.get('renderer_execution_id') != 'execution:' + operation + ':render'):
                 raise SourceSupportError('correction must concern one original negative final review')
             return {'review_event_id':review_event_id, 'previous_expression_event_id':expression_id,
                     'findings':findings, 'grounding_context':snapshot,
@@ -225,19 +225,21 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
             raise SourceSupportError('local correction proof unavailable')
         event=proof.event;data=event.payload
         try:
-            previous=self.expressions.resolve_model_candidate(context['previous_expression_event_id'])
+            # correction_context already verified the original expression and
+            # matched its complete wording to the retained review snapshot.
+            previous_text=context['grounding_context']['candidate']['text']
+            previous_digest=text_digest(previous_text)
             ref=ContentReference.from_event_payload(data['content'])
-            if (previous is None or previous.text!=context['grounding_context']['candidate']['text']
-                    or event.event_type!=('expression.source_revision_completed' if revision else 'expression.local_correction_completed')
+            if (event.event_type!=('expression.source_revision_completed' if revision else 'expression.local_correction_completed')
                     or event.source!='alive.semantic-comparator' or event.actor!='system:alive-shadow-comparator'
                     or event.subject!=subject or event.sensitivity is not start.event.sensitivity
                     or event.causation_id!=expression.event_id or event.expires_at!=expression.expires_at
                     or not start.event.observed_at<=event.observed_at
                     or data.get('method')!=method or data.get('delivery_authority_granted') is not False
-                    or data.get('previous_expression_event_id')!=previous.event_id
+                    or data.get('previous_expression_event_id')!=context['previous_expression_event_id']
                     or data.get('review_event_id')!=context['review_event_id']
                     or data.get('correction_digest')!=self.vault.digest_json(context)
-                    or data.get('previous_text_digest')!=text_digest(previous.text)
+                    or data.get('previous_text_digest')!=previous_digest
                     or data.get('result_text_digest')!=expression.digest
                     or data.get('actual_model')!=expression.renderer_model
                     or not isinstance(data.get('provider'),str)
@@ -250,7 +252,7 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
                 meaning_event_id=expression.meaning_event_id,subject=subject,observed_at=event.observed_at)
             literals=tuple(literal for atom in document.atoms for literal in atom.protected_literals)
             reconstructed=(revised_text(proposal,protected_literals=literals) if revision else
-                apply_correction(previous.text,expected_digest=previous.digest,
+                apply_correction(previous_text,expected_digest=previous_digest,
                     findings=context['findings'],response=proposal,protected_literals=literals))
             if self.vault.digest_json(proposal)!=ref.digest or reconstructed!=expression.text:
                 raise SourceSupportError('local correction reconstruction changed')
@@ -268,10 +270,9 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
             raise SourceSupportError('invalid final-wording witness')
         if not isinstance(expression_event_id, str) or not expression_event_id:
             raise SourceSupportError('final-wording witness needs an expression')
-        expression = self.expressions.resolve_model_candidate(expression_event_id)
         header = self.journal.get(expression_event_id)
-        if (expression is None or header is None or header.event.subject != subject
-                or expression.selection_event_id != selection_event_id):
+        if (header is None or header.event.subject != subject
+                or header.event.payload.get('selection_event_id') != selection_event_id):
             raise SourceSupportError('final-wording witness expression mismatch')
         findings = self.verify_current(witness['review_event_id'], subject=subject,
             interpretation_id=witness['interpretation_id'], candidate_id=expression_event_id,

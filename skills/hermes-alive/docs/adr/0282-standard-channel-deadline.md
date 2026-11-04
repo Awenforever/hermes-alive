@@ -53,3 +53,9 @@ the wrapper now checks the exact authorization, review, and expression
 identities. The outbox still verifies current support before consuming
 the start and at the launch boundary. Prepared actions without a bound
 witness retain the wrapper's full verification.
+
+Inside each final-review check, use the original expression fields and
+wording already authenticated by reconstruction of the review snapshot.
+The correction proof still binds the prior expression, exact text digest,
+proposal, and reconstructed result. The authorizer only queries whether an
+expression requires a review when it has no witness to verify.
