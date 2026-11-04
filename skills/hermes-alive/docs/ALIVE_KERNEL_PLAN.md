@@ -807,6 +807,10 @@ For each material change:
 
 ## Change log
 
+November 4 — the isolated Ubuntu native run exposed a send authorization
+deadline failure. [ADR 0282](adr/0282-standard-channel-deadline.md) records the
+submission check and the next installed-runtime acceptance step.
+
 October 26–27 qualification notes are retained in
 [the October 27 archive](ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-27.md).
 Earlier execution notes and the original change log are retained in

@@ -12,6 +12,7 @@ from types import MappingProxyType
 from pathlib import Path
 
 from .cli_send_contract import compile_text_cli_plan
+from .dispatch_outbox import DispatchOutboxError
 from .published_channel_execution import _renderer_metadata
 
 
@@ -82,6 +83,9 @@ async def execute_standard_text_once(outbox, lease, *, resolve_channel, clearanc
         if Path(observe_profile_home()).resolve() != plan.hermes_home:
             raise ValueError('conversation capture changed the owning profile')
         outbox.validate_execution_for_launch(execution, now=clock())
+    # Evidence verification can itself outlive the authenticated start.
+    if clock() >= min(execution.lease.lease_until, execution.lease.execute_by):
+        raise DispatchOutboxError('channel launch deadline passed during verification')
     result = await adapter.send(chat_id=execution.route['chat_id'], content=plan.stdin_text,
                                 metadata=metadata)
     observation = outbox.record_adapter_observation(execution, result=result, now=clock())

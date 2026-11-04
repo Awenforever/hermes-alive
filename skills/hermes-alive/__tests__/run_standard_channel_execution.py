@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'hooks'))
 from alive_kernel import AutonomyPolicyProjection, EventEnvelope, ExperienceJournal, PolicyContext, ReceiptLevel, Sensitivity
 from alive_kernel.autonomous_cycle_runtime import AutonomousCycleRuntime
 from alive_kernel.action_delegation import ActionDelegationStore
-from alive_kernel.dispatch_outbox import DispatchOutboxError
+from alive_kernel.dispatch_outbox import DispatchOutbox, DispatchOutboxError
 from alive_kernel.event_store import EventConflictError
 from run_alive_kernel_expression_runtime import scenario
 
@@ -107,10 +107,15 @@ async def test(root, mode):
         if mode=='forged-model': metadata['model_name'] = 'wrong-model'
         return adapter, metadata
     if mode=='write-failure':
-        from alive_kernel.dispatch_outbox import DispatchOutbox
         original_record = DispatchOutbox.record_adapter_observation
         def fail_record(*_,**__): raise OSError('synthetic journal failure after effect')
         DispatchOutbox.record_adapter_observation = fail_record
+    if mode=='verify-expired':
+        original_validate = DispatchOutbox.validate_execution_for_launch
+        def slow_verify(self, execution, *, now):
+            original_validate(self, execution, now=now)
+            logical_offset[0] += timedelta(seconds=31)
+        DispatchOutbox.validate_execution_for_launch = slow_verify
     expression = {k:v for k,v in parameters.items() if k not in ('subject','operation_id','policy_context')}
     cycle_args = dict(subject=owner,operation_id='one',expression_parameters=expression,
         resolve_binding=lambda _: (_ for _ in ()).throw(AssertionError('no Enhance binding expected')),
@@ -132,8 +137,11 @@ async def test(root, mode):
     successful = mode in ('success','false','unknown','long','prepare-delay')
     try:
         result = await runtime.cycle(**cycle_args)
-    except (ValueError,TimeoutError,OSError,asyncio.CancelledError):
+    except (ValueError,TimeoutError,OSError,asyncio.CancelledError) as exc:
         assert not successful, mode
+        if mode=='verify-expired':
+            assert isinstance(exc, DispatchOutboxError)
+            assert str(exc)=='channel launch deadline passed during verification'
     else:
         assert successful and result.disposition=='submitted' and not result.external_delivery_proven
         assert result.submission.adapter_result is returned
@@ -162,6 +170,9 @@ async def test(root, mode):
         else: raise AssertionError('normal return evidence overwritten')
     finally:
         if mode=='write-failure': DispatchOutbox.record_adapter_observation = original_record
+        if mode=='verify-expired':
+            DispatchOutbox.validate_execution_for_launch = original_validate
+            logical_offset[0] -= timedelta(seconds=31)
     should_send = mode in ('success','false','unknown','long','cancel','exception','write-failure','prepare-delay')
     assert len(received) == int(should_send), (mode,received)
     if prepared_executions:
@@ -242,7 +253,7 @@ async def main():
     with tempfile.TemporaryDirectory(prefix='alive-standard-channel-') as directory:
         for mode in ('success','false','unknown','long','cancel','exception','missing','disconnected',
                      'wrong-thread','forged-model','wrong-platform','wrong-profile','revoked','write-failure',
-                     'prepare-delay','prepare-expired','prepare-revoked'):
+                     'prepare-delay','prepare-expired','prepare-revoked','verify-expired'):
             await test(Path(directory)/mode,mode)
 
 

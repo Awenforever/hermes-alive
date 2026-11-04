@@ -189,8 +189,10 @@ class OpportunityExpressionStore(SemanticReviewStore):
                           if e.startswith('opportunity.synthesis:') and e.endswith(':completed'))
         start = self.journal.get(self.journal.get(completion).event.causation_id)
         interpreter = self._interpreter()
-        interpreter.load_completed(subject=subject,operation_id=completion.removeprefix(
-            'opportunity.synthesis:').removesuffix(':completed'),clearance=source.event.sensitivity)
+        # _selected_draft already validates the selected candidate against this
+        # completed synthesis before reading its original evidence window.
+        if start is None or start.event.sensitivity is not source.event.sensitivity:
+            raise SemanticReviewError('original interpretation scope differs from expression scope')
         original = interpreter.reader.active_evidence(subject=subject,clearance=source.event.sensitivity,
             limit=32,observation_event_ids=tuple(start.event.payload['observation_event_ids']))
         url = next(e.content['url'] for e in original if e.agenda_item_id == candidate.agenda_item_id)
