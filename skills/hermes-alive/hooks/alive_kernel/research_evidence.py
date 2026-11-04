@@ -14,6 +14,9 @@ from . import source_reading_depth
 RESEARCH_SOURCE_BUDGET = 64000  # <=4 retained8192-char reads plus bounded context/background.
 RESEARCH_MESSAGE_BUDGET = 120000  # Reserve framing below Core's131072-char message admission.
 RESEARCH_SCAN = 'atomic-research-source-budget-v1'
+SEARCH_PURPOSE_PREFIX = 'discovery.search-purpose:'
+SEARCH_PURPOSE_EVENT = 'discovery.search_purpose_opened'
+SEARCH_PURPOSE_METHOD = 'approved-search-purpose-v1'
 
 SEARCH_PURPOSE_GUIDANCE = """
 For a discovery, consider approved_search_queries as the scope of the current
@@ -45,6 +48,19 @@ def resolve_search_purpose(reader, *, subject, receipt_id, before_sequence=None)
                 or event.subject != subject or event.sensitivity is not Sensitivity.PRIVATE
                 or event.payload.get('delivery_authority_granted') is not False):
             raise HostDiscoveryError('search purpose has foreign provenance')
+    prefix = 'discovery.host-read:'
+    if not receipt_id.startswith(prefix) or not receipt_id.endswith(':completed'):
+        raise HostDiscoveryError('search purpose is not an original collection reference')
+    identity = receipt_id[len(prefix):-len(':completed')]
+    mode = journal.get(SEARCH_PURPOSE_PREFIX + identity)
+    if (start.event.event_id != prefix + identity + ':started' or mode is None
+            or mode.sequence >= start.sequence or mode.event.event_type != SEARCH_PURPOSE_EVENT
+            or mode.event.source != 'alive.configured-discovery'
+            or mode.event.actor != 'system:alive-configured-reader'
+            or mode.event.subject != subject or mode.event.sensitivity is not Sensitivity.PRIVATE
+            or mode.event.payload.get('method') != SEARCH_PURPOSE_METHOD
+            or mode.event.payload.get('authority_granted') is not False):
+        raise HostDiscoveryError('search purpose was not bound before this collection')
     ref = ContentReference.from_event_payload(start.event.payload['request'])
     request = vault.resolve_json(ref.content_id, expected_subject=subject,
         expected_purpose='discovery.host-request', expected_sensitivity=Sensitivity.PRIVATE)
@@ -55,6 +71,8 @@ def resolve_search_purpose(reader, *, subject, receipt_id, before_sequence=None)
     if (not isinstance(queries, list) or not 1 <= len(queries) <= 3
             or any(not isinstance(query, str) or not query.strip() or len(query) > 128 for query in queries)):
         raise HostDiscoveryError('invalid retained search purpose')
+    if vault.digest_json(queries) != mode.event.payload.get('query_digest'):
+        raise HostDiscoveryError('search purpose differs from the approved query set')
     return queries
 
 

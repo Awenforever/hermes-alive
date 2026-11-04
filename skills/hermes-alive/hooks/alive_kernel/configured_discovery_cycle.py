@@ -21,6 +21,7 @@ from .host_discovery import (HostDiscoveryReader, HostDiscoveryError, HostReadUn
 from .model_json import parse_model_json, ModelJSONError
 from .model_timeouts import DEFAULT_STAGE_SECONDS
 from .core_context_read import context_value
+from .research_evidence import SEARCH_PURPOSE_PREFIX, SEARCH_PURPOSE_EVENT, SEARCH_PURPOSE_METHOD
 from . import citation_selection
 from . import public_source_refinement
 from . import source_reading_depth
@@ -421,8 +422,8 @@ class ConfiguredDiscoveryCycle:
             payload=dict(method='inquiry-reading-assessment-v1',authority_granted=False))
         scoped_search_views=self._cycle_mode(cycle,prefix='discovery.search-views:',
             kind='discovery.search_views_opened',payload=dict(method='public-query-view-v1',authority_granted=False))
-        search_purpose=self._cycle_mode(cycle,prefix='discovery.search-purpose:',
-            kind='discovery.search_purpose_opened',payload=dict(method='approved-search-purpose-v1',
+        search_purpose=self._cycle_mode(cycle,prefix=SEARCH_PURPOSE_PREFIX,
+            kind=SEARCH_PURPOSE_EVENT,payload=dict(method=SEARCH_PURPOSE_METHOD,
                 query_digest=self.ingestor.vault.digest_json(list(self.queries)),authority_granted=False))
         if self.tools is not None:self.tools.close()
         def allow_refinement_query(query):

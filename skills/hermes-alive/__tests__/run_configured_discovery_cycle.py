@@ -350,6 +350,18 @@ async def exercise(root,mode,*,primary_url=None):
                 assert not journal.read(event_type='discovery.reading_assessment_opened')
             assert result.disposition==('paused' if mode=='paused' else 'silence' if mode=='abstain' else 'shadow_selected')
             assert len(journal.read(event_type='autonomous.host.closed'))==1
+            if mode == 'primary-read':
+                from alive_kernel.research_evidence import resolve_search_purpose
+                search, extract, *_ = journal.read(event_type='discovery.host_read_completed')
+                assert resolve_search_purpose(ingestor, subject='user:test',
+                    receipt_id=search.event.event_id) == ['public museum methods']
+                for subject, receipt in (('user:foreign', search), ('user:test', extract)):
+                    try:
+                        resolve_search_purpose(ingestor, subject=subject, receipt_id=receipt.event.event_id)
+                    except HostDiscoveryError:
+                        pass
+                    else:
+                        raise AssertionError('an unrelated receipt supplied the approved query scope')
             if mode=='paused':assert not tools and not models
             elif mode!='abstain':
                 assert url in result.expression.text
