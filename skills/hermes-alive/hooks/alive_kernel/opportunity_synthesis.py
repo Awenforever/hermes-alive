@@ -422,11 +422,9 @@ Use dated anchors rather than delivery-relative claims that can become false.
 For a DISCRETIONARY discovery_share, use this complete version 3 plan:
 {"version":3,"recipient_goal":"purpose","speech_act":"share|inform",
  "contents":[],"behavior_constraints":[]}
-Choose one speech_act and include every key even if a list is empty. This is
-a tentative editorial brief, not an inventory of facts the recipient must hear.
-Propose the substantive possible
-contribution in recipient_goal. The eventual author receives original evidence
-and chooses what to say; actual wording is reviewed for source support and value.
+Choose one speech_act and include every key. Propose one possible contribution
+in recipient_goal. The author chooses what to say from the original evidence;
+review checks the actual wording for support and value.
 Do not turn reading notes or routine operating disclaimers into required meaning.
 Use version2 for requests, admitted commitments, requested reports, reminders and
 warnings; their explicit meaning must not be relaxed into an editorial brief.
