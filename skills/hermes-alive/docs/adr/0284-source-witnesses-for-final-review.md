@@ -43,3 +43,12 @@ The assessor selects that single ID. The host resolves and retains both
 the original source event ID and exact passage, then verifies the
 association on replay. Historical index-based receipts keep their
 original validation. The new scope still requires live qualification.
+
+A real regression used valid labels after one response-format correction,
+then submitted to a local adapter. Two installed Core turns recovered the
+topic, but the first described a plausible implementation as if the team
+had reported it. The second distinguished claims from results and corrected
+the first. The continuity prompt now asks the main model to mark analogies
+and disclose missing evidence before interpreting it. This preserves the
+existing Core conversation path. Source-label validity and later correction
+alone cannot qualify the first follow-up.
