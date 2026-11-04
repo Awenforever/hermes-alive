@@ -296,11 +296,12 @@ class DeliberationSynthesizer:
 
     def validate_selection_sources(self, selection_event_id: str, *,
                                    owner: str, sensitivity: Sensitivity,
-                                   execution: bool = False, expression_event_id: str | None = None) -> None:
+                                   execution: bool = False, expression_event_id: str | None = None) -> bool:
         """Recheck original generated inputs without granting execution authority.
 
         Call outside journal writer transactions: evidence readers may project
-        newly observed withdrawals into the same database.
+        newly observed withdrawals into the same database. Return whether the
+        verified selected proposal requires a final source review.
         """
         selection = self.journal.get(selection_event_id)
         if (selection is None or selection.event.event_type != "deliberation.selected"
@@ -331,7 +332,8 @@ class DeliberationSynthesizer:
                 raise DeliberationContextChanged("selection no longer current")
             plans = self.validate_candidate_sources((stored.selection.candidate,),
                 dict(stored.candidate_contents), owner, sensitivity)
-            if execution and expression_event_id is None and stored.selection.candidate.candidate_id in plans:
+            plan = plans.get(stored.selection.candidate.candidate_id)
+            if execution and expression_event_id is None and plan is not None:
                 candidate = stored.selection.candidate
                 receipts = {e for name in (
                     'user_value', 'urgency', 'novelty', 'confidence', 'interruption_cost', 'risk')
@@ -341,6 +343,7 @@ class DeliberationSynthesizer:
                 if any(interpreter.requires_expression(receipt_event_id=receipt, subject=owner,
                         clearance=sensitivity) for receipt in receipts):
                     raise DeliberationContextChanged('recipient intent requires a validated final expression')
+            return plan is not None and plan['version'] == 3
         except DeliberationContextChanged:
             raise
         except Exception as exc:

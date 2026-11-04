@@ -59,3 +59,8 @@ wording already authenticated by reconstruction of the review snapshot.
 The correction proof still binds the prior expression, exact text digest,
 proposal, and reconstructed result. The authorizer only queries whether an
 expression requires a review when it has no witness to verify.
+
+On the outbox path without a review witness, derive the review requirement
+from the proposal already checked by selection-source validation. Discovery
+still requires its witness and exact expression. Other expressions do not
+repeat the source reconstruction just to answer this policy question.
