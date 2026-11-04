@@ -419,9 +419,12 @@ The host binds the canonical source URL separately; do not repeat it merely to
 retain provenance. Other meaningful links need their exact URL in text and literals.
 Use dated anchors rather than delivery-relative claims that can become false.
 
-For a DISCRETIONARY discovery_share with share/inform speech act, use version3
-with the same keys but contents:[]: this is a tentative editorial brief, NOT an
-inventory of facts the recipient must hear. Propose the substantive possible
+For a DISCRETIONARY discovery_share, use this complete version 3 plan:
+{"version":3,"recipient_goal":"purpose","speech_act":"share|inform",
+ "contents":[],"behavior_constraints":[]}
+Choose one speech_act and include every key even if a list is empty. This is
+a tentative editorial brief, not an inventory of facts the recipient must hear.
+Propose the substantive possible
 contribution in recipient_goal. The eventual author receives original evidence
 and chooses what to say; actual wording is reviewed for source support and value.
 Do not turn reading notes or routine operating disclaimers into required meaning.

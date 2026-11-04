@@ -12,6 +12,14 @@ retained format and reject duplicate, conflicting or incomplete fields.
 Replay of the audited response passed without changing either judgment or
 adding a model call. End-to-end qualification remains open.
 
+A later live run stopped earlier in opportunity synthesis. The configured
+primary route timed out and the official fallback returned three version 3
+plans, each missing the speech act. The existing structural recovery then
+ran out of its original stage budget. Give the model a complete version 3
+template with all required keys. Keep the speech-act requirement and the
+existing shared deadline. This earlier-stage prompt change requires a new
+live run before it can count as verified.
+
 ## Problem
 
 ADR0280 distinguishes supported facts from suitable communication. Its existing
