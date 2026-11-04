@@ -114,7 +114,7 @@ def test_source_witness_binding():
                  'source_witnesses': []}
     assert parse(json.dumps(uncertain), witness_snapshot=snapshot)['verdict'] == 'uncertain'
     from alive_kernel.final_value_findings import passage_request
-    from alive_kernel.review_contracts import LABELLED_FIT_ASSESSMENT, PASSAGE_FIT_ASSESSMENT
+    from alive_kernel.review_contracts import FLAT_FIT_ASSESSMENT, LABELLED_FIT_ASSESSMENT, PASSAGE_FIT_ASSESSMENT
     snapshot['expression_binding'] = {'final_assessment_scope': PASSAGE_FIT_ASSESSMENT}
     request = passage_request(snapshot)
     assert ''.join(request['evidence'][0]['passages']) == snapshot['evidence'][0]['excerpt']
@@ -151,6 +151,17 @@ def test_source_witness_binding():
         try: action()
         except ValueError: pass
         else: raise AssertionError('an absent or rebound passage ID was accepted')
+    snapshot['expression_binding']['final_assessment_scope'] = FLAT_FIT_ASSESSMENT
+    flat = dict(facts='supported', fact_reason='Bounded measurement.', fit='fits',
+        fit_reason='One point.', recipient_evidence=[], source_witnesses=labelled['source_witnesses'])
+    assert parse(json.dumps(flat), witness_snapshot=snapshot) == findings
+    assert validate_retained(findings, witness_snapshot=snapshot) == findings
+    try:
+        parse(json.dumps({**flat, 'factual_support': labelled['factual_support']}), witness_snapshot=snapshot)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('mixed old and new review fields were accepted')
 
 
 if __name__ == '__main__':

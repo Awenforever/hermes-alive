@@ -4,7 +4,7 @@ The host combines the model's explicit judgments; it does not classify prose or
 infer recipient preferences. Existing lifecycle consumers retain one verdict.
 """
 from .model_json import parse_model_json
-from .review_contracts import LABELLED_FIT_ASSESSMENT, PASSAGE_FIT_ASSESSMENT
+from .review_contracts import FLAT_FIT_ASSESSMENT, LABELLED_ASSESSMENTS, PASSAGE_FIT_ASSESSMENT
 
 
 PROMPT = """Assess this actual message under the supplied source evidence,
@@ -97,6 +97,28 @@ Two accurate details from different conditions do not establish a claim that joi
 them. If the retained passages leave a material scope unclear, mark it uncertain.
 """
 
+FLAT_PROMPT = PROMPT.split('Return exactly one JSON object:', 1)[0] + """
+Judge the focus and depth for the actual turn. An unsolicited message should
+give one point the recipient can picture. Details should clarify that point.
+When a number or comparison is material, check that the text preserves the
+specific task, comparator and conditions. Do not let an adjacent demonstration
+inherit a different benchmark's result. Distinguish measured effects from
+mechanistic explanations. If a needed scope is missing, mark it uncertain.
+
+Return one JSON object with exactly these six top-level fields:
+{"facts":"supported|unsupported|uncertain","fact_reason":"brief grounded explanation",
+ "fit":"fits|conflicts|uncertain","fit_reason":"brief grounded explanation",
+ "recipient_evidence":["actual supplied context, if any"],
+ "source_witnesses":[{"claim":"verbatim span of the proposed wording",
+                      "passage_id":"ID beside its supporting passage"}]}
+Reasons are at most 1500 characters, recipient_evidence has at most eight
+strings of at most 500 characters, and source_witnesses has at most eight
+entries with claim spans of at most 600 characters. Supported facts require
+witnesses for material claims and the relationships they imply. An empty
+witness list is allowed for unsupported or uncertain facts. Use the supplied
+review interval. This is advice, without permission to act or proof of delivery.
+"""
+
 
 def _labelled_passages(source_number, excerpt):
     return [{'passage_id': f'P{source_number}.{number}', 'text': text}
@@ -152,7 +174,7 @@ def _validate_witnesses(witnesses, snapshot, assessment, *, retained=False):
     text = snapshot['candidate']['text']
     scope = snapshot.get('expression_binding', {}).get('final_assessment_scope')
     indexed = scope == PASSAGE_FIT_ASSESSMENT
-    labelled = scope == LABELLED_FIT_ASSESSMENT
+    labelled = scope in LABELLED_ASSESSMENTS
     fields = {'claim', 'source_event_id'}
     if labelled:
         fields = {'claim', 'passage_id'}
@@ -199,6 +221,16 @@ def _validate_witnesses(witnesses, snapshot, assessment, *, retained=False):
 def parse(text, *, witness_snapshot=None):
     value = parse_model_json(text, max_chars=32000)
     witnesses = value.pop('source_witnesses', None) if witness_snapshot is not None and isinstance(value, dict) else None
+    if (witness_snapshot is not None and witness_snapshot.get('expression_binding', {}).get(
+            'final_assessment_scope') == FLAT_FIT_ASSESSMENT):
+        if not isinstance(value, dict) or set(value) != {
+                'facts', 'fact_reason', 'fit', 'fit_reason', 'recipient_evidence'}:
+            raise ValueError('invalid final review fields')
+        value = {
+            'factual_support': {'assessment': value['facts'], 'reason': value['fact_reason']},
+            'communication_fit': {'assessment': value['fit'], 'reason': value['fit_reason'],
+                                  'recipient_evidence': value['recipient_evidence']},
+        }
     # The provider can place the one unambiguous evidence field beside the
     # dimensions. Normalize that wire shape before the same strict validation.
     if isinstance(value, dict) and set(value) == {

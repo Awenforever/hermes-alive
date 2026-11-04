@@ -94,7 +94,7 @@ async def test(home,*,fit_revision=False):
                         for n in ('user_value','urgency','novelty','confidence','risk','interruption_cost')})]}
             elif 'expression_binding' in data:
                 from final_review_fixture import controlled_final_findings
-                assert data['expression_binding']['final_assessment_scope'] == 'factual-support-and-communication-fit-v5'
+                assert data['expression_binding']['final_assessment_scope'] == 'factual-support-and-communication-fit-v6'
                 conflict=fit_revision and 'DENSE_TEST_OPENING' in data['candidate']['text']
                 stage='final';value=controlled_final_findings(data,
                     fit='conflicts' if conflict else 'fits',

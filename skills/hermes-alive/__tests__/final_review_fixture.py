@@ -3,6 +3,13 @@
 
 def controlled_final_findings(snapshot, *, factual='supported', fit='fits', reason='Synthetic assessment.'):
     scope = snapshot.get('expression_binding', {}).get('final_assessment_scope')
+    if scope == 'factual-support-and-communication-fit-v6':
+        witnesses = []
+        if factual == 'supported':
+            passage = next(p for source in snapshot['evidence'] for p in source['passages'] if p['text'].strip())
+            witnesses = [{'claim': snapshot['candidate']['text'][:200], 'passage_id': passage['passage_id']}]
+        return dict(facts=factual, fact_reason=reason, fit=fit, fit_reason=reason,
+                    recipient_evidence=[], source_witnesses=witnesses)
     if scope in ('factual-support-and-communication-fit-v1', 'factual-support-and-communication-fit-v2',
                  'factual-support-and-communication-fit-v3', 'factual-support-and-communication-fit-v4',
                  'factual-support-and-communication-fit-v5'):

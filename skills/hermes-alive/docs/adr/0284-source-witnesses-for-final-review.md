@@ -52,3 +52,12 @@ the first. The continuity prompt now asks the main model to mark analogies
 and disclose missing evidence before interpreting it. This preserves the
 existing Core conversation path. Source-label validity and later correction
 alone cannot qualify the first follow-up.
+
+Later trials repeatedly placed recipient evidence inside both assessment
+dimensions. A new version uses one flat response schema, with a single
+recipient-evidence field and distinct judgments and reasons. The host maps
+it to the existing validated receipt, preserving older contracts. The
+factual judgment explicitly checks comparison baselines, experimental
+conditions and whether an adjacent example actually used the cited test.
+The first follow-up should answer the user's question at its requested
+depth. Live checks still have to establish both factual and conversational fit.
