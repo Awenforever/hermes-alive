@@ -25,3 +25,12 @@ Conversation context still preserves exact text and the existing Core budget.
 
 Require real-model evidence on fresh cases for quality. Controlled tests
 verify routing, response contracts, historical replay and the revision path.
+
+In the next regional news test, the new assessment rejected a list-like
+opening and the correction produced a focused message. Its second assessment
+returned an invalid structure, so the cycle stopped before submission. Use
+the existing bounded review recovery for final wording. One malformed
+response can lead to one fresh assessment of the same evidence within the
+original stage and cycle budgets. Unsupported, uncertain and valid negative
+findings still follow their ordinary paths. Store both the invalid response
+and the recovered receipt under the existing protected evidence contract.

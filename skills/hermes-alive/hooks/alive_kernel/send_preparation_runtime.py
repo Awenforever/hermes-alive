@@ -207,6 +207,7 @@ manufactures them from model output or reviews, nor falls back to another body.
                 call=parameters['call'], resolve_domain=resolver,
                 reviewer_model=parameters.get('grounding_model') or parameters.get('requested_model'),
                 require_independence=required, clearance=clearance,
+                protocol_recovery=True,
                 timeout_seconds=parameters.get('model_timeout_seconds') or 40,
                 discovery_window_seconds=parameters.get('model_timeout_seconds') or 40)
         event_id = prefix + ':completed'

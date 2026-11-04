@@ -39,6 +39,9 @@ async def test(root, mode):
             raise RuntimeError('synthetic repair provider unavailable')
         assert kwargs['task'] == 'alive_source_support'
         snapshot = json.loads(kwargs['messages'][1]['content'])
+        if mode == 'protocol' and calls:
+            assert snapshot['invalid_review'] == '{}'
+            snapshot = snapshot['original_evidence']
         assert snapshot['expression_binding']['stage'] == 'final_expression'
         assert snapshot['candidate']['text'] == expression.text
         calls.append(kwargs['task'])
@@ -47,6 +50,8 @@ async def test(root, mode):
         document = {'verdict':'unsupported' if mode == 'unsupported' else 'supported',
             'unsupported_claims':['Unsupported final wording.'] if mode == 'unsupported' else [],
             'uncertainties':[], 'reason':'Synthetic judgment only.'}
+        if mode == 'protocol' and len(calls) == 1:
+            document = {}
         return SimpleNamespace(model='synthetic/renderer', choices=[SimpleNamespace(
             message=SimpleNamespace(content=json.dumps(document)))])
     args = {**params, 'call':final_call, 'authorization_operation_id':'prepare',
@@ -56,7 +61,10 @@ async def test(root, mode):
     except asyncio.CancelledError:
         assert mode == 'cancel'
     else:
-        assert prepared.final_review_event_id and len(calls) == 1
+        assert prepared.final_review_event_id and len(calls) == (2 if mode == 'protocol' else 1)
+        if mode == 'protocol':
+            assert journal.get(prepared.final_review_event_id).event.payload['protocol_recovered'] is True
+            assert len(journal.read(event_type='opportunity.source_support_protocol_recovery')) == 1
         if mode == 'unsupported':
             assert prepared.authorization is None and prepared.attempt_event_id is None
             assert prepared.quality_disposition == 'final_repair_unavailable'
@@ -72,7 +80,7 @@ async def test(root, mode):
     else:
         assert reopened == prepared
     assert len(calls) == count
-    if mode in ('supported', 'launch'):
+    if mode in ('supported', 'launch', 'protocol'):
         outbox = DispatchOutbox(journal, content_vault=runtime.vault)
         lease = outbox.acquire(worker_id='synthetic-worker')
         runtime._validate_prepared_lease(prepared, lease)
@@ -80,7 +88,7 @@ async def test(root, mode):
         witness = _thaw_json(permit.event.payload['final_wording_witness'])
         assert witness['review_event_id'] == prepared.final_review_event_id
         outbox._validate_selection_inputs(permit)
-        if mode == 'launch':
+        if mode in ('launch', 'protocol'):
             execution = outbox.begin_execution(lease, clearance=Sensitivity.PRIVATE)
             assert execution.lease == lease and len(journal.read(event_type='dispatch.started')) == 1
             # This only crosses the local outbox boundary; no adapter is invoked.
@@ -120,6 +128,6 @@ async def test(root, mode):
 
 if __name__ == '__main__':
     with tempfile.TemporaryDirectory(prefix='alive-final-wording-') as folder:
-        for mode in ('supported', 'unsupported', 'cancel', 'launch'):
+        for mode in ('supported', 'unsupported', 'cancel', 'launch', 'protocol'):
             asyncio.run(test(Path(folder) / mode, mode))
     print('HERMES_ALIVE_FINAL_WORDING_PREPARATION_OK')
