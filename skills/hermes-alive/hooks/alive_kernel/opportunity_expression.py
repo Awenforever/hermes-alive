@@ -211,6 +211,12 @@ class OpportunityExpressionStore(SemanticReviewStore):
             context['method'] = 'discovery-source-authoring-v3' if mode=='source-led-v3' else 'discovery-source-authoring-v2'
             for field in ('recipient_goal','behavior_constraints','tentative_reading_tasks','brief_is_advisory'):
                 context.pop(field, None)
+        purpose_receipt = start.event.payload.get('search_purpose_receipt_id')
+        if purpose_receipt is not None:
+            from .research_evidence import resolve_search_purpose
+            context['approved_search_queries'] = resolve_search_purpose(
+                interpreter.reader, subject=subject, receipt_id=purpose_receipt,
+                before_sequence=start.sequence)
         from .review_contracts import SPLIT_SOURCE_REVIEW_CONTRACTS
         review_contract=start.event.payload.get('interpreter_method',{}).get('discovery_source_review')
         if review_contract in ('bounded-group-source-v1',*SPLIT_SOURCE_REVIEW_CONTRACTS):

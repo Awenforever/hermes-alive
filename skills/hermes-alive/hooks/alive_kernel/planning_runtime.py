@@ -163,7 +163,7 @@ watcher and not a complete production loop. It creates no channel queues.
                   inquiry_item_ids=(),research_read_receipt_ids=(),recalled_feedback_event_ids=(),
                   semantic_feedback_recall=False,
                   model_timeout_seconds=None,read_context=None,record_reading_assessment=False,
-                  candidate_material_scope=None):
+                  candidate_material_scope=None,search_purpose_receipt_id=None):
         validate_model_timeout(model_timeout_seconds)
         if read_context is not None and not callable(read_context):
             raise PlanningRuntimeError('explicit host context read capability required')
@@ -227,6 +227,8 @@ watcher and not a complete production loop. It creates no channel queues.
         if inquiry_item_ids:
             binding['discovery_inquiry_item_ids'] = list(inquiry_item_ids)
         research_focus=()
+        if search_purpose_receipt_id is not None:
+            binding['search_purpose_receipt_id'] = search_purpose_receipt_id
         if research_read_receipt_ids:
             from .research_evidence import resolve_research_reads
             research_focus=resolve_research_reads(self.synth.reader,subject=subject,clearance=sensitivity,
@@ -292,7 +294,8 @@ watcher and not a complete production loop. It creates no channel queues.
                 inquiry_item_ids=inquiry_item_ids,research_read_receipt_ids=research_read_receipt_ids,
                 recalled_feedback_event_ids=recalled_feedback_event_ids,
                 material_scope=binding.get('candidate_material_scope') or binding.get('feedback_material_scope'),read_context=read_context,
-                record_reading_assessment=record_reading_assessment)
+                record_reading_assessment=record_reading_assessment,
+                search_purpose_receipt_id=search_purpose_receipt_id)
         candidates, reviews, repair, repair_disposition = generated.candidates, (), None, None
         if recipient_meaning and generated.rejected_count and not candidates:
             raise PlanningRuntimeError('recipient meaning unavailable; malformed proposals are not qualified silence')
@@ -326,7 +329,8 @@ watcher and not a complete production loop. It creates no channel queues.
                             clearance=sensitivity, revision_event_ids=rejected,
                             recipient_meaning=recipient_meaning,timeout_seconds=model_timeout_seconds or 60,
                             inquiry_item_ids=inquiry_item_ids,research_read_receipt_ids=research_read_receipt_ids,
-                            recalled_feedback_event_ids=recalled_feedback_event_ids,read_context=read_context)
+                            recalled_feedback_event_ids=recalled_feedback_event_ids,read_context=read_context,
+                            search_purpose_receipt_id=search_purpose_receipt_id)
                     # A repair can address rejected intents, not expand the host's work scope.
                     from dataclasses import replace
                     if recipient_meaning and repair.rejected_count and not repair.candidates:

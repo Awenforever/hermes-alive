@@ -330,6 +330,14 @@ class SourceSupportReviewer:
                 data['candidate'].pop('text', None)
             data['interpretation_as_of'] = start.event.payload.get('interpretation_as_of')
             data['time_anchor_is_not_delivery_time'] = True
+        purpose_receipt = start.event.payload.get('search_purpose_receipt_id')
+        if purpose_receipt is not None:
+            primary = next(s for s in sources if s.agenda_item_id == candidate.action.agenda_item_id)
+            if primary.content.get('origin_kind', 'discovery') == 'discovery':
+                from .research_evidence import resolve_search_purpose
+                data['approved_search_queries'] = resolve_search_purpose(
+                    self.interpreter.reader, subject=subject, receipt_id=purpose_receipt,
+                    before_sequence=start.sequence)
         from .research_evidence import RESEARCH_MESSAGE_BUDGET
         budget=RESEARCH_MESSAGE_BUDGET if start.event.payload.get('research_read_receipt_ids') else 40000
         if len(json.dumps(data, ensure_ascii=False)) > budget:

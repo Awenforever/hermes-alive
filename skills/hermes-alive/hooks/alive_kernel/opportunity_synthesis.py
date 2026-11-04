@@ -1227,7 +1227,7 @@ class OpportunitySynthesizer:
                   protocol_recovery: bool = True,
                   inquiry_item_ids: tuple = (),research_read_receipt_ids: tuple = (),
                   recalled_feedback_event_ids: tuple = (),material_scope=None,read_context=None,
-                  record_reading_assessment=False) -> OpportunitySynthesisResult:
+                  record_reading_assessment=False,search_purpose_receipt_id=None) -> OpportunitySynthesisResult:
         if type(recipient_meaning) is not bool or type(protocol_recovery) is not bool:
             raise OpportunitySynthesisError('invalid recipient meaning mode')
         source_presentation=(self._RECIPIENT_SOURCE_PRESENTATION if recipient_meaning else self._SOURCE_PRESENTATION)
@@ -1286,6 +1286,10 @@ class OpportunitySynthesizer:
                             "opportunities": []}
         if inquiry_item_ids:
             prompt_data['tentative_discovery_tasks'] = inquiries
+        if search_purpose_receipt_id is not None:
+            from .research_evidence import resolve_search_purpose
+            prompt_data['approved_search_queries'] = resolve_search_purpose(
+                self.reader, subject=subject, receipt_id=search_purpose_receipt_id)
         prompt=json.dumps(prompt_data,ensure_ascii=False,separators=(',',':'))
         if len(prompt)>budget:
             raise OpportunitySynthesisError('current context leaves no source recall budget')
@@ -1358,6 +1362,9 @@ class OpportunitySynthesizer:
                 'They grant no search, disclosure, commitment or sending authority and impose no '
                 'must-mention inventory on a recipient message.')
         if assess_reading:system_prompt+='\n'+reading_assessment.REFERENCE_GUIDANCE
+        if search_purpose_receipt_id is not None:
+            from .research_evidence import SEARCH_PURPOSE_GUIDANCE
+            system_prompt += SEARCH_PURPOSE_GUIDANCE
         if material_scope is not None and material_scope.get('method')=='bound-material-pool-v2':
             prompt_data['stage_contract']['eligible_primary_agenda_ids']=[e.agenda_item_id for e in candidate_evidence]
             prompt=json.dumps(prompt_data,ensure_ascii=False,separators=(',',':'))
@@ -1411,6 +1418,8 @@ class OpportunitySynthesizer:
                              'discovery_inquiry_digest':self.vault.digest_json(inquiries)}
                             if inquiry_item_ids else {}),
                          **({'research_read_receipt_ids':list(research_read_receipt_ids)} if focus else {}),
+                         **({'search_purpose_receipt_id':search_purpose_receipt_id}
+                            if search_purpose_receipt_id is not None else {}),
                          "host_authority": authority.value, "raw_prompt_stored": False},
             ))
         except EventConflictError as exc:

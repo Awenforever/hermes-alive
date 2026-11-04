@@ -134,6 +134,9 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
 
     def _assessment_request(self, snapshot, as_of=None, review_until=None):
         prompt, request = super()._assessment_request(snapshot, as_of, review_until)
+        if 'approved_search_queries' in request:
+            from .research_evidence import SEARCH_PURPOSE_GUIDANCE
+            prompt += SEARCH_PURPOSE_GUIDANCE
         from .review_contracts import LABELLED_FIT_ASSESSMENT, PASSAGE_FIT_ASSESSMENT
         scope = snapshot.get('expression_binding', {}).get('final_assessment_scope')
         if scope in (PASSAGE_FIT_ASSESSMENT, LABELLED_FIT_ASSESSMENT):

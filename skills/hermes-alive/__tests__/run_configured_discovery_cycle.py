@@ -169,6 +169,9 @@ async def exercise(root,mode,*,primary_url=None):
             if task=='alive_opportunity_candidates' and isinstance(data,dict) and 'original_evidence' in data:
                 data=data['original_evidence']
             if task=='alive_discovery_reading':
+                if mode in ('share', 'primary-read', 'replay'):
+                    assert data['approved_search_queries'] == ['public museum methods']
+                    assert 'absent metadata date' in kw['messages'][0]['content']
                 refs=[s['source_ref'] for s in data['sources']]
                 if mode=='invalid-choice':refs=['https://private.invalid/not-a-supplied-reference']
                 value=dict(source_refs=[] if mode=='abstain' else refs[:1],
@@ -182,6 +185,8 @@ async def exercise(root,mode,*,primary_url=None):
                     original=journal.get(refs[0])
                     ingestor.vault.erase_item(original.event.payload['content']['content_id'])
             elif task=='alive_discovery_followup':
+                if mode in ('primary-read', 'replay'):
+                    assert data['approved_search_queries'] == ['public museum methods']
                 assert 'PRIVATE_OWNER_PREFERENCE' not in raw
                 assert 'SYNTHETIC_PREFERENCE_LONG' not in raw
                 assert 'INTERNAL_RESEARCH_QUESTION' not in raw
@@ -206,6 +211,8 @@ async def exercise(root,mode,*,primary_url=None):
                 if mode=='malformed-followup':value={'unusable':'not a source selection'}
                 if mode=='nonjson-followup':value='not JSON; no authority'
             elif task=='alive_opportunity_candidates':
+                if mode in ('share', 'primary-read', 'replay'):
+                    assert data['approved_search_queries'] == ['public museum methods']
                 sources=[{**e,'summary_excerpt':e.get('summary_excerpt') or ''.join(p['text'] for p in e.get('summary_passages',[]))}
                          for e in data['opportunities']]
                 if mode=='abstain':value=dict(candidates=[],abstentions=[dict(agenda_item_id=e['agenda_item_id'],reason='No worthwhile contribution.') for e in sources])
@@ -262,6 +269,9 @@ async def exercise(root,mode,*,primary_url=None):
                 value=dict(atom_reviews=[dict(atom_id=a['atom_id'],preserved=True,risks=[]) for a in data['meaning']['atoms']],
                     added_claims_detected=False,speech_act_preserved=True,protected_literals_preserved=True)
             elif task=='alive_source_support':
+                if mode in ('share', 'primary-read', 'replay'):
+                    assert data['approved_search_queries'] == ['public museum methods']
+                    assert 'communication-fit conflict' in kw['messages'][0]['content']
                 assert data['expression_binding']['assessment_mode']==('discovery-source-and-value-v2'
                     if mode in ('page-failed','legacy-replay','unconsented-followup','historical-followup-replay') else 'discovery-source-and-value-v3')
                 from alive_kernel_testkit import controlled_final_findings

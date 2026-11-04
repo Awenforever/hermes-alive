@@ -807,6 +807,16 @@ For each material change:
 
 ## Change log
 
+November 5 — a real discovery run shared a 2025 background article from a
+search for 2026 Chinese-team work. The publication date was present in the
+page text, but the first reading decision received neither the original
+query nor its time and region constraints. New collection cycles pass the
+authorized search scope to each reading decision and retain its protected
+input. Synthesis, authoring and final assessment recover the same purpose
+from the protected collection receipt. Existing cycles retain their
+original request contract. Discovery can surface older background when
+there is a concrete reason to share it. Live quality verification remains open.
+
 November 5 — an isolated Gateway restart preserved encrypted state and
 refused the unavailable owner channel on both boots. Core connects adapters
 before publishing them to its router. When a confirmed owner route is

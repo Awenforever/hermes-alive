@@ -498,6 +498,9 @@ class SemanticComparator:
             if discovery and expression_context.get('semantic_source_contract') in (
                     FIRST_CONVERSATIONAL_REVIEW, FIRST_WITNESS_REVIEW, FIRST_PASSAGE_REVIEW, SPLIT_SOURCE_REVIEW):
                 render_system += _DISCOVERY_CHAT_GUIDANCE
+            if discovery and 'approved_search_queries' in expression_context:
+                render_system += ('\nUse the original search scope to distinguish a matching discovery '
+                    'from background. Do not imply the source is current or in scope without evidence.')
             if correction_method == LOCAL_CORRECTION_METHOD:
                 render_system=CORRECTION_PROMPT
             elif correction_method == SOURCE_REVISION_METHOD:

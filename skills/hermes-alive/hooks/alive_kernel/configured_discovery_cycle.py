@@ -82,6 +82,17 @@ readings remain usable when no optional target can be selected. You cannot send,
 authorize actions, change memory or treat a source's claim as independently true.
 """
 
+_SEARCH_PURPOSE_GUIDANCE = """
+Use approved_search_queries as the scope of this search, separately from the
+recipient's general interests. Interpret topic, timeframe and requested source
+or region together. Publication dates written in the extract count as source
+evidence; an absent metadata date does not make a result current. Select a
+possible match if reading could resolve a concrete uncertainty. If none do,
+return no targets where the contract permits, or use the authorized refinement
+to seek a better result. A related older or broader source can provide context
+but does not establish that the original search found the requested development.
+"""
+
 
 @dataclass(frozen=True,repr=False)
 class _DiscoveryObservation:
@@ -99,6 +110,7 @@ class _DiscoveryObservation:
     assessment_enabled: bool
     listing_fingerprint: str | None
     deeper_reading: bool = False
+    search_purpose: bool = False
 
 
 class ConfiguredDiscoveryCycle:
@@ -232,7 +244,7 @@ class ConfiguredDiscoveryCycle:
 
     async def _select(self,*,operation_id,evidence,search_receipt_id,parameters,call,current,
                       followup=False,visited=(),citation_references=False,source_refinement=False,
-                      public_only=False,deeper_reading=False):
+                      public_only=False,deeper_reading=False,search_purpose=False):
         journal,vault=self.ingestor.journal,self.ingestor.vault
         if deeper_reading and not (followup and citation_references and source_refinement):
             raise HostDiscoveryError('deeper reading requires the existing public refinement scope')
@@ -247,12 +259,16 @@ class ConfiguredDiscoveryCycle:
             if not followup or not citation_references:raise HostDiscoveryError('bounded public refinement mode required')
             prompt=public_source_refinement.PROMPT
             if deeper_reading:prompt+='\n'+source_reading_depth.GUIDANCE
+        if search_purpose:
+            prompt += _SEARCH_PURPOSE_GUIDANCE
         eligible_depth=source_reading_depth.eligible_sources(evidence,read_scope_metadata) if deeper_reading else {}
         snapshot=dict(method='cited-public-followup-v1' if followup else 'public-reading-choice-v1',
             search_receipt_id=search_receipt_id,system_prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
             sources=[dict(source_ref=e.observation_event_id,title=e.content['title'],url=e.content['url'],
                 excerpt=source_prompt_excerpt(e.content,policy=SOURCE_EXCERPT_POLICY if followup else None),
                 published_at=e.content.get('published_at')) for e in evidence])
+        if search_purpose:
+            snapshot['approved_search_queries'] = list(self.queries)
         if followup:
             snapshot['already_read_urls']=list(visited)
         elif not public_only:
@@ -405,6 +421,9 @@ class ConfiguredDiscoveryCycle:
             payload=dict(method='inquiry-reading-assessment-v1',authority_granted=False))
         scoped_search_views=self._cycle_mode(cycle,prefix='discovery.search-views:',
             kind='discovery.search_views_opened',payload=dict(method='public-query-view-v1',authority_granted=False))
+        search_purpose=self._cycle_mode(cycle,prefix='discovery.search-purpose:',
+            kind='discovery.search_purpose_opened',payload=dict(method='approved-search-purpose-v1',
+                query_digest=self.ingestor.vault.digest_json(list(self.queries)),authority_granted=False))
         if self.tools is not None:self.tools.close()
         def allow_refinement_query(query):
             current()
@@ -432,7 +451,8 @@ class ConfiguredDiscoveryCycle:
             **({'scoped_search_views':True} if scoped_search_views else {})))
             if found.failures==0 else None)
         result=_DiscoveryObservation(cycle.operation_id,expected,found,tuple(evidence),reader,current,
-            research_enabled,citation_references,public_refinement,group_enabled,assessment_enabled,fingerprint,deeper_reading)
+            research_enabled,citation_references,public_refinement,group_enabled,assessment_enabled,fingerprint,
+            deeper_reading,search_purpose)
         self._observation=result
         return result
 
@@ -470,15 +490,17 @@ class ConfiguredDiscoveryCycle:
         if value['listing_fingerprint']!=listing_fingerprint:return None
         delta=value['parameters']
         if (not isinstance(delta,dict) or set(delta)-{
-                'inquiry_item_ids','research_read_receipt_ids','record_reading_assessment'}):
+                'inquiry_item_ids','research_read_receipt_ids','record_reading_assessment','search_purpose_receipt_id'}):
             raise HostDiscoveryError('discovery receipt exceeds derived argument scope')
+        if 'search_purpose_receipt_id' in delta and delta['search_purpose_receipt_id'] != expected_search:
+            raise HostDiscoveryError('discovery purpose belongs to another collection')
         return {k:tuple(v) if k in ('inquiry_item_ids','research_read_receipt_ids') else v
             for k,v in delta.items()}
 
     def _retain_parameters(self,observed,parameters):
         if observed.listing_fingerprint is None:return parameters
         delta={k:v for k,v in parameters['expression_parameters'].items() if k in (
-            'inquiry_item_ids','research_read_receipt_ids','record_reading_assessment')}
+            'inquiry_item_ids','research_read_receipt_ids','record_reading_assessment','search_purpose_receipt_id')}
         value=dict(method='discovery-derived-parameters-v1',operation_id=observed.operation_id,
             listing_fingerprint=observed.listing_fingerprint,parameters=delta)
         identity=self._prepared_identity(observed.operation_id)
@@ -550,13 +572,16 @@ class ConfiguredDiscoveryCycle:
         group_enabled,assessment_enabled=observed.group_enabled,observed.assessment_enabled
         expected=observed.binding
         if not found.observation_ids:return self._retain_parameters(observed,parameters)
+        if observed.search_purpose:
+            parameters = {**parameters, 'expression_parameters': {
+                **parameters['expression_parameters'], 'search_purpose_receipt_id': found.receipt_id}}
         retained=self.ingestor.active_evidence(subject=self.subject,clearance=Sensitivity.PRIVATE,
             limit=32,observation_event_ids=found.observation_ids)
         if tuple(retained)!=evidence:raise HostDiscoveryError('observed listing material changed before cognition')
         evidence=self._read_scope(observed,excluded_urls)
         if not evidence:return self._retain_parameters(observed,parameters)
         choice,model,digest=await self._select(operation_id=cycle.operation_id,evidence=evidence,search_receipt_id=found.receipt_id,
-            parameters=parameters,call=call,current=current)
+            parameters=parameters,call=call,current=current,search_purpose=observed.search_purpose)
         if not choice['source_refs']:return self._retain_parameters(observed,parameters)
         by_id={e.observation_event_id:e for e in evidence}
         selected=[by_id[r] for r in choice['source_refs']]
@@ -582,7 +607,8 @@ class ConfiguredDiscoveryCycle:
             followup,_,_=await self._select(operation_id=cycle.operation_id+':followup',evidence=followup_evidence,
                 search_receipt_id=read.receipt_id,parameters=parameters,call=call,current=current,followup=True,
                 visited=tuple(dict.fromkeys(e.content['url'] for e in selected)),citation_references=citation_references,
-                source_refinement=observed.public_refinement,deeper_reading=observed.deeper_reading)
+                source_refinement=observed.public_refinement,deeper_reading=observed.deeper_reading,
+                search_purpose=observed.search_purpose)
             query=followup.get('search_query')
             deeper_source=followup.get('deepen_source_ref')
             if deeper_source:
@@ -618,7 +644,7 @@ class ConfiguredDiscoveryCycle:
                 if listings:
                     next_read,_,_=await self._select(operation_id=cycle.operation_id+':refined-reading',
                         evidence=listings,search_receipt_id=refined.receipt_id,parameters=parameters,
-                        call=call,current=current,public_only=True)
+                        call=call,current=current,public_only=True,search_purpose=observed.search_purpose)
                     by_ref={e.observation_event_id:e for e in listings}
                     urls=tuple(dict.fromkeys(by_ref[r].content['url'] for r in next_read['source_refs']))
                     if urls:

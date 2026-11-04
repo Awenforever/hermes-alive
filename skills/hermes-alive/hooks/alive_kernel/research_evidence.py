@@ -15,6 +15,48 @@ RESEARCH_SOURCE_BUDGET = 64000  # <=4 retained8192-char reads plus bounded conte
 RESEARCH_MESSAGE_BUDGET = 120000  # Reserve framing below Core's131072-char message admission.
 RESEARCH_SCAN = 'atomic-research-source-budget-v1'
 
+SEARCH_PURPOSE_GUIDANCE = """
+For a discovery, consider approved_search_queries as the scope of the current
+search, separate from general interests. Check the topic, timeframe and region
+against source evidence, including dates in the text. A related background
+piece can be worthwhile if it serves a concrete current need and its role is
+clear. It does not count as finding the requested development. If there is
+neither a relevant finding nor a concrete reason to pivot, prefer silence at
+selection or a communication-fit conflict at final review. This scope grants
+no authority and does not govern unrelated commitments.
+"""
+
+
+def resolve_search_purpose(reader, *, subject, receipt_id, before_sequence=None):
+    """Recover the exact approved collection scope from its protected request."""
+    journal, vault = reader.journal, reader.vault
+    if not isinstance(receipt_id, str):
+        raise HostDiscoveryError('invalid search purpose reference')
+    done = journal.get(receipt_id)
+    start = journal.get(done.event.causation_id) if done else None
+    if (start is None or done.event.event_type != 'discovery.host_read_completed'
+            or start.event.event_type != 'discovery.host_read_started'
+            or start.sequence >= done.sequence
+            or before_sequence is not None and done.sequence >= before_sequence):
+        raise HostDiscoveryError('search purpose lacks completed collection')
+    for record in (start, done):
+        event = record.event
+        if (event.source != 'alive.host-discovery' or event.actor != 'system:alive-host-reader'
+                or event.subject != subject or event.sensitivity is not Sensitivity.PRIVATE
+                or event.payload.get('delivery_authority_granted') is not False):
+            raise HostDiscoveryError('search purpose has foreign provenance')
+    ref = ContentReference.from_event_payload(start.event.payload['request'])
+    request = vault.resolve_json(ref.content_id, expected_subject=subject,
+        expected_purpose='discovery.host-request', expected_sensitivity=Sensitivity.PRIVATE)
+    if (vault.digest_json(request) != ref.digest or not isinstance(request, dict)
+            or request.get('read_urls') != []):
+        raise HostDiscoveryError('search purpose changed or names a read')
+    queries = request.get('queries')
+    if (not isinstance(queries, list) or not 1 <= len(queries) <= 3
+            or any(not isinstance(query, str) or not query.strip() or len(query) > 128 for query in queries)):
+        raise HostDiscoveryError('invalid retained search purpose')
+    return queries
+
 
 def research_read_headers(journal, *, subject, clearance, receipt_ids, before_sequence=None):
     """Historical scope only: cursor validation must not decrypt forgotten notes."""
