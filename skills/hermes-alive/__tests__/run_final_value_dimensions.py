@@ -91,8 +91,33 @@ def test_negative_reason_reaches_existing_correction():
     else: raise AssertionError('negative finding exceeded the final assessment reason boundary')
 
 
+def test_source_witness_binding():
+    snapshot = {
+        'candidate': {'text': 'The 4-bit configuration used 2 GiB of weights.'},
+        'evidence': [{'event_id': 'benchmark', 'excerpt': 'The 4-bit model used 2 GiB of weights.'},
+                     {'event_id': 'demo', 'excerpt': 'The browser demonstration used an 8-bit model.'}],
+    }
+    response = {
+        'factual_support': {'assessment': 'supported', 'reason': 'Bounded measurement.'},
+        'communication_fit': {'assessment': 'fits', 'reason': 'One point.', 'recipient_evidence': []},
+        'source_witnesses': [{'claim': '4-bit configuration used 2 GiB',
+            'source_event_id': 'benchmark', 'quote': snapshot['evidence'][0]['excerpt']}],
+    }
+    findings = parse(json.dumps(response), witness_snapshot=snapshot)
+    assert validate_retained(findings, witness_snapshot=snapshot) == findings
+    for witnesses in ([], [{**response['source_witnesses'][0], 'source_event_id': 'demo'}],
+                      [{**response['source_witnesses'][0], 'claim': '4-bit browser demonstration'}]):
+        try: parse(json.dumps({**response, 'source_witnesses': witnesses}), witness_snapshot=snapshot)
+        except ValueError: pass
+        else: raise AssertionError('missing or unbound witness was accepted')
+    uncertain = {**response, 'factual_support': {'assessment': 'uncertain', 'reason': 'The setup is missing.'},
+                 'source_witnesses': []}
+    assert parse(json.dumps(uncertain), witness_snapshot=snapshot)['verdict'] == 'uncertain'
+
+
 if __name__ == '__main__':
     test_dimensions()
     test_old_and_new_contracts()
     test_negative_reason_reaches_existing_correction()
+    test_source_witness_binding()
     print('FINAL_VALUE_DIMENSIONS_OK')

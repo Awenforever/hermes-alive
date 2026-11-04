@@ -52,6 +52,22 @@ when the point itself needs it. Consider whether a natural next turn could
 carry optional detail, and judge the actual wording rather than its topic.
 """
 
+GROUNDED_PROMPT = CONVERSATIONAL_PROMPT + """
+In addition to the two dimensions, return a top-level source_witnesses list
+with up to eight entries. Each entry has claim (verbatim span from the proposed
+message), source_event_id (the supplied evidence event_id), and quote (verbatim
+contiguous excerpt). Limit each claim and quote to 600 characters. For supported,
+show the evidence for the material claims, including the relationship a sentence
+implies between its clauses. An empty list is allowed for unsupported or uncertain.
+
+Match numbers, demonstrations and capabilities to the same setup, population,
+time and measurement they describe. Two accurate details from different
+conditions cannot establish a claim that joins them. An aggregator summary
+does not resolve a missing qualification from the original source. If supplied
+excerpts leave a material scope uncertain, assess it as uncertain rather than
+assuming the missing connection. Do not invent or paraphrase a witness quote.
+"""
+
 
 def _reason(value):
     if not isinstance(value, str) or not value.strip() or len(value) > 1500:
@@ -87,8 +103,25 @@ def combine(value):
             'communication_fit': {**fit, 'recipient_evidence': list(evidence)}}
 
 
-def parse(text):
+def _validate_witnesses(witnesses, snapshot, assessment):
+    if not isinstance(witnesses, list) or len(witnesses) > 8 or (assessment == 'supported' and not witnesses):
+        raise ValueError('source witnesses required for supported wording')
+    sources = {item['event_id']: item['excerpt'] for item in snapshot['evidence']}
+    text = snapshot['candidate']['text']
+    for witness in witnesses:
+        if not isinstance(witness, dict) or set(witness) != {'claim', 'source_event_id', 'quote'}:
+            raise ValueError('invalid source witness')
+        claim, source_id, quote = (witness[key] for key in ('claim', 'source_event_id', 'quote'))
+        if (not all(isinstance(part, str) and part.strip() and len(part) <= 600
+                    for part in (claim, source_id, quote))
+                or claim not in text or quote not in sources.get(source_id, '')):
+            raise ValueError('source witness does not match retained wording and excerpt')
+    return [dict(witness) for witness in witnesses]
+
+
+def parse(text, *, witness_snapshot=None):
     value = parse_model_json(text, max_chars=32000)
+    witnesses = value.pop('source_witnesses', None) if witness_snapshot is not None and isinstance(value, dict) else None
     # The provider can place the one unambiguous evidence field beside the
     # dimensions. Normalize that wire shape before the same strict validation.
     if isinstance(value, dict) and set(value) == {
@@ -99,15 +132,23 @@ def parse(text):
                 'factual_support': value['factual_support'],
                 'communication_fit': {**fit, 'recipient_evidence': value['recipient_evidence']},
             }
-    return combine(value)
+    findings = combine(value)
+    if witness_snapshot is not None:
+        findings['source_witnesses'] = _validate_witnesses(
+            witnesses, witness_snapshot, findings['factual_support']['assessment'])
+    return findings
 
 
-def validate_retained(findings):
+def validate_retained(findings, *, witness_snapshot=None):
+    witness_fields = {'source_witnesses'} if witness_snapshot is not None else set()
     if not isinstance(findings, dict) or set(findings) != {
             'verdict', 'unsupported_claims', 'uncertainties', 'reason',
-            'factual_support', 'communication_fit'}:
+            'factual_support', 'communication_fit'} | witness_fields:
         raise ValueError('incomplete retained final assessment')
     rebuilt = combine({key: findings[key] for key in ('factual_support', 'communication_fit')})
+    if witness_snapshot is not None:
+        rebuilt['source_witnesses'] = _validate_witnesses(
+            findings['source_witnesses'], witness_snapshot, rebuilt['factual_support']['assessment'])
     if rebuilt != findings:
         raise ValueError('retained assessment contradicts its dimensions')
     return rebuilt

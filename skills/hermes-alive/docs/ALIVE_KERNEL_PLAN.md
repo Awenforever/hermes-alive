@@ -807,6 +807,10 @@ For each material change:
 
 ## Change log
 
+November 4 — [ADR 0284](adr/0284-source-witnesses-for-final-review.md)
+records the factual grounding gap exposed by a real share and the new
+requirement for inspectable source witnesses.
+
 November 4 — real-model continuation recovered the share across two Core
 turns. [ADR 0283](adr/0283-conversational-depth-and-attribution.md) records
 the remaining quality issues and the versioned authoring and review change.
