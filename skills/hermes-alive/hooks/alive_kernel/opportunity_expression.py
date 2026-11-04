@@ -160,14 +160,20 @@ class OpportunityExpressionStore(SemanticReviewStore):
             for e in getattr(candidate.dimensions, name).evidence_event_ids
             if e.startswith('opportunity.synthesis:') and e.endswith(':completed'))
         start = self.journal.get(self.journal.get(completion).event.causation_id)
-        original = self._interpreter().reader.active_evidence(subject=subject,
+        interpreter = self._interpreter()
+        original = interpreter.reader.active_evidence(subject=subject,
                 clearance=source.event.sensitivity, limit=32,
                 observation_event_ids=tuple(start.event.payload['observation_event_ids']))
         selected = {e.observation_event_id for e in original
                     if e.agenda_item_id == candidate.agenda_item_id}
         if plan is not None and plan['version'] == 3:
-            context = self.expression_context_for_selection(selection_event_id, subject)
-            selected.update(e['event_id'] for e in context['source_evidence'])
+            if start.event.sensitivity is not source.event.sensitivity:
+                raise SemanticReviewError('original interpretation scope differs from expression scope')
+            selected_url = next(e.content['url'] for e in original
+                                if e.agenda_item_id == candidate.agenda_item_id)
+            focus_ids = self._research_focus_ids(interpreter, start, subject, source.event.sensitivity)
+            selected.update(e.observation_event_id for e in original
+                            if e.content['url'] == selected_url or e.observation_event_id in focus_ids)
         references = []
         for evidence in original:
             if evidence.observation_event_id in selected:
@@ -198,14 +204,7 @@ class OpportunityExpressionStore(SemanticReviewStore):
         url = next(e.content['url'] for e in original if e.agenda_item_id == candidate.agenda_item_id)
         policy = start.event.payload.get('interpreter_method',{}).get('source_excerpt_policy')
         mode=start.event.payload.get('interpreter_method',{}).get('discovery_authoring')
-        focus_ids=set()
-        if mode=='source-led-v3':
-            from .research_evidence import resolve_research_reads
-            focus=resolve_research_reads(interpreter.reader,subject=subject,clearance=source.event.sensitivity,
-                receipt_ids=tuple(start.event.payload['research_read_receipt_ids']),
-                inquiries=interpreter.inquiries.read(subject=subject,clearance=source.event.sensitivity,
-                    item_ids=tuple(start.event.payload.get('discovery_inquiry_item_ids',()))),before_sequence=start.sequence)
-            focus_ids={e.observation_event_id for e in focus}
+        focus_ids = self._research_focus_ids(interpreter, start, subject, source.event.sensitivity)
         context = dict(method='discovery-source-authoring-v1',recipient_goal=plan['recipient_goal'],
             behavior_constraints=plan['behavior_constraints'],brief_is_advisory=True,
             authority_granted=False,final_source_and_value_review_required=True,
@@ -237,6 +236,18 @@ class OpportunityExpressionStore(SemanticReviewStore):
                 start,subject=subject,clearance=source.event.sensitivity)]
             context['feedback_scope']='Attributed prior pairs, not profile facts, current instructions or action permission.'
         return context
+
+    @staticmethod
+    def _research_focus_ids(interpreter, start, subject, clearance):
+        if start.event.payload.get('interpreter_method', {}).get('discovery_authoring') != 'source-led-v3':
+            return set()
+        from .research_evidence import resolve_research_reads
+        focus = resolve_research_reads(interpreter.reader, subject=subject, clearance=clearance,
+            receipt_ids=tuple(start.event.payload['research_read_receipt_ids']),
+            inquiries=interpreter.inquiries.read(subject=subject, clearance=clearance,
+                item_ids=tuple(start.event.payload.get('discovery_inquiry_item_ids', ()))),
+            before_sequence=start.sequence)
+        return {e.observation_event_id for e in focus}
 
     def requires_final_source_review(self, *, selection_event_id, subject):
         *_, plan = self._selected_draft(selection_event_id,subject)

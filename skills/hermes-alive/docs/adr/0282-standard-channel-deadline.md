@@ -22,3 +22,13 @@ The controlled regression advances the clock inside launch validation and
 checks that no adapter submission occurs. Repeat the installed native test
 without profiling to measure whether further work is needed on verification
 cost. Whole-chain and production acceptance remain open.
+
+## Follow-up after the installed Ubuntu run
+
+The first reduction still left the unprofiled run beyond the deadline in
+continuity preparation. Build final-review mode from the original synthesis
+already authenticated by the review snapshot. Continuity capture selects
+its retained references from the same source window and focused read IDs
+as expression authoring, without rebuilding the full authoring context.
+These reductions are local to one synchronous operation. A separate launch
+check still revalidates current evidence and authority before adapter IO.

@@ -330,19 +330,25 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
         if data['candidate'].get('communication_plan',{}).get('version') == 3:
             data['expression_binding']['assessment_mode'] = 'discovery-source-and-value-v1'
             data['assessment_scope']['kind'] = 'final_discovery_source_and_value'
-            context = self.expressions.expression_context_for_selection(expression.selection_event_id,subject)
+            # The base snapshot already authenticated this synthesis and
+            # reconstructed its source window. Only its method flags matter
+            # here, not a second copy of the authoring context.
+            receipt = self.journal.get(generated.receipt_event_id)
+            start = self.journal.get(receipt.event.causation_id)
+            method = start.event.payload.get('interpreter_method', {})
+            authoring = method.get('discovery_authoring')
             from .review_contracts import (SPLIT_SOURCE_REVIEW, SPLIT_SOURCE_REVIEW_CONTRACTS,
                 BOUNDARY_ASSESSMENT, FACTS_AND_FIT_ASSESSMENT)
-            if context.get('semantic_source_contract') in SPLIT_SOURCE_REVIEW_CONTRACTS:
+            if method.get('discovery_source_review') in SPLIT_SOURCE_REVIEW_CONTRACTS:
                 data['expression_binding']['semantic_assessment_scope']=BOUNDARY_ASSESSMENT
-                if context['semantic_source_contract'] == SPLIT_SOURCE_REVIEW:
+                if method['discovery_source_review'] == SPLIT_SOURCE_REVIEW:
                     data['expression_binding']['final_assessment_scope']=FACTS_AND_FIT_ASSESSMENT
-            if context['method'] in ('discovery-source-authoring-v2','discovery-source-authoring-v3'):
+            if authoring in ('source-led-v2','source-led-v3'):
                 # Evaluate actual source/context/text, not whether the author
                 # carried out the generating model's proposed research purpose.
                 data['candidate'].pop('communication_plan')
                 data['expression_binding']['assessment_mode'] = ('discovery-source-and-value-v3'
-                    if context['method']=='discovery-source-authoring-v3' else 'discovery-source-and-value-v2')
+                    if authoring=='source-led-v3' else 'discovery-source-and-value-v2')
         elif data['candidate'].get('communication_plan',{}).get('version') == 2:
             # A warning/request is not an editorial brief. Reassess its actual
             # final wording now without dropping its protected meaning contract.
