@@ -38,3 +38,10 @@ that the lease had expired. For the native continuity binding on the same
 journal, let the store's own full check guard capture. A generic callback
 still gets a full preflight before it runs, and every path retains the
 independent final check and deadline guard before submission.
+
+The subsequent Ubuntu run finished the final validation about 2.5 seconds
+after expiry and the submission guard refused it. Recover the evidence and
+context once per review snapshot, and pass the already validated original
+source window to authoring and continuity inside their own synchronous call.
+The snapshot shape and stored digest contract stay the same. No recovered
+context crosses a host callback or a separate verification boundary.

@@ -290,21 +290,13 @@ class SourceSupportReviewer:
                 and payload['reviewer_model']!=payload['generator_model']))
 
     def snapshot(self, *, subject, interpretation_id, candidate_id, clearance=Sensitivity.PRIVATE):
-        result = self.interpreter.load_completed(subject=subject, operation_id=interpretation_id,
-                                                clearance=clearance)
+        recovered = self.interpreter._recover_completed(subject=subject, operation_id=interpretation_id,
+                                                        clearance=clearance)
+        result = recovered.result
         candidate = next((c for c in result.candidates if c.action.candidate_id == candidate_id), None)
         if candidate is None:
             raise SourceSupportError('candidate is not part of retained interpretation')
-        start = self.journal.get('opportunity.synthesis:' + interpretation_id + ':started')
-        sources = self.interpreter.reader.active_evidence(subject=subject, clearance=clearance,limit=32,
-            observation_event_ids=tuple(start.event.payload['observation_event_ids']))
-        context = self.interpreter.context_reader.read(subject=subject, clearance=clearance)
-        advice = self.interpreter.learning_reader.read(subject=subject, clearance=clearance)
-        history = self.interpreter.history_reader.read(subject=subject, clearance=clearance,
-                                                     before_sequence=start.sequence)
-        actions = self.interpreter.action_reader.read(subject=subject,clearance=clearance,
-                                                      before_sequence=start.sequence)
-        feedback = self.interpreter.feedback_for_start(start,subject=subject,clearance=clearance)
+        start, sources = recovered.start, recovered.evidence
         # The recorded start is a historical anchor, not the exact model prompt clock.
         # Never substitute today's clock into a retained review snapshot.
         data = {'interpretation_started_at': start.event.occurred_at.isoformat(),
@@ -317,11 +309,11 @@ class SourceSupportReviewer:
             'excerpt_may_be_truncated':len(s.content['summary'])>len(source_prompt_excerpt(s.content,
                 policy=start.event.payload.get('interpreter_method',{}).get('source_excerpt_policy'))),
             'provenance_metadata':provenance_metadata(s.content)} for s in sources],
-            'explicit_context':[c.to_prompt() for c in context],
-            'learned_advisory':[c.to_prompt() for c in advice],
-            'recent_expression_history':[c.to_prompt() for c in history],
-            'recent_action_history':[a.to_prompt() for a in actions],
-            'recent_feedback_context':[f.to_prompt() for f in feedback],
+            'explicit_context':[c.to_prompt() for c in recovered.context],
+            'learned_advisory':[c.to_prompt() for c in recovered.learning],
+            'recent_expression_history':[c.to_prompt() for c in recovered.history],
+            'recent_action_history':[a.to_prompt() for a in recovered.actions],
+            'recent_feedback_context':[f.to_prompt() for f in recovered.feedback],
             'candidate':{'id':candidate_id, 'kind':candidate.action.action_kind.value}}
         if start.event.payload.get('interpreter_method', {}).get('recipient_output') != 'intent-only-v1':
             data['candidate']['text'] = _thaw_json(candidate.content)['operation']['text']

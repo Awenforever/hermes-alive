@@ -89,6 +89,18 @@ class OpportunitySynthesisResult:
     candidate_deferred: bool = False
 
 
+@dataclass(frozen=True, slots=True, repr=False)
+class _RecoveredSynthesis:
+    result: OpportunitySynthesisResult
+    start: object
+    evidence: tuple
+    context: tuple
+    learning: tuple
+    history: tuple
+    actions: tuple
+    feedback: tuple
+
+
 _DIMENSIONS = ("user_value", "urgency", "novelty", "confidence", "interruption_cost", "risk")
 _MAX_DIMENSION_REASON = 512  # Align with DimensionAssessment; do not truncate explanation.
 _SOURCE_PRESENTATIONS = {"model_text_v1", "canonical_source_v1", "canonical_source_inline_v2"}
@@ -901,6 +913,11 @@ class OpportunitySynthesizer:
         Requiring fresh host authority is intentional. This is neither a resume
         of an interrupted provider call nor a selection/send authorization.
         """
+        return self._recover_completed(subject=subject, operation_id=operation_id,
+            authority=authority, clearance=clearance).result
+
+    def _recover_completed(self, *, subject, operation_id,
+                           authority=ActionAuthority.NONE, clearance=Sensitivity.PRIVATE):
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}", operation_id):
             raise OpportunitySynthesisError("invalid opportunity operation")
         authority, clearance = ActionAuthority(authority), Sensitivity(clearance)
@@ -1053,9 +1070,10 @@ class OpportunitySynthesizer:
                     raise OpportunitySynthesisError('invalid no-material system completion')
             if deferred and (candidates or abstentions or reconsiderations or model!='system/alive-candidate-deferred'):
                 raise OpportunitySynthesisError('invalid deferred-material system completion')
-            return OpportunitySynthesisResult(model, candidates, receipt.event.event_id, rejected,
+            result = OpportunitySynthesisResult(model, candidates, receipt.event.event_id, rejected,
                 abstentions, rejected_abstentions, self._unassessed(evidence, candidates, abstentions),
                 reconsiderations, rejected_hints,deferred)
+            return _RecoveredSynthesis(result, start, evidence, context, learning, history, actions, feedback)
         except Exception:
             raise OpportunitySynthesisError("retained opportunity completion is not recoverable") from None
 

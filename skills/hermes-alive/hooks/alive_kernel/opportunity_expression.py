@@ -45,6 +45,10 @@ class OpportunityExpressionStore(SemanticReviewStore):
         return self._source_interpreter
 
     def _selected_draft(self, selection_event_id, subject):
+        draft, _, _, _ = self._selected_draft_with_sources(selection_event_id, subject)
+        return draft
+
+    def _selected_draft_with_sources(self, selection_event_id, subject):
         source = self.journal.get(selection_event_id)
         if (source is None or source.event.event_type != 'deliberation.selected'
                 or source.event.subject != subject):
@@ -128,7 +132,7 @@ class OpportunityExpressionStore(SemanticReviewStore):
             atoms += (SemanticAtom('source-link', SemanticAtomKind.LINK,
                                    citation_markup(original_url) if inline_policy else original_url,
                                    evidence, (original_url,)),)
-        return source, stored, atoms, expiry, plan
+        return (source, stored, atoms, expiry, plan), original_start, active, original_url
 
     def resolve_model_candidate(self,event_id,*,as_of=None):
         candidate=super().resolve_model_candidate(event_id,as_of=as_of)
@@ -153,25 +157,15 @@ class OpportunityExpressionStore(SemanticReviewStore):
         Called before submission, never to re-authorize historical discussion.
         Retain references, not the recipient's entire private planning context.
         """
-        source, stored, _atoms, _expiry, plan = self._selected_draft(selection_event_id, subject)
+        draft, start, original, selected_url = self._selected_draft_with_sources(selection_event_id, subject)
+        source, stored, _atoms, _expiry, plan = draft
         candidate = stored.selection.candidate
-        completion = next(e for name in ('user_value', 'urgency', 'novelty',
-            'confidence', 'risk', 'interruption_cost')
-            for e in getattr(candidate.dimensions, name).evidence_event_ids
-            if e.startswith('opportunity.synthesis:') and e.endswith(':completed'))
-        start = self.journal.get(self.journal.get(completion).event.causation_id)
-        interpreter = self._interpreter()
-        original = interpreter.reader.active_evidence(subject=subject,
-                clearance=source.event.sensitivity, limit=32,
-                observation_event_ids=tuple(start.event.payload['observation_event_ids']))
         selected = {e.observation_event_id for e in original
                     if e.agenda_item_id == candidate.agenda_item_id}
         if plan is not None and plan['version'] == 3:
             if start.event.sensitivity is not source.event.sensitivity:
                 raise SemanticReviewError('original interpretation scope differs from expression scope')
-            selected_url = next(e.content['url'] for e in original
-                                if e.agenda_item_id == candidate.agenda_item_id)
-            focus_ids = self._research_focus_ids(interpreter, start, subject, source.event.sensitivity)
+            focus_ids = self._research_focus_ids(self._interpreter(), start, subject, source.event.sensitivity)
             selected.update(e.observation_event_id for e in original
                             if e.content['url'] == selected_url or e.observation_event_id in focus_ids)
         references = []
@@ -186,22 +180,15 @@ class OpportunityExpressionStore(SemanticReviewStore):
         return references
 
     def expression_context_for_selection(self, selection_event_id, subject):
-        source, stored, _atoms, _expiry, plan = self._selected_draft(selection_event_id, subject)
+        draft, start, original, url = self._selected_draft_with_sources(selection_event_id, subject)
+        source, _, _, _, plan = draft
         if plan is None or plan['version'] != 3:
             return expression_context(plan) if plan is not None else None
-        candidate = stored.selection.candidate
-        # Recover only the immutable original evidence window, not today's pool.
-        completion = next(e for e in candidate.dimensions.user_value.evidence_event_ids
-                          if e.startswith('opportunity.synthesis:') and e.endswith(':completed'))
-        start = self.journal.get(self.journal.get(completion).event.causation_id)
         interpreter = self._interpreter()
         # _selected_draft already validates the selected candidate against this
         # completed synthesis before reading its original evidence window.
-        if start is None or start.event.sensitivity is not source.event.sensitivity:
+        if start.event.sensitivity is not source.event.sensitivity:
             raise SemanticReviewError('original interpretation scope differs from expression scope')
-        original = interpreter.reader.active_evidence(subject=subject,clearance=source.event.sensitivity,
-            limit=32,observation_event_ids=tuple(start.event.payload['observation_event_ids']))
-        url = next(e.content['url'] for e in original if e.agenda_item_id == candidate.agenda_item_id)
         policy = start.event.payload.get('interpreter_method',{}).get('source_excerpt_policy')
         mode=start.event.payload.get('interpreter_method',{}).get('discovery_authoring')
         focus_ids = self._research_focus_ids(interpreter, start, subject, source.event.sensitivity)
@@ -230,7 +217,8 @@ class OpportunityExpressionStore(SemanticReviewStore):
             context['semantic_source_contract']=review_contract
         if start.event.payload.get('interpreter_method',{}).get('reading_assessment'):
             context['reading_assessment']=interpreter.reading_assessment_context(
-                subject=subject,receipt_event_id=completion,clearance=source.event.sensitivity)
+                subject=subject,receipt_event_id=start.event.event_id.removesuffix(':started') + ':completed',
+                clearance=source.event.sensitivity)
         if start.event.payload.get('feedback_recall') is not None:
             context['literal_feedback_context']=[v.to_prompt() for v in interpreter.feedback_for_start(
                 start,subject=subject,clearance=source.event.sensitivity)]
