@@ -856,6 +856,15 @@ fingerprints, and the inactive delivery grant. This covers an inactive
 profile on the native CLI. Active work and revoked grants require separate
 rollback evidence.
 
+A separate offline Docker exercise copied the synthetic owner profile
+after the owner had paused it through IRC. The actual foreground Gateway
+started and stopped cleanly after runtime installs from `7c10b37`,
+`2c844d9`, and `7c10b37` again. Both the CLI and the owner channel
+reported inactive delivery authority on each boot. The final profile
+retained both original keys and all 21 original journal rows. This exercise
+used local source swaps and the stock IRC loopback. Explicit revocation,
+in-flight work, and a production transport remain separate checks.
+
 The repeated archaeology search returned a retrospective article rather
 than the prior event preview. Two real Core follow-up turns recovered the
 same source and distinguished the article's account from direct evidence.

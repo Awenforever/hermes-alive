@@ -48,3 +48,19 @@ follow-up. Ask it to name the basis for causal explanations or acknowledge
 the gap. User requests for depth take precedence. Core still owns the main
 turn and its delivery. Verify this guidance with fresh real follow-ups,
 including one where the evidence supports a causal explanation.
+
+A fresh model-inference monitoring trial produced a short opening after the
+reviewer rejected an initial report-like draft. Both subsequent Core turns
+recovered the source. The first treated a maximum cross-platform gap and a
+model-generation comparison as interchangeable, then added an unrequested
+section on first-token latency. The second corrected the comparison and
+identified the coverage limits of the sources. This trial does not qualify.
+
+The comparison failure is about what an estimate measures. Similar sizes
+cannot justify an equivalence without compatible measurements, populations
+and conditions. The reported engineering explanation is also an attribution,
+while the monitoring result establishes a difference. A source witness
+shows where a claim came from. Qualification still requires the wording to
+preserve what the cited material actually establishes. Test this with both
+an observational comparison and a genuine controlled comparison before
+crediting the evidence boundary.
