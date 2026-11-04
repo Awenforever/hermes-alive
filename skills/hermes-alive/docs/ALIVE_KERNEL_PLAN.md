@@ -818,7 +818,8 @@ The stock IRC adapter subsequently confirmed a synthetic owner session and
 restored its signed activation after a real foreground Gateway restart.
 The server was offline during boot and returned on the same loopback
 endpoint. The owner observed running state without a second enable command
-and then paused the runtime through IRC. This verifies the reconnect path
+and then paused the runtime through IRC. A third boot with the channel
+initially offline preserved the pause after reconnection. This verifies the reconnect path
 inside an isolated container. External delivery and production rollout
 remain separate gates.
 

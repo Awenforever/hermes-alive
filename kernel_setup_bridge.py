@@ -109,6 +109,7 @@ def register_setup_command(context,binding):
                         observed=binding.runtime_status()
                         retirement=observed.get('core_work_retirement') or {}
                         recovery_status = {
+                            'not_configured': '已配置，当前未运行',
                             'waiting_for_owner_channel': '等待已授权会话恢复连接',
                             'owner_channel_timeout': '等待已授权会话恢复超时，请检查渠道连接',
                             'owner_channel_recovery_failed': '无法恢复已授权会话，请检查渠道连接和网关日志',
