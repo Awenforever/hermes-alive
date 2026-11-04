@@ -182,7 +182,10 @@ async def exercise(home):
             user_id='synthetic-autonomous-owner',message_id='autonomous-setup')
         entry=runner.session_store.get_or_create_session(source);handler=get_plugin_command_handler('alive')
         async def command(text):return await runner._hm_run_plugin_handler(handler,None,source,session_entry=entry,args=text)
+        store=importlib.import_module(loaded.module.__name__+'.kernel_setup_bridge').setup_store(binding)
         if resuming:
+            previous_closes = {record.event.event_id for record in store.journal.read(
+                event_type='autonomous.host.closed')}
             started=await loaded.module.kernel_gateway_startup()
             assert started['status']=='started' and binding.native.host.execute is True
         else:
@@ -190,7 +193,6 @@ async def exercise(home):
             assert '已启用' in await command('enable')
         if not resuming:
             binding.arguments['stop'].set();await binding.task
-        store=importlib.import_module(loaded.module.__name__+'.kernel_setup_bridge').setup_store(binding)
         original=(('登记持续整理这项合成工作；从下一次自然唤醒开始，' if mode!='wait'
             else '仅登记这项合成工作，必须等我以后明确说执行，不能自行开工；')
             +f'在本地文件 {artifact} 写入 {body.strip()} 和一个换行并读回结果，不发消息。')
@@ -467,9 +469,12 @@ async def exercise(home):
             # no shortened interval: its first automatic wake starts the work.
             assert binding.arguments['interval_seconds']==600 and not binding.task.done()
             deadline=asyncio.get_running_loop().time()+60
-            while binding.native.last_call_count<2:
+            while (binding.native.last_call_count < 1
+                    or not any(record.event.event_id not in previous_closes for record in store.journal.read(
+                        event_type='autonomous.host.closed'))):
                 assert not binding.task.done() and asyncio.get_running_loop().time()<deadline
                 await asyncio.sleep(.05)
+            assert counts['start'] == 1
             binding.arguments['stop'].set()
             stopped=await binding.task
             assert stopped['completed_cycles']>=1 and stopped['exit_reason']=='stopped'

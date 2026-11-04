@@ -444,10 +444,10 @@ def continuation_context(shares, *, max_chars=None):
         'topic, follow the user’s reference and clarify ambiguity. Text is the exact prepared '
         'share. Delivery and viewing are unproven. Answer the specific follow-up first. '
         'For a brief explanation, give one useful point and expand when asked. '
-        'Separate reported claims from verified results. Label analogies and keep inferred '
-        'details separate from the reported method. If the excerpt lacks '
-        'implementation, measurements or limitations, state what is unknown before offering '
-        'an interpretation. Do not claim to have read or watched the full source.\n')
+        'Separate reported claims from verified results. A schedule establishes a plan. '
+        'Confirm occurrence separately. Label analogies and inferences, including guesses '
+        'about why a source used certain wording. State what the excerpt leaves unknown '
+        'before interpreting it. Describe only the material you actually read or watched.\n')
     if any('reference' in item for item in references):
         header = header.rstrip('\n') + (' Where available, alive_read_reference can read the exact retained '
             'text or source excerpts using its reference handle; handles are not delivery proof. '
