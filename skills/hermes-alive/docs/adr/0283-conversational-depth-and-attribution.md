@@ -34,3 +34,8 @@ response can lead to one fresh assessment of the same evidence within the
 original stage and cycle budgets. Unsupported, uncertain and valid negative
 findings still follow their ordinary paths. Store both the invalid response
 and the recovered receipt under the existing protected evidence contract.
+
+The expanded continuation instructions crowded out the source catalog under a
+2,000-character Core hook cap. Condense them while retaining the attribution
+and scope guidance. The cap remains owned by Core. The installed regression
+must still see the exact share and the handle for a source omitted for space.
