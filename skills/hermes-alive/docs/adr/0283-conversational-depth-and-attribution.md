@@ -39,3 +39,12 @@ The expanded continuation instructions crowded out the source catalog under a
 2,000-character Core hook cap. Condense them while retaining the attribution
 and scope guidance. The cap remains owned by Core. The installed regression
 must still see the exact share and the handle for a source omitted for space.
+
+The next real continuity test kept the article's claims separate from direct
+evidence, but introduced a historical cause after labeling the passage as
+analysis. It also restated its main point several times. Give the main agent
+a conversational default of one observation and its implication for a casual
+follow-up. Ask it to name the basis for causal explanations or acknowledge
+the gap. User requests for depth take precedence. Core still owns the main
+turn and its delivery. Verify this guidance with fresh real follow-ups,
+including one where the evidence supports a causal explanation.

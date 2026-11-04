@@ -849,6 +849,23 @@ November 4 — the isolated Ubuntu native run exposed a send authorization
 deadline failure. [ADR 0282](adr/0282-standard-channel-deadline.md) records the
 submission check and the next installed-runtime acceptance step.
 
+November 5 — the native Ubuntu consumer installed development revision
+`60eb589` from Git, rolled back to `19ea2f2`, and reinstalled `60eb589`.
+Each stage verified the exact revision, persisted logical state and key
+fingerprints, and the inactive delivery grant. This covers an inactive
+profile on the native CLI. Active work and revoked grants require separate
+rollback evidence.
+
+The repeated archaeology search returned a retrospective article rather
+than the prior event preview. Two real Core follow-up turns recovered the
+same source and distinguished the article's account from direct evidence.
+The first answer still introduced a broad historical explanation without
+evidence and repeated its thesis at length. The outgoing share also
+followed the article's structure more closely than a chat message needs.
+The next quality trial should test source-grounded interpretation at the
+depth requested and retain the complete outgoing and follow-up text for
+review. This repeated search adds no credit to the ten-round streak.
+
 October 26–27 qualification notes are retained in
 [the October 27 archive](ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-27.md).
 Earlier execution notes and the original change log are retained in
