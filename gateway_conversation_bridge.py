@@ -67,7 +67,13 @@ class CoreShareContinuity:
             session_id=scope.session_id, user_id=scope.user_id, platform=scope.platform)
         if current != scope:
             raise ValueError('conversation target changed')
-        return _TargetContinuity(self, scope)
+        def resolve_scope(execution, clearance):
+            if self._closed or clearance != self.clearance:
+                raise ValueError('current conversation continuity clearance required')
+            self.router.resolve_channel(scope, execution.route)
+            return scope.binding_document()
+
+        return self.store.bind_target(resolve_scope)
 
     def context(self, **values):
         if self._closed:
@@ -180,16 +186,3 @@ class CoreShareContinuity:
             import logging
             logging.getLogger(__name__).warning('Alive reference read failed: %s', type(exc).__name__)
             return {'error': 'alive_reference_unavailable'}
-
-
-class _TargetContinuity:
-    def __init__(self, bridge, scope):
-        self.bridge, self.scope = bridge, scope
-
-    def prepare(self, execution, *, clearance, now):
-        if self.bridge._closed or clearance != self.bridge.clearance:
-            raise ValueError('current conversation continuity clearance required')
-        # Recheck the canonical receiving adapter, scope and Gateway loop now.
-        self.bridge.router.resolve_channel(self.scope, execution.route)
-        return self.bridge.store.prepare(execution, scope=self.scope.binding_document(),
-                                         clearance=clearance, now=now)

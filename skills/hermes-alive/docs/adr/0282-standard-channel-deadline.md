@@ -32,3 +32,9 @@ its retained references from the same source window and focused read IDs
 as expression authoring, without rebuilding the full authoring context.
 These reductions are local to one synchronous operation. A separate launch
 check still revalidates current evidence and authority before adapter IO.
+
+On the next installed run, continuity completed and the final check found
+that the lease had expired. For the native continuity binding on the same
+journal, let the store's own full check guard capture. A generic callback
+still gets a full preflight before it runs, and every path retains the
+independent final check and deadline guard before submission.

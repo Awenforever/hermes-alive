@@ -5,6 +5,7 @@ service. Capture requires explicit outbound retention and a current one-use
 dispatch. Historical reads do not revive that dispatch or re-run planning.
 """
 from datetime import datetime, timedelta, timezone
+from dataclasses import dataclass
 import json
 
 from .content_vault import ContentReference, ContentUnavailableError
@@ -53,6 +54,18 @@ def core_scope_identity(scope, protector):
     return document, owner, fingerprint
 
 
+@dataclass(frozen=True, slots=True)
+class BoundShareContinuity:
+    """The native store always validates the launch before retaining a share."""
+
+    store: 'ShareContinuityStore'
+    resolve_scope: object
+
+    def prepare(self, execution, *, clearance, now):
+        scope = self.resolve_scope(execution, clearance)
+        return self.store.prepare(execution, scope=scope, clearance=clearance, now=now)
+
+
 class ShareContinuityStore:
     MAX_TEXT = 32768
     MAX_SOURCES = 8
@@ -65,6 +78,9 @@ class ShareContinuityStore:
 
     def _identity(self, scope):
         return core_scope_identity(scope, self.protector)
+
+    def bind_target(self, resolve_scope):
+        return BoundShareContinuity(self, resolve_scope)
 
     def _retention_policy(self, owner):
         target = self.journal.last_sequence()

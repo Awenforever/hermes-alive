@@ -12,6 +12,7 @@ from types import MappingProxyType
 from pathlib import Path
 
 from .cli_send_contract import compile_text_cli_plan
+from .conversation_continuity import BoundShareContinuity, ShareContinuityStore
 from .dispatch_outbox import DispatchOutboxError
 from .published_channel_execution import _renderer_metadata
 
@@ -75,7 +76,12 @@ async def execute_standard_text_once(outbox, lease, *, resolve_channel, clearanc
     # entering the platform's own coroutine. The platform owns its IO lifetime.
     if Path(observe_profile_home()).resolve() != plan.hermes_home:
         raise ValueError('canonical channel resolution changed the owning profile')
-    outbox.validate_execution_for_launch(execution, now=clock())
+    # The native continuity store performs this full check before capture.
+    # Other callbacks retain the preflight check before being invoked.
+    if (type(continuity) is not BoundShareContinuity
+            or type(continuity.store) is not ShareContinuityStore
+            or continuity.store.journal.path != outbox.journal.path):
+        outbox.validate_execution_for_launch(execution, now=clock())
     if continuity is not None:
         # Trusted host capability; capture the exact share before entering IO.
         # Persistence is not delivery, and must never create a second queue.
