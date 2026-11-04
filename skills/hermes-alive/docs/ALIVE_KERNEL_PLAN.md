@@ -814,8 +814,13 @@ temporarily unavailable at startup, a single Core-owned task waits for up to
 ten minutes and checks the same signed configuration and activation before
 retrying exact route validation. It neither reconnects the adapter nor
 replays delivery. A changed grant or an unloaded plugin ends the attempt.
-Controlled recovery and revocation checks are distinct from an actual
-connected-channel restart, which remains part of release acceptance.
+The stock IRC adapter subsequently confirmed a synthetic owner session and
+restored its signed activation after a real foreground Gateway restart.
+The server was offline during boot and returned on the same loopback
+endpoint. The owner observed running state without a second enable command
+and then paused the runtime through IRC. This verifies the reconnect path
+inside an isolated container. External delivery and production rollout
+remain separate gates.
 
 November 5 — the first real indexed-passage review selected a nonexistent
 passage. [ADR 0284](adr/0284-source-witnesses-for-final-review.md) records
