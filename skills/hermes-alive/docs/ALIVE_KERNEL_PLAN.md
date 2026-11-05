@@ -12,6 +12,15 @@ durable experience, layered memory, ongoing work, attributable learning and
 natural conversation. Discovery and sharing are one faculty, not its definition.
 The bounded qualifications and remaining obligations below still apply.
 
+**Immediate integration priority:** ordinary feedback is not yet connected to
+the existing interpretation/learning components. An actual installed-plugin
+Core post-admission probe observes three fresh inputs but produces no retained
+reply or attributable user outcome, even with synthetic retention/consolidation
+consents. Earlier seeded-outcome tests do not establish daily learning. Close
+this producer-to-consumer gap with guided consent and honest association
+provenance before further isolated share-style tuning; [ADR0286](adr/0286-ordinary-feedback-ingress-is-not-yet-connected.md)
+defines the required normal-turn, subsequent-cycle, recovery and erasure proof.
+
 The latest runtime candidate separates factual support, communication fit and
 search-purpose alignment in one model assessment. Source witnesses establish
 exact retained passage identity, not independent truth or semantic entailment.
