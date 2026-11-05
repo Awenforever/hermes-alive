@@ -2,7 +2,6 @@
 from datetime import datetime, timedelta, timezone
 
 from .action_contract import parse_action_contract
-from .content_vault import ContentReference
 from .communication_plan import validate_communication_plan, plan_atoms, expression_context, validate_recipient_intent
 from .host_discovery import source_prompt_excerpt, read_scope_metadata, provenance_metadata
 from .deliberation import ActionKind, SideEffect
@@ -71,7 +70,7 @@ class OpportunityExpressionStore(SemanticReviewStore):
         source, stored = self._selected_communication(selection_event_id, subject)
         candidate = stored.selection.candidate
         try:
-            self._validator().validate_candidate_sources(
+            _, recovered = self._validator()._validate_candidate_sources(
                     (candidate,), dict(stored.candidate_contents), subject, source.event.sensitivity)
             selected_content = _thaw_json(dict(stored.candidate_contents)[candidate.content_id])
             if 'recipient_intent_version' in selected_content:
@@ -83,28 +82,16 @@ class OpportunityExpressionStore(SemanticReviewStore):
                 for e in getattr(candidate.dimensions, name).evidence_event_ids))))
             completed = next(e for e in evidence
                 if e.startswith('opportunity.synthesis:') and e.endswith(':completed'))
-            receipt = self.journal.get(completed)
-            expiry = ContentReference.from_event_payload(receipt.event.payload['content']).retention_until
-            original_start = self.journal.get(receipt.event.causation_id)
-            if (original_start is None or original_start.event.subject != subject
-                    or original_start.event.event_type != 'opportunity.synthesis_started'):
+            proof = recovered[(completed, candidate.authority)]
+            expiry = proof.proposal_expiry
+            original_start = proof.start
+            if original_start.event.sensitivity is not source.event.sensitivity:
                 raise SemanticReviewError('original interpretation input is unavailable')
             # Current ranking is for new search, not revalidation of retained intent.
-            active = self._interpreter().reader.active_evidence(
-                    subject=subject, clearance=source.event.sensitivity, limit=32,
-                    observation_event_ids=tuple(original_start.event.payload['observation_event_ids']))
+            active = proof.evidence
             original_url = next(item.content['url'] for item in active
                                 if item.agenda_item_id == candidate.agenda_item_id)
-            ref = ContentReference.from_event_payload(receipt.event.payload['content'])
-            bundle = self.content_vault.resolve_json(ref.content_id, expected_subject=subject,
-                expected_purpose='opportunity.candidates', expected_sensitivity=source.event.sensitivity)
-            if self.content_vault.digest_json(bundle) != ref.digest:
-                raise SemanticReviewError('original model proposal bundle changed')
-            operation = completed.removeprefix('opportunity.synthesis:').removesuffix(':completed')
-            indices = bundle.get('proposal_indices', tuple(range(len(bundle['proposals']))))
-            original = next(raw for index, raw in zip(indices, bundle['proposals'])
-                if 'opportunity-candidate:' + self.content_vault.digest_json(
-                    {'operation': operation, 'index': index})[:40] == candidate.candidate_id)
+            original = proof.proposal(candidate.candidate_id)
             # Source-aware action presentation can exceed the 1600-character model
             # wording budget. Keep the original wording and canonical link as
             # separate atoms, not one oversized alleged model utterance.
@@ -280,10 +267,14 @@ class OpportunityExpressionStore(SemanticReviewStore):
         candidate = self.resolve_model_candidate(expression_event_id, as_of=as_of)
         if candidate is None or candidate.selection_event_id != selection_event_id:
             raise SemanticReviewError('expression is unavailable or belongs to another intent')
+        return self._text_action_contract(candidate.text), candidate.expires_at
+
+    @staticmethod
+    def _text_action_contract(text):
         return parse_action_contract({'schema_version': 1,
             'capability': 'hermes.channel.send',
-            'operation': {'text': candidate.text, 'format': 'markdown'}},
-            capability='hermes.channel.send'), candidate.expires_at
+            'operation': {'text': text, 'format': 'markdown'}},
+            capability='hermes.channel.send')
 
     def define_for_selection(self, *, selection_event_id, subject):
         source, stored, atoms, expiry, plan = self._selected_draft(selection_event_id, subject)

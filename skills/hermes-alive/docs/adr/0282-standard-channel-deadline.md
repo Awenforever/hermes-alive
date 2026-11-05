@@ -100,3 +100,13 @@ The official Core integration fixture revoked the route after the native
 capture had persisted one prepared record. The final check refused the
 launch, the adapter received zero calls, and the record carried no delivery
 claim. This proves the intervening-revocation case on the controlled path.
+
+The Windows run with the shorter capture reached the final verifier with
+2.9 seconds remaining. Full verification then took 11.6 seconds, and the
+deadline guard refused submission. Each independent verification now
+reuses the source window and proposal already reconstructed during that
+call. When it also validates a final wording witness, the authenticated
+snapshot supplies the exact text for checking the signed action contract.
+The check still requires matching owner and sensitivity, current wording
+expiry, and the original contract binding. A separate verification
+reconstructs the proof from current state again.

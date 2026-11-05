@@ -99,6 +99,14 @@ class _RecoveredSynthesis:
     history: tuple
     actions: tuple
     feedback: tuple
+    proposal_expiry: datetime
+    proposals: tuple
+
+    def proposal(self, candidate_id):
+        for candidate, proposal in zip(self.result.candidates, self.proposals, strict=True):
+            if candidate.action.candidate_id == candidate_id:
+                return proposal
+        raise OpportunitySynthesisError('proposal identity unavailable')
 
 
 _DIMENSIONS = ("user_value", "urgency", "novelty", "confidence", "interruption_cost", "risk")
@@ -1074,7 +1082,8 @@ class OpportunitySynthesizer:
             result = OpportunitySynthesisResult(model, candidates, receipt.event.event_id, rejected,
                 abstentions, rejected_abstentions, self._unassessed(evidence, candidates, abstentions),
                 reconsiderations, rejected_hints,deferred)
-            return _RecoveredSynthesis(result, start, evidence, context, learning, history, actions, feedback)
+            return _RecoveredSynthesis(result, start, evidence, context, learning, history, actions,
+                                       feedback, ref.retention_until, tuple(bundle["proposals"]))
         except Exception:
             raise OpportunitySynthesisError("retained opportunity completion is not recoverable") from None
 

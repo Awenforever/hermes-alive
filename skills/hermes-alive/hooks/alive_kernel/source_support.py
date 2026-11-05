@@ -183,6 +183,12 @@ class SourceSupportReviewer:
 
     def verify_current(self, event_id, *, subject, interpretation_id, candidate_id,
                        clearance=Sensitivity.PRIVATE, allow_correlated=False):
+        verified = self._verify_current(event_id, subject=subject, interpretation_id=interpretation_id,
+            candidate_id=candidate_id, clearance=clearance, allow_correlated=allow_correlated)
+        return verified[0] if verified is not None else None
+
+    def _verify_current(self, event_id, *, subject, interpretation_id, candidate_id,
+                        clearance, allow_correlated):
         if type(allow_correlated) is not bool:
             raise SourceSupportError('invalid correlated review mode')
         record = self.journal.get(event_id)
@@ -272,7 +278,7 @@ class SourceSupportReviewer:
                     return None
             elif recovery is not None:
                 return None
-            return findings
+            return findings, data
         except Exception:
             return None
 
@@ -317,8 +323,7 @@ class SourceSupportReviewer:
             'candidate':{'id':candidate_id, 'kind':candidate.action.action_kind.value}}
         if start.event.payload.get('interpreter_method', {}).get('recipient_output') != 'intent-only-v1':
             data['candidate']['text'] = _thaw_json(candidate.content)['operation']['text']
-        proposal = self.interpreter.retained_proposal(receipt_event_id=result.receipt_event_id,
-            candidate_id=candidate_id, subject=subject, clearance=clearance)
+        proposal = recovered.proposal(candidate_id)
         if start.event.payload.get('interpreter_method', {}).get('editorial_context') == 'origin-purpose-v1':
             source = next(item for item in sources if item.agenda_item_id == candidate.action.agenda_item_id)
             data['communication_situation'] = communication_situation(source.content.get('origin_kind','discovery'))

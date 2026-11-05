@@ -1,6 +1,6 @@
 """Source review of exact retained expression, not just its drafting ancestor."""
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 import re
 
@@ -298,6 +298,12 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
     def require_current_witness(self, witness, *, subject, expression_event_id,
                                 selection_event_id):
         """Revalidate a permit-bound quality requirement, never mint authority."""
+        assessment, _ = self._require_current_witness(witness, subject=subject,
+            expression_event_id=expression_event_id, selection_event_id=selection_event_id)
+        return assessment
+
+    def _require_current_witness(self, witness, *, subject, expression_event_id,
+                                 selection_event_id):
         if (not isinstance(witness, dict) or set(witness) != {
                 'review_event_id', 'interpretation_id', 'require_independence'}
                 or type(witness['require_independence']) is not bool
@@ -307,16 +313,22 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
         if not isinstance(expression_event_id, str) or not expression_event_id:
             raise SourceSupportError('final-wording witness needs an expression')
         header = self.journal.get(expression_event_id)
+        selection = self.journal.get(selection_event_id)
         if (header is None or header.event.subject != subject
+                or selection is None or selection.event.subject != subject
+                or header.event.sensitivity != selection.event.sensitivity
                 or header.event.payload.get('selection_event_id') != selection_event_id):
             raise SourceSupportError('final-wording witness expression mismatch')
-        findings = self.verify_current(witness['review_event_id'], subject=subject,
+        verified = self._verify_current(witness['review_event_id'], subject=subject,
             interpretation_id=witness['interpretation_id'], candidate_id=expression_event_id,
             allow_correlated=not witness['require_independence'], clearance=header.event.sensitivity)
         record = self.journal.get(witness['review_event_id'])
-        if (findings is None or findings['verdict'] != 'supported' or record is None
+        if (verified is None or verified[0]['verdict'] != 'supported' or record is None
                 or record.event.payload.get('require_independence') != witness['require_independence']):
             raise SourceSupportError('final wording is no longer supported')
+        if header.event.expires_at is None or datetime.now(timezone.utc) >= header.event.expires_at:
+            raise SourceSupportError('final wording expired during witness verification')
+        text = verified[1]['candidate']['text']
         if record.event.payload.get('assessment_clock') in (self.REVIEW_CLOCK,self.REVIEW_WINDOW_CLOCK):
             start=self.journal.get(record.event.causation_id)
             if start is None or start.event.observed_at<header.event.observed_at:
@@ -325,7 +337,6 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
                 # verify_current already matched the interval to the protected
                 # exact request and rejected completion outside that interval.
                 from contextlib import closing
-                selection=self.journal.get(selection_event_id)
                 with closing(self.journal._connect()) as connection:
                     changed=connection.execute('SELECT 1 FROM experience_events WHERE subject=? '
                         'AND event_type=? AND sequence>? LIMIT 1',
@@ -334,8 +345,9 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
                     raise SourceSupportError('owner input changed after the assessed selection')
                 until=start.event.observed_at+timedelta(
                     seconds=start.event.payload['assessment_window_seconds'])
-                return FinalValueAssessment(record.event.observed_at,until)
-            return FinalValueAssessment(start.event.observed_at)
+                return FinalValueAssessment(record.event.observed_at,until), text
+            return FinalValueAssessment(start.event.observed_at), text
+        return None, text
 
     def snapshot(self, *, subject, interpretation_id, candidate_id,
                  clearance=Sensitivity.PRIVATE):

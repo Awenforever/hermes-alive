@@ -357,6 +357,10 @@ class DeliberationSynthesizer:
         accepted historical meanings are never rewritten. Legacy candidates keep
         their original content view. No source or permission is inferred here.
         """
+        plans, _ = self._validate_candidate_sources(candidates, contents, owner, sensitivity)
+        return plans
+
+    def _validate_candidate_sources(self, candidates, contents, owner, sensitivity):
         interpreter = None
         recovered = {}
         plans = {}
@@ -385,20 +389,21 @@ class DeliberationSynthesizer:
             if key not in recovered:
                 operation = receipt_id.removeprefix("opportunity.synthesis:").removesuffix(":completed")
                 try:
-                    result = interpreter.load_completed(subject=owner, operation_id=operation,
+                    result = interpreter._recover_completed(subject=owner, operation_id=operation,
                         authority=candidate.authority, clearance=receipt.event.sensitivity)
                 except Exception:
                     raise DeliberationContextChanged("generated candidate evidence is no longer current") from None
-                recovered[key] = {item.action.candidate_id: item for item in result.candidates}
-            source = recovered[key].get(candidate.candidate_id)
+                recovered[key] = result
+            proof = recovered[key]
+            source = next((item for item in proof.result.candidates
+                           if item.action.candidate_id == candidate.candidate_id), None)
             if (source is None or source.action != candidate
                     or _thaw_json(source.content) != _thaw_json(contents.get(candidate.content_id))):
                 raise DeliberationContextChanged("generated candidate differs from retained evidence")
-            proposal=interpreter.retained_proposal(receipt_event_id=receipt_id,
-                candidate_id=candidate.candidate_id,subject=owner,clearance=receipt.event.sensitivity)
+            proposal=proof.proposal(candidate.candidate_id)
             if 'communication_plan' in proposal:
                 plans[candidate.candidate_id]=proposal['communication_plan']
-        return plans
+        return plans, recovered
 
     async def run(
         self,

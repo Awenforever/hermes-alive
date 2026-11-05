@@ -106,20 +106,22 @@ class DispatchOutbox:
                 raise DispatchOutboxError('discovery expression requires current final wording review')
             if witness is not None:
                 from .expression_support import ExpressionSourceSupportReviewer
-                ExpressionSourceSupportReviewer(self.journal, content_vault=self.vault,
-                    context_vault=self.context_vault).require_current_witness(_thaw_json(witness),
+                from .opportunity_expression import OpportunityExpressionStore
+                _, text = ExpressionSourceSupportReviewer(self.journal, content_vault=self.vault,
+                    context_vault=self.context_vault)._require_current_witness(_thaw_json(witness),
                         subject=str(authorization.event.subject), expression_event_id=expression_id,
                         selection_event_id=str(authorization.event.payload["selection_event_id"]))
-            if expression_id:
+                expressed = OpportunityExpressionStore._text_action_contract(text)
+            elif expression_id:
                 from .opportunity_expression import OpportunityExpressionStore
                 expressed, _expiry = OpportunityExpressionStore(self.journal,
                     content_vault=self.vault, context_vault=self.context_vault).action_contract_for_expression(
                         expression_event_id=str(expression_id),
                         selection_event_id=str(authorization.event.payload["selection_event_id"]),
                         subject=str(authorization.event.subject))
-                if not self.protector.verify_json("action.contract.v1", expressed.to_document(),
-                        authorization.event.payload.get("action_contract_binding")):
-                    raise DispatchOutboxError("expression differs from authorized content")
+            if expression_id and not self.protector.verify_json("action.contract.v1", expressed.to_document(),
+                    authorization.event.payload.get("action_contract_binding")):
+                raise DispatchOutboxError("expression differs from authorized content")
         except DeliberationContextChanged as exc:
             raise DispatchOutboxError("dispatch selection inputs are no longer current") from exc
         except ValueError as exc:
