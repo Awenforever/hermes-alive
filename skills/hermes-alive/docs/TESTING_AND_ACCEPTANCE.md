@@ -1,12 +1,55 @@
 # Testing and Acceptance
 
-Reviewed 2026-10-23 (Asia/Shanghai), Codex: historical results below retain their
+Reviewed 2026-11-05 (Asia/Shanghai), Codex: historical results below retain their
 original date and scope; they do not qualify the current experimental kernel.
 The current ordered release gates and real-platform lifecycle requirements are
 in [RELEASE_ACCEPTANCE.md](RELEASE_ACCEPTANCE.md). A container fixture, simulated
 Windows branch, loaded hook or model-endorsed draft is not native-platform,
 consumer-installation, delivery or human usefulness acceptance. Missing gates
 remain pending, including the ten consecutive fresh complete quality rounds.
+
+## Longitudinal usefulness and interruption measurement
+
+Evaluate complete owner-scoped journeys, not isolated prompts or a single model
+score. A journey links the admitted request or initiative, its actual authority,
+memory/source versions, decisions, Core work and observed result, feedback, later
+behavior and cold recovery. Keep the exact candidate/Core revision, observation
+window, environment, and whether models, effects and delivery were real or
+controlled. A simulated time advance or reopened store is not elapsed live use.
+
+Use existing protected event references and independently inspectable results;
+this protocol adds no telemetry, private-chat import, permanent preference or
+model authority. Detailed private evidence follows deployment retention and
+authorization. Public records contain only synthetic material or content-free
+references. Keep initial failures beside subsequent corrections.
+
+| Measure | Denominator and evidence | What does not count |
+|---|---|---|
+| Useful initiative | Reviewed actual initiatives with an explicit owner assessment or independently verified requested benefit; report positive, negative and unknown counts separately | Topic match, model self-endorsement, silence or fluent wording alone |
+| Interruption regret | Owner-attributed objection to the interruption among reviewed, actually delivered initiatives in the declared window; preserve whether topic, timing or form caused it | No reply, adapter acceptance, or a general topic dislike inferred from one rating |
+| Task attainment | All admitted finite goals in a frozen cohort; distinguish verified attained, partial, failed, waiting, stopped and unresolved against the current owner requirements | A terminal job, self-reported success, a cancellation acknowledgment, or automatic deadline changes |
+| Stale work | Active items whose explicit due/reconsideration conditions were reached without a justified current disposition; record observation coverage and owner revisions | Invented deadlines or treating a deliberate owner wait as neglect |
+| Memory benefit | Later decisions or effects demonstrably use the current relevant memory correctly, with attributable source and authority; inspect the actual result and a suitable contrary/no-context control | A recalled keyword, copied context, or treating recalled advice as new permission |
+| Correction and forgetting | Follow each corrected, withdrawn or erased source through dependent advice, later decisions, cold recovery and managed restore; report untested external copies separately | Deleting one visible row or overwriting historical evidence |
+| Duplicate effects | Repeated externally observed effects for one owned intent across retry, restart and reconciliation, with an explicit effect inventory | Assuming no duplicate merely because a journal has one completion row |
+| Grounded continuity | Independently reviewed ordinary followups preserve the actual initiative, source limits, current owner intent and ambiguity across reduced context or restart | Supplying extra test-only context, a later correction hiding the first error, or a plausible answer |
+
+For every rate publish numerator, reviewed denominator, unknown/unobserved count,
+window and evidence scope together. Missing feedback stays unknown. Do not
+silently exclude unsuccessful or still-running work, treat repeated evidence as
+independent samples, or compare rates from different cohorts as improvement.
+Record latency, logical/observed physical model calls, cost and storage alongside
+outcomes; do not claim a physical-call count without observing it.
+
+Longitudinal qualification must cover useful work, noisy/quoted/ambiguous input,
+owner correction, competing or paused matters, feedback, forgetting and recovery.
+Use materially different later situations and inspect what actually changed;
+replaying the same successful fixture does not establish adaptation. Synthetic
+controls establish causal boundaries, while live usefulness needs prospective
+observation and owner calibration. The ten fresh complete sharing rounds remain
+a separate required subgate. A refusal or a silent cycle never advances it.
+Defining these measures does not establish calibration, a passing longitudinal
+run, or production acceptance.
 
 ## Regression suites
 

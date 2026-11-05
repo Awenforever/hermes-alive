@@ -47,8 +47,9 @@ Ordinary upgrades preserve work and progress. ADR0266 has bounded actual-Core
 queued/running/cold qualification; full lifecycle distribution is still open.
 Do not equate an unload callback, paused
 schedule or cancellation acknowledgment with observed termination. External
-Holographic provider migration has a bounded synthetic library proof; its actual
-Alive-to-Core worker recall still fails and remains an independent open gate.
+Holographic provider migration has a bounded synthetic library proof. Its first
+actual Alive-to-Core worker recalls failed; ADR0272 later qualified one real
+memory-informed synthetic task. Broader longitudinal benefit remains open.
 
 ADR0267 records an isolated causal counterexample: Core cron framing alone turns
 two successful natural/semantic recalls into empty results for both tested public
@@ -353,7 +354,10 @@ main loop.
     explicitly unknown outcome labels (ADR-0053); private data stays outside Git.
     This does not close rotated-history coverage, human calibration or causal
     decision replay, and must not be scored as useful/confirmed delivery.
-- [ ] Define longitudinal quality and interruption metrics.
+- [x] Define longitudinal quality and interruption metrics, with cohort,
+  denominator, unknown-count and independent-evidence rules in
+  [Testing and Acceptance](TESTING_AND_ACCEPTANCE.md#longitudinal-usefulness-and-interruption-measurement).
+  Prospective observation and owner calibration remain unqualified.
 
 Exit: old behavior can be replayed and scored without sending messages.
 
@@ -569,6 +573,8 @@ accepts the observed long-term behavior rather than only isolated messages.
 ## Quality measures
 
 Track trends and distributions, not a single synthetic “alive score”.
+Use the [longitudinal measurement protocol](TESTING_AND_ACCEPTANCE.md#longitudinal-usefulness-and-interruption-measurement)
+for evidence, denominators, unknowns and limits; these definitions are not results.
 
 - useful proactive outcome rate;
 - interruption regret and immediate-dismissal rate;
