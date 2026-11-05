@@ -142,6 +142,9 @@ async def test(root, mode):
         if mode=='verify-expired':
             assert isinstance(exc, DispatchOutboxError)
             assert str(exc)=='channel launch deadline passed during verification'
+        if mode=='prepare-expired':
+            assert isinstance(exc, DispatchOutboxError)
+            assert str(exc)=='authenticated channel launch deadline expired before verification'
     else:
         assert successful and result.disposition=='submitted' and not result.external_delivery_proven
         assert result.submission.adapter_result is returned

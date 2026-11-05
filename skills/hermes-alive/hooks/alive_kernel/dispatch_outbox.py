@@ -1467,8 +1467,6 @@ class DispatchOutbox:
                 or row["started_event_id"] != execution.start_event_id
                 or row["lease_generation"] != lease.generation
                 or row["lease_token_digest"] != self.protector.pseudonym("dispatch_lease", lease.token)
-                or datetime.fromisoformat(row["lease_until"]) <= current
-                or datetime.fromisoformat(row["execute_by"]) <= current
                 or policy is None or not policy.enabled
                 or policy.event_id != row["policy_event_id"]
                 or not self._valid_start_evidence(
@@ -1479,6 +1477,8 @@ class DispatchOutbox:
                     sensitivity=lease.sensitivity, generation=lease.generation)
                 or current < start.event.observed_at):
             raise DispatchOutboxError("launch does not own a live authenticated start")
+        if min(datetime.fromisoformat(row["lease_until"]), datetime.fromisoformat(row["execute_by"])) <= current:
+            raise DispatchOutboxError("authenticated channel launch deadline expired before verification")
         authorization = self.journal.get(str(row["authorization_event_id"]))
         binding, reasons = self._authorization_route(
             authorization, subject=lease.subject, capability=lease.capability, now=current)
