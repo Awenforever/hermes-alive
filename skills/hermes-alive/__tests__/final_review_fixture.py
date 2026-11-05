@@ -3,14 +3,15 @@
 
 def controlled_final_findings(snapshot, *, factual='supported', fit='fits', reason='Synthetic assessment.'):
     scope = snapshot.get('expression_binding', {}).get('final_assessment_scope')
-    if scope in ('factual-support-and-communication-fit-v6', 'factual-support-and-communication-fit-v7'):
+    if scope in ('factual-support-and-communication-fit-v6', 'factual-support-and-communication-fit-v7',
+                 'factual-support-and-communication-fit-v8'):
         witnesses = []
         if factual == 'supported':
             passage = next(p for source in snapshot['evidence'] for p in source['passages'] if p['text'].strip())
             witnesses = [{'claim': snapshot['candidate']['text'][:200], 'passage_id': passage['passage_id']}]
         result = dict(facts=factual, fact_reason=reason, fit=fit, fit_reason=reason,
                       recipient_evidence=[], source_witnesses=witnesses)
-        if scope == 'factual-support-and-communication-fit-v7':
+        if scope in ('factual-support-and-communication-fit-v7', 'factual-support-and-communication-fit-v8'):
             result.update(search_alignment='matches' if snapshot.get('approved_search_queries') else 'not_applicable',
                           scope_reason='Synthetic source answers the supplied synthetic search, if present.')
         return result

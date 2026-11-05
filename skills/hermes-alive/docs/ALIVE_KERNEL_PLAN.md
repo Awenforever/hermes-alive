@@ -35,7 +35,9 @@ negative-fixture and documentation delta has its own actual-Core controls. The
 next real-source trial failed quality: the draft extrapolated beyond its source
 and mistook a configured discovery query for a current owner request. Review
 withheld it; there was no share or ordinary followup. ADR0285 records the missing
-search-role boundary and its pending implementation. Previous green baselines
+search-role boundary. Its new host-derived route-aware candidate passes initial
+propagation and matched-source correction controls; real-model qualification and
+the remaining controls are pending. Previous green baselines
 do not automatically qualify a changed candidate.
 
 Superseded run-by-run observations, including all known failures, are retained

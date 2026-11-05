@@ -30,6 +30,32 @@ no authority and does not govern unrelated commitments.
 """
 
 
+ROUTE_SEARCH_GUIDANCE = """
+search_context identifies these approved queries as configured discovery routes,
+not a current research request or words spoken by the recipient. Do not say the
+recipient asked for or searched for them. They guide collection, not a compulsory
+recipient topic. An unexpected concrete useful finding can justify a departure,
+including outside known interests, if its real value and scope are supported.
+Topic affinity alone is not enough; explain the actual contribution internally.
+Do not demand an outward search-mismatch disclaimer or turn an internal research
+hypothesis into the recipient's need. A departure still cannot count as finding
+the intended release or inherit unsupported dates, location, mechanism or effects.
+Judge factual fidelity and conversational usefulness independently. None of this
+widens collection, disclosure, execution or sending authority.
+"""
+
+
+def configured_route_context(review_contract):
+    """New receipts bind route provenance; historical receipts stay unchanged."""
+    from .review_contracts import ROUTE_AWARE_REVIEW
+    if review_contract != ROUTE_AWARE_REVIEW:
+        return None
+    return {'kind': 'configured-discovery-route-v1',
+            'current_owner_search_request_supplied': False,
+            'queries_are_collection_routes': True,
+            'useful_unexpected_findings_remain_eligible': True}
+
+
 def resolve_search_purpose(reader, *, subject, receipt_id, before_sequence=None):
     """Recover the exact approved collection scope from its protected request."""
     journal, vault = reader.journal, reader.vault

@@ -106,8 +106,11 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
     def prompt_for_snapshot(self, snapshot):
         from .review_contracts import (BOUNDARY_ASSESSMENT, FACTS_AND_FIT_ASSESSMENT,
             CONVERSATIONAL_FIT_ASSESSMENT, GROUNDED_FIT_ASSESSMENT, PASSAGE_FIT_ASSESSMENT,
-            LABELLED_FIT_ASSESSMENT, FLAT_FIT_ASSESSMENT, SEARCH_FIT_ASSESSMENT)
+            LABELLED_FIT_ASSESSMENT, FLAT_FIT_ASSESSMENT, SEARCH_FIT_ASSESSMENT, ROUTE_FIT_ASSESSMENT)
         scope = snapshot.get('expression_binding', {}).get('final_assessment_scope')
+        if scope == ROUTE_FIT_ASSESSMENT:
+            from .final_value_findings import ROUTE_FIT_PROMPT
+            return ROUTE_FIT_PROMPT
         if scope == FLAT_FIT_ASSESSMENT:
             from .final_value_findings import FLAT_PROMPT
             return FLAT_PROMPT
@@ -141,8 +144,9 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
     def _assessment_request(self, snapshot, as_of=None, review_until=None):
         prompt, request = super()._assessment_request(snapshot, as_of, review_until)
         if 'approved_search_queries' in request:
-            from .research_evidence import SEARCH_PURPOSE_GUIDANCE
-            prompt += SEARCH_PURPOSE_GUIDANCE
+            from .research_evidence import SEARCH_PURPOSE_GUIDANCE, ROUTE_SEARCH_GUIDANCE
+            prompt += (ROUTE_SEARCH_GUIDANCE if request.get('search_context',{}).get('kind')
+                       == 'configured-discovery-route-v1' else SEARCH_PURPOSE_GUIDANCE)
         from .review_contracts import LABELLED_ASSESSMENTS, PASSAGE_FIT_ASSESSMENT
         scope = snapshot.get('expression_binding', {}).get('final_assessment_scope')
         if scope in (PASSAGE_FIT_ASSESSMENT, *LABELLED_ASSESSMENTS):
@@ -395,11 +399,13 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
                 FIRST_FACTS_AND_FIT_REVIEW, BOUNDARY_ASSESSMENT, FACTS_AND_FIT_ASSESSMENT,
                 CONVERSATIONAL_FIT_ASSESSMENT, FIRST_CONVERSATIONAL_REVIEW, FIRST_WITNESS_REVIEW,
                 GROUNDED_FIT_ASSESSMENT, PASSAGE_FIT_ASSESSMENT, LABELLED_FIT_ASSESSMENT,
-                FIRST_PASSAGE_REVIEW, FIRST_LABELLED_REVIEW, FIRST_FLAT_REVIEW,
-                FLAT_FIT_ASSESSMENT, SEARCH_FIT_ASSESSMENT)
+                FIRST_PASSAGE_REVIEW, FIRST_LABELLED_REVIEW, FIRST_FLAT_REVIEW, FIRST_SEARCH_REVIEW,
+                FLAT_FIT_ASSESSMENT, SEARCH_FIT_ASSESSMENT, ROUTE_FIT_ASSESSMENT)
             if method.get('discovery_source_review') in SPLIT_SOURCE_REVIEW_CONTRACTS:
                 data['expression_binding']['semantic_assessment_scope']=BOUNDARY_ASSESSMENT
                 if method['discovery_source_review'] == SPLIT_SOURCE_REVIEW:
+                    data['expression_binding']['final_assessment_scope']=ROUTE_FIT_ASSESSMENT
+                elif method['discovery_source_review'] == FIRST_SEARCH_REVIEW:
                     data['expression_binding']['final_assessment_scope']=SEARCH_FIT_ASSESSMENT
                 elif method['discovery_source_review'] == FIRST_FLAT_REVIEW:
                     data['expression_binding']['final_assessment_scope']=FLAT_FIT_ASSESSMENT

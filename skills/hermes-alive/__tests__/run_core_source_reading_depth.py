@@ -13,8 +13,9 @@ from run_core_guided_setup import cli
 
 
 async def test(home,*,fit_revision=False,revoke_after_capture=False,search_alignment='matches'):
-    assert search_alignment in ('matches','conflicts','uncertain')
+    assert search_alignment in ('matches','justified_pivot','conflicts','uncertain')
     assert search_alignment=='matches' or not (fit_revision or revoke_after_capture)
+    search_negative=search_alignment in ('conflicts','uncertain')
     import httpx
     home.mkdir(exist_ok=True)
     assert not any(home.iterdir()),'fixture requires its newly reserved empty profile'
@@ -87,6 +88,7 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                     value_hypothesis='A bounded understandable result.')
             elif 'opportunities' in data:
                 stage='interpret';assert any(qualifier in excerpt(e) for e in data['opportunities'])
+                assert data['search_context']['current_owner_search_request_supplied'] is False
                 item=next(e for e in data['opportunities'] if qualifier in excerpt(e))
                 assert item['provenance_metadata']['source_title_available'] is False
                 assert item['provenance_metadata']['title_is_placeholder'] is True
@@ -96,7 +98,9 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                         for n in ('user_value','urgency','novelty','confidence','risk','interruption_cost')})]}
             elif 'expression_binding' in data:
                 from final_review_fixture import controlled_final_findings
-                assert data['expression_binding']['final_assessment_scope'] == 'factual-support-and-communication-fit-v7'
+                assert data['expression_binding']['final_assessment_scope'] == 'factual-support-and-communication-fit-v8'
+                assert data['search_context']['kind']=='configured-discovery-route-v1'
+                assert data['search_context']['current_owner_search_request_supplied'] is False
                 conflict=fit_revision and 'DENSE_TEST_OPENING' in data['candidate']['text']
                 stage='final';value=controlled_final_findings(data,
                     fit='conflicts' if conflict else 'fits',
@@ -109,10 +113,12 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                     for x in data['meaning']['atoms']],added_claims_detected=False,speech_act_preserved=True,protected_literals_preserved=True)
             elif 'meaning' in data:
                 stage='author';assert qualifier in raw
+                assert data['expression_context']['search_context']['kind']=='configured-discovery-route-v1'
+                assert 'not a current research request' in body['messages'][0]['content']
                 assert any(e['provenance_metadata'].get('title_is_placeholder') is True
                     for e in data['expression_context']['source_evidence'])
                 value=qualifier+' [Source](<'+url+'>)'
-                if search_alignment!='matches' and data.get('correction'):
+                if search_negative and data.get('correction'):
                     assert 'review-anchored' in body['messages'][0]['content'] or 'Repair the supplied' in body['messages'][0]['content']
                     stage='abstain';value={'abstain':True}
                 if fit_revision:
@@ -165,7 +171,7 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                 print('HERMES_ALIVE_NATIVE_CAPTURE_REVOCATION_OK',flush=True)
                 return
             result=await native.step(binding.arguments['build_parameters']())
-            if search_alignment!='matches':
+            if search_negative:
                 assert result.disposition=='content_review_attention',result
                 assert result.prepared is not None and result.prepared.authorization is None
                 assert result.prepared.attempt_event_id is None and result.submission is None
@@ -192,7 +198,8 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
         print('HERMES_ALIVE_CORE_SOURCE_READING_DEPTH_OK '+json.dumps(dict(stages=stages,
             requested_windows=[6000,15000],local_adapter_submissions=1,physical_sends=0,actual_model_inference=False,
             qualification_after_old_window_preserved=True,untitled_extracts_retained=True,
-            final_facts_and_fit_exercised=True,source_led_revision_exercised=fit_revision,quality_rounds=0)),flush=True)
+            final_facts_and_fit_exercised=True,source_led_revision_exercised=fit_revision,
+            search_alignment=search_alignment,quality_rounds=0)),flush=True)
     finally:
         if manager is not None:manager.unload()
         core.reset_hermes_home_override(token)

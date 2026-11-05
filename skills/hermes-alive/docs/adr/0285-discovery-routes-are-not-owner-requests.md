@@ -1,6 +1,6 @@
 # ADR-0285 — Discovery routes are not current owner requests
 
-Date: 2026-11-05. Status: observed defect; implementation pending.
+Date: 2026-11-05. Status: development candidate; real-model qualification pending.
 
 ## Evidence
 
@@ -46,6 +46,17 @@ existing model call; no extra judge, keyword gate, topic quota, routing override
 or relaxation of send authority follows from this change.
 
 ## Qualification required
+
+New interpretation starts bind a route-aware source-review contract. The host
+reconstructs configured-route provenance into interpretation, authoring and
+final-review snapshots, including the existing correction invocation. Historical
+review scopes retain their prior schemas and prompts. The response fields and
+one-review budget are unchanged. Pure propagation/pivot controls and cold
+recovery of historical boundary, fit, flat and first search contracts pass.
+Actual Core matched-source correction, useful-departure, conflict and uncertainty
+paths pass with role assertions at interpretation, authoring and final review.
+Negative paths create no send authorization or adapter call. The broader current
+candidate suite and real semantic/usefulness qualification remain pending.
 
 Prove role propagation and old-contract cold recovery, then exercise actual Core
 matched, useful-departure, unsupported-request-attribution and unresolved cases.

@@ -339,10 +339,13 @@ class SourceSupportReviewer:
         if purpose_receipt is not None:
             primary = next(s for s in sources if s.agenda_item_id == candidate.action.agenda_item_id)
             if primary.content.get('origin_kind', 'discovery') == 'discovery':
-                from .research_evidence import resolve_search_purpose
+                from .research_evidence import resolve_search_purpose, configured_route_context
                 data['approved_search_queries'] = resolve_search_purpose(
                     self.interpreter.reader, subject=subject, receipt_id=purpose_receipt,
                     before_sequence=start.sequence)
+                role = configured_route_context(start.event.payload.get('interpreter_method',{}).get('discovery_source_review'))
+                if role is not None:
+                    data['search_context'] = role
         from .research_evidence import RESEARCH_MESSAGE_BUDGET
         budget=RESEARCH_MESSAGE_BUDGET if start.event.payload.get('research_read_receipt_ids') else 40000
         if len(json.dumps(data, ensure_ascii=False)) > budget:

@@ -495,18 +495,23 @@ class SemanticComparator:
                 if discovery else _RENDER_PROMPT)
             from .review_contracts import (FIRST_CONVERSATIONAL_REVIEW, FIRST_WITNESS_REVIEW,
                                            FIRST_PASSAGE_REVIEW, FIRST_LABELLED_REVIEW,
-                                           FIRST_FLAT_REVIEW, SPLIT_SOURCE_REVIEW)
+                                           FIRST_FLAT_REVIEW, FIRST_SEARCH_REVIEW, SPLIT_SOURCE_REVIEW)
             if discovery and expression_context.get('semantic_source_contract') in (
                     FIRST_CONVERSATIONAL_REVIEW, FIRST_WITNESS_REVIEW, FIRST_PASSAGE_REVIEW,
-                    FIRST_LABELLED_REVIEW, FIRST_FLAT_REVIEW, SPLIT_SOURCE_REVIEW):
+                    FIRST_LABELLED_REVIEW, FIRST_FLAT_REVIEW, FIRST_SEARCH_REVIEW, SPLIT_SOURCE_REVIEW):
                 render_system += _DISCOVERY_CHAT_GUIDANCE
-            if discovery and 'approved_search_queries' in expression_context:
+            configured_route = bool(discovery and expression_context.get('search_context',{}).get(
+                'kind')=='configured-discovery-route-v1')
+            if discovery and 'approved_search_queries' in expression_context and not configured_route:
                 render_system += ('\nUse the original search scope to distinguish a matching discovery '
                     'from background. Do not imply the source is current or in scope without evidence.')
             if correction_method == LOCAL_CORRECTION_METHOD:
                 render_system=CORRECTION_PROMPT
             elif correction_method == SOURCE_REVISION_METHOD:
                 render_system += '\n' + SOURCE_REVISION_PROMPT
+            if configured_route:
+                from .research_evidence import ROUTE_SEARCH_GUIDANCE
+                render_system += ROUTE_SEARCH_GUIDANCE
             response = await asyncio.wait_for(call(
                 task="alive_semantic_render", model=renderer_model,
                 messages=[{"role": "system", "content": render_system},

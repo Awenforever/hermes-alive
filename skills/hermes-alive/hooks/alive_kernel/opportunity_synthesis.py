@@ -1296,9 +1296,13 @@ class OpportunitySynthesizer:
         if inquiry_item_ids:
             prompt_data['tentative_discovery_tasks'] = inquiries
         if search_purpose_receipt_id is not None:
-            from .research_evidence import resolve_search_purpose
+            from .research_evidence import resolve_search_purpose, configured_route_context
             prompt_data['approved_search_queries'] = resolve_search_purpose(
                 self.reader, subject=subject, receipt_id=search_purpose_receipt_id)
+            role = configured_route_context(SPLIT_SOURCE_REVIEW) if recipient_meaning and (
+                focus or _DISCOVERY_AUTHORING=='source-led-v2') else None
+            if role is not None:
+                prompt_data['search_context'] = role
         prompt=json.dumps(prompt_data,ensure_ascii=False,separators=(',',':'))
         if len(prompt)>budget:
             raise OpportunitySynthesisError('current context leaves no source recall budget')
@@ -1372,8 +1376,8 @@ class OpportunitySynthesizer:
                 'must-mention inventory on a recipient message.')
         if assess_reading:system_prompt+='\n'+reading_assessment.REFERENCE_GUIDANCE
         if search_purpose_receipt_id is not None:
-            from .research_evidence import SEARCH_PURPOSE_GUIDANCE
-            system_prompt += SEARCH_PURPOSE_GUIDANCE
+            from .research_evidence import SEARCH_PURPOSE_GUIDANCE, ROUTE_SEARCH_GUIDANCE
+            system_prompt += (ROUTE_SEARCH_GUIDANCE if 'search_context' in prompt_data else SEARCH_PURPOSE_GUIDANCE)
         if material_scope is not None and material_scope.get('method')=='bound-material-pool-v2':
             prompt_data['stage_contract']['eligible_primary_agenda_ids']=[e.agenda_item_id for e in candidate_evidence]
             prompt=json.dumps(prompt_data,ensure_ascii=False,separators=(',',':'))

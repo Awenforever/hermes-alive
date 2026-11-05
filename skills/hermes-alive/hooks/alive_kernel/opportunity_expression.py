@@ -198,10 +198,13 @@ class OpportunityExpressionStore(SemanticReviewStore):
                 context.pop(field, None)
         purpose_receipt = start.event.payload.get('search_purpose_receipt_id')
         if purpose_receipt is not None:
-            from .research_evidence import resolve_search_purpose
+            from .research_evidence import resolve_search_purpose, configured_route_context
             context['approved_search_queries'] = resolve_search_purpose(
                 interpreter.reader, subject=subject, receipt_id=purpose_receipt,
                 before_sequence=start.sequence)
+            role = configured_route_context(start.event.payload.get('interpreter_method',{}).get('discovery_source_review'))
+            if role is not None:
+                context['search_context'] = role
         from .review_contracts import SPLIT_SOURCE_REVIEW_CONTRACTS
         review_contract=start.event.payload.get('interpreter_method',{}).get('discovery_source_review')
         if review_contract in ('bounded-group-source-v1',*SPLIT_SOURCE_REVIEW_CONTRACTS):

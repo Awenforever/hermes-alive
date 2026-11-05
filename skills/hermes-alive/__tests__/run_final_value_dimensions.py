@@ -200,10 +200,39 @@ def test_independent_search_alignment():
     assert validate_retained(result, witness_snapshot=snapshot)['verdict'] == 'supported'
 
 
+def test_configured_route_provenance():
+    from alive_kernel.research_evidence import configured_route_context, ROUTE_SEARCH_GUIDANCE
+    from alive_kernel.review_contracts import ROUTE_AWARE_REVIEW, FIRST_SEARCH_REVIEW, ROUTE_FIT_ASSESSMENT
+    from alive_kernel.final_value_findings import ROUTE_FIT_PROMPT
+    assert configured_route_context(FIRST_SEARCH_REVIEW) is None
+    role = configured_route_context(ROUTE_AWARE_REVIEW)
+    assert role['current_owner_search_request_supplied'] is False
+    role['current_owner_search_request_supplied'] = True
+    assert configured_route_context(ROUTE_AWARE_REVIEW)['current_owner_search_request_supplied'] is False
+    snapshot = {'expression_binding': {'final_assessment_scope': ROUTE_FIT_ASSESSMENT},
+        'search_context': configured_route_context(ROUTE_AWARE_REVIEW),
+        'candidate': {'text': 'A concrete unexpected trial used an existing instrument.'},
+        'evidence': [{'event_id': 'trial', 'excerpt': 'A concrete unexpected trial used an existing instrument.'}],
+        'approved_search_queries': ['A different collection route.']}
+    wire = dict(facts='supported', fact_reason='Directly stated trial.', fit='fits',
+        fit_reason='A concrete useful unexpected result, not a user assignment.',
+        recipient_evidence=[], search_alignment='justified_pivot',
+        scope_reason='The result has its own supported value; no claim of fulfilling the query.',
+        source_witnesses=[{'claim': 'used an existing instrument', 'passage_id': 'P1.1'}])
+    reviewer = object.__new__(ExpressionSourceSupportReviewer)
+    assert reviewer.prompt_for_snapshot(snapshot) == ROUTE_FIT_PROMPT
+    prompt, request = reviewer._assessment_request(snapshot)
+    assert ROUTE_SEARCH_GUIDANCE in prompt and request['search_context'] == snapshot['search_context']
+    result = parse(json.dumps(wire), witness_snapshot=snapshot)
+    assert result['verdict'] == 'supported'
+    assert validate_retained(result, witness_snapshot=snapshot) == result
+
+
 if __name__ == '__main__':
     test_dimensions()
     test_old_and_new_contracts()
     test_negative_reason_reaches_existing_correction()
     test_source_witness_binding()
     test_independent_search_alignment()
+    test_configured_route_provenance()
     print('FINAL_VALUE_DIMENSIONS_OK')

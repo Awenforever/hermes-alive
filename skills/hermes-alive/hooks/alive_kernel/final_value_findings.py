@@ -4,7 +4,7 @@ The host combines the model's explicit judgments; it does not classify prose or
 infer recipient preferences. Existing lifecycle consumers retain one verdict.
 """
 from .model_json import parse_model_json
-from .review_contracts import FLAT_ASSESSMENTS, SEARCH_FIT_ASSESSMENT, LABELLED_ASSESSMENTS, PASSAGE_FIT_ASSESSMENT
+from .review_contracts import FLAT_ASSESSMENTS, SEARCH_ASSESSMENTS, LABELLED_ASSESSMENTS, PASSAGE_FIT_ASSESSMENT
 
 
 PROMPT = """Assess this actual message under the supplied source evidence,
@@ -140,9 +140,16 @@ is at most 1500 characters. This third judgment grants no execution authority.
 """
 
 
+ROUTE_FIT_PROMPT = SEARCH_FIT_PROMPT + """
+The host's search_context describes the collection route's provenance. It is
+distinct from a current recipient request; judge the actual role supplied.
+Do not promote a route or internal hypothesis into a statement by the user.
+"""
+
+
 def _search_scope(snapshot):
     return (snapshot is not None and snapshot.get('expression_binding', {}).get(
-        'final_assessment_scope') == SEARCH_FIT_ASSESSMENT)
+        'final_assessment_scope') in SEARCH_ASSESSMENTS)
 
 
 def _with_search(findings, search, snapshot):
