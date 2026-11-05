@@ -875,8 +875,13 @@ candidate while a Core job was still scheduled. Both installs kept the
 same job definition and work identity, preserved the keys, and left the
 work eligible without a second submission. Core then executed the job
 and a cold process associated the result with the original work record.
-This covers queued work. It does not exercise a source swap during active
-tool execution or a lost external outcome across rollback.
+In the running-work variant, Core had entered a controlled model request
+and the response was held across the same two runtime installs. Both
+versions preserved the running job, the keys and the original authority.
+After release, Core completed the single job and a cold process linked
+the result to the original work. This covers a running Core worker with
+controlled effects. It does not establish crash recovery during an
+external effect or a lost external outcome across rollback.
 
 The repeated archaeology search returned a retrospective article rather
 than the prior event preview. Two real Core follow-up turns recovered the
