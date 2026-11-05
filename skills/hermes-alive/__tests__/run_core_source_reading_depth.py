@@ -12,7 +12,9 @@ import run_core_session_routing as core
 from run_core_guided_setup import cli
 
 
-async def test(home,*,fit_revision=False,revoke_after_capture=False):
+async def test(home,*,fit_revision=False,revoke_after_capture=False,search_alignment='matches'):
+    assert search_alignment in ('matches','conflicts','uncertain')
+    assert search_alignment=='matches' or not (fit_revision or revoke_after_capture)
     import httpx
     home.mkdir(exist_ok=True)
     assert not any(home.iterdir()),'fixture requires its newly reserved empty profile'
@@ -99,6 +101,9 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False):
                 stage='final';value=controlled_final_findings(data,
                     fit='conflicts' if conflict else 'fits',
                     reason='Synthetic whole-form mismatch.' if conflict else 'Synthetic form fits the situation.')
+                if search_alignment!='matches':
+                    assert data.get('approved_search_queries')==['synthetic public observation']
+                    value.update(search_alignment=search_alignment,scope_reason='Synthetic unresolved search scope.')
             elif 'meaning' in data and 'candidate' in data:
                 stage='semantic';value=dict(atom_reviews=[dict(atom_id=x['atom_id'],preserved=True,risks=[])
                     for x in data['meaning']['atoms']],added_claims_detected=False,speech_act_preserved=True,protected_literals_preserved=True)
@@ -107,6 +112,9 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False):
                 assert any(e['provenance_metadata'].get('title_is_placeholder') is True
                     for e in data['expression_context']['source_evidence'])
                 value=qualifier+' [Source](<'+url+'>)'
+                if search_alignment!='matches' and data.get('correction'):
+                    assert 'review-anchored' in body['messages'][0]['content'] or 'Repair the supplied' in body['messages'][0]['content']
+                    stage='abstain';value={'abstain':True}
                 if fit_revision:
                     if data.get('correction'):
                         assert 'may change the opening, focus, ordering and depth' in body['messages'][0]['content']
@@ -157,6 +165,20 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False):
                 print('HERMES_ALIVE_NATIVE_CAPTURE_REVOCATION_OK',flush=True)
                 return
             result=await native.step(binding.arguments['build_parameters']())
+            if search_alignment!='matches':
+                assert result.disposition=='content_review_attention',result
+                assert result.prepared is not None and result.prepared.authorization is None
+                assert result.prepared.attempt_event_id is None and result.submission is None
+                assert stages.count('final')==1 and stages.count('abstain')==1 and not sent
+                setup=importlib.import_module(loaded.module.__name__+'.kernel_setup_bridge')
+                journal=setup.setup_store(binding).journal
+                review=journal.get(result.prepared.initial_final_review_event_id)
+                assert review.event.payload['verdict']==('unsupported' if search_alignment=='conflicts' else 'uncertain')
+                assert not journal.read(event_type='dispatch.started')
+                assert not journal.read(event_type='action.authorization_evaluated')
+                assert not native.pending
+                print('HERMES_ALIVE_CORE_SEARCH_ALIGNMENT_REFUSAL_OK '+search_alignment,flush=True)
+                return
             assert result.disposition=='submitted',result
             assert not native.pending
         assert reads==[('web_search',dict(query='synthetic public observation',limit=3)),
@@ -190,7 +212,8 @@ if __name__=='__main__':
     succeeded=False
     try:
         asyncio.run(test(directory,fit_revision=os.environ.get('HERMES_ALIVE_TEST_FIT_REVISION')=='1',
-                         revoke_after_capture=os.environ.get('HERMES_ALIVE_TEST_CAPTURE_REVOCATION')=='1'))
+                         revoke_after_capture=os.environ.get('HERMES_ALIVE_TEST_CAPTURE_REVOCATION')=='1',
+                         search_alignment=os.environ.get('HERMES_ALIVE_TEST_SEARCH_ALIGNMENT','matches')))
         succeeded=True
     finally:
         from hermes_state_registry import close_all_under

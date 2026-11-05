@@ -1,4 +1,4 @@
-"""Two advisory dimensions from one final assessment, never another reviewer.
+"""Advisory dimensions from one final assessment, never another reviewer.
 
 The host combines the model's explicit judgments; it does not classify prose or
 infer recipient preferences. Existing lifecycle consumers retain one verdict.

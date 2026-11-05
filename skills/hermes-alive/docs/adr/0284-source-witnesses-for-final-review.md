@@ -86,3 +86,13 @@ remain mandatory, and earlier receipts keep their original review contracts.
 Controlled regressions establish combination, replay consistency and missing
 judgment rejection. They do not establish model judgment quality. Fresh real
 source trials and follow-up evaluation remain required before any quality credit.
+
+The actual Core controlled source-reading chain also exercised independent
+search conflict and uncertainty while keeping factual support and communication
+fit positive. Each retained the negative final review, reached content-review
+attention after an explicit correction abstention, and created no authorization,
+dispatch start or adapter call. The matched-source correction path still passed.
+These tests establish propagation through the runtime, not the accuracy of the
+model's relevance judgment. An actual November accessibility search produced no
+candidate from its three results and stopped before final review; it earns no
+quality round and does not qualify that new assessment contract.
