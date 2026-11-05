@@ -32,8 +32,11 @@ other-plugin integration and the actual production state must be checked again
 before any deployment. No production approval or release follows from development
 tests. The exact runtime candidate passed the complete portable suite; the later
 negative-fixture and documentation delta has its own actual-Core controls. The
-real-source trial is still pending. Previous green baselines do not automatically
-qualify a changed candidate.
+next real-source trial failed quality: the draft extrapolated beyond its source
+and mistook a configured discovery query for a current owner request. Review
+withheld it; there was no share or ordinary followup. ADR0285 records the missing
+search-role boundary and its pending implementation. Previous green baselines
+do not automatically qualify a changed candidate.
 
 Superseded run-by-run observations, including all known failures, are retained
 in [the November 5 archive](ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-11-05.md).
@@ -159,8 +162,11 @@ records and ADRs0241–0256. Historical detail is retained in
 
 ## Next work in order
 
-Immediate focus: inspect the exact pending regression and real-source results,
-including original outgoing text and ordinary followups. Do not credit silence,
+Immediate focus: carry host-derived discovery-route provenance through the
+existing interpretation, authoring and assessment stages under ADR0285. Verify
+both honest useful departures and false request attribution, preserving old
+receipt semantics, then inspect fresh original text and ordinary followups.
+Do not credit silence,
 controlled judgments or factual correctness as natural usefulness. Then return
 to longitudinal memory, ongoing-work continuity and the remaining platform service
 journeys below. Sharing remains one subgate, not the product definition.

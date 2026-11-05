@@ -296,7 +296,7 @@ fbabb024702d8394fe6af3f145afb25fcb11b0674369aa0d2ece030b485f9f64  ./__tests__/ru
 c820346cb0721a679f22c1e15a59f23616f6d7a70adf2511e45e4a15a13c0e2c  ./__tests__/run_transport_publisher_withdrawal.py
 6210bc2e2fb0f3c78fe10a87ac68b007982a555a90e5c3245924e2c6c71c372f  ./__tests__/run_transport_reconciliation_runtime.py
 ed5065f1271617efd9df6f0c5ef5473d73e343f122df77f5668aa292abca617e  ./__tests__/run_watcher_retention_maintenance.py
-f6d0a1ee141068e59bdfc3de4240552c0afdd6243201e03d3f0d7bdce2b4d440  ./docs/ALIVE_KERNEL_PLAN.md
+3b5499ed88a95d8ae81756f973eff1e83b4b1fe1f5322ca49fea266125ec0b08  ./docs/ALIVE_KERNEL_PLAN.md
 bb1240b8645d5bde807e126c36ee12164e2ad602609064402df28740e0e3b315  ./docs/ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-25.md
 a7115842a8cd05021e657b281efb86655a48bd86294b917a3a324935b8a5383b  ./docs/ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-27.md
 861ecc2a8cdee6d997501ac564de7d11c6ac94b1a202fd5d143c8520acd7f1e5  ./docs/ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-11-05.md
@@ -599,6 +599,7 @@ b3bd07052614d76f2d8dcb611f86ff69e8766364b7ce29e33e686442788d4998  ./docs/adr/028
 805263fc587d3dd31ac5bd732de0d16844573beee2f2860cdd068c3d19d63efa  ./docs/adr/0282-standard-channel-deadline.md
 8e441b45aaee6299dd29d8fffc3762145190cd9c1022069dab20b8015d3d465f  ./docs/adr/0283-conversational-depth-and-attribution.md
 6ae450562523a511ef5313c1de0d5aad06c8b802c34b27610fdcee4775d386c8  ./docs/adr/0284-source-witnesses-for-final-review.md
+1ec828e60db257c2f8c066318b16c8295ef22e5374e8344372a4be6fdbdaae22  ./docs/adr/0285-discovery-routes-are-not-owner-requests.md
 4d6108e5f522390a4f9008265a2681771192c500c4c34a02179e24a238b55332  ./docs/evidence/deepseek-seed-20261012.json
 40941e141314d626c51ad4d22ccc19c76dcf4b770a85daa0881d135089fb75ea  ./docs/evidence/qwen-route-20261012.json
 460cffae94c5494e13515ab9c2dc42331e9fd14260bf4182086d5f3bd9e19114  ./hooks/HOOK.yaml
