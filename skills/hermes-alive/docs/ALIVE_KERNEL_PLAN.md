@@ -870,6 +870,14 @@ actual Gateway reported inactive delivery authority. This exercise called
 the delegation API directly. In-flight work and a production transport
 remain separate checks.
 
+The queued-work exercise installed the older runtime and restored the
+candidate while a Core job was still scheduled. Both installs kept the
+same job definition and work identity, preserved the keys, and left the
+work eligible without a second submission. Core then executed the job
+and a cold process associated the result with the original work record.
+This covers queued work. It does not exercise a source swap during active
+tool execution or a lost external outcome across rollback.
+
 The repeated archaeology search returned a retrospective article rather
 than the prior event preview. Two real Core follow-up turns recovered the
 same source and distinguished the article's account from direct evidence.
@@ -879,6 +887,14 @@ followed the article's structure more closely than a chat message needs.
 The next quality trial should test source-grounded interpretation at the
 depth requested and retain the complete outgoing and follow-up text for
 review. This repeated search adds no credit to the ten-round streak.
+
+A fresh urban-transit trial produced a concrete short opening and two
+source-linked follow-ups. The first still expanded an inference about the
+old rule's motivation into an unsupported account. The second identified
+the inference and the missing measurement conditions. Keep this failure
+alongside the passing synthetic comparison. Subsequent trials must cover
+both focused questions and open-ended questions. A supported answer to
+one does not qualify the other.
 
 October 26–27 qualification notes are retained in
 [the October 27 archive](ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-27.md).

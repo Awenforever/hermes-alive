@@ -73,3 +73,16 @@ into a general claim that unique prefixes eliminate any speed effect.
 Keep negative results within their tested scope as well. This fixture
 tests reasoning under known evidence boundaries. It earns no credit
 toward qualification on fresh sources.
+
+The measured-scope revision passed the same paired fixture. On a fresh
+urban-transit source, it still supplied unsupported motives in the first
+open-ended answer, then identified those as guesses on the second turn.
+Retain both results. A focused benchmark question and a broad invitation
+to explain test different behaviors.
+
+Core's output transform receives final text and turn identifiers. It does
+not supply the user's question or the cited evidence in that callback, and
+the first plugin replacement wins. Keep Alive's default integration at the
+reference and context boundary. Any further evaluation of ordinary Core
+answers should preserve the original output and distinguish the observed
+mistake from a later correction.
