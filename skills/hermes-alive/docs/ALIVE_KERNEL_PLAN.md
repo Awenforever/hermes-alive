@@ -883,6 +883,26 @@ the result to the original work. This covers a running Core worker with
 controlled effects. It does not establish crash recovery during an
 external effect or a lost external outcome across rollback.
 
+Native Windows reached the actual Core source-reading, interpretation,
+selection, authoring, final review, correction and local adapter submission
+path. The unprofiled repeat passed and cleaned its temporary profile.
+The measured failure was the cumulative cost of repeated evidence
+reconstruction inside the 30-second permit. The revised path preserves
+independent start and final checks while sharing validated material within
+each individual check. The exact committed candidate was subsequently installed
+from public Git and passed on the isolated Windows VM, preserving
+the ten baseline state fingerprints and the default launcher. The original
+Git-installed files completed the controlled chain without overlays or timing
+instrumentation. Windows Desktop service behavior
+and external transport are still open.
+
+The final model assessment now records search-purpose alignment separately
+from factual support and communication fit, in the same existing call. It
+allows a justified background pivot without treating interests as hard limits.
+Controlled tests verify explicit uncertainty, rejection and consistent replay;
+the real Core controlled ten-stage chain also passed with the new contract.
+These results do not qualify real model judgment or add a sharing quality round.
+
 The repeated archaeology search returned a retrospective article rather
 than the prior event preview. Two real Core follow-up turns recovered the
 same source and distinguished the article's account from direct evidence.

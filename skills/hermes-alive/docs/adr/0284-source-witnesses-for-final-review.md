@@ -71,3 +71,18 @@ the qualifying streak. A future version should record search-purpose
 alignment separately from recipient fit. It should allow a justified
 background pivot and distinguish it from a direct match. General interest
 or the availability of a related article cannot substitute for that judgment.
+
+The new immutable review contract records a third model judgment in the same
+existing assessment call. Search alignment distinguishes a supported match,
+a justified pivot, a conflict, unresolved scope, and an absent search purpose.
+The reviewer must ground a pivot in an actual conversational need and the
+source's accurately represented role. No keyword, region-domain or date regex
+decides relevance. Recipient preferences remain soft evidence, not a filter.
+The host preserves the separate reasons, refuses conflicts, and retains
+uncertainty rather than upgrading it to a match. Supplied queries cannot be
+dismissed as not applicable. Existing source witnesses and authority checks
+remain mandatory, and earlier receipts keep their original review contracts.
+
+Controlled regressions establish combination, replay consistency and missing
+judgment rejection. They do not establish model judgment quality. Fresh real
+source trials and follow-up evaluation remain required before any quality credit.

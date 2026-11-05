@@ -9,7 +9,7 @@ from alive_kernel import ExperienceJournal, OpportunitySynthesizer
 from alive_kernel.content_vault import ContentReference
 from alive_kernel.expression_support import ExpressionSourceSupportReviewer
 from alive_kernel.review_contracts import (LEGACY_SPLIT_SOURCE_REVIEW, FIRST_FACTS_AND_FIT_REVIEW,
-    FACTS_AND_FIT_ASSESSMENT, SPLIT_SOURCE_REVIEW)
+    FACTS_AND_FIT_ASSESSMENT, SPLIT_SOURCE_REVIEW, FIRST_FLAT_REVIEW, FLAT_FIT_ASSESSMENT)
 
 
 async def test(root, original_contract, original_scope):
@@ -45,4 +45,5 @@ if __name__ == '__main__':
     with tempfile.TemporaryDirectory(prefix='alive-final-value-recovery-') as directory:
         asyncio.run(test(Path(directory) / 'legacy', LEGACY_SPLIT_SOURCE_REVIEW, None))
         asyncio.run(test(Path(directory) / 'first-fit', FIRST_FACTS_AND_FIT_REVIEW, FACTS_AND_FIT_ASSESSMENT))
+        asyncio.run(test(Path(directory) / 'previous-flat', FIRST_FLAT_REVIEW, FLAT_FIT_ASSESSMENT))
     print('FINAL_VALUE_RECOVERY_OK')

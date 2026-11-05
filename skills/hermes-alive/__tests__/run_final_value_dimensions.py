@@ -164,9 +164,46 @@ def test_source_witness_binding():
         raise AssertionError('mixed old and new review fields were accepted')
 
 
+def test_independent_search_alignment():
+    from alive_kernel.final_value_findings import SEARCH_FIT_PROMPT
+    from alive_kernel.review_contracts import SEARCH_FIT_ASSESSMENT
+    snapshot = {'expression_binding': {'final_assessment_scope': SEARCH_FIT_ASSESSMENT},
+        'candidate': {'text': 'A public trial used an existing instrument.'},
+        'evidence': [{'event_id': 'public-trial', 'excerpt': 'A public trial used an existing instrument.'}],
+        'approved_search_queries': ['Current public trials in the specified region.']}
+    wire = dict(facts='supported', fact_reason='The source reports this trial.', fit='fits',
+        fit_reason='A useful plain explanation.', recipient_evidence=[],
+        source_witnesses=[{'claim': 'used an existing instrument', 'passage_id': 'P1.1'}])
+    reviewer = object.__new__(ExpressionSourceSupportReviewer)
+    assert reviewer.prompt_for_snapshot(snapshot) == SEARCH_FIT_PROMPT
+    for alignment, expected in (('matches', 'supported'), ('justified_pivot', 'supported'),
+                                ('conflicts', 'unsupported'), ('uncertain', 'uncertain')):
+        result = parse(json.dumps({**wire, 'search_alignment': alignment,
+            'scope_reason': 'Synthetic explicit scope judgment.'}), witness_snapshot=snapshot)
+        assert result['verdict'] == expected
+        assert result['factual_support']['assessment'] == 'supported'
+        assert result['communication_fit']['assessment'] == 'fits'
+        assert validate_retained(result, witness_snapshot=snapshot) == result
+        tampered = copy.deepcopy(result)
+        tampered['search_alignment']['assessment'] = 'conflicts' if alignment != 'conflicts' else 'matches'
+        try: validate_retained(tampered, witness_snapshot=snapshot)
+        except ValueError: pass
+        else: raise AssertionError('search judgment detached from retained verdict')
+    for extra in ({}, {'search_alignment': 'not_applicable', 'scope_reason': 'No query'},
+                  {'search_alignment': 'matches', 'scope_reason': ''}):
+        try: parse(json.dumps({**wire, **extra}), witness_snapshot=snapshot)
+        except ValueError: pass
+        else: raise AssertionError('missing or inapplicable search judgment admitted')
+    snapshot.pop('approved_search_queries')
+    result = parse(json.dumps({**wire, 'search_alignment': 'not_applicable',
+        'scope_reason': 'No approved search supplied.'}), witness_snapshot=snapshot)
+    assert validate_retained(result, witness_snapshot=snapshot)['verdict'] == 'supported'
+
+
 if __name__ == '__main__':
     test_dimensions()
     test_old_and_new_contracts()
     test_negative_reason_reaches_existing_correction()
     test_source_witness_binding()
+    test_independent_search_alignment()
     print('FINAL_VALUE_DIMENSIONS_OK')

@@ -4,7 +4,7 @@ The host combines the model's explicit judgments; it does not classify prose or
 infer recipient preferences. Existing lifecycle consumers retain one verdict.
 """
 from .model_json import parse_model_json
-from .review_contracts import FLAT_FIT_ASSESSMENT, LABELLED_ASSESSMENTS, PASSAGE_FIT_ASSESSMENT
+from .review_contracts import FLAT_ASSESSMENTS, SEARCH_FIT_ASSESSMENT, LABELLED_ASSESSMENTS, PASSAGE_FIT_ASSESSMENT
 
 
 PROMPT = """Assess this actual message under the supplied source evidence,
@@ -120,6 +120,51 @@ review interval. This is advice, without permission to act or proof of delivery.
 """
 
 
+SEARCH_FIT_PROMPT = FLAT_PROMPT.replace(
+    'exactly these six top-level fields:', 'exactly these eight top-level fields:').replace(
+    '"recipient_evidence":["actual supplied context, if any"],',
+    '"search_alignment":"matches|justified_pivot|conflicts|uncertain|not_applicable",\n'
+    ' "scope_reason":"brief grounded explanation",\n'
+    ' "recipient_evidence":["actual supplied context, if any"],') + """
+Judge search_alignment independently of facts and recipient interest. Use the
+approved_search_queries supplied in this assessment, including their purpose,
+time and geographic scope. A reliable and interesting source can still fail
+to answer that search. Explain matches using supplied evidence for material
+scope constraints; domain names alone do not establish location or date.
+A justified_pivot needs a concrete reason to depart from the search purpose
+and wording that clearly represents the source's actual role, such as background
+rather than a current release. Interest alone does not justify that departure.
+Missing material scope evidence means uncertain, not an assumed match. Use
+not_applicable only when no approved search queries were supplied. scope_reason
+is at most 1500 characters. This third judgment grants no execution authority.
+"""
+
+
+def _search_scope(snapshot):
+    return (snapshot is not None and snapshot.get('expression_binding', {}).get(
+        'final_assessment_scope') == SEARCH_FIT_ASSESSMENT)
+
+
+def _with_search(findings, search, snapshot):
+    if (not isinstance(search, dict) or set(search) != {'assessment', 'reason'}
+            or not isinstance(search['assessment'], str)
+            or search['assessment'] not in (
+                'matches', 'justified_pivot', 'conflicts', 'uncertain', 'not_applicable')):
+        raise ValueError('explicit search alignment required')
+    reason = _reason(search['reason'])
+    if search['assessment'] == 'not_applicable' and snapshot.get('approved_search_queries'):
+        raise ValueError('search alignment cannot omit supplied queries')
+    result = {**findings, 'search_alignment': dict(search)}
+    if search['assessment'] == 'conflicts':
+        result['unsupported_claims'] = [*findings['unsupported_claims'], reason]
+    elif search['assessment'] == 'uncertain':
+        result['uncertainties'] = [*findings['uncertainties'], reason]
+    result['verdict'] = ('unsupported' if result['unsupported_claims'] else
+                         'uncertain' if result['uncertainties'] else 'supported')
+    result['reason'] = (result['unsupported_claims'] or result['uncertainties'] or [findings['reason']])[0]
+    return result
+
+
 def _labelled_passages(source_number, excerpt):
     return [{'passage_id': f'P{source_number}.{number}', 'text': text}
             for number, text in enumerate(_passages(excerpt), 1)]
@@ -221,8 +266,12 @@ def _validate_witnesses(witnesses, snapshot, assessment, *, retained=False):
 def parse(text, *, witness_snapshot=None):
     value = parse_model_json(text, max_chars=32000)
     witnesses = value.pop('source_witnesses', None) if witness_snapshot is not None and isinstance(value, dict) else None
+    search = None
+    if _search_scope(witness_snapshot) and isinstance(value, dict):
+        search = {'assessment': value.pop('search_alignment', None),
+                  'reason': value.pop('scope_reason', None)}
     if (witness_snapshot is not None and witness_snapshot.get('expression_binding', {}).get(
-            'final_assessment_scope') == FLAT_FIT_ASSESSMENT):
+            'final_assessment_scope') in FLAT_ASSESSMENTS):
         if not isinstance(value, dict) or set(value) != {
                 'facts', 'fact_reason', 'fit', 'fit_reason', 'recipient_evidence'}:
             raise ValueError('invalid final review fields')
@@ -242,6 +291,8 @@ def parse(text, *, witness_snapshot=None):
                 'communication_fit': {**fit, 'recipient_evidence': value['recipient_evidence']},
             }
     findings = combine(value)
+    if _search_scope(witness_snapshot):
+        findings = _with_search(findings, search, witness_snapshot)
     if witness_snapshot is not None:
         findings['source_witnesses'] = _validate_witnesses(
             witnesses, witness_snapshot, findings['factual_support']['assessment'])
@@ -250,11 +301,15 @@ def parse(text, *, witness_snapshot=None):
 
 def validate_retained(findings, *, witness_snapshot=None):
     witness_fields = {'source_witnesses'} if witness_snapshot is not None else set()
+    if _search_scope(witness_snapshot):
+        witness_fields.add('search_alignment')
     if not isinstance(findings, dict) or set(findings) != {
             'verdict', 'unsupported_claims', 'uncertainties', 'reason',
             'factual_support', 'communication_fit'} | witness_fields:
         raise ValueError('incomplete retained final assessment')
     rebuilt = combine({key: findings[key] for key in ('factual_support', 'communication_fit')})
+    if _search_scope(witness_snapshot):
+        rebuilt = _with_search(rebuilt, findings['search_alignment'], witness_snapshot)
     if witness_snapshot is not None:
         rebuilt['source_witnesses'] = _validate_witnesses(
             findings['source_witnesses'], witness_snapshot, rebuilt['factual_support']['assessment'], retained=True)

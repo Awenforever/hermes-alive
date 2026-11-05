@@ -138,7 +138,10 @@ async def exercise(root,delegated,transport=False):
         def revoked_launch():
             try:outbox.validate_execution_for_launch(execution,now=anchor+timedelta(seconds=1))
             except DispatchOutboxError as error:
-                assert 'selection inputs' in str(error),str(error)
+                from alive_kernel.source_support import SourceSupportError
+                from alive_kernel.deliberation_synthesis import DeliberationContextChanged
+                assert isinstance(error.__cause__, (SourceSupportError, DeliberationContextChanged)),repr(error)
+                assert not store.journal.read(event_type='delivery.succeeded')
                 return
             raise AssertionError('revoked contact crossed final adapter-launch fence')
         launch_guard=revoked_launch
