@@ -1,6 +1,10 @@
 # ADR-0285 — Discovery routes are not current owner requests
 
-Date: 2026-11-05. Status: development candidate; real-model qualification pending.
+> **2026-11-05 注（Codex，非原文）**: Audience: maintainers and QA. Purpose: architecture decisions, historical evidence and qualification limits.
+
+> **2026-11-05 注（Codex，非原文）**: The initial pending status below is historical. The dated implementation addendum records the subsequent development candidate; it does not grant production or semantic qualification.
+
+Date: 2026-11-05. Status: observed defect; implementation pending.
 
 ## Evidence
 
@@ -47,6 +51,17 @@ or relaxation of send authority follows from this change.
 
 ## Qualification required
 
+Prove role propagation and old-contract cold recovery, then exercise actual Core
+matched, useful-departure, unsupported-request-attribution and unresolved cases.
+Controlled model output establishes runtime wiring only. Use fresh real material
+to inspect the original share and ordinary main followups before claiming useful
+selection or conversational success. Continue longitudinal memory and work gates
+alongside sharing; passing this defect's controls cannot qualify the product.
+
+## Implementation addendum — 2026-11-05, Codex
+
+Status: development candidate; real-model qualification pending.
+
 New interpretation starts bind a route-aware source-review contract. The host
 reconstructs configured-route provenance into interpretation, authoring and
 final-review snapshots, including the existing correction invocation. Historical
@@ -57,10 +72,3 @@ Actual Core matched-source correction, useful-departure, conflict and uncertaint
 paths pass with role assertions at interpretation, authoring and final review.
 Negative paths create no send authorization or adapter call. The broader current
 candidate suite and real semantic/usefulness qualification remain pending.
-
-Prove role propagation and old-contract cold recovery, then exercise actual Core
-matched, useful-departure, unsupported-request-attribution and unresolved cases.
-Controlled model output establishes runtime wiring only. Use fresh real material
-to inspect the original share and ordinary main followups before claiming useful
-selection or conversational success. Continue longitudinal memory and work gates
-alongside sharing; passing this defect's controls cannot qualify the product.

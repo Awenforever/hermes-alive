@@ -1,5 +1,7 @@
 # ADR 0284 — Bind final factual judgments to retained excerpts
 
+> **2026-11-05 注（Codex，非原文）**: Audience: maintainers and QA. Purpose: architecture decisions, historical evidence and qualification limits.
+
 Date 2026-11-04. Development candidate.
 
 An isolated real-model trial passed the final review even though the share

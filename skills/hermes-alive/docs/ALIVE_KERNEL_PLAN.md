@@ -1,5 +1,7 @@
 # Hermes Alive Kernel — Living Development Plan
 
+Audience: maintainers and QA. Purpose: active development planning and acceptance tracking.
+
 Status: active; development branch only, no production acceptance.
 Last reviewed: 2026-11-05 (Asia/Shanghai).
 

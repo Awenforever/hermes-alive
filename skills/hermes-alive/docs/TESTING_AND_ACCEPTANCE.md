@@ -1,5 +1,7 @@
 # Testing and Acceptance
 
+Audience: maintainers and QA. Purpose: test scope, evidence and acceptance criteria.
+
 Reviewed 2026-11-05 (Asia/Shanghai), Codex: historical results below retain their
 original date and scope; they do not qualify the current experimental kernel.
 The current ordered release gates and real-platform lifecycle requirements are

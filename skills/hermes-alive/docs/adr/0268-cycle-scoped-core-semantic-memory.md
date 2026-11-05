@@ -1,5 +1,7 @@
 # ADR 0268 — Separately granted, cycle-scoped Core semantic memory
 
+> **2026-11-05 注（Codex，非原文）**: Audience: maintainers and QA. Purpose: architecture decisions, historical evidence and qualification limits.
+
 Date: 2026-10-28. Status: bounded controlled Native integration passed; real-model
 semantics, longitudinal learning and production/distribution acceptance remain open.
 Implements ADR0267's Native-read proposal; its separate automatic Core-worker
