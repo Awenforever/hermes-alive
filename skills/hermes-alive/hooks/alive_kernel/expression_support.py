@@ -179,7 +179,10 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
         binding=snapshot.get('expression_binding',{})
         header=self.journal.get(snapshot.get('candidate',{}).get('id',''))
         if header is None:return False
-        stored=self.expressions._selected_draft(binding.get('selection_event_id'),header.event.subject)[1]
+        # Snapshot construction validates the source chain. The interval rule
+        # needs only the current selected candidate and its authority.
+        _, stored=self.expressions._selected_communication(
+            binding.get('selection_event_id'),header.event.subject)
         return stored.selection.candidate.authority is ActionAuthority.USER_DELEGATED
 
     def correction_context(self, review_event_id, *, subject, selection_event_id):

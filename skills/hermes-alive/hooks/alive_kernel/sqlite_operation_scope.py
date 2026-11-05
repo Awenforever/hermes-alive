@@ -18,13 +18,18 @@ _LOG=logging.getLogger(__name__)
 
 class _Scope:
     def __init__(self):
-        self.pid=os.getpid();self.lock=threading.RLock();self.keepers={};self.closed=False
+        self.pid=os.getpid();self.lock=threading.RLock();self.keepers={};self.aliases=set();self.closed=False
 
     def hold(self,path):
         if self.pid!=os.getpid():return
-        key=os.path.normcase(str(Path(path).resolve()))
+        path=Path(path)
+        alias=str(path if path.is_absolute() else Path.cwd()/path)
         with self.lock:
-            if self.closed or key in self.keepers or len(self.keepers)>=16:return
+            if self.closed or alias in self.aliases or len(self.keepers)>=16:return
+            key=os.path.normcase(str(Path(alias).resolve()))
+            if key in self.keepers:
+                if len(self.aliases)<32:self.aliases.add(alias)
+                return
             connection=None
             try:
                 # Never recreate a file concurrently removed by its owner.
@@ -35,6 +40,7 @@ class _Scope:
                 cursor.fetchone();cursor.close()
                 assert not connection.in_transaction
                 self.keepers[key]=connection
+                if len(self.aliases)<32:self.aliases.add(alias)
             except sqlite3.Error:
                 if connection is not None:connection.close()
                 # This is an optimization, never an alternate database or an
@@ -46,6 +52,7 @@ class _Scope:
         with self.lock:
             self.closed=True
             connections=tuple(self.keepers.values());self.keepers.clear()
+            self.aliases.clear()
             for connection in connections:connection.close()
 
 

@@ -2,6 +2,7 @@
 import asyncio,json,sqlite3,sys,tempfile,threading
 from contextlib import closing
 from pathlib import Path
+from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'hooks'))
 from alive_kernel import ExperienceJournal,EventEnvelope
 from alive_kernel.content_vault import ContentVault,ContentUnavailableError
@@ -16,6 +17,9 @@ async def test(root):
         for _ in range(3):
             assert vault.resolve_json(ref.content_id,expected_subject='user:test',expected_purpose='test')=={'fact':'public synthetic value'}
         assert len(scope.keepers)==2
+        with patch.object(Path,'resolve',side_effect=AssertionError('known keeper path resolved again')):
+            hold_sqlite_resource(journal.path)
+            hold_sqlite_resource(vault.path)
         with sqlite_operation_scope() as nested:
             assert nested is scope
             event=journal.append(EventEnvelope(event_type='synthetic.changed',source='test',actor='user:test',subject='user:test',payload={}))

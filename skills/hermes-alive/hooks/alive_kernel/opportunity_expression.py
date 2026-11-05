@@ -48,7 +48,7 @@ class OpportunityExpressionStore(SemanticReviewStore):
         draft, _, _, _ = self._selected_draft_with_sources(selection_event_id, subject)
         return draft
 
-    def _selected_draft_with_sources(self, selection_event_id, subject):
+    def _selected_communication(self, selection_event_id, subject):
         source = self.journal.get(selection_event_id)
         if (source is None or source.event.event_type != 'deliberation.selected'
                 or source.event.subject != subject):
@@ -65,6 +65,11 @@ class OpportunityExpressionStore(SemanticReviewStore):
                 or candidate.side_effect is not SideEffect.COMMUNICATION
                 or not candidate.candidate_id.startswith('opportunity-candidate:')):
             raise SemanticReviewError('selection is not a generated communication draft')
+        return source, stored
+
+    def _selected_draft_with_sources(self, selection_event_id, subject):
+        source, stored = self._selected_communication(selection_event_id, subject)
+        candidate = stored.selection.candidate
         try:
             self._validator().validate_candidate_sources(
                     (candidate,), dict(stored.candidate_contents), subject, source.event.sensitivity)

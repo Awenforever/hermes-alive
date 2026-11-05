@@ -64,3 +64,22 @@ On the outbox path without a review witness, derive the review requirement
 from the proposal already checked by selection-source validation. Discovery
 still requires its witness and exact expression. Other expressions do not
 repeat the source reconstruction just to answer this policy question.
+
+## Native Windows profiling
+
+The installed Windows test reached the launch check on one run and
+failed before attempt admission on two further runs. One authorization
+evaluation took 32.2 seconds. The profile attributed 24.4 seconds to
+final witness verification, including repeated selection reconstruction.
+It also recorded 1,864 SQLite keeper lookups taking 4.9 seconds,
+mostly in Windows filesystem path resolution. These timings overlap.
+
+Remember the spellings of successfully opened keeper paths within the
+same bounded operation. The keeper still holds no data or transaction.
+Queries keep using their own connections, and a new operation resolves
+paths afresh. The review-window rule now resolves the current selected
+communication and checks its authority without reconstructing the full
+draft. Source verification remains in snapshot construction, and later
+authorization and launch checks still revalidate independently. The
+stored snapshot and prompt formats stay the same. Measure both changes
+again on native Windows.
