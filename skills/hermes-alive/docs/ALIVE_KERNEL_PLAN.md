@@ -30,15 +30,23 @@ remain open. WSL stays a thin check under the owner's scope decision.
 The current test supplier is official Core 0.22.5. Production admission,
 other-plugin integration and the actual production state must be checked again
 before any deployment. No production approval or release follows from development
-tests. The exact runtime candidate passed the complete portable suite; the later
-negative-fixture and documentation delta has its own actual-Core controls. The
-next real-source trial failed quality: the draft extrapolated beyond its source
+tests. The earlier search-alignment runtime passed the complete portable suite.
+The current route-aware candidate's broad run stopped at a fixture's stale
+prompt-wording assertion. Its contract-based share, primary-read and replay
+controls now pass; the complete current suite remains unqualified. The preceding real-source
+trial failed quality: the draft extrapolated beyond its source
 and mistook a configured discovery query for a current owner request. Review
 withheld it; there was no share or ordinary followup. ADR0285 records the missing
 search-role boundary. Its new host-derived route-aware candidate passes initial
 propagation and matched-source correction controls; real-model qualification and
 the remaining controls are pending. Previous green baselines
 do not automatically qualify a changed candidate.
+
+An actual-Core controlled external-memory journey also passes provider correction
+and deletion between three Native cycles: old advice, corrected advice, then no
+advice. It uses Core's real provider tool dispatch and preserves private/public
+boundaries. This is not conversational learning, useful task attainment,
+in-flight erasure or cold-recovery qualification; see ADR0268.
 
 Superseded run-by-run observations, including all known failures, are retained
 in [the November 5 archive](ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-11-05.md).

@@ -19,7 +19,7 @@ from unittest.mock import patch
 if __name__=='__main__' and not os.environ.get('ALIVE_NATIVE_MEMORY_CASE'):
     with tempfile.TemporaryDirectory(prefix='alive-native-memory-') as directory:
         for mode in ('granted','old-grant','declined','invalid-query','work','old-grant-work',
-                'refine','refine-stop','refine-repeat','refine-invalid'):
+                'refine','refine-stop','refine-repeat','refine-invalid','updates'):
             env={**os.environ,'HOME':directory,'HERMES_HOME':str(Path(directory)/mode),
                 'ALIVE_NATIVE_MEMORY_CASE':mode,'PYTHONDONTWRITEBYTECODE':'1'}
             result=subprocess.run([sys.executable,'-B',__file__,*sys.argv[1:]],env=env,
@@ -36,7 +36,8 @@ from run_core_guided_setup import cli
 
 async def exercise(home):
     mode=os.environ['ALIVE_NATIVE_MEMORY_CASE'];granted=mode not in ('old-grant','old-grant-work')
-    has_context=mode in ('granted','work','refine');work_case=mode in ('work','old-grant-work','refine')
+    has_context=mode in ('granted','work','refine','updates');work_case=mode in ('work','old-grant-work','refine')
+    phase={'number':1,'expected':'amber counters'}
     home.mkdir(exist_ok=True)
     shutil.copytree(core.repo,home/'plugins/hermes-alive')
     shutil.copytree('/holo-catalog',home/'plugins/holographic',ignore=shutil.ignore_patterns('.git','__pycache__'))
@@ -47,7 +48,7 @@ async def exercise(home):
     (home/'config.yaml').write_text(json.dumps(cfg),encoding='utf-8')
     package=types.ModuleType('alive_native_memory_legacy');package.__path__=['/legacy'];sys.modules[package.__name__]=package
     legacy=importlib.import_module(package.__name__+'.store').MemoryStore(home/'memory_store.db')
-    try:legacy.add_fact('Sable uses amber counters for classroom arithmetic.','preference','public synthetic')
+    try:fact_id=legacy.add_fact('Sable uses amber counters for classroom arithmetic.','preference','public synthetic')
     finally:legacy.close()
     rc,staged=cli(home,'setup','--confirm-model-calls','--confirm-delivery','--confirm-outbound-retention',
         *(('--confirm-followup-management','--confirm-core-background-work','--confirm-autonomous-core-work') if work_case else ()),
@@ -104,9 +105,10 @@ async def exercise(home):
         from tools.registry import registry
         def public_search(arguments,**kwargs):
             searches.append(arguments)
-            assert 'amber counters' not in json.dumps(arguments) and 'Sable' not in json.dumps(arguments)
+            assert not any(term in json.dumps(arguments) for term in ('amber counters','blue wooden blocks','Sable'))
             return json.dumps({'success':True,'data':{'web':[{'url':'https://example.invalid/memory-context',
-                'title':'Synthetic classroom resource','description':'Public synthetic listing; no verified new finding.'}]}})
+                'title':'Synthetic classroom resource','description':('Public synthetic listing; no verified new finding.'
+                    + (' Different public material '+str(phase['number']) if mode=='updates' else ''))}]}})
         registry.register(name='web_search',toolset='web',schema={'name':'web_search',
             'description':'Public synthetic no-network search','parameters':{'type':'object'}},
             handler=public_search,override=True,scope=str(home))
@@ -118,7 +120,8 @@ async def exercise(home):
                 text=json.dumps(kwargs['messages'],ensure_ascii=False)
                 if kwargs['task']=='alive_private_memory_query':
                     assert granted and 'Sable' in text
-                    assert 'amber counters' not in text,'query planner received the answer before retrieval'
+                    assert not any(fact in text for fact in ('amber counters','blue wooden blocks')), \
+                        'query planner received the answer before retrieval'
                     if mode.startswith('refine'):
                         miss="What is Sable's usual teaching aid for classroom arithmetic, and what arithmetic topics or activity formats work best for her?"
                         supplied=json.loads(kwargs['messages'][-1]['content'])
@@ -149,7 +152,12 @@ async def exercise(home):
                     assert 'amber counters' not in text,'private recall entered public reading planner'
                     document={'source_refs':[],'question':None,'value_hypothesis':'No new material in this public synthetic search.'}
                 elif kwargs['task']=='alive_opportunity_candidates':
-                    cognition.append({'has_fact':'amber counters' in text,'has_advisory_kind':'core_recalled_advisory' in text})
+                    if mode=='updates':
+                        observed={fact:fact in text for fact in ('amber counters','blue wooden blocks')}
+                        assert observed=={fact:fact==phase['expected'] for fact in observed},observed
+                    cognition.append({'has_fact':(phase['expected'] in text if mode=='updates' and phase['expected']
+                        else False if mode=='updates' else 'amber counters' in text),
+                        'has_advisory_kind':'core_recalled_advisory' in text})
                     assert cognition[-1]['has_fact'] is has_context,cognition[-1]
                     if has_context:assert cognition[-1]['has_advisory_kind']
                     assert 'Prefer brief grounded explanations.' in text
@@ -165,21 +173,47 @@ async def exercise(home):
             read_queries.append(query)
             return original_read(self,query)
         async def allow(self,url):return url=='https://example.invalid/memory-context'
+        def memory_action(action,**fields):
+            # A controlled owner mutation through Core's actual external-provider
+            # tool boundary, not an edit to provider tables or an Alive memory copy.
+            from plugins.memory import load_memory_provider
+            from agent.memory_manager import MemoryManager
+            manager=MemoryManager()
+            try:
+                manager.add_provider(load_memory_provider('holographic',register_skills=False))
+                assert manager.initialize_for_agent(session_id=entry.session_id,hermes_home=str(home),
+                    platform='telegram',agent_context='primary',user_id=source.user_id,chat_id=source.chat_id)
+                result=json.loads(manager.handle_tool_call('fact_store',{'action':action,'fact_id':fact_id,**fields}))
+                assert result.get('updated' if action=='update' else 'removed') is True,result
+            finally:manager.shutdown_all()
         with patch.object(execution.kernel('core_discovery_tools').CoreDiscoveryTools,'allow_url',allow), \
                 patch.object(capability,'read',observed_read):
             first=await native.step(binding.arguments['build_parameters']())
+            if mode=='updates':
+                assert cognition and cognition[-1]['has_fact']
+                memory_action('update',content='Sable uses blue wooden blocks for classroom arithmetic.',origin='said')
+                phase.update(number=2,expected='blue wooden blocks')
             second=await native.step(binding.arguments['build_parameters']())
+            if mode=='updates':
+                assert len(cognition)>=2 and cognition[-1]['has_fact']
+                memory_action('remove')
+                phase.update(number=3,expected=None);has_context=False
             before_third=calls.count('alive_private_memory_query')
             third=await native.step(binding.arguments['build_parameters']())
-            assert calls.count('alive_private_memory_query')==before_third,'unchanged semantic inputs repeated query planning'
+            if mode=='updates':
+                assert len(cognition)>=3 and not cognition[-1]['has_fact'] and not cognition[-1]['has_advisory_kind']
+                assert native.private_context.last_status=='no_usable_context_returned'
+                assert len(read_queries)>=3
+            else:
+                assert calls.count('alive_private_memory_query')==before_third,'unchanged semantic inputs repeated query planning'
         assert first.disposition in ('silence','waiting_for_change'),first.disposition
         assert second.disposition in ('silence','waiting_for_change'),second.disposition
         assert cognition and searches,{'calls':calls,'first':first.disposition,'second':second.disposition,'third':third.disposition,
             'memory':native.private_context.last_status if granted else None,'searches':len(searches)}
-        assert 1<=calls.count('alive_private_memory_query')<=(4 if mode.startswith('refine') else 2) if granted else calls.count('alive_private_memory_query')==0,calls
+        assert 1<=calls.count('alive_private_memory_query')<=(5 if mode=='updates' else 4 if mode.startswith('refine') else 2) if granted else calls.count('alive_private_memory_query')==0,calls
         store=importlib.import_module(loaded.module.__name__+'.kernel_setup_bridge').setup_store(binding)
         records=store.journal.read(event_type='memory.core_recall_observed')
-        assert len(records)==(2 if mode=='work' else 1 if has_context else 0),len(records)
+        assert len(records)==(2 if mode in ('work','updates') else 1 if has_context else 0),len(records)
         if work_case:assert calls.count('alive_core_autonomous_work')==1,calls
         if mode.startswith('refine'):
             assert len(read_queries)==(4 if mode=='refine' else 3 if mode=='refine-repeat' else 1),read_queries
@@ -192,7 +226,7 @@ async def exercise(home):
         from cron.jobs import list_jobs
         assert not list_jobs(include_disabled=True)
         serialized='\n'.join(row.event.canonical_json() for row in store.journal.read())
-        assert 'amber counters' not in serialized
+        assert 'amber counters' not in serialized and 'blue wooden blocks' not in serialized
         from_module=importlib.import_module(store.__class__.__module__.rsplit('.',1)[0]+'.cognition_context')
         current=from_module.CognitionContextReader(store.journal).read(subject=store.configuration().subject,clearance='private')
         assert not any(value.kind=='core_recalled_advisory' for value in current),'recall escaped the completed Native cycle'

@@ -271,7 +271,8 @@ async def exercise(root,mode,*,primary_url=None):
             elif task=='alive_source_support':
                 if mode in ('share', 'primary-read', 'replay'):
                     assert data['approved_search_queries'] == ['public museum methods']
-                    assert 'communication-fit conflict' in kw['messages'][0]['content']
+                    assert data['search_context']['kind']=='configured-discovery-route-v1'
+                    assert data['search_context']['current_owner_search_request_supplied'] is False
                 assert data['expression_binding']['assessment_mode']==('discovery-source-and-value-v2'
                     if mode in ('page-failed','legacy-replay','unconsented-followup','historical-followup-replay') else 'discovery-source-and-value-v3')
                 from alive_kernel_testkit import controlled_final_findings

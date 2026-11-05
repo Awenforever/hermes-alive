@@ -87,3 +87,24 @@ audit was clean and the read-only authentication projection had been removed.
 This is one synthetic semantic-recall/no-share case, not longitudinal interest
 learning, real sharing usefulness, provider failover qualification or a fresh
 sharing round. The separate automatic Core-worker framing failure remains open.
+
+## Provider correction and deletion control — 2026-11-05
+
+On the current route-aware candidate, a controlled actual-Core Native journey
+reads a synthetic external preference, changes it through Core MemoryManager's
+real provider tool dispatch, then removes it through that same boundary. The
+following cognition inputs contain respectively the old value, corrected value
+and no recalled advice. No provider table is edited directly. Each phase also
+changes its public synthetic material so an ordinary next decision is exercised.
+
+There are four controlled semantic-query calls, three public searches and two
+content-free recall observations. Neither private value reaches public search
+parameters or the durable Alive journal. The completed cycle exposes no recall
+to subsequent ordinary readers; jobs, real model calls and adapter sends are
+zero. The original process exited zero and its --rm container is absent.
+
+This establishes provider updates between Native cycles, not noisy-conversation
+interpretation, memory-informed useful effects, deletion during an in-flight
+model call, backup erasure, cold Native recovery or long-term learning. The
+earlier worker-framing failure subsequently has the separately bounded real task
+result in ADR0272; neither result closes the wider longitudinal gate.
