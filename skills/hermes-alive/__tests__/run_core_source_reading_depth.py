@@ -16,7 +16,7 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False):
     import httpx
     home.mkdir(exist_ok=True)
     assert not any(home.iterdir()),'fixture requires its newly reserved empty profile'
-    shutil.copytree(core.repo,home/'plugins/hermes-alive')
+    shutil.copytree(core.repo,home/'plugins/hermes-alive',ignore=shutil.ignore_patterns('.git'))
     (home/'config.yaml').write_text(json.dumps({'plugins':{'enabled':['hermes-alive']},
         'model':{'provider':'custom:owner','default':'configured-primary'},
         'custom_providers':[{'name':'owner','model':'configured-primary','base_url':'https://provider.invalid/v1',

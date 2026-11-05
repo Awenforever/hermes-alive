@@ -303,7 +303,7 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
         return assessment
 
     def _require_current_witness(self, witness, *, subject, expression_event_id,
-                                 selection_event_id):
+                                 selection_event_id, clearance=None):
         if (not isinstance(witness, dict) or set(witness) != {
                 'review_event_id', 'interpretation_id', 'require_independence'}
                 or type(witness['require_independence']) is not bool
@@ -317,6 +317,8 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
         if (header is None or header.event.subject != subject
                 or selection is None or selection.event.subject != subject
                 or header.event.sensitivity != selection.event.sensitivity
+                or clearance is not None
+                and tuple(Sensitivity).index(selection.event.sensitivity) > tuple(Sensitivity).index(clearance)
                 or header.event.payload.get('selection_event_id') != selection_event_id):
             raise SourceSupportError('final-wording witness expression mismatch')
         verified = self._verify_current(witness['review_event_id'], subject=subject,

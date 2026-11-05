@@ -5,7 +5,7 @@ from .action_contract import parse_action_contract
 from .communication_plan import validate_communication_plan, plan_atoms, expression_context, validate_recipient_intent
 from .host_discovery import source_prompt_excerpt, read_scope_metadata, provenance_metadata
 from .deliberation import ActionKind, SideEffect
-from .deliberation_synthesis import DeliberationSynthesizer
+from .deliberation_synthesis import DeliberationContextChanged, DeliberationSynthesizer
 from .events import _thaw_json
 from .opportunity_synthesis import OpportunitySynthesizer
 from .semantic_rendering import (MeaningDocument, MessageSpeechAct, SemanticAtom,
@@ -48,17 +48,10 @@ class OpportunityExpressionStore(SemanticReviewStore):
         return draft
 
     def _selected_communication(self, selection_event_id, subject):
-        source = self.journal.get(selection_event_id)
-        if (source is None or source.event.event_type != 'deliberation.selected'
-                or source.event.subject != subject):
-            raise SemanticReviewError('selected opportunity is missing or foreign')
-        frame_id = str(source.event.payload.get('frame_id') or '')
-        self.deliberation.project_new()
-        if self.deliberation.latest_selection_event_id(frame_id) != selection_event_id:
-            raise SemanticReviewError('opportunity is no longer the current intent')
-        stored = self.deliberation.inspect(frame_id, clearance=source.event.sensitivity)
-        if stored is None or stored.selection is None:
-            raise SemanticReviewError('selected opportunity is unavailable')
+        try:
+            source, stored = self._validator()._current_selection(selection_event_id, owner=subject)
+        except DeliberationContextChanged as exc:
+            raise SemanticReviewError('selected opportunity is no longer current') from exc
         candidate = stored.selection.candidate
         if (candidate.action_kind not in (ActionKind.SHARE, ActionKind.ASK)
                 or candidate.side_effect is not SideEffect.COMMUNICATION

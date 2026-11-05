@@ -442,18 +442,34 @@ class SendTimeAuthorizer:
             if selection_event.observed_at > current:
                 reasons.append("selection_from_future")
 
+        witness_text = None
+        if final_wording_witness is not None:
+            from .expression_support import ExpressionSourceSupportReviewer
+            try:
+                assessment, witness_text=ExpressionSourceSupportReviewer(self.journal,
+                    content_vault=self.deliberation.content_vault,
+                    context_vault=self.context_vault)._require_current_witness(final_wording_witness,
+                        subject=owner, expression_event_id=expression_event_id,
+                        selection_event_id=selection_event_id,clearance=sensitivity)
+                if assessment is not None:
+                    current_value_anchor=assessment.assessed_at
+                    current_value_until=(assessment.valid_until or
+                        current_value_anchor+self.MAX_SELECTION_AGE)
+            except ValueError:
+                reasons.append("final_wording_not_current")
         if candidate is not None:
             if delegation_event_id is not None and candidate.authority is not ActionAuthority.USER_DELEGATED:
                 reasons.append("delegation_not_applicable")
             from .deliberation_synthesis import DeliberationSynthesizer, DeliberationContextChanged
-            try:
-                DeliberationSynthesizer(self.journal,
-                    content_vault=self.deliberation.content_vault,
-                    context_vault=self.context_vault).validate_selection_sources(
-                        selection_event_id, owner=owner, sensitivity=sensitivity,
-                        execution=True, expression_event_id=expression_event_id)
-            except DeliberationContextChanged:
-                reasons.append("generated_inputs_not_current")
+            if witness_text is None:
+                try:
+                    DeliberationSynthesizer(self.journal,
+                        content_vault=self.deliberation.content_vault,
+                        context_vault=self.context_vault).validate_selection_sources(
+                            selection_event_id, owner=owner, sensitivity=sensitivity,
+                            execution=True, expression_event_id=expression_event_id)
+                except DeliberationContextChanged:
+                    reasons.append("generated_inputs_not_current")
             if candidate.action_kind is ActionKind.SILENCE:
                 reasons.append("silence_not_executable")
             if self._required_capability(candidate.side_effect) != capability:
@@ -483,11 +499,15 @@ class SendTimeAuthorizer:
                     reasons.append("exact_expression_confirmation_required")
                 else:
                     try:
-                        expressed, expiry = OpportunityExpressionStore(self.journal,
-                            content_vault=self.deliberation.content_vault,
-                            context_vault=self.context_vault).action_contract_for_expression(
-                                expression_event_id=expression_event_id,
-                                selection_event_id=selection_event_id, subject=owner, as_of=current)
+                        if witness_text is not None:
+                            expressed = OpportunityExpressionStore._text_action_contract(witness_text)
+                            expiry = expression_header.event.expires_at
+                        else:
+                            expressed, expiry = OpportunityExpressionStore(self.journal,
+                                content_vault=self.deliberation.content_vault,
+                                context_vault=self.context_vault).action_contract_for_expression(
+                                    expression_event_id=expression_event_id,
+                                    selection_event_id=selection_event_id, subject=owner, as_of=current)
                         content_document = expressed.to_document()
                         reference = self.deliberation.content_vault.put_json(content_document,
                             subject=owner, purpose="deliberation.candidate", sensitivity=sensitivity,
@@ -596,20 +616,6 @@ class SendTimeAuthorizer:
                     reasons.append('final_wording_required')
             except ValueError:
                 reasons.append('final_wording_not_current')
-        if final_wording_witness is not None:
-            from .expression_support import ExpressionSourceSupportReviewer
-            try:
-                assessment=ExpressionSourceSupportReviewer(self.journal,
-                    content_vault=self.deliberation.content_vault,
-                    context_vault=self.context_vault).require_current_witness(final_wording_witness,
-                        subject=owner, expression_event_id=expression_event_id,
-                        selection_event_id=selection_event_id)
-                if assessment is not None:
-                    current_value_anchor=assessment.assessed_at
-                    current_value_until=(assessment.valid_until or
-                        current_value_anchor+self.MAX_SELECTION_AGE)
-            except ValueError:
-                reasons.append("final_wording_not_current")
         if current_value_anchor is not None and (current_value_anchor>current or
                 self.journal.get(final_wording_witness['review_event_id']).event.observed_at>current):
             reasons.append('final_value_assessment_from_future')

@@ -294,6 +294,37 @@ class DeliberationSynthesizer:
                 "deliberation context changed while awaiting the model"
             )
 
+    def _current_selection(self, selection_event_id, *, owner, sensitivity=None):
+        selection = self.journal.get(selection_event_id)
+        if (selection is None or selection.event.event_type != "deliberation.selected"
+                or selection.event.subject != owner
+                or sensitivity is not None and tuple(Sensitivity).index(selection.event.sensitivity)
+                > tuple(Sensitivity).index(sensitivity)):
+            raise DeliberationContextChanged("selection scope unavailable")
+        if sensitivity is None:
+            sensitivity = selection.event.sensitivity
+        frame_id = str(selection.event.payload.get("frame_id") or "")
+        frame = self.journal.get(f"deliberation.frame:{frame_id}")
+        if (frame is None or frame.event.event_type != "deliberation.framed"
+                or frame.event.subject != owner
+                or tuple(Sensitivity).index(frame.event.sensitivity)
+                > tuple(Sensitivity).index(sensitivity)):
+            raise DeliberationContextChanged("selection frame scope unavailable")
+        target = self.journal.last_sequence()
+        while self.journal.checkpoint(self.deliberation.CHECKPOINT) < target:
+            before = self.journal.checkpoint(self.deliberation.CHECKPOINT)
+            self.deliberation.project_new()
+            after = self.journal.checkpoint(self.deliberation.CHECKPOINT)
+            if after < target and after <= before:
+                raise DeliberationContextChanged("selection projection stalled")
+        stored = self.deliberation.inspect(frame_id, clearance=sensitivity)
+        if (stored is None or stored.selection is None
+                or self.deliberation.latest_selection_event_id(frame_id) != selection_event_id
+                or stored.selection.candidate.candidate_id
+                != selection.event.payload.get("candidate_id")):
+            raise DeliberationContextChanged("selection no longer current")
+        return selection, stored
+
     def validate_selection_sources(self, selection_event_id: str, *,
                                    owner: str, sensitivity: Sensitivity,
                                    execution: bool = False, expression_event_id: str | None = None) -> bool:
@@ -303,33 +334,8 @@ class DeliberationSynthesizer:
         newly observed withdrawals into the same database. Return whether the
         verified selected proposal requires a final source review.
         """
-        selection = self.journal.get(selection_event_id)
-        if (selection is None or selection.event.event_type != "deliberation.selected"
-                or selection.event.subject != owner
-                or tuple(Sensitivity).index(selection.event.sensitivity)
-                > tuple(Sensitivity).index(sensitivity)):
-            raise DeliberationContextChanged("selection scope unavailable")
-        frame_id = str(selection.event.payload.get("frame_id") or "")
-        frame = self.journal.get(f"deliberation.frame:{frame_id}")
-        if (frame is None or frame.event.event_type != "deliberation.framed"
-                or frame.event.subject != owner
-                or tuple(Sensitivity).index(frame.event.sensitivity)
-                > tuple(Sensitivity).index(sensitivity)):
-            raise DeliberationContextChanged("selection frame scope unavailable")
         try:
-            target = self.journal.last_sequence()
-            while self.journal.checkpoint(self.deliberation.CHECKPOINT) < target:
-                before = self.journal.checkpoint(self.deliberation.CHECKPOINT)
-                self.deliberation.project_new()
-                after = self.journal.checkpoint(self.deliberation.CHECKPOINT)
-                if after < target and after <= before:
-                    raise DeliberationContextChanged("selection projection stalled")
-            stored = self.deliberation.inspect(frame_id, clearance=sensitivity)
-            if (stored is None or stored.selection is None
-                    or self.deliberation.latest_selection_event_id(frame_id) != selection_event_id
-                    or stored.selection.candidate.candidate_id
-                    != selection.event.payload.get("candidate_id")):
-                raise DeliberationContextChanged("selection no longer current")
+            _, stored = self._current_selection(selection_event_id, owner=owner, sensitivity=sensitivity)
             plans = self.validate_candidate_sources((stored.selection.candidate,),
                 dict(stored.candidate_contents), owner, sensitivity)
             plan = plans.get(stored.selection.candidate.candidate_id)

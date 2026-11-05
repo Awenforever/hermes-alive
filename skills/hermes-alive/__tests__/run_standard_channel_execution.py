@@ -110,11 +110,14 @@ async def test(root, mode):
         original_record = DispatchOutbox.record_adapter_observation
         def fail_record(*_,**__): raise OSError('synthetic journal failure after effect')
         DispatchOutbox.record_adapter_observation = fail_record
-    if mode=='verify-expired':
+    if mode in ('verify-expired','verify-revoked'):
         original_validate = DispatchOutbox.validate_execution_for_launch
         def slow_verify(self, execution, *, now):
             original_validate(self, execution, now=now)
-            logical_offset[0] += timedelta(seconds=31)
+            if mode=='verify-expired':
+                logical_offset[0] += timedelta(seconds=31)
+            else:
+                host.revoke_route(binding_id)
         DispatchOutbox.validate_execution_for_launch = slow_verify
     expression = {k:v for k,v in parameters.items() if k not in ('subject','operation_id','policy_context')}
     cycle_args = dict(subject=owner,operation_id='one',expression_parameters=expression,
@@ -142,6 +145,9 @@ async def test(root, mode):
         if mode=='verify-expired':
             assert isinstance(exc, DispatchOutboxError)
             assert str(exc)=='channel launch deadline passed during verification'
+        if mode=='verify-revoked':
+            assert isinstance(exc, DispatchOutboxError)
+            assert 'launch route is no longer authorized' in str(exc)
         if mode=='prepare-expired':
             assert isinstance(exc, DispatchOutboxError)
             assert str(exc)=='authenticated channel launch deadline expired before verification'
@@ -173,8 +179,9 @@ async def test(root, mode):
         else: raise AssertionError('normal return evidence overwritten')
     finally:
         if mode=='write-failure': DispatchOutbox.record_adapter_observation = original_record
-        if mode=='verify-expired':
+        if mode in ('verify-expired','verify-revoked'):
             DispatchOutbox.validate_execution_for_launch = original_validate
+        if mode=='verify-expired':
             logical_offset[0] -= timedelta(seconds=31)
     should_send = mode in ('success','false','unknown','long','cancel','exception','write-failure','prepare-delay')
     assert len(received) == int(should_send), (mode,received)
@@ -195,11 +202,11 @@ async def test(root, mode):
     assert len(journal.read(event_type='dispatch.started')) == 1
     assert not journal.read(event_type='transport.publisher.bound')
     assert not journal.read(event_type='delivery.succeeded') and not journal.read(event_type='outcome.recorded')
-    if mode not in ('revoked','prepare-revoked'):
+    if mode not in ('revoked','prepare-revoked','verify-revoked'):
         async def forbidden(**_): raise AssertionError('recovery repeated inference')
         reopened = AutonomousCycleRuntime(ExperienceJournal(journal.path))
         replay = await reopened.cycle(**{**cycle_args,'expression_parameters':{**expression,'call':forbidden}})
-        assert replay.disposition=='attempt_unavailable' and len(received)==int(should_send)
+        assert replay.disposition=='attempt_unavailable' and len(received)==int(should_send),repr(replay)
     raw = journal.path.read_bytes()
     assert b'PRIVATE_ERROR_SENTINEL' not in raw and b'PRIVATE_OPAQUE_ID_SENTINEL' not in raw
     if mode in ('false','unknown','long','cancel','exception','write-failure'):
@@ -256,7 +263,7 @@ async def main():
     with tempfile.TemporaryDirectory(prefix='alive-standard-channel-') as directory:
         for mode in ('success','false','unknown','long','cancel','exception','missing','disconnected',
                      'wrong-thread','forged-model','wrong-platform','wrong-profile','revoked','write-failure',
-                     'prepare-delay','prepare-expired','prepare-revoked','verify-expired'):
+                     'prepare-delay','prepare-expired','prepare-revoked','verify-expired','verify-revoked'):
             await test(Path(directory)/mode,mode)
 
 

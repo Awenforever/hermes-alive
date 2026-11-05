@@ -110,3 +110,37 @@ snapshot supplies the exact text for checking the signed action contract.
 The check still requires matching owner and sensitivity, current wording
 expiry, and the original contract binding. A separate verification
 reconstructs the proof from current state again.
+
+The next Windows run entered final verification with 5.6 seconds
+remaining. Verification took 8.0 seconds and submission was refused.
+For a permit with a final wording witness, the same verifier now
+checks the current selection and frame, revalidates the original
+generated inputs, and matches the exact signed action contract. Both
+expression and standalone selection paths use the shared current-selection
+check. Permits without a witness continue to use the standalone path.
+Each independent verifier still projects the journal to its current
+frontier and checks the applicable sensitivity.
+
+The corresponding Windows run still expired. Its authorization stage
+took 14.4 seconds, followed by a 7.1-second start check and a 6.3-second
+final check. Authorization now reuses its own complete wording witness
+for selection-source validation and the executable text. The current
+policy, delegated or confirmed expression authority, active agenda,
+route, final-review interval and signed action contract are still
+checked in that evaluation. A lightweight authority and deadline check
+also follows the final source verification, since another process can
+revoke a route while that verification is running.
+
+The profiled Windows run then passed its ten controlled stages and submitted
+once to the local adapter within the original permit. Authorization took
+3.5 seconds, start admission 6.0 seconds, and final proof 6.1 seconds.
+The test subsequently failed cleaning a copied read-only Git pack file.
+The functional fixture now copies installed source without Git metadata.
+An unprofiled repeat and installation of the exact committed candidate
+are still required for native Windows qualification.
+
+The unprofiled repeat passed all ten controlled stages, submitted once
+to the local adapter, and cleaned its temporary profile. It used the
+existing Git-installed plugin as a base with candidate files in the
+isolated fixture. Install the exact committed revision and repeat its
+normal entry point before closing native Windows qualification.

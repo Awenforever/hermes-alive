@@ -96,6 +96,10 @@ async def execute_standard_text_once(outbox, lease, *, resolve_channel, clearanc
     # Evidence verification can itself outlive the authenticated start.
     if clock() >= min(execution.lease.lease_until, execution.lease.execute_by):
         raise DispatchOutboxError('channel launch deadline passed during verification')
+    # Another process can revoke authority while the proof is rebuilt.
+    outbox._validate_execution_identity(execution, now=clock())
+    if clock() >= min(execution.lease.lease_until, execution.lease.execute_by):
+        raise DispatchOutboxError('channel launch deadline passed during verification')
     result = await adapter.send(chat_id=execution.route['chat_id'], content=plan.stdin_text,
                                 metadata=metadata)
     observation = outbox.record_adapter_observation(execution, result=result, now=clock())
