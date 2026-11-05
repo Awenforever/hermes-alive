@@ -65,6 +65,11 @@ class BoundShareContinuity:
         scope = self.resolve_scope(execution, clearance)
         return self.store.prepare(execution, scope=scope, clearance=clearance, now=now)
 
+    def _prepare_before_launch(self, execution, *, clearance, now):
+        scope = self.resolve_scope(execution, clearance)
+        return self.store._prepare(execution, scope=scope, clearance=clearance, now=now,
+                                   validate=self.store.outbox._validate_execution_identity)
+
 
 class ShareContinuityStore:
     MAX_TEXT = 32768
@@ -106,6 +111,10 @@ class ShareContinuityStore:
         A restart/replay cannot renew the original retention deadline, resurrect
         erased IDs, authorize a second send or write to a different conversation.
         """
+        return self._prepare(execution, scope=scope, clearance=clearance, now=now,
+                             validate=self.outbox.validate_execution_for_launch)
+
+    def _prepare(self, execution, *, scope, clearance, now, validate):
         current = self.outbox._utc(now)
         document, owner, fingerprint = self._identity(scope)
         route = {'profile': document['runtime_profile'], 'platform': document['platform'],
@@ -114,7 +123,7 @@ class ShareContinuityStore:
                 or execution.lease.capability != 'hermes.channel.send'
                 or not _allowed(execution.lease.sensitivity, clearance)):
             raise ContinuityUnavailable('share does not belong to the canonical conversation')
-        self.outbox.validate_execution_for_launch(execution, now=current)
+        validate(execution, now=current)
         start = self.journal.get(execution.start_event_id)
         if start.sequence <= self._erasure_cutoff(owner, current):
             raise ContinuityUnavailable('original share predates a forget request')

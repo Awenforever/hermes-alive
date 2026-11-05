@@ -76,16 +76,20 @@ async def execute_standard_text_once(outbox, lease, *, resolve_channel, clearanc
     # entering the platform's own coroutine. The platform owns its IO lifetime.
     if Path(observe_profile_home()).resolve() != plan.hermes_home:
         raise ValueError('canonical channel resolution changed the owning profile')
-    # The native continuity store performs this full check before capture.
-    # Other callbacks retain the preflight check before being invoked.
-    if (type(continuity) is not BoundShareContinuity
-            or type(continuity.store) is not ShareContinuityStore
-            or continuity.store.journal.path != outbox.journal.path):
+    native_capture = (type(continuity) is BoundShareContinuity
+                      and type(continuity.store) is ShareContinuityStore
+                      and continuity.store.journal.path == outbox.journal.path)
+    if not native_capture:
         outbox.validate_execution_for_launch(execution, now=clock())
     if continuity is not None:
         # Trusted host capability; capture the exact share before entering IO.
         # Persistence is not delivery, and must never create a second queue.
-        continuity.prepare(execution, clearance=clearance, now=clock())
+        if native_capture:
+            # begin_execution checked the source proof. Capture checks its
+            # binding and retained references. Replay the full proof after it.
+            continuity._prepare_before_launch(execution, clearance=clearance, now=clock())
+        else:
+            continuity.prepare(execution, clearance=clearance, now=clock())
         if Path(observe_profile_home()).resolve() != plan.hermes_home:
             raise ValueError('conversation capture changed the owning profile')
         outbox.validate_execution_for_launch(execution, now=clock())

@@ -61,3 +61,13 @@ factual judgment explicitly checks comparison baselines, experimental
 conditions and whether an adjacent example actually used the cited test.
 The first follow-up should answer the user's question at its requested
 depth. Live checks still have to establish both factual and conversational fit.
+
+The native accessibility-tool trial supplied the approved timeframe and
+region in the final review snapshot. The reviewer justified recipient fit
+with technical clarity and an interesting benchmark. It did not establish
+that the selected project matched the timeframe and region or explain
+a concrete reason to pivot. The original result therefore stays outside
+the qualifying streak. A future version should record search-purpose
+alignment separately from recipient fit. It should allow a justified
+background pivot and distinguish it from a direct match. General interest
+or the availability of a related article cannot substitute for that judgment.

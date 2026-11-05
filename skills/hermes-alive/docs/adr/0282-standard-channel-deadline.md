@@ -83,3 +83,20 @@ draft. Source verification remains in snapshot construction, and later
 authorization and launch checks still revalidate independently. The
 stored snapshot and prompt formats stay the same. Measure both changes
 again on native Windows.
+
+The combined profiling run still expired. Continuity alone took 13.3
+seconds, including a full repeat of selection and final review validation
+immediately after the start had validated those same inputs. In the native
+standard-channel path on the same journal, continuity now checks the
+authenticated start, exact body and route, policy, deadline, and retained
+source references. The full evidence validation remains at start admission
+and immediately before entering the adapter. Standalone continuity and
+generic host callbacks retain their original validation. A captured share
+whose launch is subsequently refused remains prepared evidence without a
+delivery claim. Verify the combined path on Windows within the original
+30-second permit.
+
+The official Core integration fixture revoked the route after the native
+capture had persisted one prepared record. The final check refused the
+launch, the adapter received zero calls, and the record carried no delivery
+claim. This proves the intervening-revocation case on the controlled path.

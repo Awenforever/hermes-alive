@@ -1446,6 +1446,11 @@ class DispatchOutbox:
         This is not an atomic transaction with external delivery. Host runtime
         identity and process launch still belong to the qualified executor.
         """
+        authorization = self._validate_execution_identity(execution, now=now)
+        self._validate_selection_inputs(authorization)
+
+    def _validate_execution_identity(self, execution, *, now):
+        """Check start, policy, deadline and exact body/route without replaying source proof."""
         current = self._utc(now)
         target_sequence = self.journal.last_sequence()
         while self.journal.checkpoint(self.autonomy.CHECKPOINT) < target_sequence:
@@ -1484,7 +1489,6 @@ class DispatchOutbox:
             authorization, subject=lease.subject, capability=lease.capability, now=current)
         if binding is None:
             raise DispatchOutboxError("launch route is no longer authorized: " + ",".join(reasons))
-        self._validate_selection_inputs(authorization)
         contract = parse_action_contract(execution.content, capability=lease.capability)
         if (not self.protector.verify_json(
                 "action.contract.v1", contract.to_document(),
@@ -1493,6 +1497,7 @@ class DispatchOutbox:
                 != self.protector.authenticate_json(
                     "dispatch.launch.route.v1", self.host.resolve_route(binding))):
             raise DispatchOutboxError("launch content or route differs from authorization")
+        return authorization
 
     def _channel_observation_owner(self, execution, current):
         return self._channel_observation_context(execution,current)[0]

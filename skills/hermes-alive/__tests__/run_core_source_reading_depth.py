@@ -12,7 +12,7 @@ import run_core_session_routing as core
 from run_core_guided_setup import cli
 
 
-async def test(home,*,fit_revision=False):
+async def test(home,*,fit_revision=False,revoke_after_capture=False):
     import httpx
     home.mkdir(exist_ok=True)
     assert not any(home.iterdir()),'fixture requires its newly reserved empty profile'
@@ -126,12 +126,37 @@ async def test(home,*,fit_revision=False):
                 import traceback;traceback.print_exc();raise
         async def send(client,request,*args,**kwargs):return checked(request)
         execution=importlib.import_module(loaded.module.__name__+'.kernel_execution_bridge')
+        continuity=execution.kernel('conversation_continuity').ShareContinuityStore
+        prepare=continuity._prepare
+        captured=[]
+        def capture(store,dispatch,**kwargs):
+            record=prepare(store,dispatch,**kwargs)
+            if revoke_after_capture:
+                captured.append(record)
+                authorization=store.journal.get(
+                    store.journal.get('action.attempt:'+dispatch.lease.attempt_id).event.payload['authorization_event_id'])
+                store.outbox.host.revoke_route(authorization.event.payload['route_binding_id'])
+            return record
         async def allowed(self,target):return target==url
         with patch.object(httpx.AsyncClient,'send',send),patch.object(httpx.Client,'send',lambda client,request,*a,**k:checked(request)),\
-             patch.object(execution.kernel('core_discovery_tools').CoreDiscoveryTools,'allow_url',allowed):
+             patch.object(execution.kernel('core_discovery_tools').CoreDiscoveryTools,'allow_url',allowed),\
+             patch.object(continuity,'_prepare',capture):
             assert '已启用' in await command('enable')
             binding.arguments['stop'].set();await binding.task
-            native=binding.native;result=await native.step(binding.arguments['build_parameters']())
+            native=binding.native
+            if revoke_after_capture:
+                error=execution.kernel('dispatch_outbox').DispatchOutboxError
+                try:
+                    await native.step(binding.arguments['build_parameters']())
+                except error as exc:
+                    assert 'launch route is no longer authorized' in str(exc),str(exc)
+                else:
+                    raise AssertionError('revocation after capture did not stop launch')
+                assert len(captured)==1 and not sent
+                assert captured[0].event.payload['external_delivery_proven'] is False
+                print('HERMES_ALIVE_NATIVE_CAPTURE_REVOCATION_OK',flush=True)
+                return
+            result=await native.step(binding.arguments['build_parameters']())
             assert result.disposition=='submitted',result
             assert not native.pending
         assert reads==[('web_search',dict(query='synthetic public observation',limit=3)),
@@ -164,7 +189,9 @@ if __name__=='__main__':
     directory=Path(tempfile.mkdtemp(prefix='alive-core-source-depth-',dir=parent))
     succeeded=False
     try:
-        asyncio.run(test(directory,fit_revision=os.environ.get('HERMES_ALIVE_TEST_FIT_REVISION')=='1'));succeeded=True
+        asyncio.run(test(directory,fit_revision=os.environ.get('HERMES_ALIVE_TEST_FIT_REVISION')=='1',
+                         revoke_after_capture=os.environ.get('HERMES_ALIVE_TEST_CAPTURE_REVOCATION')=='1'))
+        succeeded=True
     finally:
         from hermes_state_registry import close_all_under
         close_all_under(directory)
