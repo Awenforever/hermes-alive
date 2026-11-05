@@ -35,13 +35,17 @@ before any deployment. No production approval or release follows from developmen
 tests. The earlier search-alignment runtime passed the complete portable suite.
 The current route-aware candidate's broad run stopped at a fixture's stale
 prompt-wording assertion. Its contract-based share, primary-read and replay
-controls now pass; the complete current suite remains unqualified. The preceding real-source
+controls passed, followed by the corrected exact candidate's complete portable
+suite. Subsequent audience-label edits change documentation only. The preceding real-source
 trial failed quality: the draft extrapolated beyond its source
 and mistook a configured discovery query for a current owner request. Review
 withheld it; there was no share or ordinary followup. ADR0285 records the missing
 search-role boundary. Its new host-derived route-aware candidate passes initial
-propagation and matched-source correction controls; real-model qualification and
-the remaining controls are pending. Previous green baselines
+propagation, correction, pivot, negative and historical-recovery controls. Its
+inherited-route real trial timed out before final assessment after repeated
+primary-provider timeouts; a separate isolated control now selects the existing
+configured official fallback. Production model choices remain unchanged, and
+real semantic/usefulness qualification remains pending. Previous green baselines
 do not automatically qualify a changed candidate.
 
 An actual-Core controlled external-memory journey also passes provider correction

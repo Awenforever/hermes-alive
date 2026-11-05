@@ -72,3 +72,20 @@ Actual Core matched-source correction, useful-departure, conflict and uncertaint
 paths pass with role assertions at interpretation, authoring and final review.
 Negative paths create no send authorization or adapter call. The broader current
 candidate suite and real semantic/usefulness qualification remain pending.
+
+### Qualification addendum — 2026-11-05, Codex
+
+The complete portable suite first stopped at a fixture checking wording from the
+previous search-purpose prompt. Replacing that stale phrase check with assertions
+on the actual route kind and absence of a current owner request passed targeted
+share, primary-read and replay cases. The corrected exact candidate subsequently
+passed the complete portable suite. Later audience annotations change documents,
+not that runtime or those tests.
+
+The inherited-route real regression reached final assessment but exhausted the
+diagnostic observation window after repeated primary-provider timeouts. The
+configured official fallback returned successful responses at earlier stages;
+no final assessment, submission or ordinary followup was completed. An isolated
+control selects that same already configured official model to separate semantic
+behavior from provider latency. Neither production configuration nor stage/send
+authority is changed. This remains a regression, not a fresh quality round.
