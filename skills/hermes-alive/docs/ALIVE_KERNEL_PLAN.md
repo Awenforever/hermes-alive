@@ -820,7 +820,16 @@ author and reviewer had filtered it. Reusing the model-facing projection
 closed that path. The exact controlled rerun checked the later topic signal,
 the initial author, the final assessor and repair, and verified that erasure
 still removed dependent evidence while retaining unrelated artifacts.
-Real-model longitudinal feedback and withdrawal remain open.
+
+[ADR 0286](adr/0286-ordinary-feedback-ingress-is-not-yet-connected.md) now
+records one successful real-model test of that boundary. The same test
+revealed another problem: a reviewer could accept the focus of a share that
+read like a source audit. [ADR 0287](adr/0287-conversational-discovery-contribution.md)
+records the new authoring and review contract. The installed Core tests
+passed an independent fit rejection and a complete revision, as well as
+feedback scoping and erasure through the new review. Cold recovery preserved
+the prior assessment scopes. A fresh public discovery and the two ordinary
+follow-ups still need review of their complete model output.
 
 October 26–27 qualification notes are retained in
 [the October 27 archive](ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-27.md).
