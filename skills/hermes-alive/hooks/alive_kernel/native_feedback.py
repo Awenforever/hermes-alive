@@ -6,6 +6,7 @@ preference, tool permission or a wire-level reply. Bodies use the existing vault
 """
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 import json
 
 from .content_vault import ContentReference, ContentUnavailableError
@@ -101,7 +102,95 @@ def forget_feedback(store, subject, event_id):
     ref = _owner_content(store, subject, store.journal.get(event_id))
     if ref is None:
         return None
-    return store.vault.erase_item(ref.content_id)
+    dependents = _legacy_feedback_dependents(store.journal, store.vault, subject, event_id)
+    return store.vault.erase_item(ref.content_id, subject=subject, legacy_dependents=dependents)
+
+
+def native_feedback_dependencies(journal, subject, outcome_ids):
+    native_ids = tuple(event_id for event_id in outcome_ids
+                       if event_id.startswith('feedback.native:'))
+    if not native_ids:
+        return ()
+    setup = KernelSetupStore(journal.path.parent, initialize=False, journal=journal)
+    references = [_owner_content(setup, subject, journal.get(event_id)) for event_id in native_ids]
+    if any(ref is None for ref in references):
+        raise ContentUnavailableError('native feedback dependency is unavailable')
+    return tuple(ref.content_id for ref in references)
+
+
+def _legacy_feedback_dependents(journal, vault, subject, outcome_id):
+    """Find older copies by their typed receipt chain, without reading review bodies."""
+    synthesis_types = ('opportunity.synthesis_completed', 'opportunity.synthesis_protocol_recovery')
+    review_types = ('opportunity.source_support_completed', 'opportunity.source_support_protocol_recovery')
+
+    def matches(event, types, source, actor):
+        return (event.event_type in types and event.subject == subject
+                and event.source == source and event.actor == actor)
+
+    @lru_cache(maxsize=512)
+    def synthesis_used_feedback(start_id):
+        start = journal.get(start_id) if start_id else None
+        return (start is not None and matches(start.event, ('opportunity.synthesis_started',),
+                    'alive.opportunity-synthesis', 'system:alive-interpreter')
+                and outcome_id in start.event.payload.get('feedback_outcome_event_ids', ()))
+
+    def final_review_interpretation(expression):
+        from .deliberation import deserialize_frame
+        selection = journal.get(expression.event.causation_id)
+        if (selection is None or selection.sequence >= expression.sequence or not matches(
+                selection.event, ('deliberation.selected',), 'alive.deliberation', 'system:alive-deliberator')
+                or selection.event.event_id != expression.event.payload.get('selection_event_id')
+                or selection.event.payload.get('candidate_id') != expression.event.payload.get('candidate_id')
+                or selection.event.payload.get('frame_id') != expression.event.payload.get('frame_id')):
+            return None
+        frame_id = selection.event.payload['frame_id']
+        frame = journal.get(f'deliberation.frame:{frame_id}')
+        if (frame is None or frame.sequence >= selection.sequence
+                or frame.event.event_type != 'deliberation.framed'
+                or frame.event.source != 'alive.deliberation' or frame.event.subject != subject
+                or frame.event.sensitivity is not selection.event.sensitivity):
+            return None
+        ref = ContentReference.from_event_payload(frame.event.payload['content'])
+        document = vault.resolve_json(ref.content_id, expected_subject=subject,
+            expected_purpose='deliberation.frame', expected_sensitivity=frame.event.sensitivity)
+        if vault.digest_json(document) != ref.digest:
+            raise ValueError('legacy deliberation frame integrity unavailable')
+        frame_data, _ = deserialize_frame(document)
+        candidate = next((item for item in frame_data.candidates
+                          if item.candidate_id == selection.event.payload['candidate_id']), None)
+        if candidate is None or candidate.dimensions is None:
+            return None
+        receipts = {identity for dimension in ('user_value', 'urgency', 'novelty', 'confidence', 'risk', 'interruption_cost')
+                    for identity in getattr(candidate.dimensions, dimension).evidence_event_ids
+                    if identity.startswith('opportunity.synthesis:') and identity.endswith(':completed')}
+        receipt = journal.get(receipts.pop()) if len(receipts) == 1 else None
+        return receipt if receipt is not None and receipt.sequence < frame.sequence else None
+
+    dependents = set()
+    for row in journal.iter_reverse(event_types=synthesis_types + review_types, subject=subject):
+        event = row.event
+        if matches(event, review_types, 'alive.source-support', 'system:alive-shadow-reviewer'):
+            start = journal.get(event.causation_id) if event.causation_id else None
+            if (start is None or start.sequence >= row.sequence or not matches(start.event,
+                    ('opportunity.source_support_started',), 'alive.source-support', 'system:alive-shadow-reviewer')):
+                continue
+            synthesis = journal.get(start.event.causation_id) if start.event.causation_id else None
+            if synthesis is None or synthesis.sequence >= start.sequence:
+                continue
+            if matches(synthesis.event, ('message.model_candidate',),
+                       'alive.semantic-review', 'system:alive-model-renderer'):
+                synthesis = final_review_interpretation(synthesis)
+                if synthesis is None:
+                    continue
+            parent = synthesis.event
+        else:
+            parent = event
+        if (matches(parent, synthesis_types, 'alive.opportunity-synthesis', 'system:alive-interpreter')
+                and synthesis_used_feedback(parent.causation_id)):
+            ref = ContentReference.from_event_payload(event.payload['content'])
+            if ref.sensitivity is event.sensitivity:
+                dependents.add(ref.content_id)
+    return tuple(sorted(dependents))
 
 
 def admitted_input(store, configured, text, message_id):

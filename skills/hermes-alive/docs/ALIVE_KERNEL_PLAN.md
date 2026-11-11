@@ -197,7 +197,10 @@ Exercise ordinary feedback with actual main models under ADR0286. Check that
 quoted opinions and follow-up questions remain ordinary conversation, and
 that an evaluation of one share retains its original wording and scope. Then
 compare subsequent original drafts and decisions for useful adaptation over
-several wakes. Keep discovery-route provenance and historical receipt recovery
+several wakes. Verify feedback erasure through downstream selection, wording,
+review and delivery artifacts as well as restart and rollback. Interpretation
+and source-review copies have bounded controlled proof under ADR0286.
+Keep discovery-route provenance and historical receipt recovery
 covered under ADR0285. Credit fresh sharing rounds only after reviewing actual
 usefulness and follow-ups. Continue the longitudinal memory, ongoing work,
 and platform service journeys below.

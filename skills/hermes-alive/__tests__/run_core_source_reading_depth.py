@@ -239,6 +239,20 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
         assert all(stage in stages for stage in ('interpret','select','author','semantic','final'))
         if feedback_case:
             from core_native_feedback_case import exercise
+            setup = importlib.import_module(loaded.module.__name__+'.kernel_setup_bridge')
+            store = setup.setup_store(binding)
+            vault_type = type(store.vault)
+            put_json = vault_type.put_json
+            feedback_module = execution.kernel('native_feedback')
+            legacy = os.environ.get('HERMES_ALIVE_TEST_LEGACY_FEEDBACK_DERIVATIVES') == '1'
+            affected, unrelated = [], []
+
+            def write_legacy(vault, value, **options):
+                if options['purpose'] in ('opportunity.candidates', 'opportunity.protocol-failure',
+                                          'opportunity.source-support', 'opportunity.source-support-invalid'):
+                    options.pop('depends_on', None)
+                return put_json(vault, value, **options)
+
             async def next_cycle(text):
                 nonlocal url
                 feedback_probe['expected']=text
@@ -257,18 +271,48 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                         return moment.astimezone(tz) if tz is not None else moment.replace(tzinfo=None)
                 with patch.object(httpx.AsyncClient,'send',send),patch.object(httpx.Client,'send',lambda client,request,*a,**k:checked(request)),\
                      patch.object(execution.kernel('core_discovery_tools').CoreDiscoveryTools,'allow_url',allowed),\
-                     patch.object(cycle_clock,'datetime',AfterCadence):
+                     patch.object(cycle_clock,'datetime',AfterCadence),\
+                     patch.object(vault_type,'put_json',write_legacy if legacy else put_json):
                     following=await native.step(binding.arguments['build_parameters']())
                 assert feedback_probe['seen'], ('next Native cycle did not receive recorded feedback',following.disposition)
                 assert feedback_probe['author_seen'],'source-led author did not receive the feedback'
                 assert following.disposition=='content_review_attention' and len(sent)==1,following.disposition
                 assert stages.count('abstain')==1 and not fixture_errors,fixture_errors
+                for row in store.journal.read(event_type='opportunity.source_support_completed'):
+                    content_id = row.event.payload['content']['content_id']
+                    document = store.vault.resolve_json(content_id, expected_subject=row.event.subject,
+                        expected_purpose='opportunity.source-support', expected_sensitivity=row.event.sensitivity)
+                    has_input = any(pair.get('current_input') == text
+                                    for pair in document['snapshot']['recent_feedback_context'])
+                    (affected if has_input else unrelated).append(content_id)
+                assert affected and unrelated
+                if legacy:
+                    owner = store.configuration().subject
+                    outcome = store.journal.read(event_type=feedback_module.EVENT)[0].event.event_id
+                    dependencies = feedback_module._legacy_feedback_dependents(
+                        store.journal, store.vault, owner, outcome)
+                    assert set(affected).issubset(dependencies)
+                    assert set(unrelated).isdisjoint(dependencies)
                 print('CORE_NATIVE_FEEDBACK_NEXT_CYCLE_OK '+json.dumps(dict(
                     disposition=following.disposition,main_turn_association_provenance_preserved=True,
                     eligibility_clock_simulated=True,normal_cadence_wait_observed=True,
                     feedback_reached_intent_and_author=True,author_mode=feedback_probe.get('author_mode'),
                     actual_model_inference=False,quality_rounds=0)),flush=True)
-            await exercise(core,loaded,binding,runner,source,entry,command,next_cycle)
+            migration = feedback_module._legacy_feedback_dependents if legacy else lambda *_: ()
+            with patch.object(feedback_module, '_legacy_feedback_dependents', migration):
+                await exercise(core,loaded,binding,runner,source,entry,command,next_cycle)
+            unavailable = execution.kernel('content_vault').ContentErasedError
+            for content_id in affected:
+                try:
+                    store.vault.resolve_json(content_id)
+                    raise AssertionError('dependent review remained readable')
+                except unavailable:
+                    pass
+            for content_id in unrelated:
+                assert store.vault.resolve_json(content_id)['snapshot']
+            print('HERMES_ALIVE_CORE_DEPENDENT_FEEDBACK_ERASURE_OK '+json.dumps(dict(
+                legacy_writer_simulated=legacy, erased_review_copies=len(affected),
+                preserved_unrelated_review_copies=len(unrelated))),flush=True)
         print('HERMES_ALIVE_CORE_SOURCE_READING_DEPTH_OK '+json.dumps(dict(stages=stages,
             requested_windows=[6000,15000],local_adapter_submissions=1,physical_sends=0,actual_model_inference=False,
             qualification_after_old_window_preserved=True,untitled_extracts_retained=True,

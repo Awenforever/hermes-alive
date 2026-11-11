@@ -436,6 +436,9 @@ class SourceSupportReviewer:
                 raise SourceSupportEvidenceChanged('source-review evidence became unavailable') from error
 
         try:
+            from .native_feedback import native_feedback_dependencies
+            feedback_dependencies = native_feedback_dependencies(self.journal, subject,
+                (item['outcome_event_id'] for item in snapshot['recent_feedback_context']))
             bundle = ContentReference.from_event_payload(self.journal.get(generated.receipt_event_id).event.payload['content'])
             messages = [{'role':'system','content':review_prompt},{'role':'user',
                          'content':json.dumps(request, ensure_ascii=False)}]
@@ -477,7 +480,7 @@ class SourceSupportReviewer:
                     invalid_ref = self.vault.put_json({'snapshot':snapshot,'raw_review':text},
                         subject=subject, purpose='opportunity.source-support-invalid',
                         sensitivity=Sensitivity(clearance), retention_until=bundle.retention_until,
-                        content_id=prefix + ':invalid')
+                        content_id=prefix + ':invalid', depends_on=feedback_dependencies)
                     recovery = self.journal.append(EventEnvelope(event_id=prefix+':protocol-recovery',
                         event_type='opportunity.source_support_protocol_recovery',
                         causation_id=prefix+':started', payload={'content':invalid_ref.to_event_payload(),
@@ -498,7 +501,7 @@ class SourceSupportReviewer:
                 **({'review_as_of':review_as_of.isoformat()} if review_as_of is not None else {}),
                 **({'review_valid_until':review_until.isoformat()} if review_until is not None else {})}, subject=subject,
                 purpose='opportunity.source-support', sensitivity=Sensitivity(clearance),
-                retention_until=bundle.retention_until, content_id=prefix)
+                retention_until=bundle.retention_until, content_id=prefix, depends_on=feedback_dependencies)
             completed_at=self._assessment_now().astimezone(timezone.utc) if review_as_of is not None else None
             record = self.journal.append(EventEnvelope(event_id=prefix+':completed',
                 event_type='opportunity.source_support_completed', causation_id=prefix+':started',
@@ -515,5 +518,8 @@ class SourceSupportReviewer:
         except BaseException as exc:
             self.journal.append(EventEnvelope(event_id=prefix+':failed',
                 event_type='opportunity.source_support_failed', causation_id=prefix+':started',
-                payload={'error_class':type(exc).__name__,'delivery_authority_granted':False}, **base))
+                payload={'error_class':('SourceSupportEvidenceChanged' if isinstance(exc, ContentUnavailableError)
+                                        else type(exc).__name__), 'delivery_authority_granted':False}, **base))
+            if isinstance(exc, ContentUnavailableError):
+                raise SourceSupportEvidenceChanged('source-review evidence became unavailable') from exc
             raise

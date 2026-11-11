@@ -176,6 +176,31 @@ record and its managed backup were erased, one completed review snapshot
 still held the exact feedback input. Its current-evidence check prevents reuse
 for authorization. The encrypted copy remains until its own retention ends.
 Item-level erasure therefore covers the original association today, with
-dependent content still pending. The acceptance case must cover completed
-reviews, interrupted writes, managed restore, and existing records produced
-before a dependency contract is introduced.
+dependent content originally pending.
+
+New opportunity interpretations and source-review records, including retained
+invalid model responses, declare their signed native feedback inputs at write
+time. The vault records these references with the ciphertext under its writer
+lock, bounds child retention to the earliest parent, and refuses publication
+if an input was erased or expired. Item and expiry erasure traverse those
+references and use the existing resumable managed-backup purge. Receipt
+metadata and tombstones remain available for audit.
+
+For pre-lineage records, the authenticated owner forget command traces
+interpretation and review receipts. Final expression reviews link to the
+model candidate rather than directly to its interpretation. The migration
+checks the selected candidate's retained frame to recover the exact synthesis
+receipt, without matching raw feedback against review prose. Controlled
+installed Core r854 simulated the old writer and r855 exercised new writes
+with legacy discovery disabled. Each removed the affected final-review copy
+and its managed backup while preserving a different review for the same owner.
+Local vault coverage separately verifies transitive deletion, owner scope,
+restored dependency metadata, and rejection of a write after erasure.
+
+The verified scope is interpretation and source-review artifacts in the Alive
+vault. Selection rationale, authored expressions, semantic comparison and
+delivery history still need a dependency inventory and lifecycle proof.
+Independent exports and original Hermes chat history remain outside the vault.
+An older writer that omits dependency metadata must not run alongside this
+runtime. Upgrade and rollback qualification must verify pending erasures
+and reject any path that restores withdrawn content.

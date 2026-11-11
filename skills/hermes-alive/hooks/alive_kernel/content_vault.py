@@ -260,6 +260,13 @@ class ContentVault:
                 );
                 CREATE INDEX IF NOT EXISTS idx_content_subject
                     ON content_items(subject);
+                CREATE TABLE IF NOT EXISTS content_dependencies (
+                    parent_id TEXT NOT NULL,
+                    dependent_id TEXT NOT NULL,
+                    PRIMARY KEY(parent_id, dependent_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_content_dependent
+                    ON content_dependencies(dependent_id);
                 CREATE TABLE IF NOT EXISTS erasure_jobs (
                     job_id TEXT PRIMARY KEY,
                     selector_kind TEXT NOT NULL,
@@ -402,6 +409,7 @@ class ContentVault:
         sensitivity: Sensitivity = Sensitivity.PRIVATE,
         retention_until: datetime | None = None,
         content_id: str | None = None,
+        depends_on: tuple[str, ...] = (),
     ) -> ContentReference:
         subject = str(subject).strip()
         purpose = str(purpose).strip()
@@ -412,6 +420,10 @@ class ContentVault:
         content_id = str(content_id or f"content_{uuid4().hex}").strip()
         if not content_id or len(content_id) > 255:
             raise ValueError("invalid content_id")
+        if (not isinstance(depends_on, tuple)
+                or any(not isinstance(parent, str) or not parent or parent == content_id for parent in depends_on)):
+            raise ValueError("invalid content dependencies")
+        parents = set(depends_on)
         payload = _canonical_json(value)
         key = self._key()
         digest = self._keyed_digest(key, payload)
@@ -436,10 +448,28 @@ class ContentVault:
                     raise ContentErasedError(
                         "an erased content_id cannot be reused"
                     )
+                checked_at = datetime.now(timezone.utc)
+                for parent in parents:
+                    ancestor = connection.execute(
+                        "SELECT subject,sensitivity,retention_until FROM content_items WHERE content_id=?",
+                        (parent,),
+                    ).fetchone()
+                    if ancestor is None:
+                        raise ContentUnavailableError("content dependency is unavailable")
+                    if (ancestor['subject'] != subject
+                            or tuple(Sensitivity).index(Sensitivity(ancestor['sensitivity'])) > tuple(Sensitivity).index(sensitivity)):
+                        raise ContentIntegrityError("content dependency is outside the requested scope")
+                    if ancestor['retention_until'] is not None:
+                        until = datetime.fromisoformat(ancestor['retention_until'])
+                        if until <= checked_at:
+                            raise ContentExpiredError("content dependency has expired")
+                        retention_until = until if retention_until is None else min(until, retention_until)
                 existing = connection.execute(
                     "SELECT * FROM content_items WHERE content_id=?", (content_id,)
                 ).fetchone()
                 if existing is not None:
+                    existing_parents = {row['parent_id'] for row in connection.execute(
+                        "SELECT parent_id FROM content_dependencies WHERE dependent_id=?", (content_id,))}
                     expected_retention = retention_until.isoformat() if retention_until else None
                     same = (
                         existing["subject"] == subject
@@ -448,6 +478,7 @@ class ContentVault:
                         and existing["retention_until"] == expected_retention
                         and existing["digest"] == digest
                         and int(existing["size_bytes"]) == len(payload)
+                        and existing_parents == parents
                     )
                     if not same:
                         raise ContentIntegrityError(
@@ -472,6 +503,8 @@ class ContentVault:
                         created_at,
                     ),
                 )
+                connection.executemany("INSERT INTO content_dependencies VALUES (?,?)",
+                    ((parent, content_id) for parent in sorted(parents)))
                 connection.execute("COMMIT")
             except Exception:
                 if connection.in_transaction:
@@ -575,15 +608,28 @@ class ContentVault:
             (content_id,),
         ).fetchone()
 
-    def erase_item(self, content_id: str) -> ErasureResult:
+    def erase_item(
+        self, content_id: str, *, subject: str | None = None,
+        legacy_dependents: tuple[str, ...] = (),
+    ) -> ErasureResult:
+        """Erase an item and its derivatives, including verified older lineage."""
+        content_id = str(content_id)
+        if legacy_dependents and not subject:
+            raise ValueError("legacy erasure requires a subject")
+        if any(not isinstance(item, str) or not item or item == content_id
+               for item in legacy_dependents):
+            raise ValueError("invalid legacy erasure dependency")
         with self._exclusive_operation():
-            return self._erase("item", str(content_id))
+            return self._erase("item", content_id, subject=subject, legacy_dependents=legacy_dependents)
 
     def erase_subject(self, subject: str) -> ErasureResult:
         with self._exclusive_operation():
             return self._erase("subject", str(subject))
 
-    def _erase(self, selector_kind: str, selector_value: str) -> ErasureResult:
+    def _erase(
+        self, selector_kind: str, selector_value: str, *,
+        subject: str | None = None, legacy_dependents: tuple[str, ...] = (),
+    ) -> ErasureResult:
         if selector_kind not in ('item', 'expiry', 'subject'):
             raise ValueError('invalid erasure selector')
         if not selector_value:
@@ -591,18 +637,35 @@ class ContentVault:
         with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
+                if subject is not None:
+                    for item in (selector_value, *legacy_dependents):
+                        row = connection.execute(
+                            "SELECT subject FROM content_items WHERE content_id=?", (item,)
+                        ).fetchone()
+                        if row is not None and row["subject"] != subject:
+                            raise ContentIntegrityError("erasure dependency belongs to another subject")
+                connection.executemany(
+                    "INSERT OR IGNORE INTO content_dependencies(parent_id, dependent_id) VALUES (?, ?)",
+                    ((selector_value, item) for item in legacy_dependents),
+                )
                 if selector_kind in ('item', 'expiry'):
-                    rows = connection.execute(
-                        "SELECT content_id FROM content_items WHERE content_id=?",
+                    dependencies = connection.execute(
+                        """WITH RECURSIVE targets(content_id) AS (
+                               SELECT ? UNION SELECT links.dependent_id FROM content_dependencies AS links
+                               JOIN targets ON links.parent_id=targets.content_id
+                           ) SELECT targets.content_id, content_items.content_id IS NOT NULL AS live
+                             FROM targets LEFT JOIN content_items USING (content_id)""",
                         (selector_value,),
                     ).fetchall()
+                    ids = [str(row['content_id']) for row in dependencies]
+                    live_ids = [str(row['content_id']) for row in dependencies if row['live']]
                 else:
                     rows = connection.execute(
                         "SELECT content_id FROM content_items WHERE subject=?",
                         (selector_value,),
                     ).fetchall()
-                live_ids = [str(row["content_id"]) for row in rows]
-                ids = live_ids or ([selector_value] if selector_kind in ('item', 'expiry') else [])
+                    live_ids = [str(row["content_id"]) for row in rows]
+                    ids = live_ids
                 previous = connection.execute(
                     """
                     SELECT * FROM erasure_jobs
@@ -611,8 +674,11 @@ class ContentVault:
                     """,
                     (selector_kind, selector_value),
                 ).fetchone()
-                if not live_ids and previous is not None:
+                if (not live_ids and previous is not None
+                        and set(ids).issubset(json.loads(previous["content_ids_json"]))):
                     connection.execute("COMMIT")
+                    if previous["backups_purged_at"] is None:
+                        self._compact()
                     removed = self._finish_erasure(str(previous["job_id"]))
                     return ErasureResult(0, 0, removed, True)
                 now = datetime.now(timezone.utc).isoformat()
@@ -633,10 +699,9 @@ class ContentVault:
                     ((job_id, content_id) for content_id in ids),
                 )
                 if live_ids:
-                    placeholders = ",".join("?" for _ in live_ids)
                     connection.execute(
-                        f"DELETE FROM content_items WHERE content_id IN ({placeholders})",
-                        live_ids,
+                        "DELETE FROM content_items WHERE content_id IN "
+                        "(SELECT content_id FROM erasure_items WHERE job_id=?)", (job_id,),
                     )
                 connection.execute("COMMIT")
             except Exception:

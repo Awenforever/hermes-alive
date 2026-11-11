@@ -57,12 +57,12 @@ async def exercise(root,mode):
         assert 'single permitted protocol correction' in kwargs['messages'][0]['content']
         if mode=='twice-invalid': return response(invalid,'synthetic/corrector')
         if mode=='cancelled': raise asyncio.CancelledError()
-        if mode=='timeout': await asyncio.sleep(2)
+        if mode=='timeout': await asyncio.sleep(60)
         if mode=='revoked-during-repair':
             memory.forget_item(preference.proposal_id,actor=owner,request_id='withdraw-during')
         return response(valid,'synthetic/corrector')
     args=dict(subject=owner,operation_id='protocol:'+mode,call=call,
-        protocol_recovery=mode!='disabled',timeout_seconds=.1 if mode=='timeout' else 60)
+        protocol_recovery=mode!='disabled',timeout_seconds=5 if mode=='timeout' else 60)
     try:
         result=await synth.run(**args)
     except (OpportunitySynthesisError,asyncio.CancelledError) as error:

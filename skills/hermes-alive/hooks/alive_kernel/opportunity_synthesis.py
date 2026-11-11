@@ -14,7 +14,7 @@ from typing import Any
 from .action_contract import parse_action_contract
 from .cognition_cycle import CycleCandidate
 from .cognition_context import CognitionContextReader
-from .content_vault import ContentReference
+from .content_vault import ContentReference, ContentUnavailableError
 from .deliberation import (
     ActionAuthority, ActionCandidate, ActionKind, AssessmentBasis,
     DecisionDimensions, DimensionAssessment, SideEffect,
@@ -1465,7 +1465,7 @@ class OpportunitySynthesizer:
             if self.context_reader.read(subject=subject, clearance=clearance) != context:
                 raise OpportunitySynthesisError("user context changed during model wait")
             if self.feedback_for_start(start,subject=subject,clearance=clearance) != feedback:
-                raise OpportunitySynthesisError('literal feedback context changed during model wait')
+                raise OpportunityEvidenceChanged('literal feedback context changed during model wait')
             if self.learning_reader.read(subject=subject, clearance=clearance) != learning:
                 raise OpportunitySynthesisError("learned advice changed during model wait")
             if self.history_reader.read(subject=subject, clearance=clearance) != history:
@@ -1479,6 +1479,9 @@ class OpportunitySynthesizer:
         structural_failure=False
         assessment_raw=None
         try:
+            from .native_feedback import native_feedback_dependencies
+            feedback_dependencies = native_feedback_dependencies(
+                self.journal, subject, (item.outcome_event_id for item in feedback))
             if candidate_evidence:
                 messages=[{'role':'system','content':system_prompt},{'role':'user','content':prompt}]
                 for attempt in range(2 if protocol_recovery else 1):
@@ -1515,6 +1518,7 @@ class OpportunitySynthesizer:
                         invalid_ref=self.vault.put_json(failed_output,
                             subject=subject,purpose='opportunity.protocol-failure',
                             sensitivity=Sensitivity(clearance),content_id='opportunity-protocol:'+operation_id,
+                            depends_on=feedback_dependencies,
                             retention_until=min([as_of+timedelta(days=7)]+[e.expires_at for e in retention_sources]+
                                 [datetime.fromisoformat(f.retention_until) for f in feedback]))
                         correction=self.journal.append(EventEnvelope(
@@ -1569,6 +1573,7 @@ class OpportunitySynthesizer:
                                  for a in abstentions]}, subject=subject,
                 purpose="opportunity.candidates", sensitivity=Sensitivity(clearance),
                 content_id=f"opportunity-proposals:{operation_id}",
+                depends_on=feedback_dependencies,
                 retention_until=min([as_of+timedelta(days=7)]+[item.expires_at for item in retention_sources]+
                                     [datetime.fromisoformat(f.retention_until) for f in feedback]),
             )
@@ -1598,8 +1603,11 @@ class OpportunitySynthesizer:
                 event_id=f"opportunity.synthesis:{operation_id}:failed",
                 event_type="opportunity.synthesis_failed", **base,
                 causation_id=start.event.event_id,
-                payload={"error_class": type(exc).__name__, "raw_response_stored": False},
+                payload={"error_class": ("OpportunityEvidenceChanged" if isinstance(exc, ContentUnavailableError)
+                                         else type(exc).__name__), "raw_response_stored": False},
             ))
             if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt, SystemExit, OpportunityEvidenceChanged)):
                 raise
+            if isinstance(exc, ContentUnavailableError):
+                raise OpportunityEvidenceChanged("opportunity evidence became unavailable") from exc
             raise OpportunitySynthesisError("opportunity interpretation failed; inspect its receipt") from None

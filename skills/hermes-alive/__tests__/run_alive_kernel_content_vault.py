@@ -19,6 +19,8 @@ sys.path.insert(0, str(ROOT / "hooks"))
 from alive_kernel.content_vault import (  # noqa: E402
     ContentErasedError,
     ContentExpiredError,
+    ContentIntegrityError,
+    ContentUnavailableError,
     ContentVault,
 )
 from alive_kernel.events import Sensitivity  # noqa: E402
@@ -46,9 +48,67 @@ def worker_main(base: Path, backups: Path, index: int) -> None:
     )
 
 
+def dependent_erasure(base: Path) -> None:
+    vault = ContentVault(base / "live", backup_root=base / "backups")
+    owner = "subject:dependent"
+    until = datetime.now(timezone.utc) + timedelta(days=1)
+    root = vault.put_json("feedback", subject=owner, purpose="feedback", retention_until=until)
+    other = vault.put_json("other feedback", subject=owner, purpose="feedback")
+    child = vault.put_json("interpretation", subject=owner, purpose="model",
+                           depends_on=(root.content_id, other.content_id))
+    leaf = vault.put_json("review", subject=owner, purpose="model", depends_on=(child.content_id,))
+    legacy = vault.put_json("old review", subject=owner, purpose="model")
+    unrelated = vault.put_json("foreign", subject="subject:foreign", purpose="model")
+    assert child.retention_until == leaf.retention_until == until
+    for options in (dict(subject="subject:foreign"), dict(sensitivity=Sensitivity.PUBLIC)):
+        try:
+            vault.put_json("derived", **{"subject":owner, "purpose":"model", **options},
+                           depends_on=(root.content_id,))
+            raise AssertionError("dependency crossed scope")
+        except ContentIntegrityError:
+            pass
+    try:
+        vault.put_json("interpretation", subject=owner, purpose="model", content_id=child.content_id,
+                       retention_until=until)
+        raise AssertionError("idempotent write dropped dependency")
+    except ContentIntegrityError:
+        pass
+    snapshot = vault.create_managed_backup("before")
+    try:
+        vault.erase_item(root.content_id, subject=owner, legacy_dependents=(unrelated.content_id,))
+        raise AssertionError("legacy lineage crossed subjects")
+    except ContentIntegrityError:
+        pass
+    restored = ContentVault.restore_managed_backup(snapshot, base / "restore",
+                                                   backup_root=base / "restore-backups")
+    assert restored.erase_item(root.content_id).newly_erased == 3
+    assert restored.resolve_json(other.content_id) == "other feedback"
+    assert vault.erase_item(root.content_id).newly_erased == 3
+    assert not snapshot.exists()
+    late_backup = vault.create_managed_backup("legacy-only")
+    assert vault.erase_item(root.content_id, subject=owner,
+                            legacy_dependents=(legacy.content_id,)).newly_erased == 1
+    assert not late_backup.exists()
+    assert vault.erase_item(root.content_id).already_erased
+    for ref in (root, child, leaf, legacy):
+        try:
+            vault.resolve_json(ref.content_id)
+            raise AssertionError("erased derivative remains available")
+        except ContentErasedError:
+            pass
+    try:
+        vault.put_json("late review", subject=owner, purpose="model", depends_on=(root.content_id,))
+        raise AssertionError("late writer resurrected deleted feedback")
+    except ContentUnavailableError:
+        pass
+    assert vault.resolve_json(other.content_id) == "other feedback"
+    assert vault.resolve_json(unrelated.content_id) == "foreign"
+
+
 def main() -> None:
     with tempfile.TemporaryDirectory(prefix="alive-content-vault-") as raw:
         base = Path(raw)
+        dependent_erasure(base / "dependencies")
         live = base / "live"
         backups = base / "backups"
         vault = ContentVault(live, backup_root=backups)
