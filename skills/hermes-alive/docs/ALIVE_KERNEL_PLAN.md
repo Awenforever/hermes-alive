@@ -20,6 +20,10 @@ the remaining semantic and recovery checks are recorded in
 [ADR0286](adr/0286-ordinary-feedback-ingress-is-not-yet-connected.md).
 The owner can inspect and erase individual feedback records through Core.
 Controlled tests cover paused inspection and managed backup erasure.
+Withdrawal during an outstanding review closes that wake without a new
+authorization. A completed review can retain its own feedback snapshot after
+the original association is erased. Dependent-content erasure and recovery
+remain an acceptance requirement under ADR0286.
 Actual model judgment on ambiguous replies, multi-turn adaptation, and
 production acceptance remain open.
 

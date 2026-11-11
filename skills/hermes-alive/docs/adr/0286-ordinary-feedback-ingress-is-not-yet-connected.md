@@ -153,3 +153,29 @@ commands use the signed owner association and existing vault erasure path.
 Controlled Core r842 verified inspection while processing is paused, refusal
 across owner scope, managed backup removal, repeat erasure, and replay after
 erasure. Hermes retains its own chat history under its history settings.
+
+## 2026-11-11 route comparison and review erasure
+
+The inherited main route in r845 used the configured custom provider for all
+three turns. The reply kept the instrument unspecified, explained the limits
+of the retained source, and kept the feedback acknowledgment local to the
+share. The answer exceeded the requested one sentence. The official fallback
+still inferred a scale and comparability in r841. The two route results and
+the single synthetic subject leave broader conversational quality open.
+
+In controlled Core r846, the owner erased feedback while the later draft's
+final review was outstanding. A supported review response arrived after the
+erasure. The candidate became unavailable before authorization, but a generic
+source-support error failed the wake. The reviewer now distinguishes loss of
+an initially validated evidence snapshot from provider and protocol failures.
+The same scenario in r847 closed the wake as `evidence_changed`, with only the
+initial share's authorization and local submission.
+
+Controlled Core r848 exposed a separate retention gap. After the feedback
+record and its managed backup were erased, one completed review snapshot
+still held the exact feedback input. Its current-evidence check prevents reuse
+for authorization. The encrypted copy remains until its own retention ends.
+Item-level erasure therefore covers the original association today, with
+dependent content still pending. The acceptance case must cover completed
+reviews, interrupted writes, managed restore, and existing records produced
+before a dependency contract is introduced.

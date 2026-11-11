@@ -12,7 +12,7 @@ from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'hooks'))
 from alive_kernel import (ExperienceJournal,DiscoveryCandidate,DiscoveryOpportunityIngestor,
                          OpportunitySynthesizer)
-from alive_kernel.source_support import SourceSupportReviewer,SourceSupportError
+from alive_kernel.source_support import SourceSupportReviewer,SourceSupportError,SourceSupportEvidenceChanged
 import alive_kernel.source_support as support_module
 
 
@@ -74,8 +74,9 @@ async def exercise(root,mode):
         journal.append=competing_append
     try:
         receipt=await reviewer.run(**args)
-    except Exception:
+    except Exception as error:
         assert mode in ('source-changed','invalid','self-review','start-race')
+        assert isinstance(error,SourceSupportEvidenceChanged) == (mode=='source-changed')
         assert not journal.read(event_type='opportunity.source_support_completed')
     else:
         assert mode in ('supported','unsupported','ambiguous-terminal')

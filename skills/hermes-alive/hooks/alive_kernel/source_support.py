@@ -7,9 +7,9 @@ import math
 import re
 from datetime import datetime,timedelta,timezone
 
-from .content_vault import ContentReference
+from .content_vault import ContentReference, ContentUnavailableError
 from .events import EventEnvelope, Sensitivity, _thaw_json
-from .opportunity_synthesis import OpportunitySynthesizer
+from .opportunity_synthesis import OpportunityEvidenceChanged, OpportunitySynthesisError, OpportunitySynthesizer
 from .semantic_comparator import SemanticComparator
 from .model_json import parse_model_json
 from .host_discovery import read_scope_metadata, source_prompt_excerpt, provenance_metadata
@@ -19,6 +19,10 @@ from .model_timeouts import MAX_STAGE_SECONDS
 
 class SourceSupportError(ValueError):
     pass
+
+
+class SourceSupportEvidenceChanged(SourceSupportError, OpportunityEvidenceChanged):
+    """A valid review snapshot became unavailable or changed during this review."""
 
 
 BASELINE_PROMPT = """Review a tentative communication against supplied evidence and context.
@@ -424,18 +428,24 @@ class SourceSupportReviewer:
         if not started.created:
             raise SourceSupportError('source-support operation already attempted')
         deadline = asyncio.get_running_loop().time() + timeout_seconds
+        def current_snapshot():
+            try:
+                return self.snapshot(subject=subject, interpretation_id=interpretation_id,
+                                     candidate_id=candidate_id, clearance=clearance)
+            except (SourceSupportError, OpportunitySynthesisError, ContentUnavailableError) as error:
+                raise SourceSupportEvidenceChanged('source-review evidence became unavailable') from error
+
         try:
             bundle = ContentReference.from_event_payload(self.journal.get(generated.receipt_event_id).event.payload['content'])
             messages = [{'role':'system','content':review_prompt},{'role':'user',
                          'content':json.dumps(request, ensure_ascii=False)}]
             recovered = False
             for attempt in range(2 if protocol_recovery else 1):
-                current, result = self.snapshot(subject=subject, interpretation_id=interpretation_id,
-                    candidate_id=candidate_id, clearance=clearance)
+                current, result = current_snapshot()
                 if (self.vault.digest_json(current)!=digest or result!=generated
                         or resolve_domain(generated.actual_model)!=generator_domain
                         or self._assessment_request(current,review_as_of,review_until)[0]!=review_prompt):
-                    raise SourceSupportError('source-review context changed before inference')
+                    raise SourceSupportEvidenceChanged('source-review context changed before inference')
                 if recovered:
                     invalid = self.vault.resolve_json(invalid_ref.content_id, expected_subject=subject,
                         expected_purpose='opportunity.source-support-invalid',
@@ -449,12 +459,11 @@ class SourceSupportReviewer:
                 response = await asyncio.wait_for(call(task='alive_source_support', model=reviewer_model,
                     messages=messages, temperature=0, max_tokens=self.max_tokens,
                     timeout=remaining, route_info=route), timeout=remaining)
-                current, result = self.snapshot(subject=subject, interpretation_id=interpretation_id,
-                                                 candidate_id=candidate_id, clearance=clearance)
+                current, result = current_snapshot()
                 if (self.vault.digest_json(current)!=digest or result!=generated
                         or resolve_domain(generated.actual_model)!=generator_domain
                         or hashlib.sha256(self._assessment_request(current,review_as_of,review_until)[0].encode()).hexdigest()!=prompt_digest):
-                    raise SourceSupportError('source-review context changed during model wait')
+                    raise SourceSupportEvidenceChanged('source-review context changed during model wait')
                 text, model, provider = SemanticComparator._response(response, route)
                 domain = resolve_domain(model)
                 independent = bool(domain and domain != generator_domain and model != generated.actual_model)
