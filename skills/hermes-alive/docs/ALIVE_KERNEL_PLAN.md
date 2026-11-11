@@ -197,12 +197,12 @@ Exercise ordinary feedback with actual main models under ADR0286. Check that
 quoted opinions and follow-up questions remain ordinary conversation, and
 that an evaluation of one share retains its original wording and scope. Then
 compare subsequent original drafts and decisions for useful adaptation over
-several wakes. Verify feedback erasure through planning frame reasons and
-candidate content, then through restart, upgrade and rollback. Interpretation,
-model selection rationale, authored drafts, source reviews, executable
-contracts and retained share context have bounded controlled proof under
-ADR0286. Cover withdrawal and ordinary expiry as distinct paths, including
-preservation of structural action history.
+several wakes. Verify ordinary expiry and interrupted planning writes, then
+exercise feedback erasure through restart, upgrade and rollback. Explicit
+withdrawal of candidate bodies and frame reasons has bounded controlled
+proof under ADR0286 alongside selection rationale, authored drafts, source
+reviews, executable contracts and retained share context. Preserve structural
+lineage and action history through both expiry and withdrawal.
 Keep discovery-route provenance and historical receipt recovery
 covered under ADR0285. Credit fresh sharing rounds only after reviewing actual
 usefulness and follow-ups. Continue the longitudinal memory, ongoing work,

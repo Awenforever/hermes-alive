@@ -928,6 +928,14 @@ class ContentVault:
                 WHERE items.content_id=? AND jobs.selector_kind!='expiry' LIMIT 1''',
                 (str(content_id),)).fetchone() is not None
 
+    def subject_erasure_recorded(self, subject: str, content_id: str) -> bool:
+        """Check that a specific item belonged to a whole-subject purge."""
+        with closing(self._connect()) as connection:
+            return connection.execute('''SELECT 1 FROM erasure_jobs AS jobs
+                JOIN erasure_items AS items ON items.job_id=jobs.job_id
+                WHERE jobs.selector_kind='subject' AND jobs.selector_value=? AND items.content_id=? LIMIT 1''',
+                (subject, content_id)).fetchone() is not None
+
     def pending_erasure_jobs(self) -> list[str]:
         with closing(self._connect()) as connection:
             return [

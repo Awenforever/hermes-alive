@@ -474,6 +474,7 @@ class OpportunitySynthesizer:
     # 4000 repeatedly truncated this actual task. Stay within the existing native
     # worker ceiling; no model-specific route/reasoning/configuration change.
     MAX_RESPONSE_TOKENS = 8192
+    MAX_CANDIDATES = 4
 
     def __init__(self, journal: ExperienceJournal, *, content_vault: Any = None,
                  context_vault: Any = None) -> None:
@@ -736,13 +737,13 @@ class OpportunitySynthesizer:
         if (not isinstance(document, dict) or 'candidates' not in document
                 or set(document)-{'candidates','abstentions','reconsiderations'}
                 or not isinstance(document["candidates"], list)
-                or len(document["candidates"]) > 4):
+                or len(document["candidates"]) > self.MAX_CANDIDATES):
             raise OpportunitySynthesisError("invalid opportunity candidate envelope")
         sources = {item.agenda_item_id: item for item in evidence}
         if indices is None:
             indices = tuple(range(len(document["candidates"])))
         if (len(indices) != len(document["candidates"]) or len(set(indices)) != len(indices)
-                or any(type(i) is not int or not 0 <= i < 4 for i in indices)):
+                or any(type(i) is not int or not 0 <= i < self.MAX_CANDIDATES for i in indices)):
             raise OpportunitySynthesisError("invalid proposal identity indices")
         accepted, drafts, accepted_indices = [], [], []
         for index, raw in zip(indices, document["candidates"]):

@@ -246,6 +246,7 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
             put_json = vault_type.put_json
             feedback_module = execution.kernel('native_feedback')
             legacy = os.environ.get('HERMES_ALIVE_TEST_LEGACY_FEEDBACK_DERIVATIVES') == '1'
+            erase_frames = legacy or os.environ.get('HERMES_ALIVE_TEST_FRAME_ERASURE') == '1'
             affected, unrelated = {}, {}
 
             def write_legacy(vault, value, **options):
@@ -301,6 +302,15 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                     selection_ref = selection.event.payload['content']['content_id']
                     assert store.vault.resolve_json(selection_ref)['rationale']
                     group[selection_ref] = 'rationale'
+                    if erase_frames:
+                        frame_row = store.journal.get('deliberation.frame:' + selection.event.payload['frame_id'])
+                        frame_ref = frame_row.event.payload['content']['content_id']
+                        document = store.vault.resolve_json(frame_ref)
+                        body = next(item['content_id'] for item in document['candidates']
+                                    if item['candidate_id'] == selection.event.payload['candidate_id'])
+                        assert store.vault.resolve_json(body)
+                        group[frame_ref] = 'candidates'
+                        group[body] = 'candidate-content'
                     if has_input:
                         affected_selection = selection
                 assert affected and unrelated and affected_selection is not None
@@ -327,19 +337,21 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                 silent_ref = silent_row.event.payload['content']['content_id']
                 assert store.vault.resolve_json(silent_ref)['rationale']
                 affected[silent_ref] = 'rationale'
-                if legacy:
+                if erase_frames:
                     owner = store.configuration().subject
                     outcome = store.journal.read(event_type=feedback_module.EVENT)[0].event.event_id
                     dependencies = feedback_module._legacy_feedback_dependents(
                         store.journal, store.vault, owner, outcome)
                     assert set(affected).issubset(dependencies)
                     assert set(unrelated).isdisjoint(dependencies)
+                    recorded = store.journal.read(event_type='deliberation.frame_lineage_recorded')
+                    assert any(row.event.causation_id == frame.event.event_id for row in recorded)
                 print('CORE_NATIVE_FEEDBACK_NEXT_CYCLE_OK '+json.dumps(dict(
                     disposition=following.disposition,main_turn_association_provenance_preserved=True,
                     eligibility_clock_simulated=True,normal_cadence_wait_observed=True,
                     feedback_reached_intent_and_author=True,author_mode=feedback_probe.get('author_mode'),
                     actual_model_inference=False,quality_rounds=0)),flush=True)
-            migration = feedback_module._legacy_feedback_dependents if legacy else lambda *_: ()
+            migration = feedback_module._legacy_feedback_dependents if erase_frames else lambda *_: ()
             with patch.object(feedback_module, '_legacy_feedback_dependents', migration):
                 await exercise(core,loaded,binding,runner,source,entry,command,next_cycle)
             unavailable = execution.kernel('content_vault').ContentErasedError
@@ -350,7 +362,8 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                 except unavailable:
                     pass
             for content_id, field in unrelated.items():
-                assert store.vault.resolve_json(content_id)[field]
+                document = store.vault.resolve_json(content_id)
+                assert document if field == 'candidate-content' else document[field]
             print('HERMES_ALIVE_CORE_DEPENDENT_FEEDBACK_ERASURE_OK '+json.dumps(dict(
                 legacy_writer_simulated=legacy, erased_artifacts=sorted(affected.values()),
                 preserved_unrelated_artifacts=sorted(unrelated.values()))),flush=True)

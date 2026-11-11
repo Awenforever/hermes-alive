@@ -9,10 +9,11 @@ from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 import json
 
-from .content_vault import ContentReference, ContentUnavailableError
+from .content_vault import ContentErasedError, ContentReference, ContentUnavailableError
 from .events import EventEnvelope, Sensitivity, _thaw_json
 from .kernel_setup import KernelSetupStore
 from .event_store import EventConflictError
+from .privacy import LocalIdentityProtector
 
 FLAG = 'interpret_share_feedback'
 EVENT = 'feedback.native_associated'
@@ -124,6 +125,9 @@ def _legacy_feedback_dependents(journal, vault, subject, outcome_id):
     review_types = ('opportunity.source_support_completed', 'opportunity.source_support_protocol_recovery')
     expression_types = ('message.model_candidate',)
     selection_types = ('deliberation.selected',)
+    frame_type = 'deliberation.framed'
+    lineage_type = 'deliberation.frame_lineage_recorded'
+    protector = LocalIdentityProtector(journal.path.parent / 'identity.key')
     comparison_types = ('expression.source_revision_completed', 'expression.local_correction_completed',
                         'semantic.comparison_protocol_recovery')
 
@@ -138,30 +142,63 @@ def _legacy_feedback_dependents(journal, vault, subject, outcome_id):
                     'alive.opportunity-synthesis', 'system:alive-interpreter')
                 and outcome_id in start.event.payload.get('feedback_outcome_event_ids', ()))
 
+    def frame_lineage_id(frame_id):
+        return 'deliberation.frame-lineage:' + vault.digest_json({'frame_id': frame_id})[:40]
+
     @lru_cache(maxsize=256)
     def frame_sources(frame_id):
         from .deliberation import deserialize_frame
+        from .opportunity_synthesis import OpportunitySynthesizer
         frame = journal.get(f'deliberation.frame:{frame_id}')
-        if (frame is None or frame.event.event_type != 'deliberation.framed'
+        if (frame is None or frame.event.event_type != frame_type
                 or frame.event.source != 'alive.deliberation' or frame.event.subject != subject):
             return None, {}
         ref = ContentReference.from_event_payload(frame.event.payload['content'])
-        document = vault.resolve_json(ref.content_id, expected_subject=subject,
-            expected_purpose='deliberation.frame', expected_sensitivity=frame.event.sensitivity)
-        if vault.digest_json(document) != ref.digest:
-            raise ValueError('legacy deliberation frame integrity unavailable')
-        frame_data, _ = deserialize_frame(document)
+        lineage = journal.get(frame_lineage_id(frame_id))
+        if lineage is not None:
+            data = _thaw_json(lineage.event.payload)
+            signature = data.pop('integrity_authenticator', None)
+            if (not matches(lineage.event, (lineage_type,), 'alive.deliberation', 'system:alive-feedback-erasure')
+                    or lineage.event.causation_id != frame.event.event_id
+                    or lineage.event.sensitivity is not frame.event.sensitivity
+                    or data.get('frame_event_id') != frame.event.event_id
+                    or data.get('subject') != subject or data.get('frame_digest') != ref.digest
+                    or not protector.verify_json(lineage_type + '.v1', data, signature)):
+                raise ValueError('deliberation frame lineage integrity unavailable')
+            locators = data['candidates']
+        else:
+            try:
+                document = vault.resolve_json(ref.content_id, expected_subject=subject,
+                    expected_purpose='deliberation.frame', expected_sensitivity=frame.event.sensitivity)
+            except ContentErasedError:
+                if vault.subject_erasure_recorded(subject, ref.content_id):
+                    return frame, {}
+                raise
+            if vault.digest_json(document) != ref.digest:
+                raise ValueError('legacy deliberation frame integrity unavailable')
+            frame_data, _ = deserialize_frame(document)
+            locators = {}
+            for candidate in frame_data.candidates:
+                if candidate.dimensions is None:
+                    continue
+                receipts = {identity for dimension in ('user_value', 'urgency', 'novelty', 'confidence', 'risk', 'interruption_cost')
+                            for identity in getattr(candidate.dimensions, dimension).evidence_event_ids
+                            if identity.startswith('opportunity.synthesis:') and identity.endswith(':completed')}
+                if (len(receipts) == 1 and candidate.candidate_id.startswith('opportunity-candidate:')
+                        and candidate.content_id == 'opportunity-content:' + candidate.candidate_id.split(':', 1)[1]):
+                    locators[candidate.candidate_id] = {
+                        'receipt_id': receipts.pop(), 'content_id': candidate.content_id}
         sources = {}
-        for candidate in frame_data.candidates:
-            if candidate.dimensions is None:
-                continue
-            receipts = {identity for dimension in ('user_value', 'urgency', 'novelty', 'confidence', 'risk', 'interruption_cost')
-                        for identity in getattr(candidate.dimensions, dimension).evidence_event_ids
-                        if identity.startswith('opportunity.synthesis:') and identity.endswith(':completed')}
-            if len(receipts) == 1:
-                receipt = journal.get(receipts.pop())
-                if receipt is not None and receipt.sequence < frame.sequence:
-                    sources[candidate.candidate_id] = receipt
+        for candidate_id, locator in locators.items():
+            receipt = journal.get(locator['receipt_id'])
+            if (receipt is not None and receipt.sequence < frame.sequence
+                    and matches(receipt.event, ('opportunity.synthesis_completed',),
+                                'alive.opportunity-synthesis', 'system:alive-interpreter')):
+                operation = receipt.event.event_id.removeprefix('opportunity.synthesis:').removesuffix(':completed')
+                if any(candidate_id == 'opportunity-candidate:' + vault.digest_json(
+                        {'operation': operation, 'index': index})[:40]
+                        for index in range(OpportunitySynthesizer.MAX_CANDIDATES)):
+                    sources[candidate_id] = (receipt, locator['content_id'])
         return frame, sources
 
     def selection_sources(selection):
@@ -179,14 +216,15 @@ def _legacy_feedback_dependents(journal, vault, subject, outcome_id):
                 or selection.event.payload.get('candidate_id') != expression.event.payload.get('candidate_id')
                 or selection.event.payload.get('frame_id') != expression.event.payload.get('frame_id')):
             return None
-        return selection_sources(selection).get(selection.event.payload['candidate_id'])
+        linked = selection_sources(selection).get(selection.event.payload['candidate_id'])
+        return linked[0] if linked is not None else None
 
     def depends_on_feedback(receipt):
         return (matches(receipt.event, synthesis_types, 'alive.opportunity-synthesis', 'system:alive-interpreter')
                 and synthesis_used_feedback(receipt.event.causation_id))
 
     dependents, expressions = set(), set()
-    for row in journal.iter_reverse(event_types=synthesis_types + review_types + expression_types + comparison_types + selection_types,
+    for row in journal.iter_reverse(event_types=synthesis_types + review_types + expression_types + comparison_types + selection_types + (frame_type,),
                                     subject=subject):
         event = row.event
         synthesis = row
@@ -212,11 +250,40 @@ def _legacy_feedback_dependents(journal, vault, subject, outcome_id):
                     or gate.event.payload.get('frame_id') != event.payload.get('frame_id')):
                 continue
             admitted = set(gate.event.payload['admissible_ids'])
-            if any(depends_on_feedback(receipt) for candidate_id, receipt in selection_sources(row).items()
+            if any(depends_on_feedback(receipt) for candidate_id, (receipt, _) in selection_sources(row).items()
                    if candidate_id in admitted):
                 ref = ContentReference.from_event_payload(event.payload['content'])
                 if ref.sensitivity is event.sensitivity:
                     dependents.add(ref.content_id)
+            continue
+        elif event.event_type == frame_type and event.source == 'alive.deliberation':
+            frame_id = event.payload['frame_id']
+            frame, sources = frame_sources(frame_id)
+            if frame != row:
+                continue
+            affected = {content_id for receipt, content_id in sources.values()
+                        if content_id is not None and depends_on_feedback(receipt)}
+            if affected:
+                ref = ContentReference.from_event_payload(event.payload['content'])
+                lineage_id = frame_lineage_id(frame_id)
+                if journal.get(lineage_id) is None:
+                    data = {'frame_event_id': event.event_id, 'subject': subject, 'frame_digest': ref.digest,
+                            'candidates': {candidate: {'receipt_id': receipt.event.event_id, 'content_id': content_id}
+                                           for candidate, (receipt, content_id) in sources.items()}}
+                    data['integrity_authenticator'] = protector.authenticate_json(lineage_type + '.v1', data)
+                    lineage_event = EventEnvelope(event_id=lineage_id, event_type=lineage_type,
+                        source='alive.deliberation', actor='system:alive-feedback-erasure',
+                        subject=subject, sensitivity=event.sensitivity, causation_id=event.event_id, payload=data)
+                    try:
+                        journal.append(lineage_event)
+                    except EventConflictError:
+                        existing = journal.get(lineage_id)
+                        if (existing is None
+                                or replace(lineage_event, occurred_at=existing.event.occurred_at,
+                                           observed_at=existing.event.observed_at) != existing.event):
+                            raise
+                dependents.update(affected)
+                dependents.add(ref.content_id)
             continue
         if matches(synthesis.event, expression_types, 'alive.semantic-review', 'system:alive-model-renderer'):
             synthesis = expression_interpretation(synthesis)

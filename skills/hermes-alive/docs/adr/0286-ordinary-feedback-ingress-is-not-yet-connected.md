@@ -226,13 +226,20 @@ a selected draft and a subsequent model choice of silence on the same
 candidate pool. A separate rationale and its draft and review remained
 readable for the same owner.
 
-The serialized planning frame still contains model-written dimension
-reasons, and candidate content has separate storage. Erasing those bodies
-requires preserving the structural candidate-to-synthesis lineage so
-subsequent owner requests can still find legacy copies. Rollout and rollback
-proof also remain open. An older runtime cannot create the new edges, and a
-snapshot captured outside the managed backup boundary can bypass current
-tombstones.
+Explicit feedback forgetting now includes the affected encrypted planning
+frame with its model-written dimension reasons, and the separate candidate
+bodies from the affected interpretation. It checks the original frame digest,
+same-owner synthesis receipt, and candidate identity before accepting a
+locator. Before erasing the frame, it records signed candidate-to-synthesis
+locators, including the other candidates in that frame. These carry IDs and
+the frame digest only. Later withdrawals can use the locators after the
+encrypted frame is gone. The first and repeat owner requests were exercised
+through controlled Core, with an unrelated frame and candidate preserved.
+
+Automatic retention and interrupted pre-receipt writes still need proof
+for frame and candidate copies. Rollout and rollback proof remain open.
+An older runtime cannot create the new edges, and a snapshot captured
+outside the managed backup boundary can bypass current tombstones.
 Independent exports and original Hermes chat history remain outside the vault.
 An older writer that omits dependency metadata must not run alongside this
 runtime. Upgrade and rollback qualification must verify pending erasures
