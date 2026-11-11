@@ -197,9 +197,19 @@ and its managed backup while preserving a different review for the same owner.
 Local vault coverage separately verifies transitive deletion, owner scope,
 restored dependency metadata, and rejection of a write after erasure.
 
-The verified scope is interpretation and source-review artifacts in the Alive
-vault. Selection rationale, authored expressions, semantic comparison and
-delivery history still need a dependency inventory and lifecycle proof.
+The author now binds saved model candidates to the native feedback actually
+included in their prompt. Correction documents and invalid semantic review
+responses depend on that candidate. The legacy forget path traces the same
+typed selection and expression chain for these records. Controlled installed
+Core r858 and r859 each removed the affected authored text and source-review
+snapshot while preserving a separate draft and review for the same owner.
+The semantic review receipt retains structured dispositions and risk labels
+for audit. Its eligibility check requires the candidate to remain available.
+
+Selection rationale, executable content and consented delivery history
+still need lifecycle proof. The delivery-history store already checks signed
+action, context and agenda dependencies for explicit erasure on read. That
+check alone does not remove the retained contract from its vault or backups.
 Independent exports and original Hermes chat history remain outside the vault.
 An older writer that omits dependency metadata must not run alongside this
 runtime. Upgrade and rollback qualification must verify pending erasures

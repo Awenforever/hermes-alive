@@ -245,11 +245,13 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
             put_json = vault_type.put_json
             feedback_module = execution.kernel('native_feedback')
             legacy = os.environ.get('HERMES_ALIVE_TEST_LEGACY_FEEDBACK_DERIVATIVES') == '1'
-            affected, unrelated = [], []
+            affected, unrelated = {}, {}
 
             def write_legacy(vault, value, **options):
                 if options['purpose'] in ('opportunity.candidates', 'opportunity.protocol-failure',
-                                          'opportunity.source-support', 'opportunity.source-support-invalid'):
+                                          'opportunity.source-support', 'opportunity.source-support-invalid',
+                                          'message.model_candidate', 'semantic.local-correction',
+                                          'semantic.source-revision', 'semantic.protocol-failure'):
                     options.pop('depends_on', None)
                 return put_json(vault, value, **options)
 
@@ -284,7 +286,14 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                         expected_purpose='opportunity.source-support', expected_sensitivity=row.event.sensitivity)
                     has_input = any(pair.get('current_input') == text
                                     for pair in document['snapshot']['recent_feedback_context'])
-                    (affected if has_input else unrelated).append(content_id)
+                    group = affected if has_input else unrelated
+                    group[content_id] = 'snapshot'
+                    start = store.journal.get(row.event.causation_id)
+                    expression = store.journal.get(start.event.causation_id)
+                    assert expression.event.event_type == 'message.model_candidate'
+                    expression_ref = expression.event.payload['content']['content_id']
+                    assert store.vault.resolve_json(expression_ref)['text']
+                    group[expression_ref] = 'text'
                 assert affected and unrelated
                 if legacy:
                     owner = store.configuration().subject
@@ -305,14 +314,14 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
             for content_id in affected:
                 try:
                     store.vault.resolve_json(content_id)
-                    raise AssertionError('dependent review remained readable')
+                    raise AssertionError(f'dependent {affected[content_id]} remained readable')
                 except unavailable:
                     pass
-            for content_id in unrelated:
-                assert store.vault.resolve_json(content_id)['snapshot']
+            for content_id, field in unrelated.items():
+                assert store.vault.resolve_json(content_id)[field]
             print('HERMES_ALIVE_CORE_DEPENDENT_FEEDBACK_ERASURE_OK '+json.dumps(dict(
-                legacy_writer_simulated=legacy, erased_review_copies=len(affected),
-                preserved_unrelated_review_copies=len(unrelated))),flush=True)
+                legacy_writer_simulated=legacy, erased_artifacts=sorted(affected.values()),
+                preserved_unrelated_artifacts=sorted(unrelated.values()))),flush=True)
         print('HERMES_ALIVE_CORE_SOURCE_READING_DEPTH_OK '+json.dumps(dict(stages=stages,
             requested_windows=[6000,15000],local_adapter_submissions=1,physical_sends=0,actual_model_inference=False,
             qualification_after_old_window_preserved=True,untitled_extracts_retained=True,

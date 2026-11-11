@@ -122,6 +122,9 @@ def _legacy_feedback_dependents(journal, vault, subject, outcome_id):
     """Find older copies by their typed receipt chain, without reading review bodies."""
     synthesis_types = ('opportunity.synthesis_completed', 'opportunity.synthesis_protocol_recovery')
     review_types = ('opportunity.source_support_completed', 'opportunity.source_support_protocol_recovery')
+    expression_types = ('message.model_candidate',)
+    comparison_types = ('expression.source_revision_completed', 'expression.local_correction_completed',
+                        'semantic.comparison_protocol_recovery')
 
     def matches(event, types, source, actor):
         return (event.event_type in types and event.subject == subject
@@ -134,7 +137,7 @@ def _legacy_feedback_dependents(journal, vault, subject, outcome_id):
                     'alive.opportunity-synthesis', 'system:alive-interpreter')
                 and outcome_id in start.event.payload.get('feedback_outcome_event_ids', ()))
 
-    def final_review_interpretation(expression):
+    def expression_interpretation(expression):
         from .deliberation import deserialize_frame
         selection = journal.get(expression.event.causation_id)
         if (selection is None or selection.sequence >= expression.sequence or not matches(
@@ -167,8 +170,10 @@ def _legacy_feedback_dependents(journal, vault, subject, outcome_id):
         return receipt if receipt is not None and receipt.sequence < frame.sequence else None
 
     dependents = set()
-    for row in journal.iter_reverse(event_types=synthesis_types + review_types, subject=subject):
+    for row in journal.iter_reverse(event_types=synthesis_types + review_types + expression_types + comparison_types,
+                                    subject=subject):
         event = row.event
+        synthesis = row
         if matches(event, review_types, 'alive.source-support', 'system:alive-shadow-reviewer'):
             start = journal.get(event.causation_id) if event.causation_id else None
             if (start is None or start.sequence >= row.sequence or not matches(start.event,
@@ -177,14 +182,16 @@ def _legacy_feedback_dependents(journal, vault, subject, outcome_id):
             synthesis = journal.get(start.event.causation_id) if start.event.causation_id else None
             if synthesis is None or synthesis.sequence >= start.sequence:
                 continue
-            if matches(synthesis.event, ('message.model_candidate',),
-                       'alive.semantic-review', 'system:alive-model-renderer'):
-                synthesis = final_review_interpretation(synthesis)
-                if synthesis is None:
-                    continue
-            parent = synthesis.event
-        else:
-            parent = event
+        elif matches(event, comparison_types, 'alive.semantic-comparator', 'system:alive-shadow-comparator'):
+            synthesis = journal.get(event.causation_id) if event.causation_id else None
+            if (synthesis is None or synthesis.sequence >= row.sequence or not matches(synthesis.event,
+                    expression_types, 'alive.semantic-review', 'system:alive-model-renderer')):
+                continue
+        if matches(synthesis.event, expression_types, 'alive.semantic-review', 'system:alive-model-renderer'):
+            synthesis = expression_interpretation(synthesis)
+            if synthesis is None:
+                continue
+        parent = synthesis.event
         if (matches(parent, synthesis_types, 'alive.opportunity-synthesis', 'system:alive-interpreter')
                 and synthesis_used_feedback(parent.causation_id)):
             ref = ContentReference.from_event_payload(event.payload['content'])

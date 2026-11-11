@@ -14,7 +14,7 @@ from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'hooks'))
 from run_alive_kernel_expression_runtime import scenario
 from alive_kernel import ExperienceJournal,DiscoveryOpportunityIngestor,DiscoveryCandidate
-from alive_kernel.content_vault import ContentReference
+from alive_kernel.content_vault import ContentErasedError, ContentReference
 from alive_kernel.expression_runtime import ExpressionRuntime
 from alive_kernel.semantic_review import SemanticReviewError
 from alive_kernel.semantic_comparator import SemanticComparator
@@ -128,7 +128,15 @@ async def exercise(root,mode):
                 stripped['integrity_authenticator']=runtime.store.protector.authenticate_json('message.semantic_review.v1',
                     runtime.store._authentication_document('message.semantic_review.v1',stripped))
                 assert runtime.store.verify_review(replace(record,event=replace(record.event,payload=stripped))) is None
-                runtime.store.content_vault.erase_item(ref.content_id)
+                candidate = journal.get(result.expression_event_id)
+                candidate_ref = ContentReference.from_event_payload(candidate.event.payload['content'])
+                runtime.store.content_vault.erase_item(candidate_ref.content_id)
+                try:
+                    runtime.store.content_vault.resolve_json(ref.content_id)
+                    raise AssertionError('protocol recovery outlived its model candidate')
+                except ContentErasedError:
+                    pass
+                assert runtime.store.content_vault.resolve_json(forged.content_id)
                 assert runtime.store.verify_review(record) is None
     expected=1 if mode in ('provider-error','revoke-before-repair','valid-negative','disabled','oversize') else 2
     assert len(calls)==expected,(mode,len(calls))

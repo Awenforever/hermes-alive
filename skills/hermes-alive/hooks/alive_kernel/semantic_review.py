@@ -475,6 +475,7 @@ class SemanticReviewStore:
         renderer_model: str,
         renderer_independence_domain: str,
         observed_at: datetime | None = None,
+        depends_on: tuple[str, ...] = (),
     ) -> StoredModelCandidate:
         candidate_text = str(text)
         if not candidate_text or len(candidate_text.encode("utf-8")) > 256_000:
@@ -518,6 +519,7 @@ class SemanticReviewStore:
             sensitivity=source.event.sensitivity,
             retention_until=document.expires_at,
             content_id=f"message-model-candidate:{output_id}",
+            depends_on=depends_on,
         )
         payload: dict[str, Any] = {
             "meaning_event_id": meaning_event_id,

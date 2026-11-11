@@ -459,6 +459,9 @@ class SemanticComparator:
         context_reader = getattr(self.store, 'expression_context_for_selection', None)
         expression_context = (context_reader(selection_event_id, subject)
                               if context_reader is not None else None)
+        from .native_feedback import native_feedback_dependencies
+        feedback_dependencies = native_feedback_dependencies(self.store.journal, subject,
+            (item['outcome_event_id'] for item in (expression_context or {}).get('literal_feedback_context', ())))
         discovery = bool(expression_context and expression_context.get('method') in (
             'discovery-source-authoring-v1','discovery-source-authoring-v2','discovery-source-authoring-v3'))
         if correction_method == SOURCE_REVISION_METHOD and (not discovery or not source_revision_eligible(correction)):
@@ -540,14 +543,19 @@ class SemanticComparator:
                 subject=subject, text=text,
                 renderer_execution_id=f"execution:{operation}:render",
                 renderer_model=actual_model, renderer_independence_domain=domain,
+                depends_on=feedback_dependencies,
             )
+            candidate_record = self.store.journal.get(candidate.event_id)
+            candidate_ref = ContentReference.from_event_payload(candidate_record.event.payload['content'])
+            rendered_dependencies = (candidate_ref.content_id,)
             if proposal is not None:
                 # Retain reconstruction evidence in the existing encrypted vault
                 # and journal, not a new backend, reviewer or delivery mechanism.
                 revision=correction_method == SOURCE_REVISION_METHOD
                 ref=self.store.content_vault.put_json(proposal,subject=subject,
                     purpose='semantic.source-revision' if revision else 'semantic.local-correction',sensitivity=source.event.sensitivity,
-                    retention_until=candidate.expires_at,content_id=('semantic-source-revision:' if revision else 'semantic-local-correction:')+operation)
+                    retention_until=candidate.expires_at,content_id=('semantic-source-revision:' if revision else 'semantic-local-correction:')+operation,
+                    depends_on=rendered_dependencies)
                 self.store.journal.append(EventEnvelope(
                     event_id=('message.source_revision:' if revision else 'message.local_correction:')+operation,
                     event_type='expression.source_revision_completed' if revision else 'expression.local_correction_completed',source='alive.semantic-comparator',
@@ -614,7 +622,7 @@ class SemanticComparator:
                         raise SemanticReviewError('semantic correction exceeds input boundary')
                     ref=self.store.content_vault.put_json(failed,subject=subject,purpose='semantic.protocol-failure',
                         sensitivity=source.event.sensitivity,retention_until=candidate.expires_at,
-                        content_id='semantic-protocol:'+operation)
+                        content_id='semantic-protocol:'+operation,depends_on=rendered_dependencies)
                     recovery_ref,failure_snapshot=ref,failed
                     recovery_event_id=f'semantic.comparison:{operation}:protocol-recovery'
                     appended=self.store.journal.append(EventEnvelope(event_id=recovery_event_id,
