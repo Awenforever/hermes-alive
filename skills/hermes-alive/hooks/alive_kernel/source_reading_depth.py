@@ -25,18 +25,39 @@ action may be nonempty. For example:
 The returned window may remain incomplete. Facts outside it stay unknown.
 '''
 
+PUBLIC_COPY_GUIDANCE = '''
+If the available direct link may be a landing page or incomplete extract, you
+may search once for accessible substantive evidence, such as the author copy
+of a named work or the technical record behind a release. In that case you
+may also reserve ONE existing cited resource in read_targets as an anchor.
+This is the only exception to the one-nonempty-action rule above.
+The host can then read that anchor and at most one distinct result. You still
+have at most one new query and two reads in this entire follow-up. A search
+without an anchor still allows at most two result reads. When a cited page
+already provides the relevant substantive material, a search is unnecessary.
+Never assume a DOI, abstract label or publisher name means the result contains
+the part needed. Use the exact public title or identifier if it is supplied.
+'''
+
 
 def eligible_sources(evidence, read_scope):
     return {e.observation_event_id:e.content['url'] for e in evidence
             if read_scope(e.content).get('reported_read_scope')=='webpage_extract'}
 
 
-def normalize(raw, catalogs, already_queried, eligible):
+def normalize(raw, catalogs, already_queried, eligible, *, allow_query_with_citation=False):
     from . import public_source_refinement as legacy
     if not isinstance(raw,dict):
         return {**legacy._invalid(),'deepen_source_ref':None}
     target=raw.get('deepen_source_ref')
     if target is None:
+        if allow_query_with_citation and raw.get('search_query') is not None and raw.get('read_targets'):
+            query=legacy.normalize({**raw,'read_targets':[]},catalogs,already_queried)
+            citation=legacy.normalize({**raw,'search_query':None},catalogs,already_queried)
+            if (query['search_query'] is None or citation['rejected_count']
+                    or len(citation['read_targets'])!=1):
+                return {**legacy._invalid(),'deepen_source_ref':None}
+            return {**query,'read_targets':citation['read_targets'],'deepen_source_ref':None}
         return {**legacy.normalize(raw,catalogs,already_queried),'deepen_source_ref':None}
     reason=raw.get('reason')
     if (not isinstance(target,str) or target not in eligible
@@ -47,7 +68,7 @@ def normalize(raw, catalogs, already_queried, eligible):
                 reason=reason,rejected_count=0,decision_status='deeper_read_selected')
 
 
-def validate(value,catalogs,already_queried,eligible):
+def validate(value,catalogs,already_queried,eligible,*,allow_query_with_citation=False):
     from .host_discovery import HostDiscoveryError
     if (not isinstance(value,dict) or set(value)!={
             'search_query','read_targets','deepen_source_ref','reason','rejected_count','decision_status'}):
@@ -55,6 +76,9 @@ def validate(value,catalogs,already_queried,eligible):
     if value.get('deepen_source_ref') is not None:
         if normalize(value,catalogs,already_queried,eligible)!=value:
             raise HostDiscoveryError('retained deeper read changed or lost its source')
+    elif allow_query_with_citation and value['search_query'] is not None and value['read_targets']:
+        if normalize(value,catalogs,already_queried,eligible,allow_query_with_citation=True)!=value:
+            raise HostDiscoveryError('retained public copy search lost its cited anchor')
     else:
         from . import public_source_refinement as legacy
         legacy.validate({k:v for k,v in value.items() if k!='deepen_source_ref'},catalogs,already_queried)

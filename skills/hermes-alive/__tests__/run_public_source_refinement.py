@@ -28,6 +28,15 @@ def contracts():
     eligible={'page1':'https://example.invalid/page'}
     deeper=depth.normalize(dict(search_query=None,read_targets=[],deepen_source_ref='page1',reason='Read the qualification.'),{},(),eligible)
     assert depth.validate(deeper,{},(),eligible)==deeper
+    citations={'page1':[dict(citation_ref='link1',url='https://example.invalid/official')]}
+    copy=dict(search_query='public open copy',read_targets=[dict(source_ref='page1',citation_ref='link1')],
+              reason='Read the substantive result.')
+    assert depth.normalize(copy,citations,(),eligible)['decision_status']=='invalid'
+    authorized=depth.normalize(copy,citations,(),eligible,allow_query_with_citation=True)
+    assert authorized['search_query']==copy['search_query'] and authorized['read_targets']==copy['read_targets']
+    assert depth.validate(authorized,citations,(),eligible,allow_query_with_citation=True)==authorized
+    assert depth.normalize({**copy,'read_targets':copy['read_targets']*2},citations,(),eligible,
+                           allow_query_with_citation=True)['decision_status']=='invalid'
     for raw in (dict(deepen_source_ref='foreign',reason='unknown'),
                 dict(deepen_source_ref='page1',search_query='another',reason='two actions'),
                 dict(deepen_source_ref='page1',read_targets=[{}],reason='two actions'),
@@ -78,6 +87,8 @@ async def exercise(root,mode):
     seed='https://example.invalid/aggregator'
     original='https://example.invalid/original'
     secondary='https://example.invalid/other-report'
+    anchor='https://example.invalid/publisher'
+    copy_search=mode in ('public-copy','public-copy-empty')
     research_reason='Check whether the claimed effect was measured or inferred.'
     def dispatch(name,args):
         network.append((name,dict(args)))
@@ -88,6 +99,12 @@ async def exercise(root,mode):
                 entered.set();assert release.wait(10),'fixture did not release public query worker'
             if args['query']=='public original project' and mode=='search-failed':
                 return {'success':False,'error':'synthetic public search unavailable'}
+            if args['query']=='public original project' and copy_search:
+                items=[] if mode=='public-copy-empty' else [
+                    dict(url=anchor,title='Publisher duplicate',description='Already reserved.'),
+                    dict(url=original,title='Author manuscript',description='Open direct evidence.'),
+                    dict(url=secondary,title='Second summary',description='Unneeded fallback.')]
+                return {'success':True,'data':{'web':items}}
             if args['query']=='public original project' and mode in ('overlap','only-overlap'):
                 items=[dict(url=seed,title='Public method',description='A different query gives another excerpt of the SAME source.')]
                 if mode=='overlap':
@@ -101,8 +118,13 @@ async def exercise(root,mode):
             url=seed if args['query']=='public seed' else original
             return {'success':True,'data':{'web':[dict(url=url,title='Public method',
                 description='A public account names a method whose original evidence is worth reading.')]}}
-        assert name=='web_extract' and args['urls'] in ([seed],[original])
+        assert name=='web_extract' and args['urls'] in ([seed],[original],[anchor])
         url=args['urls'][0]
+        if copy_search:
+            content={seed:'Public release. [Publisher]('+anchor+')',
+                     anchor:'Publisher page contains only its data availability statement.',
+                     original:'PUBLIC_PRIMARY_BODY: The proxy changed; the underlying effect was not measured.'}[url]
+            return {'results':[dict(url=url,title='Public observations',content=content)]}
         if url==original and mode=='refined-page-failed':return {'results':[dict(url=url,error='unavailable')]}
         if url==seed and mode not in ('cited','overlap','only-overlap','conflicting-report','deeper','deeper-revoked','deeper-erased','deeper-oversized'):
             return {'results':[dict(url=url,error='unavailable')]}
@@ -163,9 +185,14 @@ async def exercise(root,mode):
             assert 'user_context' not in data and 'owner_context_digest' not in data
             assert data['already_queried']==['public seed']
             assert data['collection_as_of'] and data['collection_clock_is_not_publication_date'] is True
-            assert data['public_evidence_focus']==1 and 'underlying evidence' in kw['messages'][0]['content']
+            assert data['public_evidence_focus']==(2 if data['method']==depth.METHOD else 1)
+            assert 'underlying evidence' in kw['messages'][0]['content']
             assert all(s['reported_read_scope'] in ('search_listing','webpage_extract') for s in data['sources'])
-            if mode.startswith('deeper'):
+            if copy_search:
+                source=next(s for s in data['sources'] if s.get('citations'))
+                value=dict(search_query='public original project',reason=research_reason,
+                    read_targets=[dict(source_ref=source['source_ref'],citation_ref=source['citations'][0]['citation_ref'])])
+            elif mode.startswith('deeper'):
                 source=next(s for s in data['sources'] if s['source_ref'] in
                     {row['source_ref'] for row in data['deeper_read_sources']})
                 value=dict(search_query=None,read_targets=[],deepen_source_ref=source['source_ref'],reason='Read the missing qualification.')
@@ -189,7 +216,11 @@ async def exercise(root,mode):
             if data['method']=='public-source-read-choice-v1':
                 assert 'PRIVATE_' not in json.dumps(kw['messages']) and 'user_context' not in data
                 assert data['public_evidence_focus']==1
-                assert data['public_refinement']==dict(query='public original project',reason=research_reason)
+                refinement=dict(query='public original project',reason=research_reason)
+                if copy_search:
+                    refinement.update(reserved_citation_url=anchor,additional_read_limit=1)
+                    assert all(s['url']!=anchor for s in data['sources'])
+                assert data['public_refinement']==refinement
                 assert all(s['reported_read_scope']=='search_listing' for s in data['sources'])
                 assert 'prefer a direct record' in kw['messages'][0]['content']
             else:assert 'PRIVATE_OWNER_PREFERENCE' in json.dumps(data)
@@ -199,6 +230,8 @@ async def exercise(root,mode):
             value=dict(source_refs=[selected['source_ref']],
                 question='PRIVATE_INQUIRY: internal tentative task, not a public search input.',
                 value_hypothesis='A tentative useful comparison.')
+            if copy_search and data['method']=='public-source-read-choice-v1':
+                value['source_refs']=[s['source_ref'] for s in sorted(data['sources'],key=lambda s:s['url']!=original)]
         return NS(model='synthetic/model',choices=[NS(message=NS(content=json.dumps(value)))])
     task=asyncio.create_task(preparation.reason(observed,cycle=cycle,parameters=parameters,call=call,read_binding=binding))
     if mode=='uncertain-search':
@@ -272,6 +305,10 @@ async def exercise(root,mode):
     elif mode=='refined-page-failed':
         assert len(network)==4 and len(models)==3
         assert not result['expression_parameters'].get('research_read_receipt_ids')
+    elif copy_search:
+        expected=[original,anchor] if mode=='public-copy' else [anchor]
+        assert [args['urls'][0] for name,args in network if name=='web_extract']==[seed,*expected]
+        assert len([1 for name,_ in network if name=='web_search'])==2
     elif mode=='only-overlap':
         assert len(network)==3 and len(models)==2
         assert len(result['expression_parameters']['research_read_receipt_ids'])==1
@@ -296,12 +333,14 @@ async def exercise(root,mode):
             item_ids=result['expression_parameters']['inquiry_item_ids'])
         material=resolve_research_reads(ingestor,subject='user:test',clearance=Sensitivity.PRIVATE,
             receipt_ids=receipts,inquiries=inquiries)
-        assert len(material)==len(receipts)
+        assert len(material)==(len(expected)+1 if copy_search else len(receipts))
         if mode=='conflicting-report':
             by_url={e.content['url']:e.content['summary'] for e in material}
             assert 'underlying effect was measured' in by_url[seed]
             assert 'underlying effect was not measured' in by_url[original]
             assert secondary not in by_url
+        if copy_search:
+            assert {e.content['url'] for e in material}=={seed,*expected}
     if mode=='deeper':
         rich_event=journal.get(rich.observation_event_id)
         ingestor.vault.erase_item(rich_event.event.payload['content']['content_id'])
@@ -309,7 +348,7 @@ async def exercise(root,mode):
             receipt_ids=receipts,inquiries=inquiries)
         except HostDiscoveryError:pass
         else:raise AssertionError('erased expanded source remained in research group')
-    if mode in ('overlap','only-overlap','conflicting-report'):
+    if mode in ('overlap','only-overlap','conflicting-report') or copy_search:
         before=list(network)
         preparation.close()
         preparation=make(True)
@@ -342,7 +381,7 @@ async def allow_synthetic_url(self,url):
 contracts()
 with tempfile.TemporaryDirectory(prefix='alive-public-refinement-') as folder:
     parent=Path(folder)
-    for mode in ('off','old-cycle','old-depth-cycle','legacy-search','on','overlap','only-overlap','conflicting-report','cited','deeper','deeper-revoked','deeper-erased','deeper-oversized','malformed','revoked','erased','search-failed','refined-page-failed','uncertain-search'):
+    for mode in ('off','old-cycle','old-depth-cycle','legacy-search','on','overlap','only-overlap','conflicting-report','public-copy','public-copy-empty','cited','deeper','deeper-revoked','deeper-erased','deeper-oversized','malformed','revoked','erased','search-failed','refined-page-failed','uncertain-search'):
         home=parent/mode
         with patch.dict(sys.modules,hermes_constants=NS(get_hermes_home=lambda:home)):
             with patch.object(CoreDiscoveryTools,'allow_url',allow_synthetic_url):

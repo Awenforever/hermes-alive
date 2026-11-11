@@ -206,3 +206,30 @@ This is a decision within one model review. Passage identity is validated by
 the host, while the meaning of the passage and the scope judgment still
 depend on model quality. Substantive extraction and real-model qualification
 are open.
+
+## Accessible copies within the public reading budget
+
+With public refinement and deeper reading already enabled, the planner can
+use its optional query to look for an accessible author copy or direct
+technical record. It can reserve one already cited URL for the same
+follow-up. The host then excludes that URL from the search-result choices and
+reads at most one additional result. An empty search can still leave the
+reserved citation available. The total allowance stays at one optional query
+and two optional reads. An unresolved worker cannot start another read.
+Selection uses retained public citations and search results, with the normal
+Core URL checks. Historical decisions keep their original mutually exclusive
+actions and cannot acquire a reserved citation on replay.
+
+The collector still returns excerpts. An accessible URL and a successful
+response do not establish that a useful passage was retrieved. The final
+scope assessment remains responsible for withholding assertions that the
+available evidence cannot support.
+
+The independent r919 VLM trial used the earlier runtime. A real public query
+and final read selection sought an official model page. The candidate focused
+on an adjacent computer-use demonstration. Final review found that it did not
+establish the original search's released open weights and visual-grounding
+capability. No adapter submission or follow-up took place. This proves real
+use of the query-to-selection handoff and a review rejection, with no fresh
+quality credit. A useful unexpected discovery remains eligible under the
+existing justified-pivot contract, which needs further real calibration.

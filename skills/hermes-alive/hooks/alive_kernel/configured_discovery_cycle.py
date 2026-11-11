@@ -307,10 +307,15 @@ class ConfiguredDiscoveryCycle:
         if search_purpose:
             prompt += _SEARCH_PURPOSE_GUIDANCE
         # Existing receipts keep their original prompt and input shape.
-        public_evidence_focus=(source_refinement or public_refinement is not None) and (
-            original is None or original.get('public_evidence_focus')==1)
+        public_evidence_focus=(original.get('public_evidence_focus') if original is not None else
+            (2 if deeper_reading else 1) if source_refinement or public_refinement is not None else None)
+        copy_search=deeper_reading and public_evidence_focus==2
         if public_evidence_focus:
             prompt+=_PRIMARY_EVIDENCE_GUIDANCE if source_refinement else _REFINED_EVIDENCE_GUIDANCE
+        if public_refinement is not None and public_refinement.get('additional_read_limit')==1:
+            prompt+='\nThe reserved citation already uses one read. Select at most one additional result.'
+        if copy_search:
+            prompt+=source_reading_depth.PUBLIC_COPY_GUIDANCE
         eligible_depth=source_reading_depth.eligible_sources(evidence,read_scope_metadata) if deeper_reading else {}
         snapshot=dict(method='cited-public-followup-v1' if followup else 'public-reading-choice-v1',
             search_receipt_id=search_receipt_id,system_prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
@@ -318,7 +323,7 @@ class ConfiguredDiscoveryCycle:
                 excerpt=source_prompt_excerpt(e.content,policy=SOURCE_EXCERPT_POLICY if followup else None),
                 published_at=e.content.get('published_at')) for e in evidence])
         if public_evidence_focus:
-            snapshot['public_evidence_focus']=1
+            snapshot['public_evidence_focus']=public_evidence_focus
             for source,item in zip(snapshot['sources'],evidence):
                 source['reported_read_scope']=read_scope_metadata(item.content)['reported_read_scope']
             if public_refinement is not None:
@@ -354,7 +359,8 @@ class ConfiguredDiscoveryCycle:
             snapshot['deeper_read_sources']=[dict(source_ref=identity,
                 requested_extract_chars=source_reading_depth.EXTRACT_CHARS,whole_resource_read_proven=False)
                 for identity in eligible_depth]
-        parse_choice=lambda raw:(source_reading_depth.normalize(raw,catalogs,self.queries,eligible_depth) if deeper_reading else
+        parse_choice=lambda raw:(source_reading_depth.normalize(raw,catalogs,self.queries,eligible_depth,
+            allow_query_with_citation=copy_search) if deeper_reading else
             public_source_refinement.normalize(raw,catalogs,self.queries) if source_refinement else
             citation_selection.normalize(raw,catalogs) if followup and citation_references else
             self._followup_choice(raw,refs,visited) if followup else self._choice(raw,refs))
@@ -379,7 +385,8 @@ class ConfiguredDiscoveryCycle:
             result=resolve(done,'discovery.reading-choice')
             if result['input_digest']!=vault.digest_json(snapshot):
                 raise HostDiscoveryError('reading result differs from its original input')
-            choice=(source_reading_depth.validate(result['choice'],catalogs,self.queries,eligible_depth) if deeper_reading else
+            choice=(source_reading_depth.validate(result['choice'],catalogs,self.queries,eligible_depth,
+                allow_query_with_citation=copy_search) if deeper_reading else
                 public_source_refinement.validate(result['choice'],catalogs,self.queries) if source_refinement else
                 citation_selection.validate(result['choice'],catalogs)
                 if followup and citation_references else parse_choice(result['choice']))
@@ -419,9 +426,14 @@ class ConfiguredDiscoveryCycle:
         await context_value(read_context,validate_context)
         if followup and citation_references:
             ordinary_choice={k:v for k,v in choice.items() if k!='deepen_source_ref'}
-            targets=(() if choice.get('deepen_source_ref') is not None else
-                public_source_refinement.read_targets(ordinary_choice,catalogs,self.queries) if source_refinement else
-                     citation_selection.read_targets(choice,catalogs))
+            if copy_search and choice.get('search_query') and choice['read_targets']:
+                anchor=citation_selection.normalize(dict(read_targets=choice['read_targets'],
+                    reason=choice['reason']),catalogs)
+                targets=citation_selection.read_targets(anchor,catalogs)
+            else:
+                targets=(() if choice.get('deepen_source_ref') is not None else
+                    public_source_refinement.read_targets(ordinary_choice,catalogs,self.queries) if source_refinement else
+                         citation_selection.read_targets(choice,catalogs))
             choice={**choice,'read_targets':list(targets)}
         return choice,model,digest
 
@@ -684,20 +696,25 @@ class ConfiguredDiscoveryCycle:
                     raise HostDiscoveryError('refined search is not current public listing evidence')
                 from .discovery_opportunities import canonicalize_discovery_url
                 visited={canonicalize_discovery_url(e.content['url']) for e in selected}
+                anchors=tuple(target['url'] for target in followup['read_targets'])
+                visited.update(canonicalize_discovery_url(url) for url in anchors)
                 listings=tuple(e for e in listings if canonicalize_discovery_url(e.content['url']) not in visited)
+                urls=anchors
                 if listings:
                     next_read,_,_=await self._select(operation_id=cycle.operation_id+':refined-reading',
                         evidence=listings,search_receipt_id=refined.receipt_id,parameters=parameters,
                         call=call,current=current,public_only=True,search_purpose=observed.search_purpose,
-                        public_refinement=dict(query=query,reason=followup['reason']))
+                        public_refinement=dict(query=query,reason=followup['reason'],**(
+                            {'reserved_citation_url':anchors[0],'additional_read_limit':1} if anchors else {})))
                     by_ref={e.observation_event_id:e for e in listings}
-                    urls=tuple(dict.fromkeys(by_ref[r].content['url'] for r in next_read['source_refs']))
-                    if urls:
-                        followed=await reader.collect(operation_id=cycle.operation_id+':followup-read',
-                            read_urls=urls,inquiry_item_ids=(item_id,),
-                            read_depth=source_reading_depth.WINDOW if observed.deeper_reading else None)
-                        if group_enabled and followed.observation_ids:read_receipts.append(followed.receipt_id)
-                        current()
+                    selected_urls=tuple(dict.fromkeys(by_ref[r].content['url'] for r in next_read['source_refs']))
+                    urls=(*selected_urls[:2-len(anchors)],*anchors)
+                if urls:
+                    followed=await reader.collect(operation_id=cycle.operation_id+':followup-read',
+                        read_urls=urls,inquiry_item_ids=(item_id,),
+                        read_depth=source_reading_depth.WINDOW if observed.deeper_reading else None)
+                    if group_enabled and followed.observation_ids:read_receipts.append(followed.receipt_id)
+                    current()
             elif followup['read_targets']:
                 followed=await reader.collect(operation_id=cycle.operation_id+':followup-read',
                     read_urls=tuple(t['url'] for t in followup['read_targets']),inquiry_item_ids=(item_id,),
