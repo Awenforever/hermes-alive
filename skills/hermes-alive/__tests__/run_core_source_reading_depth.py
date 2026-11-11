@@ -289,6 +289,7 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
 
             async def next_cycle(text):
                 nonlocal url
+                shadow = os.environ.get('HERMES_ALIVE_TEST_FEEDBACK_SHADOW') == '1'
                 feedback_probe['expected']=text
                 # Offer a fresh synthetic resource if collection is due. A
                 # normal wake may instead reason over retained opportunities.
@@ -303,12 +304,26 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                     def now(cls,tz=None):
                         moment=actual_datetime.now(timezone.utc)+timedelta(hours=1,seconds=1)
                         return moment.astimezone(tz) if tz is not None else moment.replace(tzinfo=None)
+                original_binder = native.preparation.bind_parameters
+                async def bind_shadow(**kwargs):
+                    bound = await original_binder(**kwargs)
+                    # The installed preparation attaches delivery fields even
+                    # when they were absent at the test's input boundary.
+                    assert bound.pop('defer_until_eligible') is True
+                    assert bound.pop('authorization_parameters')
+                    bound.pop('send_parameters', None)
+                    bound.pop('worker_id', None)
+                    return bound
                 with patch.object(httpx.AsyncClient,'send',send),patch.object(httpx.Client,'send',lambda client,request,*a,**k:checked(request)),\
                      patch.object(execution.kernel('core_discovery_tools').CoreDiscoveryTools,'allow_url',allowed),\
                      patch.object(cycle_clock,'datetime',AfterCadence),\
+                     patch.object(native.host,'execute',not shadow),\
+                     patch.object(native.preparation,'bind_parameters',bind_shadow if shadow else original_binder),\
                      patch.object(projection_type,'append_frame',legacy_frame if legacy else append_frame),\
                      patch.object(vault_type,'put_json',write_legacy if legacy else put_json):
                     following=await native.step(binding.arguments['build_parameters']())
+                if shadow:
+                    assert following.prepared is None and following.submission is None
                 assert feedback_probe['seen'], ('next Native cycle did not receive recorded feedback',following.disposition)
                 assert feedback_probe['author_seen'],'source-led author did not receive the feedback'
                 assert following.disposition=='content_review_attention' and len(sent)==1,following.disposition
