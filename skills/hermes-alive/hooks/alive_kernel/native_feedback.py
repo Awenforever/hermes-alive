@@ -386,6 +386,7 @@ class NativeFeedbackEvidence:
     evidence_span: str = field(repr=False)
     association_reason: str = field(repr=False)
     submission_report: str = 'submission_unconfirmed'
+    topic_reaction: str | None = None
 
     def to_prompt(self):
         return dict(outcome_event_id=self.outcome_event_id, source_event_id=self.source_event_id,
@@ -396,6 +397,7 @@ class NativeFeedbackEvidence:
             status='native_main_turn_semantic_association_not_quote_proof',
             actual_human_seeing_proven=False, automatic_profile_update=False,
             association_semantic_accuracy_proven=False, complete_feedback_inventory=False,
+            **({'model_topic_reaction':self.topic_reaction} if self.topic_reaction is not None else {}),
             action_authority=False)
 
 
@@ -406,12 +408,13 @@ class NativeFeedbackStore:
         self.setup = KernelSetupStore(self.journal.path.parent, initialize=False, journal=self.journal)
 
     def record(self, *, configured, scope, admission_id, message_id, share_id, text, evidence_span,
-               association_reason, permission_id, validate_current):
+               association_reason, permission_id, validate_current, topic_reaction=None):
         if (not callable(validate_current) or not isinstance(text, str) or not 1 <= len(text) <= 8000
                 or not isinstance(evidence_span, str) or not evidence_span.strip()
                 or len(evidence_span) > 1500 or evidence_span not in text
                 or not isinstance(association_reason, str) or not association_reason.strip()
-                or len(association_reason) > 1000):
+                or len(association_reason) > 1000
+                or topic_reaction not in (None,'positive','negative','unclear')):
             raise ValueError('bounded exact current input and semantic association required')
         now = datetime.now(timezone.utc)
         def current():
@@ -448,7 +451,8 @@ class NativeFeedbackStore:
             raise ValueError('feedback must arrive after its current processing grant')
         until = min(now+timedelta(days=configured.options['outbound_retention_days']), original.event.expires_at)
         content = self.vault.put_json(dict(scope=scope, share_id=share_id, text=text,
-            evidence_span=evidence_span, association_reason=association_reason),
+            evidence_span=evidence_span, association_reason=association_reason,
+            **({'topic_reaction':topic_reaction} if topic_reaction is not None else {})),
             subject=configured.subject, purpose='feedback.native_association',
             sensitivity=Sensitivity.PRIVATE, retention_until=until)
         event = _signed(self.setup, EventEnvelope(event_id=event_id, event_type=EVENT,
@@ -496,6 +500,8 @@ class NativeFeedbackStore:
                 expected_purpose='feedback.native_association', expected_sensitivity=Sensitivity.PRIVATE)
             if self.vault.digest_json(body) != ref.digest or ref.retention_until != event.expires_at:
                 return None
+            if body.get('topic_reaction') not in (None,'positive','negative','unclear'):
+                return None
             share = self.continuity.read_reference(scope=body['scope'], clearance=Sensitivity.PRIVATE,
                 share_id=event.payload['share_id'], include_sources=False)
             original = self.journal.get(event.payload['share_id'])
@@ -514,6 +520,6 @@ class NativeFeedbackStore:
             return NativeFeedbackEvidence(event.event_id, admission.event.event_id,
                 original.event.causation_id, event.observed_at.isoformat(), ref.retention_until.isoformat(),
                 share['text'], body['text'], body['evidence_span'], body['association_reason'],
-                observation['report_kind'])
+                observation['report_kind'],body.get('topic_reaction'))
         except (KeyError, TypeError, ValueError, ContentUnavailableError):
             return None

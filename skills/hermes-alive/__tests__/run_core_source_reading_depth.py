@@ -105,9 +105,10 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                 stage='interpret';assert any(qualifier in excerpt(e) for e in data['opportunities'])
                 if feedback_probe['expected'] is not None:
                     pairs=data.get('recent_feedback_context',[])
-                    assert any(pair.get('current_input')==feedback_probe['expected'] and
-                        pair.get('status')=='native_main_turn_semantic_association_not_quote_proof'
-                        and pair.get('automatic_profile_update') is False for pair in pairs),pairs
+                    assert any(pair.get('status')=='tentative_reaction_to_prior_share_topic'
+                        and pair.get('reaction')=='positive' and pair.get('automatic_profile_update') is False
+                        for pair in pairs),pairs
+                    assert feedback_probe['expected'] not in raw
                     feedback_probe['seen']=True
                 if 'search_context' in data:
                     assert data['search_context']['current_owner_search_request_supplied'] is False
@@ -126,6 +127,8 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
             elif 'expression_binding' in data:
                 from final_review_fixture import controlled_final_findings
                 assert data['expression_binding']['final_assessment_scope'] == 'factual-support-and-communication-fit-v9'
+                if feedback_probe['expected'] is not None:
+                    assert not data['recent_feedback_context'] and feedback_probe['expected'] not in raw
                 if feedback_probe['expected'] is None or 'search_context' in data:
                     assert data['search_context']['kind']=='configured-discovery-route-v1'
                     assert data['search_context']['current_owner_search_request_supplied'] is False
@@ -153,8 +156,7 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                         for e in data['expression_context']['source_evidence'])
                 if feedback_probe['expected'] is not None:
                     pairs=data['expression_context'].get('literal_feedback_context',[])
-                    assert any(pair.get('current_input')==feedback_probe['expected'] and
-                        pair.get('status')=='native_main_turn_semantic_association_not_quote_proof' for pair in pairs),pairs
+                    assert not pairs and feedback_probe['expected'] not in raw
                     feedback_probe['author_seen']=True
                     feedback_probe['author_mode']=data['expression_context'].get('method')
                 source_url=url
@@ -375,7 +377,8 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                 print('CORE_NATIVE_FEEDBACK_NEXT_CYCLE_OK '+json.dumps(dict(
                     disposition=following.disposition,main_turn_association_provenance_preserved=True,
                     eligibility_clock_simulated=True,normal_cadence_wait_observed=True,
-                    feedback_reached_intent_and_author=True,author_mode=feedback_probe.get('author_mode'),
+                    topic_signal_reached_intent=True,native_reply_excluded_from_author_and_review=True,
+                    author_mode=feedback_probe.get('author_mode'),
                     actual_model_inference=False,quality_rounds=0)),flush=True)
             migration = feedback_module._legacy_feedback_dependents if erase_frames and not graph_only else lambda *_: ()
             with patch.object(feedback_module, '_legacy_feedback_dependents', migration):

@@ -75,7 +75,7 @@ async def exercise(core, loaded, binding, runner, source, session, command, befo
         collect()
         targets=[handle for handle,item in binding._continuity._references.items() if item[1]==task]
         assert len(targets)==1,targets
-        arguments=dict(reference=targets[0],evidence_span=text,
+        arguments=dict(reference=targets[0],evidence_span=text,topic_reaction='positive',
             association_reason='The current owner evaluates the preceding retained synthetic trial share, with an explicit one-off qualification.')
         def call(args=None,**overrides):
             if args is None:args=arguments
@@ -96,6 +96,7 @@ async def exercise(core, loaded, binding, runner, source, session, command, befo
         values=reader.read(subject=store.configuration().subject,clearance=Sensitivity.PRIVATE)
         assert len(values)==1 and values[0].feedback_text==text
         assert values[0].to_prompt()['status']=='native_main_turn_semantic_association_not_quote_proof'
+        assert values[0].to_prompt()['model_topic_reaction']=='positive'
         assert not values[0].to_prompt()['automatic_profile_update']
         assert authority_before=={kind:len(store.journal.read(event_type=kind)) for kind in authority_before}
         assert text.encode() not in store.journal.path.read_bytes()

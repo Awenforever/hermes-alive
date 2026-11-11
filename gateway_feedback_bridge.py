@@ -13,10 +13,14 @@ FEEDBACK_SCHEMA = {
         'Do not record casual topical followups, third-party quotations or ambiguous evaluations; ask if unclear. '
         'Preserve situational qualifications and negations. Acknowledge the evaluation at the scope in the '
         'tool result. Reserve promises about future behavior for confirmed changes. '
+        'Use topic_reaction only for an explicit reaction to the share subject or example. '
+        'Use unclear for a presentation-only request, mixed reaction or ambiguous topic value. '
         'The tool retains the exact current message for the guided bounded period, not other chat history.',
     'parameters':{'type':'object','properties':{
         'reference':{'type':'string'}, 'evidence_span':{'type':'string'},
-        'association_reason':{'type':'string'}},
+        'association_reason':{'type':'string'},
+        'topic_reaction':{'type':'string','enum':['positive','negative','unclear'],
+            'description':'Tentative reaction to the subject of this share. Exclude presentation requests.'}},
         'required':['reference','evidence_span','association_reason'],'additionalProperties':False}}
 
 
@@ -91,8 +95,9 @@ class CoreFeedbackBridge:
             from gateway.session_context import get_session_env
             from tools import approval_context
             continuity=self.binding._continuity
+            required={'reference','evidence_span','association_reason'}
             if (self.binding.closed or continuity is None or not isinstance(args,dict)
-                    or set(args)!={'reference','evidence_span','association_reason'}):
+                    or not required<=set(args)<=required|{'topic_reaction'}):
                 raise ValueError('current feedback operation required')
             scope=continuity.router.scope_for_hook(dict(session_id=session_id,
                 sender_id=get_session_env('HERMES_SESSION_USER_ID'),
@@ -124,7 +129,7 @@ class CoreFeedbackBridge:
                 configured=configured,scope=scope.binding_document(),admission_id=ticket[2],
                 share_id=reference[2],text=ticket[3],permission_id=ticket[1],message_id=ticket[4],
                 evidence_span=args['evidence_span'],association_reason=args['association_reason'],
-                validate_current=validate)
+                validate_current=validate,topic_reaction=args.get('topic_reaction'))
             result=dict(status='recorded_tentative_share_feedback',event_id=recorded.event.event_id,
                 feedback_scope='referenced_share',future_behavior_committed=False,
                 automatic_profile_update=False,action_authority=False,

@@ -210,6 +210,14 @@ class SemanticComparator:
                 "evidence_event_ids": list(plan.evidence_event_ids)}
 
     @staticmethod
+    def _author_context(context):
+        from .feedback_context import NATIVE_TOPIC_METHOD, prospective_feedback
+        if not context or context.get('native_feedback_application')!=NATIVE_TOPIC_METHOD:
+            return context
+        return {**context,'literal_feedback_context':prospective_feedback(context['literal_feedback_context']),
+                'feedback_scope':'Native share reactions apply only to internal topic selection.'}
+
+    @staticmethod
     def _review_contract(meaning, text, context):
         original = dict(meaning=meaning,candidate=text)
         from .review_contracts import SPLIT_SOURCE_REVIEW_CONTRACTS,BOUNDARY_ASSESSMENT
@@ -219,7 +227,7 @@ class SemanticComparator:
         if context and (context.get('method') in ('discovery-source-authoring-v1','discovery-source-authoring-v2')
                 or context.get('method')=='discovery-source-authoring-v3'
                     and context.get('semantic_source_contract')=='bounded-group-source-v1'):
-            original['source_context'] = context
+            original['source_context'] = SemanticComparator._author_context(context)
             return original, _DISCOVERY_REVIEW_PROMPT_V1, 'semantic-source-findings-v1'
         return original, _REVIEW_PROMPT_V1, 'semantic-findings-v1'
 
@@ -473,7 +481,7 @@ class SemanticComparator:
         prompt = json.dumps({"meaning": meaning, "presentation": style,
                              "language": language,
                              **({'authoring_as_of':authoring_as_of} if authoring_as_of else {}),
-                             **({'expression_context':expression_context} if expression_context else {}),
+                             **({'expression_context':self._author_context(expression_context)} if expression_context else {}),
                              **({'correction':correction} if correction else {}),
                              **({'issues':correction['findings']['unsupported_claims']+
                                   correction['findings']['uncertainties']}

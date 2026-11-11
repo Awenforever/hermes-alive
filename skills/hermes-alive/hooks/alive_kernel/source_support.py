@@ -125,6 +125,9 @@ class SourceSupportReviewer:
 
     def _assessment_request(self,snapshot,as_of=None,review_until=None):
         prompt=self.prompt_for_snapshot(snapshot)
+        from .feedback_context import NATIVE_TOPIC_METHOD, prospective_feedback
+        if snapshot.get('native_feedback_application')==NATIVE_TOPIC_METHOD:
+            snapshot={**snapshot,'recent_feedback_context':prospective_feedback(snapshot['recent_feedback_context'])}
         if as_of is None:return prompt,snapshot
         if (snapshot.get('assessment_scope',{}).get('kind') not in (
                 'final_discovery_source_and_value', 'final_source_and_recipient_purpose')
@@ -325,6 +328,9 @@ class SourceSupportReviewer:
             'recent_action_history':[a.to_prompt() for a in recovered.actions],
             'recent_feedback_context':[f.to_prompt() for f in recovered.feedback],
             'candidate':{'id':candidate_id, 'kind':candidate.action.action_kind.value}}
+        from .feedback_context import NATIVE_TOPIC_METHOD
+        if start.event.payload.get('interpreter_method',{}).get('native_feedback_context')==NATIVE_TOPIC_METHOD:
+            data['native_feedback_application']=NATIVE_TOPIC_METHOD
         if start.event.payload.get('interpreter_method', {}).get('recipient_output') != 'intent-only-v1':
             data['candidate']['text'] = _thaw_json(candidate.content)['operation']['text']
         proposal = recovered.proposal(candidate_id)

@@ -1124,7 +1124,8 @@ class OpportunitySynthesizer:
         authoring = method.get('discovery_authoring')
         source_review=method.get('discovery_source_review')
         assessment=method.get('reading_assessment')
-        if method.get('native_feedback_context') not in (None,'main-turn-association-v1'):
+        from .feedback_context import NATIVE_TOPIC_METHOD
+        if method.get('native_feedback_context') not in (None,'main-turn-association-v1',NATIVE_TOPIC_METHOD):
             raise OpportunitySynthesisError('unknown native feedback context contract')
         if (assessment not in (None,*reading_assessment.METHODS)
                 or assessment is not None and (authoring!='source-led-v3'
@@ -1283,6 +1284,10 @@ class OpportunitySynthesizer:
         assess_reading=bool(record_reading_assessment and focus and inquiries)
         as_of = datetime.now(timezone.utc)
         budget=RESEARCH_SOURCE_BUDGET if focus else 32000 if revisions else 24000
+        from .feedback_context import NATIVE_ASSOCIATION, NATIVE_TOPIC_METHOD, prospective_feedback
+        literal_feedback=[item.to_prompt() for item in feedback]
+        native_feedback=any(item['status']==NATIVE_ASSOCIATION for item in literal_feedback)
+        feedback_input=prospective_feedback(literal_feedback,topic_signals=True)
         prompt_data={"as_of": as_of.isoformat(),
                             "stage_contract": {"stage": "internal_candidate_interpretation",
                                 "current_owner_turn_supplied": False,
@@ -1294,7 +1299,7 @@ class OpportunitySynthesizer:
                             "corrective_reviews": revisions,
                             "recent_expression_history": [c.to_prompt() for c in history],
                             "recent_action_history": [a.to_prompt() for a in actions],
-                            "recent_feedback_context": [f.to_prompt() for f in feedback],
+                            "recent_feedback_context": feedback_input,
                             "learned_advisory": [c.to_prompt() for c in learning],
                             "user_context": [c.to_prompt() for c in context],
                             "recall_window": {'bounded_visibility_only':True,'pool_size':len(pool)},
@@ -1381,6 +1386,10 @@ class OpportunitySynthesizer:
                 'They grant no search, disclosure, commitment or sending authority and impose no '
                 'must-mention inventory on a recipient message.')
         if assess_reading:system_prompt+='\n'+reading_assessment.REFERENCE_GUIDANCE
+        if native_feedback:
+            system_prompt += ('\nA tentative_reaction_to_prior_share_topic may inform relevance of a genuinely '
+                'new contribution. Preserve exploration and weigh novelty independently. This signal concerns '
+                'one prior share; it carries no style instruction or enduring profile preference.')
         if search_purpose_receipt_id is not None:
             from .research_evidence import SEARCH_PURPOSE_GUIDANCE, ROUTE_SEARCH_GUIDANCE
             system_prompt += (ROUTE_SEARCH_GUIDANCE if 'search_context' in prompt_data else SEARCH_PURPOSE_GUIDANCE)
@@ -1390,9 +1399,7 @@ class OpportunitySynthesizer:
             if len(prompt)>budget:raise OpportunitySynthesisError('candidate eligibility exceeds source budget')
             system_prompt+='\nOnly eligible_primary_agenda_ids may anchor a new communication candidate. Other supplied sources remain factual context, not rejected facts or user dislikes.'
         method = dict(protocol='recipient-plan-v3' if recipient_meaning else 'legacy-draft-v1',
-            **({'native_feedback_context':'main-turn-association-v1'} if any(
-                f.to_prompt().get('status')=='native_main_turn_semantic_association_not_quote_proof'
-                for f in feedback) else {}),
+            **({'native_feedback_context':NATIVE_TOPIC_METHOD} if native_feedback else {}),
             recipient_execution='expression-required-v1' if recipient_meaning else None,
             recipient_output='intent-only-v1' if recipient_meaning else None,
             editorial_context='origin-purpose-v1' if recipient_meaning else None,

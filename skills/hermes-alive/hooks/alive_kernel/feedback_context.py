@@ -13,6 +13,24 @@ from .feedback_synthesis import FeedbackSynthesizer,FeedbackSynthesisError
 from .outcomes import OutcomeProjection
 
 
+NATIVE_ASSOCIATION = 'native_main_turn_semantic_association_not_quote_proof'
+NATIVE_TOPIC_METHOD = 'main-turn-topic-signal-v2'
+
+
+def prospective_feedback(pairs, *, topic_signals=False):
+    """Project native share reactions without carrying forward user wording."""
+    result = []
+    for pair in pairs:
+        if pair.get('status') != NATIVE_ASSOCIATION:
+            result.append(pair)
+        elif topic_signals and pair.get('model_topic_reaction') in ('positive','negative'):
+            result.append(dict(status='tentative_reaction_to_prior_share_topic',
+                prior_share=pair['prepared_text'], reaction=pair['model_topic_reaction'],
+                observed_at=pair['observed_at'], outcome_event_id=pair['outcome_event_id'],
+                automatic_profile_update=False, action_authority=False))
+    return result
+
+
 @dataclass(frozen=True,slots=True)
 class LiteralFeedback:
     outcome_event_id: str

@@ -374,3 +374,18 @@ the actual decision and authoring stages in shadow mode, preserving the
 outbox and its real clock. It must verify exposure in both directions and
 check the actual wording independently of whether a preference record exists.
 No physical delivery or fresh sharing credit follows from these runs.
+
+New interpretations use a bounded topic-reaction view for native feedback.
+The main turn may record a tentative positive or negative reaction to the
+subject of an exact prior share. An unclear reaction or an older association
+without that field supplies no topic vote. The view carries the prior share
+and the annotation, without the user's literal feedback or the association
+rationale. Only candidate interpretation receives this topic view. Drafting
+and factual review use their normal confirmed context and source evidence.
+
+The owner-facing record, consent checks, prior contracts and deletion lineage
+retain their original role. No new write to the Hermes profile follows from
+the annotation. This keeps a presentation request such as “this time, lead
+with the result” out of later generation inputs while allowing a share's
+topic reaction to inform relevance. Real-model topic classification, choice,
+and withdrawal still need qualification.
