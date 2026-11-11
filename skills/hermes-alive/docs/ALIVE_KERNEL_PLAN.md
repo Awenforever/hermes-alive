@@ -195,8 +195,12 @@ records and ADRs0241–0256. Historical detail is retained in
 
 Exercise ordinary feedback with actual main models under ADR0286. Check that
 quoted opinions and follow-up questions remain ordinary conversation, and
-that an evaluation of one share retains its original wording and scope. Then
-compare subsequent original drafts and decisions for useful adaptation over
+that an evaluation of one share retains its original wording and scope.
+Exercise factual follow-ups with known outcomes and evidence gaps across
+both configured routes. ADR0286 records the remaining unsupported-inference
+failure under the official route. Test response exposure at the Core
+streaming boundary before treating a reply reviewer as a user-facing guard.
+Compare subsequent original drafts and decisions for useful adaptation over
 several wakes. ADR0286 covers planning expiry, interrupted writes, vault
 recovery and the isolated Core startup sequence for dormant rollback.
 Verify the same boundary through package-manager admission and actual

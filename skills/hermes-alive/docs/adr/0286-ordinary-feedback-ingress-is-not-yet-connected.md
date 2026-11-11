@@ -281,3 +281,31 @@ platform service restart are separate fleet checks.
 
 Independent exports, original Hermes history and complete volume snapshots
 outside the managed backup root remain outside the vault erasure boundary.
+
+## Evidence-grounded ordinary replies
+
+Real r886 used the configured main route with a new synthetic public
+fixture. The prepared share said a two-station pilot was planned and the
+source said testing was scheduled and no passengers had used it. The main
+turn answered the requested question in one sentence, correctly withheld
+an accessibility-effect claim, and recorded the later one-share feedback
+without promoting it to a lasting preference. Quote, follow-up and
+evaluation association counts were 0, 0 and 1.
+
+Real r887 used the configured official fallback as the isolated main
+route and repeated the earlier instrument-reuse counterexample. A shorter
+continuity instruction moved the answer into one sentence, but the answer
+still called the instrument a scale and asserted established validity and
+direct comparability. It made one model request for the follow-up with no
+reference-tool turn. The earlier r841 response also overreached after
+reading source evidence. A format improvement and a read receipt therefore
+cannot serve as the claim-grounding gate. The r887 prompt overlay was
+discarded. Both trials used controlled shares and earn zero fresh
+sharing rounds.
+
+Further qualification needs an explicit boundary for scoped, evidence-dependent
+ordinary answers. Test both documented results and missing results. Preserve
+short format, natural implications and unrelated turns. Any independent claim
+review must operate before the relevant wording is exposed, or the streaming
+boundary must be treated as an unresolved limitation. Run the two configured
+routes separately and retain the exact answer, scope and evidence they used.
