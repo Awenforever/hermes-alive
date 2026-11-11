@@ -47,8 +47,8 @@ widens collection, disclosure, execution or sending authority.
 
 def configured_route_context(review_contract):
     """New receipts bind route provenance; historical receipts stay unchanged."""
-    from .review_contracts import ROUTE_AWARE_REVIEW
-    if review_contract != ROUTE_AWARE_REVIEW:
+    from .review_contracts import ROUTE_AWARE_REVIEW, SPLIT_SOURCE_REVIEW
+    if review_contract not in (ROUTE_AWARE_REVIEW, SPLIT_SOURCE_REVIEW):
         return None
     return {'kind': 'configured-discovery-route-v1',
             'current_owner_search_request_supplied': False,

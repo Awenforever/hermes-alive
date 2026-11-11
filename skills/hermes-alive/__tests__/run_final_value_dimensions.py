@@ -228,6 +228,40 @@ def test_configured_route_provenance():
     assert validate_retained(result, witness_snapshot=snapshot) == result
 
 
+def test_claim_scope_veto():
+    from alive_kernel.final_value_findings import CLAIM_SCOPE_PROMPT, ROUTE_FIT_PROMPT
+    from alive_kernel.review_contracts import CLAIM_SCOPE_ASSESSMENT, ROUTE_FIT_ASSESSMENT
+
+    snapshot = {'expression_binding': {'final_assessment_scope': CLAIM_SCOPE_ASSESSMENT},
+                'candidate': {'text': 'The material cooled. The sensor registered an apparent drop.'},
+                'evidence': [{'event_id': 'trial', 'excerpt': 'Only the surface proxy appeared to fall.'}]}
+    wire = dict(facts='supported', fact_reason='Synthetic independent facts judgment.', fit='fits',
+                fit_reason='Synthetic fit.', recipient_evidence=[], search_alignment='not_applicable',
+                scope_reason='No query.', source_witnesses=[{'claim': 'The material cooled.', 'passage_id': 'P1.1'}])
+    reviewer = object.__new__(ExpressionSourceSupportReviewer)
+    assert reviewer.prompt_for_snapshot(snapshot) == CLAIM_SCOPE_PROMPT
+    assert '"claim_scope":' in CLAIM_SCOPE_PROMPT and 'ten top-level fields' in CLAIM_SCOPE_PROMPT
+    reason = 'The opening asserts direct cooling; the source only describes the proxy.'
+    for status, verdict in (('overstated', 'unsupported'), ('unresolved', 'uncertain'),
+                            ('preserved', 'supported')):
+        result = parse(json.dumps(dict(wire, claim_scope=status, claim_scope_reason=reason)),
+                       witness_snapshot=snapshot)
+        assert result['verdict'] == verdict
+        assert validate_retained(result, witness_snapshot=snapshot) == result
+        if status != 'preserved':
+            assert result['reason'] == reason
+            tampered = {**result, 'verdict': 'supported'}
+            try: validate_retained(tampered, witness_snapshot=snapshot)
+            except ValueError: pass
+            else: raise AssertionError('claim scope veto lost during retained review recovery')
+    try: parse(json.dumps(wire), witness_snapshot=snapshot)
+    except ValueError: pass
+    else: raise AssertionError('current review accepted an absent scope judgment')
+    snapshot['expression_binding']['final_assessment_scope'] = ROUTE_FIT_ASSESSMENT
+    assert reviewer.prompt_for_snapshot(snapshot) == ROUTE_FIT_PROMPT
+    assert parse(json.dumps(wire), witness_snapshot=snapshot)['verdict'] == 'supported'
+
+
 if __name__ == '__main__':
     test_dimensions()
     test_old_and_new_contracts()
@@ -235,4 +269,5 @@ if __name__ == '__main__':
     test_source_witness_binding()
     test_independent_search_alignment()
     test_configured_route_provenance()
+    test_claim_scope_veto()
     print('FINAL_VALUE_DIMENSIONS_OK')

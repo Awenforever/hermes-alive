@@ -189,3 +189,20 @@ when the decisive evidence is unavailable. A new reading allowance would
 require its own explicit policy choice. Cover conflicting primary and
 secondary text, an incomplete publisher extract, a useful open alternative,
 and the absence of any usable alternative.
+
+## Claim scope in the final assessment
+
+New discovery receipts bind the v10 review contract. The same final review
+call explicitly judges whether the strongest material assertion stays within
+the retained evidence. A conflicting headline or opening is evaluated where
+it appears. An incompatible caveat elsewhere does not repair it. The assessor
+distinguishes direct measurement, proxies, explanations and attributed reports.
+An overstated assertion yields an unsupported verdict, and an unresolved
+material scope yields an uncertain verdict, even if the other judgments pass.
+The host reconstructs that result from retained findings when reopening it.
+Historical contracts preserve their previous prompt, wire shape and verdict.
+
+This is a decision within one model review. Passage identity is validated by
+the host, while the meaning of the passage and the scope judgment still
+depend on model quality. Substantive extraction and real-model qualification
+are open.

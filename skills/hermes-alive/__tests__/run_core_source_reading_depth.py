@@ -14,11 +14,14 @@ import run_core_session_routing as core
 from run_core_guided_setup import cli
 
 
-async def test(home,*,fit_revision=False,revoke_after_capture=False,search_alignment='matches'):
+async def test(home,*,fit_revision=False,revoke_after_capture=False,search_alignment='matches',
+               claim_scope_conflict=False):
     feedback_case=os.environ.get('HERMES_ALIVE_TEST_NATIVE_FEEDBACK')=='1'
     assert search_alignment in ('matches','justified_pivot','conflicts','uncertain')
     assert search_alignment=='matches' or not (fit_revision or revoke_after_capture)
     search_negative=search_alignment in ('conflicts','uncertain')
+    assert not claim_scope_conflict or (search_alignment=='matches' and not (fit_revision or revoke_after_capture or feedback_case))
+    review_negative=search_negative or claim_scope_conflict
     import httpx
     home.mkdir(exist_ok=True)
     assert not any(home.iterdir()),'fixture requires its newly reserved empty profile'
@@ -37,6 +40,7 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
     feedback_probe={'expected':None,'seen':False,'author_seen':False}
     fixture_errors=[]
     qualifier='The trial used an existing instrument, not a newly constructed one.'
+    overstatement='The trial used a newly constructed instrument.'
     try:
         manager=core.get_plugin_manager();manager.discover_and_load()
         loaded=manager._plugins['hermes-alive'];binding=loaded.module._gateway_host_binding
@@ -121,7 +125,7 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                         for n in ('user_value','urgency','novelty','confidence','risk','interruption_cost')})]}
             elif 'expression_binding' in data:
                 from final_review_fixture import controlled_final_findings
-                assert data['expression_binding']['final_assessment_scope'] == 'factual-support-and-communication-fit-v8'
+                assert data['expression_binding']['final_assessment_scope'] == 'factual-support-and-communication-fit-v9'
                 if feedback_probe['expected'] is None or 'search_context' in data:
                     assert data['search_context']['kind']=='configured-discovery-route-v1'
                     assert data['search_context']['current_owner_search_request_supplied'] is False
@@ -133,6 +137,10 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                 if search_alignment!='matches':
                     assert data.get('approved_search_queries')==['synthetic public observation']
                     value.update(search_alignment=search_alignment,scope_reason='Synthetic unresolved search scope.')
+                if claim_scope_conflict:
+                    assert data['candidate']['text'].startswith(overstatement)
+                    assert qualifier in data['candidate']['text']
+                    value.update(claim_scope='overstated',claim_scope_reason='The opening contradicts the retained passage.')
             elif 'meaning' in data and 'candidate' in data:
                 stage='semantic';value=dict(atom_reviews=[dict(atom_id=x['atom_id'],preserved=True,risks=[])
                     for x in data['meaning']['atoms']],added_claims_detected=False,speech_act_preserved=True,protected_literals_preserved=True)
@@ -157,8 +165,10 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                     assert len(urls)==1,urls
                     source_url=next(iter(urls))
                 value=qualifier+' [Source](<'+source_url+'>)'
-                if (search_negative or feedback_probe['expected'] is not None) and data.get('correction'):
-                    if search_negative:
+                if claim_scope_conflict:
+                    value=overstatement+' '+value
+                if (review_negative or feedback_probe['expected'] is not None) and data.get('correction'):
+                    if review_negative:
                         assert 'review-anchored' in body['messages'][0]['content'] or 'Repair the supplied' in body['messages'][0]['content']
                     else:
                         assert isinstance(data['correction'],dict)
@@ -214,7 +224,7 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                 print('HERMES_ALIVE_NATIVE_CAPTURE_REVOCATION_OK',flush=True)
                 return
             result=await native.step(binding.arguments['build_parameters']())
-            if search_negative:
+            if review_negative:
                 assert result.disposition=='content_review_attention',result
                 assert result.prepared is not None and result.prepared.authorization is None
                 assert result.prepared.attempt_event_id is None and result.submission is None
@@ -222,11 +232,13 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                 setup=importlib.import_module(loaded.module.__name__+'.kernel_setup_bridge')
                 journal=setup.setup_store(binding).journal
                 review=journal.get(result.prepared.initial_final_review_event_id)
-                assert review.event.payload['verdict']==('unsupported' if search_alignment=='conflicts' else 'uncertain')
+                assert review.event.payload['verdict']==('uncertain' if search_alignment=='uncertain' else 'unsupported')
                 assert not journal.read(event_type='dispatch.started')
                 assert not journal.read(event_type='action.authorization_evaluated')
                 assert not native.pending
-                print('HERMES_ALIVE_CORE_SEARCH_ALIGNMENT_REFUSAL_OK '+search_alignment,flush=True)
+                marker=('HERMES_ALIVE_CORE_CLAIM_SCOPE_REFUSAL_OK' if claim_scope_conflict
+                        else 'HERMES_ALIVE_CORE_SEARCH_ALIGNMENT_REFUSAL_OK '+search_alignment)
+                print(marker,flush=True)
                 return
             assert result.disposition=='submitted',result
             assert not native.pending
@@ -412,7 +424,8 @@ if __name__=='__main__':
     try:
         asyncio.run(test(directory,fit_revision=os.environ.get('HERMES_ALIVE_TEST_FIT_REVISION')=='1',
                          revoke_after_capture=os.environ.get('HERMES_ALIVE_TEST_CAPTURE_REVOCATION')=='1',
-                         search_alignment=os.environ.get('HERMES_ALIVE_TEST_SEARCH_ALIGNMENT','matches')))
+                         search_alignment=os.environ.get('HERMES_ALIVE_TEST_SEARCH_ALIGNMENT','matches'),
+                         claim_scope_conflict=os.environ.get('HERMES_ALIVE_TEST_CLAIM_SCOPE_CONFLICT')=='1'))
         succeeded=True
     finally:
         from hermes_state_registry import close_all_under

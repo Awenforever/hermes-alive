@@ -498,10 +498,12 @@ class SemanticComparator:
                 if discovery else _RENDER_PROMPT)
             from .review_contracts import (FIRST_CONVERSATIONAL_REVIEW, FIRST_WITNESS_REVIEW,
                                            FIRST_PASSAGE_REVIEW, FIRST_LABELLED_REVIEW,
-                                           FIRST_FLAT_REVIEW, FIRST_SEARCH_REVIEW, SPLIT_SOURCE_REVIEW)
+                                           FIRST_FLAT_REVIEW, FIRST_SEARCH_REVIEW,
+                                           ROUTE_AWARE_REVIEW, SPLIT_SOURCE_REVIEW)
             if discovery and expression_context.get('semantic_source_contract') in (
                     FIRST_CONVERSATIONAL_REVIEW, FIRST_WITNESS_REVIEW, FIRST_PASSAGE_REVIEW,
-                    FIRST_LABELLED_REVIEW, FIRST_FLAT_REVIEW, FIRST_SEARCH_REVIEW, SPLIT_SOURCE_REVIEW):
+                    FIRST_LABELLED_REVIEW, FIRST_FLAT_REVIEW, FIRST_SEARCH_REVIEW,
+                    ROUTE_AWARE_REVIEW, SPLIT_SOURCE_REVIEW):
                 render_system += _DISCOVERY_CHAT_GUIDANCE
             configured_route = bool(discovery and expression_context.get('search_context',{}).get(
                 'kind')=='configured-discovery-route-v1')

@@ -4,7 +4,8 @@ The host combines the model's explicit judgments; it does not classify prose or
 infer recipient preferences. Existing lifecycle consumers retain one verdict.
 """
 from .model_json import parse_model_json
-from .review_contracts import FLAT_ASSESSMENTS, SEARCH_ASSESSMENTS, LABELLED_ASSESSMENTS, PASSAGE_FIT_ASSESSMENT
+from .review_contracts import (CLAIM_SCOPE_ASSESSMENT, FLAT_ASSESSMENTS, SEARCH_ASSESSMENTS,
+                               LABELLED_ASSESSMENTS, PASSAGE_FIT_ASSESSMENT)
 
 
 PROMPT = """Assess this actual message under the supplied source evidence,
@@ -146,10 +147,38 @@ distinct from a current recipient request; judge the actual role supplied.
 Do not promote a route or internal hypothesis into a statement by the user.
 """
 
+CLAIM_SCOPE_PROMPT = ROUTE_FIT_PROMPT.replace(
+    'exactly these eight top-level fields:', 'exactly these ten top-level fields:').replace(
+    ' "scope_reason":"brief grounded explanation",',
+    ' "scope_reason":"brief grounded explanation",\n'
+    ' "claim_scope":"preserved|overstated|unresolved",\n'
+    ' "claim_scope_reason":"strongest material assertion, its wording and the evidence limit",') + """
+Assess claim_scope explicitly. Read the most consequential assertion where it
+appears, including the opening and any headline. A later caveat does not repair
+an earlier incompatible assertion. Distinguish direct observations, proxies,
+inferences and attributed accounts. When a material qualification appears in a
+source, check that every assertion it changes retains it. Read actual passages;
+a paper title, citation, data availability statement or successful extraction
+does not establish what the unretained body shows. Do not use a stronger
+secondary description to override a qualification in direct evidence.
+Use overstated for a concrete mismatch, unresolved when a material assertion's
+scope cannot be established from available passages, and preserved when the
+actual wording stays within the available evidence. An attributed report or
+narrow claim can preserve scope without establishing the missing explanation.
+Do not demand extra caveats on harmless simplifications. Give the strongest
+material assertion and relevant limit in claim_scope_reason (at most 1500
+characters). Overstated or unresolved prevents a supported verdict.
+"""
+
 
 def _search_scope(snapshot):
     return (snapshot is not None and snapshot.get('expression_binding', {}).get(
         'final_assessment_scope') in SEARCH_ASSESSMENTS)
+
+
+def _claim_scope(snapshot):
+    return (snapshot is not None and snapshot.get('expression_binding', {}).get(
+        'final_assessment_scope') == CLAIM_SCOPE_ASSESSMENT)
 
 
 def _with_search(findings, search, snapshot):
@@ -158,13 +187,24 @@ def _with_search(findings, search, snapshot):
             or search['assessment'] not in (
                 'matches', 'justified_pivot', 'conflicts', 'uncertain', 'not_applicable')):
         raise ValueError('explicit search alignment required')
-    reason = _reason(search['reason'])
     if search['assessment'] == 'not_applicable' and snapshot.get('approved_search_queries'):
         raise ValueError('search alignment cannot omit supplied queries')
-    result = {**findings, 'search_alignment': dict(search)}
-    if search['assessment'] == 'conflicts':
+    return _with_finding(findings, 'search_alignment', search, 'conflicts', 'uncertain')
+
+
+def _with_claim_scope(findings, scope):
+    if (not isinstance(scope, dict) or set(scope) != {'assessment', 'reason'}
+            or scope['assessment'] not in ('preserved', 'overstated', 'unresolved')):
+        raise ValueError('explicit claim scope judgment required')
+    return _with_finding(findings, 'claim_scope', scope, 'overstated', 'unresolved')
+
+
+def _with_finding(findings, key, finding, rejected, unresolved):
+    reason = _reason(finding['reason'])
+    result = {**findings, key: dict(finding)}
+    if finding['assessment'] == rejected:
         result['unsupported_claims'] = [*findings['unsupported_claims'], reason]
-    elif search['assessment'] == 'uncertain':
+    elif finding['assessment'] == unresolved:
         result['uncertainties'] = [*findings['uncertainties'], reason]
     result['verdict'] = ('unsupported' if result['unsupported_claims'] else
                          'uncertain' if result['uncertainties'] else 'supported')
@@ -274,9 +314,13 @@ def parse(text, *, witness_snapshot=None):
     value = parse_model_json(text, max_chars=32000)
     witnesses = value.pop('source_witnesses', None) if witness_snapshot is not None and isinstance(value, dict) else None
     search = None
+    scope = None
     if _search_scope(witness_snapshot) and isinstance(value, dict):
         search = {'assessment': value.pop('search_alignment', None),
                   'reason': value.pop('scope_reason', None)}
+    if _claim_scope(witness_snapshot) and isinstance(value, dict):
+        scope = {'assessment': value.pop('claim_scope', None),
+                 'reason': value.pop('claim_scope_reason', None)}
     if (witness_snapshot is not None and witness_snapshot.get('expression_binding', {}).get(
             'final_assessment_scope') in FLAT_ASSESSMENTS):
         if not isinstance(value, dict) or set(value) != {
@@ -300,6 +344,8 @@ def parse(text, *, witness_snapshot=None):
     findings = combine(value)
     if _search_scope(witness_snapshot):
         findings = _with_search(findings, search, witness_snapshot)
+    if _claim_scope(witness_snapshot):
+        findings = _with_claim_scope(findings, scope)
     if witness_snapshot is not None:
         findings['source_witnesses'] = _validate_witnesses(
             witnesses, witness_snapshot, findings['factual_support']['assessment'])
@@ -310,6 +356,8 @@ def validate_retained(findings, *, witness_snapshot=None):
     witness_fields = {'source_witnesses'} if witness_snapshot is not None else set()
     if _search_scope(witness_snapshot):
         witness_fields.add('search_alignment')
+    if _claim_scope(witness_snapshot):
+        witness_fields.add('claim_scope')
     if not isinstance(findings, dict) or set(findings) != {
             'verdict', 'unsupported_claims', 'uncertainties', 'reason',
             'factual_support', 'communication_fit'} | witness_fields:
@@ -317,6 +365,8 @@ def validate_retained(findings, *, witness_snapshot=None):
     rebuilt = combine({key: findings[key] for key in ('factual_support', 'communication_fit')})
     if _search_scope(witness_snapshot):
         rebuilt = _with_search(rebuilt, findings['search_alignment'], witness_snapshot)
+    if _claim_scope(witness_snapshot):
+        rebuilt = _with_claim_scope(rebuilt, findings['claim_scope'])
     if witness_snapshot is not None:
         rebuilt['source_witnesses'] = _validate_witnesses(
             findings['source_witnesses'], witness_snapshot, rebuilt['factual_support']['assessment'], retained=True)

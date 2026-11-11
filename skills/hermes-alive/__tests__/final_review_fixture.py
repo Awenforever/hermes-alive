@@ -3,17 +3,20 @@
 
 def controlled_final_findings(snapshot, *, factual='supported', fit='fits', reason='Synthetic assessment.'):
     scope = snapshot.get('expression_binding', {}).get('final_assessment_scope')
-    if scope in ('factual-support-and-communication-fit-v6', 'factual-support-and-communication-fit-v7',
-                 'factual-support-and-communication-fit-v8'):
+    search_scopes = ('factual-support-and-communication-fit-v7', 'factual-support-and-communication-fit-v8',
+                     'factual-support-and-communication-fit-v9')
+    if scope in ('factual-support-and-communication-fit-v6', *search_scopes):
         witnesses = []
         if factual == 'supported':
             passage = next(p for source in snapshot['evidence'] for p in source['passages'] if p['text'].strip())
             witnesses = [{'claim': snapshot['candidate']['text'][:200], 'passage_id': passage['passage_id']}]
         result = dict(facts=factual, fact_reason=reason, fit=fit, fit_reason=reason,
                       recipient_evidence=[], source_witnesses=witnesses)
-        if scope in ('factual-support-and-communication-fit-v7', 'factual-support-and-communication-fit-v8'):
+        if scope in search_scopes:
             result.update(search_alignment='matches' if snapshot.get('approved_search_queries') else 'not_applicable',
                           scope_reason='Synthetic source answers the supplied synthetic search, if present.')
+        if scope == search_scopes[-1]:
+            result.update(claim_scope='preserved', claim_scope_reason='Synthetic assertion scope.')
         return result
     if scope in ('factual-support-and-communication-fit-v1', 'factual-support-and-communication-fit-v2',
                  'factual-support-and-communication-fit-v3', 'factual-support-and-communication-fit-v4',
