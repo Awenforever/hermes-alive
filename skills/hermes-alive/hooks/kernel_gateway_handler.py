@@ -4,7 +4,11 @@ Not selected by the legacy lifecycle installer. Host assembly must explicitly
 attach the current profile's bounded shadow host or authenticated native host.
 The installed engine and current signed authority jointly govern execution.
 """
+import logging
 from pathlib import Path
+
+
+logger = logging.getLogger(__name__)
 
 
 async def handle(event_type,context):
@@ -16,8 +20,13 @@ async def handle(event_type,context):
         raise RuntimeError('Gateway plugin manager scope mismatch')
     loaded=manager._plugins.get('hermes-alive')
     if loaded is None or not loaded.enabled:
+        logger.warning('Hermes Alive gateway startup: plugin unavailable')
         return {'status':'plugin_unavailable','legacy_allowed':False}
     startup=getattr(loaded.module,'kernel_gateway_startup',None)
     if not callable(startup):
+        logger.warning('Hermes Alive gateway startup: startup contract unavailable')
         return {'status':'startup_contract_unavailable','legacy_allowed':False}
-    return await startup()
+    result = await startup()
+    # Record the callback outcome, without exposing owner, route or model data.
+    logger.info('Hermes Alive gateway startup: %s', result['status'])
+    return result

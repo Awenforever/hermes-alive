@@ -6,6 +6,7 @@ This is not a public consumer install, enabled autonomous loop or fleet proof.
 import argparse
 import asyncio
 import faulthandler
+from importlib.util import module_from_spec, spec_from_file_location
 import json
 from pathlib import Path
 import shutil
@@ -118,7 +119,14 @@ async def exercise(home,shadow):
         assert {'post_tool_call','post_gateway_admission'}<=set(loaded.hooks_registered)
         if not shadow:
             assert not binding.channels
-            assert (await loaded.module.kernel_gateway_startup())['status']=='not_configured'
+            handler_path = installed/'skills/hermes-alive/hooks/kernel_gateway_handler.py'
+            spec = spec_from_file_location('installed_alive_startup_handler', handler_path)
+            handler = module_from_spec(spec)
+            spec.loader.exec_module(handler)
+            with patch.object(handler.logger, 'info') as report:
+                assert await handler.handle('gateway:startup', {}) == {
+                    'status':'not_configured', 'legacy_allowed':False}
+            report.assert_called_once_with('Hermes Alive gateway startup: %s', 'not_configured')
             await exercise_startup_recovery(loaded.module,binding)
         else:
             expected={p.value for p in Platform}|platform_registry.registered_names()
