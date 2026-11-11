@@ -301,7 +301,7 @@ fbabb024702d8394fe6af3f145afb25fcb11b0674369aa0d2ece030b485f9f64  ./__tests__/ru
 c820346cb0721a679f22c1e15a59f23616f6d7a70adf2511e45e4a15a13c0e2c  ./__tests__/run_transport_publisher_withdrawal.py
 6210bc2e2fb0f3c78fe10a87ac68b007982a555a90e5c3245924e2c6c71c372f  ./__tests__/run_transport_reconciliation_runtime.py
 ed5065f1271617efd9df6f0c5ef5473d73e343f122df77f5668aa292abca617e  ./__tests__/run_watcher_retention_maintenance.py
-86d7abd267986c4dd302234e889d6b535655268de15d73ae5e2884b3f13daae2  ./docs/ALIVE_KERNEL_PLAN.md
+da3232a88f19f405c1da2521ba0ac9f7ad1b7ece76b0d67f2beac321adc50474  ./docs/ALIVE_KERNEL_PLAN.md
 bb1240b8645d5bde807e126c36ee12164e2ad602609064402df28740e0e3b315  ./docs/ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-25.md
 a7115842a8cd05021e657b281efb86655a48bd86294b917a3a324935b8a5383b  ./docs/ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-27.md
 861ecc2a8cdee6d997501ac564de7d11c6ac94b1a202fd5d143c8520acd7f1e5  ./docs/ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-11-05.md
@@ -583,7 +583,7 @@ c96a94952a5055ffba4bf2d67b95b6572196fe5343a580db8f550d033cd7d049  ./docs/adr/026
 6e5933eff3f4e5de232d73940c0af0a8715d91b3dcaa0322fd8a15fc4a4eeb6d  ./docs/adr/0261-distinct-continued-Core-work.md
 f3feb9936e8510940c0e5740b99b8e1715d8bbf988eab10ee2cce9fc4a24447c  ./docs/adr/0262-rejected-work-and-visible-waiting.md
 8e4c51d656f79b4769c822f5c8e152c6a52b81475d2f1f94d40c6bec23e0c8f6  ./docs/adr/0263-argument-feedback-and-typed-task-lookups.md
-f6f68a4fe3babdaf6530af8abbf5134256deee243311d4796acf9ffcb5cec70a  ./docs/adr/0264-background-context-is-not-the-intake-turn.md
+3a78efe3b2644615788fe92bd0aba2bf3cc0966363963d028cc1454f2ac7a4b4  ./docs/adr/0264-background-context-is-not-the-intake-turn.md
 3c1bd17f968abcc3bd7e08a388494edc0c55ed447e7a44727d5ba6636e258e39  ./docs/adr/0265-empty-automatic-scope-is-model-only.md
 37f00d397edbe6c0505794fd34ef779a4d1cd32531d08b5b71fbe940b3095be4  ./docs/adr/0266-explicit-deactivation-retires-owned-core-work.md
 37664cb03002c3a3aa014ce02ecb5b0da1f4f5e3043306265f98bf23283702a0  ./docs/adr/0267-semantic-recall-is-not-execution-protocol.md

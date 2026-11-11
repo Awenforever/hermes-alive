@@ -251,6 +251,12 @@ the longitudinal memory, ongoing work and platform service journeys below.
    and unnecessarily frame retained project binding as a further alignment point;
    these dialogue limitations remain open. ADR0265 also corrects the
    empty-scope contradiction without adding tool authority or an executor.
+   A separate real-model run on the current development runtime stopped after
+   the first settled job and resumed in a fresh process. It recovered the
+   same agenda and session, did the remaining step in the original project,
+   preserved the first file, and answered a read-only progress question from
+   empty main-turn history. The wakes were driven by the test. The follow-up
+   still needs clearer distinctions between internal review and user notices.
    Audit found that r265's launcher did not actually select its model-only
    branch; that part of the earlier qualification claim is withdrawn. Its
    file-scope controls remain evidence only for file scope. Requalification must

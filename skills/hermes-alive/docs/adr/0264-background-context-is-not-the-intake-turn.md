@@ -82,3 +82,24 @@ the verbose/status-key wording as dialogue limitations. The positive and wait
 pair qualify these bounded work decisions, not universal source semantics or
 zero-error conversation/sharing. Later empty-scope changes have their own
 controlled Core qualification rather than being silently called this exact run.
+
+## Real model continuation across a process restart
+
+The installed Core and Alive test used a synthetic two-phase file assignment
+with an explicitly granted file toolset. The first process settled one Core
+job and stopped. A fresh process loaded the same profile through the installed
+startup hook, recovered the agenda and Core session, and observed the first
+job and file with its original modification time. The current chat project
+was different and the new main conversation history was empty.
+
+The later wake completed the second file in the original project. Core
+history recorded exactly two write requests, one per file. The task remained
+open with an explicit wait, and the main answer recovered both results and
+distinguished the next reconsideration time from a scheduled action. The
+answer was longer than needed, and its wording blurred outbound follow-up
+notices and internal work review. No adapter send occurred.
+
+This test used real inherited model inference and real Core file effects with
+controlled wake timing. It establishes a bounded cold continuation, while
+daemon scheduling, real channel delivery and more complex ongoing work still
+require independent qualification.
