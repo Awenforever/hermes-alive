@@ -382,6 +382,11 @@ async def test(home):
         assert tick(verbose=False,sync=True,headless=False)==1
         status=tool({'operation':'work_status','work_id':started['work_id']})
         assert status.get('core_execution_state')=='completed',(status,jobs.get_job(started['job_id']).get('last_error'))
+        assert 'automatic_result_followup_enabled' not in status
+        assert status['internal_result_review']['configured_for_owned_terminal_records'] is review_records
+        assert status['internal_result_review']['independent_result_verification_proven'] is False
+        assert status['owner_result_notification']['scheduled_by_work_handoff'] is False
+        assert status['observed_alive_runtime']==binding.runtime_status()['status']
         assert artifact.read_text()==body and requests
         sessions=list(store.journal.read(event_type='work.session_observed'))
         assert len(sessions)==1,sessions
@@ -793,7 +798,11 @@ async def test(home):
         assert len(prepared)==1 and jobs.get_job(prepared[0]['id'])['state']=='paused'
         assert latest_execution(prepared[0]['id']) is None
         held=tool({'operation':'work_status','item_id':fourth_row['item_id']})
-        assert held['status']=='prepared_not_activated_by_alive' and held['automatic_result_followup_enabled'] is False
+        assert held['status']=='prepared_not_activated_by_alive'
+        assert held['internal_result_review']['configured_for_owned_terminal_records'] is review_records
+        assert held['owner_result_notification']['scheduled_by_work_handoff'] is False
+        assert held['observed_alive_runtime']!='running' and 'automatic_result_followup_enabled' not in held
+        internal_status=work_store.status(started['work_id'],subject=configured.subject)
         if review_records:
             with closing(store.journal._connect()) as c:
                 c.execute('UPDATE autonomy_policies_v1 SET enabled=1 WHERE subject=?',(configured.subject,))
@@ -801,7 +810,7 @@ async def test(home):
                 with patch('hermes_state.SessionDB',side_effect=AssertionError('tampered paused cache opened Core bodies')):
                     try:
                         execution.kernel('core_work_evidence').CoreWorkEvidence(work_store).for_review(
-                            started['work_id'],subject=configured.subject,state=status)
+                            started['work_id'],subject=configured.subject,state=internal_status)
                         raise AssertionError('tampered policy projection was trusted')
                     except ValueError:pass
             finally:
@@ -814,7 +823,7 @@ async def test(home):
         assert len(list(store.journal.read(event_type='work.observed')))==observations_before_pause
         with patch('hermes_state.SessionDB',side_effect=AssertionError('paused owner read Core bodies')):
             assert execution.kernel('core_work_evidence').CoreWorkEvidence(work_store).for_review(
-                started['work_id'],subject=configured.subject,state=status) is None
+                started['work_id'],subject=configured.subject,state=internal_status) is None
         # Removing original evidence never reconstructs it from the description.
         text='持续跟进 SOURCE_ERASURE_ONLY，原文与整理稿必须区别。'
         erasure_tool=turn('source-erasure',text)

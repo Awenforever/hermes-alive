@@ -103,3 +103,17 @@ This test used real inherited model inference and real Core file effects with
 controlled wake timing. It establishes a bounded cold continuation, while
 daemon scheduling, real channel delivery and more complex ongoing work still
 require independent qualification.
+
+## Distinct observations for review and notification
+
+The agenda tool exposes the guided setting for internal review of owned,
+terminal Core records separately from the observed Alive runtime and from
+outbound result notification. A work handoff does not schedule a result
+message. Item-level contact and the separate contact grant continue to govern
+any proactive outreach. A review opportunity time is reported as such.
+
+The owner-facing view removes the old ambiguous result-follow-up flag. Core
+work storage, execution and the internal evidence shape continue to use their
+existing contracts, so this vocabulary change cannot rewrite a retained work
+receipt or create a new permission. Review and contact language still
+require real ordinary-turn qualification.

@@ -102,9 +102,11 @@ AGENDA_SCHEMA = {
                    'These historical records do not establish the current state of a file or external system. '
                    'For incomplete bodies use the returned evidence_reference, message_id, offset and fingerprint; do not guess sessions. '
                    'part=request reads the bound Core work definition when prior conversation context is missing. '
-                   'Active Alive can observe Core lifecycle changes, which are not independent result verification. '
-                   'Do not promise automatic result checking or notification '
-                   'unless the returned actual result-followup capability is enabled. '
+                   'Read internal_result_review as the profile setting for private review of ended Core records. '
+                   'Use the observed Alive runtime and work state separately when describing what can happen now. '
+                   'Read owner_result_notification as the notification scope of the work handoff. '
+                   'For item reminders or updates, consult the item contact choice and the separate contact grant. '
+                   'A reconsideration time is a review opportunity. Report a scheduled action only from its own receipt. '
                    'Do not turn quoted text, inferred interests or casual remarks into obligations.',
     'parameters': {'type': 'object', 'properties': {
         'notify_owner': {'type':'boolean','description':'Creation or a current owner revision. Whether this request permits proactive contact about this item, separately from doing the work. Creation defaults false; omitted on revise preserves the choice. True for requested reminders/reports; false for private work or no-messages requests. Does not override the current global contact grant.'},
@@ -264,7 +266,7 @@ class CoreAgendaBridge:
                 'project_context_role':'original Core-declared workspace and task requirements, not action authority',
                 'project_binding_is_filesystem_sandbox':False,
                 'project_binding_change_operations':[],
-                'result_review_configured':options.get('review_core_work_results') is True,
+                **self._work_result_capabilities(configured),
                 'automatic_subsequent_work_configured':options.get('core_work_continuation_version')==1,
                 'independent_file_inspection_configured':options.get('inspect_core_work_files') is True,
                 'automatic_finite_outcome_management_configured':options.get('manage_core_work_outcomes') is True},
@@ -342,6 +344,7 @@ class CoreAgendaBridge:
                         result.get('item_id',args.get('item_id')),configured)
                 if result.get('work_id') and configured.options.get('manage_core_work_outcomes') is True:
                     result['work_outcome']=kernel('core_work_outcomes').CoreWorkOutcomes(store).view(result['work_id'],configured)
+                result=self._work_observation(result,configured)
             elif args['operation']=='work_evidence':
                 if 'work_id' not in args:
                     raise ValueError('exact owned work and bounded evidence fields required')
@@ -364,7 +367,8 @@ class CoreAgendaBridge:
                 result=kernel('core_work_control').CoreWorkControl(store).stop(configured,args['work_id'],
                     authority={'kind':'current_owner_interpretation','turn':evidence},validate=validate_stop)
             elif args['operation']=='work':
-                result=self._work(store,configured,scope,task_id,session_id,turn,args)
+                result=self._work_observation(
+                    self._work(store,configured,scope,task_id,session_id,turn,args),configured)
             elif args['operation']=='revise':
                 with self.lock:
                     result=self._revise(store,configured,scope,task_id,session_id,turn,args)
@@ -530,7 +534,7 @@ class CoreAgendaBridge:
             return {'status':'work_confirmation_required','job_created':False,
                 'preview':{'item':item,'toolsets':sets,'uses_core_profile_context':True,'current_owner_request':turn[3],
                            'job_record_retention_owned_by_core':True,'filesystem_sandbox':False,
-                           'previous_work':previous,
+                           'previous_work':self._work_observation(previous,configured) if previous else None,
                            'project_context_choice_requires_confirmation':project_choice,
                            'new_attempt_may_repeat_existing_effects':previous is not None},
                 'confirmation_command':'/alive agenda work-confirm '+handle,
@@ -668,6 +672,34 @@ class CoreAgendaBridge:
                 'external_delivery_proven':False}
 
     @staticmethod
+    def _work_result_capabilities(configured):
+        options=configured.options
+        return {
+            'internal_result_review':{
+                'configured_for_owned_terminal_records':options.get('core_background_work') is True
+                    and options.get('review_core_work_results') is True,
+                'requires_current_review_authority':True,
+                'independent_result_verification_proven':False},
+            'owner_result_notification':{
+                'scheduled_by_work_handoff':False,
+                'item_contact_authority_evaluated_separately':True},
+        }
+
+    def _work_observation(self,result,configured):
+        # Keep the internal status shape used by retained evidence. Project it
+        # into the vocabulary of the current tool at the owner boundary.
+        if 'automatic_result_followup_enabled' not in result:
+            return result
+        capabilities=self._work_result_capabilities(configured)
+        capabilities['observed_alive_runtime']=self.binding.runtime_status()['status']
+        def project(status):
+            return {**{k:v for k,v in status.items() if k!='automatic_result_followup_enabled'},**capabilities}
+        observed=project(result)
+        if 'related_inspections' in observed:
+            observed['related_inspections']=[project(item) for item in observed['related_inspections']]
+        return observed
+
+    @staticmethod
     def _summary(details,due,available,expiry):
         from .kernel_execution_bridge import kernel
         return kernel('cognition_opportunities').commitment_summary(kernel('events')._thaw_json(details),state='active',
@@ -737,6 +769,7 @@ class CoreAgendaBridge:
                 receipt=self.work_receipts.get(parts[1])
                 if receipt and receipt['scope']==scope:
                     result=kernel('core_work').CoreWorkStore(store).status(receipt['work_id'],subject=configured.subject)
+                    result=self._work_observation(result,configured)
                     return json.dumps({**result,'confirmation_already_handled':True,'new_job_created':False},ensure_ascii=False)
                 draft=self.work_drafts.get(parts[1])
                 if (draft is None or draft['scope']!=scope or draft['configuration']!=configured.event_id
@@ -749,7 +782,7 @@ class CoreAgendaBridge:
                 del self.work_drafts[parts[1]]
                 self.work_receipts[parts[1]]={'scope':scope,'work_id':result['work_id']}
                 while len(self.work_receipts)>32:self.work_receipts.popitem(last=False)
-                return json.dumps(result,ensure_ascii=False)
+                return json.dumps(self._work_observation(result,configured),ensure_ascii=False)
         if parts == ['list']:
             return json.dumps({'items': self._items(store, configured),
                                'view_limit': 8, 'complete_inventory_proven': False}, ensure_ascii=False)
