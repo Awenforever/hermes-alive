@@ -117,3 +117,19 @@ journey made one local adapter submission and earned zero sharing rounds.
 An earlier run returned exit zero after the fixture raised an assertion in
 the correction call. The final fixture checks the correction result and
 fails on any fixture exception.
+
+The real public-source attempt r835 ended with zero candidates and reached
+none of the feedback turns. In r836 the installed Core produced a controlled
+synthetic local share, then the configured official DeepSeek model handled
+three admitted main turns. A quotation and a follow-up question produced zero
+associations. An evaluation of the previous share produced one association
+with the full input and an explicit one-off length scope. The model's ordinary
+follow-up nevertheless inferred a measurement scale and comparability from
+a source that said only that the trial reused an existing instrument. Its
+acknowledgment also shifted from one share to similar topics. These examples
+keep conversational accuracy and adaptation open.
+
+The subsequent admission guard binds the turn to the platform message ID
+from Core's structured current input. It retains the journal identity format.
+The installed Core test r837 passed after adding a replay case with identical
+text and different message IDs.

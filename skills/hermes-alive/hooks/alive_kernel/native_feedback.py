@@ -55,16 +55,17 @@ def set_permission(store, configured, enabled):
             'enabled':enabled, 'automatic_profile_update':False})))
 
 
-def admitted_input(store, configured, text):
+def admitted_input(store, configured, text, message_id):
     """Only the newest observed input may support the normal turn association."""
-    fingerprint = store.protector.authenticate_json('configured.input.text.v1', text)
+    from .admitted_inbound import configured_input_identity
+    expected_id, fingerprint = configured_input_identity(store,configured,message_id,text)
     for row in store.journal.iter_reverse(event_types=('conversation.inbound',),
             subject=configured.subject, max_records=32):
         event = row.event
         if (event.source == 'hermes.plugin.post_gateway_admission'
                 and event.payload.get('method') == 'configured-input-wake-v1'
                 and event.payload.get('configuration_event_id') == configured.event_id):
-            return row if event.payload.get('text_fingerprint') == fingerprint else None
+            return row if event.event_id == expected_id and event.payload.get('text_fingerprint') == fingerprint else None
     return None
 
 
@@ -99,7 +100,7 @@ class NativeFeedbackStore:
         self.journal, self.vault = continuity.journal, continuity.vault
         self.setup = KernelSetupStore(self.journal.path.parent, initialize=False, journal=self.journal)
 
-    def record(self, *, configured, scope, admission_id, share_id, text, evidence_span,
+    def record(self, *, configured, scope, admission_id, message_id, share_id, text, evidence_span,
                association_reason, permission_id, validate_current):
         if (not callable(validate_current) or not isinstance(text, str) or not 1 <= len(text) <= 8000
                 or not isinstance(evidence_span, str) or not evidence_span.strip()
@@ -110,7 +111,7 @@ class NativeFeedbackStore:
         now = datetime.now(timezone.utc)
         def current():
             latest = self.setup.configuration()
-            observed = admitted_input(self.setup, configured, text)
+            observed = admitted_input(self.setup, configured, text, message_id)
             if (latest is None or latest.event_id != configured.event_id
                     or permission(self.setup, latest) != (True, permission_id)
                     or observed is None or observed.event.event_id != admission_id):

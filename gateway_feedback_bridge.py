@@ -55,11 +55,15 @@ class CoreFeedbackBridge:
         if (scope is None or not isinstance(task,str) or not 1<=len(task)<=4096
                 or not isinstance(turn,str) or not 1<=len(turn)<=4096
                 or not isinstance(text,str) or not 1<=len(text)<=8000):return None
+        history=values.get('conversation_history')
+        current=history[-1] if isinstance(history,list) and history else None
+        message_id=current.get('platform_message_id') if isinstance(current,dict) and current.get('role')=='user' else None
+        if not isinstance(message_id,str) or not 1<=len(message_id)<=4096:return None
         store,configured=self._owner(scope)
         feedback=kernel('native_feedback')
         enabled,permission_id=feedback.permission(store,configured)
         if not enabled:return None
-        admission=feedback.admitted_input(store,configured,text)
+        admission=feedback.admitted_input(store,configured,text,message_id)
         if admission is None:return None
         shares=continuity.store.read(scope=scope.binding_document(),clearance=continuity.clearance,
             include_sources=False)
@@ -69,7 +73,7 @@ class CoreFeedbackBridge:
         with self.lock:
             for previous in tuple(self.turns):
                 if previous[0]==scope and previous[2]!=turn:del self.turns[previous]
-            self.turns[(scope,task,turn)]=(configured.event_id,permission_id,admission.event.event_id,text)
+            self.turns[(scope,task,turn)]=(configured.event_id,permission_id,admission.event.event_id,text,message_id)
             while len(self.turns)>64:self.turns.popitem(last=False)
         return {'context':'Alive share-feedback capture and interpretation is enabled for this owner. '
             'If this current message clearly evaluates a retained share, use alive_record_feedback with its '
@@ -117,7 +121,7 @@ class CoreFeedbackBridge:
                     raise ValueError('feedback route changed')
             recorded=kernel('native_feedback').NativeFeedbackStore(continuity.store).record(
                 configured=configured,scope=scope.binding_document(),admission_id=ticket[2],
-                share_id=reference[2],text=ticket[3],permission_id=ticket[1],
+                share_id=reference[2],text=ticket[3],permission_id=ticket[1],message_id=ticket[4],
                 evidence_span=args['evidence_span'],association_reason=args['association_reason'],
                 validate_current=validate)
             result=dict(status='recorded_tentative_share_feedback',event_id=recorded.event.event_id,

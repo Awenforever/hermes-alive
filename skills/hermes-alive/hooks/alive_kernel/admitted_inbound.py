@@ -19,6 +19,15 @@ class AdmittedInboundError(ValueError):
     pass
 
 
+def configured_input_identity(store,configured,message_id,text):
+    scope=configured.scope
+    fingerprint=store.protector.authenticate_json('configured.input.text.v1',text)
+    identity=dict(owner=configured.subject,platform=scope['platform'],transport=scope['transport_profile'],
+        configuration=configured.event_id,session=scope['session_key'],message=message_id,
+        normalized_text_revision=fingerprint)
+    return 'conversation.configured:'+store.protector.authenticate_json('configured.input.v1',identity),fingerprint
+
+
 def record_configured_input(store,configured,scope,values):
     """Wake the configured native owner without retaining or learning a body.
 
@@ -36,11 +45,9 @@ def record_configured_input(store,configured,scope,values):
     message=values.get('message_id');text=values.get('text')
     if not _identifier(message) or not isinstance(text,str) or len(text)>1_000_000:
         raise AdmittedInboundError('bounded current native input required')
-    text_fingerprint=store.protector.authenticate_json('configured.input.text.v1',text)
-    identity=dict(owner=owner,platform=scope['platform'],transport=scope['transport_profile'],
-        configuration=configured.event_id,session=values['session_key'],message=message,
-        normalized_text_revision=text_fingerprint)
-    event_id='conversation.configured:'+store.protector.authenticate_json('configured.input.v1',identity)
+    if values.get('session_key')!=configured.scope['session_key']:
+        raise AdmittedInboundError('configured input session changed')
+    event_id,text_fingerprint=configured_input_identity(store,configured,message,text)
     payload=dict(method='configured-input-wake-v1',configuration_event_id=configured.event_id,
         text_fingerprint=text_fingerprint,
         text_characters=len(text),raw_content_stored=False,erasable_content_stored=False,

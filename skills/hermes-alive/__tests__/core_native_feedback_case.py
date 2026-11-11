@@ -29,10 +29,11 @@ async def exercise(core, loaded, binding, runner, source, session, command, befo
         session_key=session.session_key,session_id=session.session_id)
     task='native-feedback-current-turn'
     try:
-        def collect():
+        def collect(message_id=None):
             _collect_pre_llm_call_context(SimpleNamespace(session_id=session.session_id,model='configured-primary',
                 platform='telegram',_user_id=source.user_id),effective_task_id=task,turn_id=task,
-                original_user_message=text,messages=[{'role':'user','content':text}],conversation_history=[])
+                original_user_message=text,messages=[{'role':'user','content':text,
+                    'platform_message_id':message_id or event.message_id}],conversation_history=[])
         collect()
         targets=[handle for handle,item in binding._continuity._references.items() if item[1]==task]
         assert len(targets)==1,targets
@@ -98,6 +99,9 @@ async def exercise(core, loaded, binding, runner, source, session, command, befo
         # fault injection of a concurrent owner command, not a preseeded outcome.
         event=SimpleNamespace(message_id='synthetic-native-feedback-race',text=text)
         assert await run_post_admission_hook(runner,event,source,session.session_key)==(False,None)
+        task='native-feedback-stale-identical-turn'
+        collect('synthetic-native-feedback-1')
+        assert all(ticket[1]!=task for ticket in binding._feedback.turns), 'identical text bound to a different message'
         task='native-feedback-race-turn'
         collect()
         targets=[handle for handle,item in binding._continuity._references.items() if item[1]==task]
