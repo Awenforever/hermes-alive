@@ -31,7 +31,8 @@ from uuid import uuid4
 from .events import Sensitivity
 
 
-_SCHEMA_VERSION = 2
+_CONTENT_FORMAT_VERSION = 2
+_STORAGE_SCHEMA_VERSION = 3
 _MAX_CONTENT_BYTES = 4 * 1024 * 1024
 _OPERATION_LOCK = threading.Lock()
 
@@ -156,7 +157,7 @@ def _metadata_aad(
 ) -> bytes:
     return json.dumps(
         {
-            "schema": _SCHEMA_VERSION,
+            "schema": _CONTENT_FORMAT_VERSION,
             "content_id": content_id,
             "subject": subject,
             "purpose": purpose,
@@ -239,8 +240,14 @@ class ContentVault:
                 raise ContentVaultError(
                     "unsupported pre-release content-vault schema; migrate or remove it before use"
                 )
+            if has_meta is not None:
+                row = connection.execute(
+                    "SELECT value FROM vault_meta WHERE key='schema_version'"
+                ).fetchone()
+                if row is None or row["value"] not in ("2", str(_STORAGE_SCHEMA_VERSION)):
+                    raise ContentVaultError("unsupported content-vault schema")
             connection.executescript(
-                """
+                f"""
                 BEGIN IMMEDIATE;
                 CREATE TABLE IF NOT EXISTS vault_meta (
                     key TEXT PRIMARY KEY,
@@ -299,15 +306,17 @@ class ContentVault:
                     outcome TEXT NOT NULL,
                     occurred_at TEXT NOT NULL
                 );
-                INSERT INTO vault_meta(key, value) VALUES ('schema_version', '2')
+                INSERT INTO vault_meta(key, value) VALUES ('schema_version', '{_STORAGE_SCHEMA_VERSION}')
                     ON CONFLICT(key) DO NOTHING;
+                UPDATE vault_meta SET value='{_STORAGE_SCHEMA_VERSION}'
+                    WHERE key='schema_version' AND value='2';
                 COMMIT;
                 """
             )
             row = connection.execute(
                 "SELECT value FROM vault_meta WHERE key='schema_version'"
             ).fetchone()
-            if row is None or int(row["value"]) != _SCHEMA_VERSION:
+            if row is None or row["value"] != str(_STORAGE_SCHEMA_VERSION):
                 raise ContentVaultError("unsupported content-vault schema")
 
     @contextmanager
@@ -816,7 +825,7 @@ class ContentVault:
                 shutil.rmtree(resolved)
                 removed += 1
                 continue
-            if manifest.get("schema") != _SCHEMA_VERSION:
+            if manifest.get("schema") != _CONTENT_FORMAT_VERSION:
                 shutil.rmtree(resolved)
                 removed += 1
                 continue
@@ -857,7 +866,7 @@ class ContentVault:
                         "SELECT content_id, subject FROM content_items ORDER BY content_id"
                     ).fetchall()
                 manifest = {
-                    "schema": _SCHEMA_VERSION,
+                    "schema": _CONTENT_FORMAT_VERSION,
                     "created_at": datetime.now(timezone.utc).isoformat(),
                     "content_ids": [str(row["content_id"]) for row in rows],
                     "subjects": sorted({str(row["subject"]) for row in rows}),
@@ -883,7 +892,7 @@ class ContentVault:
             manifest = json.loads((backup / "manifest.json").read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
             raise ContentVaultError("managed backup manifest is missing or invalid") from exc
-        if manifest.get("schema") != _SCHEMA_VERSION:
+        if manifest.get("schema") != _CONTENT_FORMAT_VERSION:
             raise ContentVaultError("managed backup schema is unsupported")
         if destination.exists() and any(destination.iterdir()):
             raise ContentVaultError("restore destination must be empty")

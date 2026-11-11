@@ -254,10 +254,20 @@ Controlled installed Core r877 verified the old writer path. r878 disabled
 legacy discovery for explicit erasure, then recovered the signed lineage
 after the frame body was gone.
 
-Rollout, cold recovery and rollback proof remain open. An older runtime
-cannot create the new edges, and a snapshot captured outside the managed
-backup boundary can bypass current tombstones.
-Independent exports and original Hermes chat history remain outside the vault.
-An older writer that omits dependency metadata must not run alongside this
-runtime. Upgrade and rollback qualification must verify pending erasures
-and reject any path that restores withdrawn content.
+The SQLite storage version now advances from 2 to 3 without changing the
+encrypted payload format or managed backup format. A prior runtime rejects
+the upgraded store on open. It cannot claim readiness against state whose
+retention rules it cannot enforce. Stop the outgoing Alive runtime before
+the replacement opens the vault. A process that already opened the prior
+schema is outside the startup guard.
+
+The cross-version test seeds real version-2 state and a managed backup
+using the previous code. The current runtime opens both formats, persists
+a linked derivative and interrupts erasure before backup cleanup. The
+old runtime refuses the migrated store. The current runtime resumes the
+durable cleanup on cold open, then a newly created managed backup restores
+the tombstones and unrelated history. This qualifies the local storage
+boundary. The isolated Core service rollback with Alive dormant remains
+to be exercised. Independent exports, original Hermes history and complete
+volume snapshots outside the managed backup root remain outside the vault
+erasure boundary.
