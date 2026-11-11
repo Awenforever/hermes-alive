@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from datetime import datetime, timedelta, timezone
 import sys
 import tempfile
+from unittest.mock import patch
 
 HOOKS = Path(__file__).resolve().parents[1] / "hooks"
 sys.path.insert(0, str(HOOKS))
@@ -22,6 +24,7 @@ from alive_kernel.deliberation import (  # noqa: E402
     SideEffect,
 )
 from alive_kernel.deliberation_store import DeliberationProjection  # noqa: E402
+from alive_kernel.content_vault import ContentErasedError  # noqa: E402
 from alive_kernel.agenda import (  # noqa: E402
     AgendaAuthority,
     AgendaItemKind,
@@ -286,6 +289,60 @@ def main() -> int:
         assert any(item.event_id == selection_record.event.event_id for item in decisions)
         after_rebuild = projection.inspect(frame.frame_id, clearance=Sensitivity.PRIVATE)
         assert after_rebuild == before_rebuild
+
+        vault = projection.content_vault
+        deadline = datetime.now(timezone.utc) + timedelta(days=1)
+        feedback = vault.put_json({'text': 'synthetic feedback'}, subject='user:test',
+                                  purpose='test.feedback', retention_until=deadline)
+        later_feedback = vault.put_json({'text': 'independent feedback'}, subject='user:test',
+                                        purpose='test.feedback', retention_until=deadline + timedelta(days=1))
+        parent = (feedback.content_id,)
+        candidate = ActionCandidate(ActionKind.SHARE, SideEffect.COMMUNICATION,
+            ActionAuthority.USER_DELEGATED, dimensions(confidence=0.9, risk=0.1),
+            content_id='candidate-content:withdrawal', candidate_id='candidate:withdrawal')
+        sibling = ActionCandidate(ActionKind.SHARE, SideEffect.COMMUNICATION,
+            ActionAuthority.USER_DELEGATED, dimensions(confidence=0.9, risk=0.1),
+            content_id='candidate-content:sibling', candidate_id='candidate:sibling')
+        body = {'message': 'derived plan'}
+        vault.put_json(body, subject='user:test', purpose='deliberation.candidate',
+                       content_id=candidate.content_id)
+        params = dict(actor='system:alive-coordinator', subject='user:test',
+            candidate_contents={candidate.content_id: body, sibling.content_id: {'message': 'independent plan'}},
+            candidate_sources={candidate.candidate_id: ('opportunity.synthesis:test:completed', parent),
+                sibling.candidate_id: ('opportunity.synthesis:sibling:completed', (later_feedback.content_id,))})
+        pool = (candidate, sibling)
+        completed, _ = projection.append_frame(pool, PolicyContext(can_interrupt=True),
+                                                frame_id='frame:linked', **params)
+        replay, _ = projection.append_frame(pool, PolicyContext(can_interrupt=True),
+                                             frame_id='frame:linked', **params)
+        assert replay == completed
+        assert completed.event.payload['feedback_lineage']['candidates'][candidate.candidate_id]['content_id'] == candidate.content_id
+        with patch.object(projection, '_append_idempotent', side_effect=RuntimeError('interrupted before receipt')):
+            try:
+                projection.append_frame(pool, PolicyContext(can_interrupt=True),
+                                        frame_id='frame:interrupted', **params)
+            except RuntimeError as exc:
+                assert str(exc) == 'interrupted before receipt'
+            else:
+                raise AssertionError('interruption was not exercised')
+        orphan = 'deliberation-frame:frame:interrupted'
+        assert journal.get('deliberation.frame:frame:interrupted') is None
+        assert vault.resolve_json(orphan)
+        backup = vault.create_managed_backup('before-planning-expiry')
+        assert vault.erase_expired(now=deadline + timedelta(seconds=1)).newly_erased == 4
+        assert not backup.exists()
+        for content_id in (orphan, candidate.content_id, completed.event.payload['content']['content_id']):
+            try:
+                vault.resolve_json(content_id)
+                raise AssertionError('planning copy outlived feedback')
+            except ContentErasedError:
+                pass
+            assert not vault.explicit_erasure_recorded(content_id)
+        assert journal.get(completed.event.event_id) == completed
+        assert projection.inspect(frame.frame_id, clearance=Sensitivity.PRIVATE) == before_rebuild
+        assert vault.resolve_json(sibling.content_id) == {'message': 'independent plan'}
+        vault.erase_item(later_feedback.content_id)
+        assert vault.explicit_erasure_recorded(sibling.content_id)
 
     print("HERMES_ALIVE_KERNEL_DELIBERATION_STORE_OK")
     return 0

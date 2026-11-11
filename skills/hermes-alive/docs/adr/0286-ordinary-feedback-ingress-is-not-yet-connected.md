@@ -236,10 +236,27 @@ the frame digest only. Later withdrawals can use the locators after the
 encrypted frame is gone. The first and repeat owner requests were exercised
 through controlled Core, with an unrelated frame and candidate preserved.
 
-Automatic retention and interrupted pre-receipt writes still need proof
-for frame and candidate copies. Rollout and rollback proof remain open.
-An older runtime cannot create the new edges, and a snapshot captured
-outside the managed backup boundary can bypass current tombstones.
+New planning writes bind candidate ciphertext to the verified feedback of
+its own interpretation. The full frame depends on the union because it
+contains model-written scores and reasons for the entire pool. The vault
+records the links with the body, before any frame event can be published.
+A new frame event contains the signed structural locators at publication,
+so automatic expiry can remove its ciphertext without losing provenance.
+Reused legacy candidate content is adopted only after exact identity,
+owner, purpose, sensitivity and body checks. Existing frame receipts keep
+their original retention references.
+
+The deliberation store fault test interrupted publication after ciphertext
+write, then applied expiry. It removed the orphan, linked frame, affected
+candidate and managed backup, retained the structural event and independent
+candidate, and removed that second candidate only after its own withdrawal.
+Controlled installed Core r877 verified the old writer path. r878 disabled
+legacy discovery for explicit erasure, then recovered the signed lineage
+after the frame body was gone.
+
+Rollout, cold recovery and rollback proof remain open. An older runtime
+cannot create the new edges, and a snapshot captured outside the managed
+backup boundary can bypass current tombstones.
 Independent exports and original Hermes chat history remain outside the vault.
 An older writer that omits dependency metadata must not run alongside this
 runtime. Upgrade and rollback qualification must verify pending erasures

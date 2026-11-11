@@ -418,6 +418,7 @@ class ContentVault:
         content_id: str | None = None,
         depends_on: tuple[str, ...] = (),
         withdraw_with: tuple[str, ...] = (),
+        adopt_unlinked: bool = False,
     ) -> ContentReference:
         """Store ciphertext with retention dependencies or withdrawal-only links."""
         subject = str(subject).strip()
@@ -485,17 +486,27 @@ class ContentVault:
                     existing_withdrawal_parents = {row['parent_id'] for row in connection.execute(
                         "SELECT parent_id FROM content_withdrawal_dependencies WHERE dependent_id=?", (content_id,))}
                     expected_retention = retention_until.isoformat() if retention_until else None
-                    same = (
+                    matching_content = (
                         existing["subject"] == subject
                         and existing["purpose"] == purpose
                         and existing["sensitivity"] == sensitivity.value
-                        and existing["retention_until"] == expected_retention
                         and existing["digest"] == digest
                         and int(existing["size_bytes"]) == len(payload)
-                        and existing_parents == parents
-                        and existing_withdrawal_parents == withdrawal_parents
                     )
-                    if not same:
+                    matching_links = (existing["retention_until"] == expected_retention
+                        and existing_parents == parents and existing_withdrawal_parents == withdrawal_parents)
+                    if (matching_content and not matching_links and adopt_unlinked and parents
+                            and not (existing_parents or existing_withdrawal_parents or withdrawal_parents)
+                            and existing["retention_until"] is None):
+                        # A reused legacy candidate has no separate signed
+                        # retention reference. Tighten its exact existing body.
+                        connection.execute("UPDATE content_items SET retention_until=? WHERE content_id=?",
+                                           (expected_retention, content_id))
+                        connection.executemany("INSERT INTO content_dependencies VALUES (?,?)",
+                            ((parent, content_id) for parent in sorted(parents)))
+                        connection.execute("COMMIT")
+                        return ContentReference(content_id, digest, len(payload), sensitivity, retention_until)
+                    if not (matching_content and matching_links):
                         raise ContentIntegrityError(
                             "content_id already belongs to different content or metadata"
                         )

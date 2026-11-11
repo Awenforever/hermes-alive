@@ -31,6 +31,18 @@ from .deliberation import (
 )
 from .event_store import EventConflictError, ExperienceJournal, JournalRecord
 from .events import EventEnvelope, Sensitivity
+from .privacy import LocalIdentityProtector
+
+
+FRAME_LINEAGE_TYPE = 'deliberation.frame_lineage_recorded'
+
+
+def signed_frame_lineage(journal, frame_event_id, subject, digest, candidates):
+    data = {'frame_event_id': frame_event_id, 'subject': subject, 'frame_digest': digest,
+            'candidates': candidates}
+    protector = LocalIdentityProtector(journal.path.parent / 'identity.key')
+    data['integrity_authenticator'] = protector.authenticate_json(FRAME_LINEAGE_TYPE + '.v1', data)
+    return data
 
 
 @dataclass(frozen=True, slots=True)
@@ -164,10 +176,12 @@ class DeliberationProjection:
         causation_id: str | None = None,
         correlation_id: str | None = None,
         candidate_contents: Mapping[str, Any] | None = None,
+        candidate_sources: Mapping[str, tuple[str, tuple[str, ...]]] | None = None,
     ) -> tuple[JournalRecord, DeliberationFrame]:
         frame = build_frame(candidates, context, frame_id=frame_id)
         sensitivity = Sensitivity(sensitivity)
         supplied_contents = dict(candidate_contents or {})
+        sources = dict(candidate_sources or {})
         required_ids = {
             str(candidate.content_id)
             for candidate in frame.candidates
@@ -177,23 +191,37 @@ class DeliberationProjection:
             raise DeliberationValidationError(
                 "candidate_contents must exactly cover non-silence content IDs"
             )
-        for content_id, value in supplied_contents.items():
+        frame_event_id = f"deliberation.frame:{frame.frame_id}"
+        prior = self.journal.get(frame_event_id)
+        dependencies, locators = set(), {}
+        for candidate in frame.candidates:
+            content_id = candidate.content_id
+            if content_id is None:
+                continue
+            receipt_id, parents = sources.get(candidate.candidate_id, (None, ()))
+            if receipt_id is not None:
+                locators[candidate.candidate_id] = {'receipt_id': receipt_id, 'content_id': content_id}
+            dependencies.update(parents)
             self.content_vault.put_json(
-                value,
+                supplied_contents[content_id],
                 subject=subject,
                 purpose="deliberation.candidate",
                 sensitivity=sensitivity,
                 content_id=content_id,
+                depends_on=parents,
+                adopt_unlinked=bool(parents),
             )
+        linked_frame = bool(dependencies) and (prior is None or 'feedback_lineage' in prior.event.payload)
         content = self.content_vault.put_json(
             serialize_frame(frame, context),
             subject=subject,
             purpose="deliberation.frame",
             sensitivity=sensitivity,
             content_id=f"deliberation-frame:{frame.frame_id}",
+            depends_on=tuple(sorted(dependencies)) if linked_frame else (),
         )
         event = EventEnvelope(
-            event_id=f"deliberation.frame:{frame.frame_id}",
+            event_id=frame_event_id,
             event_type="deliberation.framed",
             source="alive.deliberation",
             actor=actor,
@@ -206,6 +234,8 @@ class DeliberationProjection:
                 "content": content.to_event_payload(),
                 "silence_id": frame.silence_id,
                 "candidate_ids": [item.candidate_id for item in frame.candidates],
+                **({'feedback_lineage': signed_frame_lineage(self.journal, frame_event_id,
+                    subject, content.digest, locators)} if linked_frame else {}),
             },
         )
         return self._append_idempotent(event), frame

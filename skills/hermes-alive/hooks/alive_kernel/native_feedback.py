@@ -121,12 +121,12 @@ def native_feedback_dependencies(journal, subject, outcome_ids):
 
 def _legacy_feedback_dependents(journal, vault, subject, outcome_id):
     """Find older copies by their typed receipt chain, without reading review bodies."""
+    from .deliberation_store import FRAME_LINEAGE_TYPE, signed_frame_lineage
     synthesis_types = ('opportunity.synthesis_completed', 'opportunity.synthesis_protocol_recovery')
     review_types = ('opportunity.source_support_completed', 'opportunity.source_support_protocol_recovery')
     expression_types = ('message.model_candidate',)
     selection_types = ('deliberation.selected',)
     frame_type = 'deliberation.framed'
-    lineage_type = 'deliberation.frame_lineage_recorded'
     protector = LocalIdentityProtector(journal.path.parent / 'identity.key')
     comparison_types = ('expression.source_revision_completed', 'expression.local_correction_completed',
                         'semantic.comparison_protocol_recovery')
@@ -155,15 +155,18 @@ def _legacy_feedback_dependents(journal, vault, subject, outcome_id):
             return None, {}
         ref = ContentReference.from_event_payload(frame.event.payload['content'])
         lineage = journal.get(frame_lineage_id(frame_id))
+        inline = frame.event.payload.get('feedback_lineage')
         if lineage is not None:
-            data = _thaw_json(lineage.event.payload)
-            signature = data.pop('integrity_authenticator', None)
-            if (not matches(lineage.event, (lineage_type,), 'alive.deliberation', 'system:alive-feedback-erasure')
+            if (not matches(lineage.event, (FRAME_LINEAGE_TYPE,), 'alive.deliberation', 'system:alive-feedback-erasure')
                     or lineage.event.causation_id != frame.event.event_id
-                    or lineage.event.sensitivity is not frame.event.sensitivity
-                    or data.get('frame_event_id') != frame.event.event_id
+                    or lineage.event.sensitivity is not frame.event.sensitivity):
+                raise ValueError('deliberation frame lineage scope unavailable')
+        if inline is not None or lineage is not None:
+            data = _thaw_json(inline if inline is not None else lineage.event.payload)
+            signature = data.pop('integrity_authenticator', None)
+            if (data.get('frame_event_id') != frame.event.event_id
                     or data.get('subject') != subject or data.get('frame_digest') != ref.digest
-                    or not protector.verify_json(lineage_type + '.v1', data, signature)):
+                    or not protector.verify_json(FRAME_LINEAGE_TYPE + '.v1', data, signature)):
                 raise ValueError('deliberation frame lineage integrity unavailable')
             locators = data['candidates']
         else:
@@ -266,12 +269,11 @@ def _legacy_feedback_dependents(journal, vault, subject, outcome_id):
             if affected:
                 ref = ContentReference.from_event_payload(event.payload['content'])
                 lineage_id = frame_lineage_id(frame_id)
-                if journal.get(lineage_id) is None:
-                    data = {'frame_event_id': event.event_id, 'subject': subject, 'frame_digest': ref.digest,
-                            'candidates': {candidate: {'receipt_id': receipt.event.event_id, 'content_id': content_id}
-                                           for candidate, (receipt, content_id) in sources.items()}}
-                    data['integrity_authenticator'] = protector.authenticate_json(lineage_type + '.v1', data)
-                    lineage_event = EventEnvelope(event_id=lineage_id, event_type=lineage_type,
+                if event.payload.get('feedback_lineage') is None and journal.get(lineage_id) is None:
+                    locators = {candidate: {'receipt_id': receipt.event.event_id, 'content_id': content_id}
+                                for candidate, (receipt, content_id) in sources.items()}
+                    data = signed_frame_lineage(journal, event.event_id, subject, ref.digest, locators)
+                    lineage_event = EventEnvelope(event_id=lineage_id, event_type=FRAME_LINEAGE_TYPE,
                         source='alive.deliberation', actor='system:alive-feedback-erasure',
                         subject=subject, sensitivity=event.sensitivity, causation_id=event.event_id, payload=data)
                     try:

@@ -189,11 +189,19 @@ class CognitionCycleCoordinator:
         sensitivity = Sensitivity(sensitivity)
         # Check derived evidence before copying private candidate text into a new
         # frame; later await-bound checks alone would be too late for owner scope.
-        DeliberationSynthesizer(self.journal, content_vault=self.vault,
-                               context_vault=self.context_vault).validate_candidate_sources(
+        _, proofs = DeliberationSynthesizer(self.journal, content_vault=self.vault,
+                               context_vault=self.context_vault)._validate_candidate_sources(
             tuple(item.action for item in values),
             {str(item.action.content_id): item.content for item in values}, owner, sensitivity,
         )
+        from .native_feedback import native_feedback_dependencies
+        candidate_sources = {}
+        for (receipt_id, _), proof in proofs.items():
+            dependencies = native_feedback_dependencies(self.journal, owner,
+                (pair.outcome_event_id for pair in proof.feedback))
+            for proposal in proof.result.candidates:
+                if proposal.action.candidate_id in ids:
+                    candidate_sources[proposal.action.candidate_id] = (receipt_id, dependencies)
         frame_id = self._identifier("cycle-frame", cycle)
         actor = "system:alive-coordinator"
         try:
@@ -210,6 +218,7 @@ class CognitionCycleCoordinator:
                     str(item.action.content_id): _thaw_json(item.content)
                     for item in values
                 },
+                candidate_sources=candidate_sources,
             )
         except ContentIntegrityError as exc:
             raise CognitionCycleError(

@@ -247,7 +247,14 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
             feedback_module = execution.kernel('native_feedback')
             legacy = os.environ.get('HERMES_ALIVE_TEST_LEGACY_FEEDBACK_DERIVATIVES') == '1'
             erase_frames = legacy or os.environ.get('HERMES_ALIVE_TEST_FRAME_ERASURE') == '1'
+            graph_only = os.environ.get('HERMES_ALIVE_TEST_FRAME_GRAPH_ONLY') == '1'
+            projection_type = execution.kernel('deliberation_store').DeliberationProjection
+            append_frame = projection_type.append_frame
             affected, unrelated = {}, {}
+
+            def legacy_frame(projection, *args, **options):
+                options.pop('candidate_sources', None)
+                return append_frame(projection, *args, **options)
 
             def write_legacy(vault, value, **options):
                 if options['purpose'] in ('opportunity.candidates', 'opportunity.protocol-failure',
@@ -277,6 +284,7 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                 with patch.object(httpx.AsyncClient,'send',send),patch.object(httpx.Client,'send',lambda client,request,*a,**k:checked(request)),\
                      patch.object(execution.kernel('core_discovery_tools').CoreDiscoveryTools,'allow_url',allowed),\
                      patch.object(cycle_clock,'datetime',AfterCadence),\
+                     patch.object(projection_type,'append_frame',legacy_frame if legacy else append_frame),\
                      patch.object(vault_type,'put_json',write_legacy if legacy else put_json):
                     following=await native.step(binding.arguments['build_parameters']())
                 assert feedback_probe['seen'], ('next Native cycle did not receive recorded feedback',following.disposition)
@@ -337,23 +345,32 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                 silent_ref = silent_row.event.payload['content']['content_id']
                 assert store.vault.resolve_json(silent_ref)['rationale']
                 affected[silent_ref] = 'rationale'
-                if erase_frames:
+                if erase_frames and not graph_only:
                     owner = store.configuration().subject
                     outcome = store.journal.read(event_type=feedback_module.EVENT)[0].event.event_id
                     dependencies = feedback_module._legacy_feedback_dependents(
                         store.journal, store.vault, owner, outcome)
                     assert set(affected).issubset(dependencies)
                     assert set(unrelated).isdisjoint(dependencies)
-                    recorded = store.journal.read(event_type='deliberation.frame_lineage_recorded')
-                    assert any(row.event.causation_id == frame.event.event_id for row in recorded)
+                    if legacy:
+                        recorded = store.journal.read(event_type='deliberation.frame_lineage_recorded')
+                        assert any(row.event.causation_id == frame.event.event_id for row in recorded)
+                if erase_frames and not legacy:
+                    assert frame.event.payload['feedback_lineage']['candidates'][selection['candidate_id']]
                 print('CORE_NATIVE_FEEDBACK_NEXT_CYCLE_OK '+json.dumps(dict(
                     disposition=following.disposition,main_turn_association_provenance_preserved=True,
                     eligibility_clock_simulated=True,normal_cadence_wait_observed=True,
                     feedback_reached_intent_and_author=True,author_mode=feedback_probe.get('author_mode'),
                     actual_model_inference=False,quality_rounds=0)),flush=True)
-            migration = feedback_module._legacy_feedback_dependents if erase_frames else lambda *_: ()
+            migration = feedback_module._legacy_feedback_dependents if erase_frames and not graph_only else lambda *_: ()
             with patch.object(feedback_module, '_legacy_feedback_dependents', migration):
                 await exercise(core,loaded,binding,runner,source,entry,command,next_cycle)
+            if graph_only:
+                owner = store.configuration().subject
+                outcome = store.journal.read(event_type=feedback_module.EVENT)[0].event.event_id
+                remaining_lineage = feedback_module._legacy_feedback_dependents(
+                    store.journal, store.vault, owner, outcome)
+                assert set(affected).issubset(remaining_lineage)
             unavailable = execution.kernel('content_vault').ContentErasedError
             for content_id in affected:
                 try:
