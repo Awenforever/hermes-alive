@@ -187,14 +187,14 @@ records and ADRs0241–0256. Historical detail is retained in
 
 ## Next work in order
 
-Immediate focus: carry host-derived discovery-route provenance through the
-existing interpretation, authoring and assessment stages under ADR0285. Verify
-both honest useful departures and false request attribution, preserving old
-receipt semantics, then inspect fresh original text and ordinary followups.
-Do not credit silence,
-controlled judgments or factual correctness as natural usefulness. Then return
-to longitudinal memory, ongoing-work continuity and the remaining platform service
-journeys below. Sharing remains one subgate, not the product definition.
+Exercise ordinary feedback with actual main models under ADR0286. Check that
+quoted opinions and follow-up questions remain ordinary conversation, and
+that an evaluation of one share retains its original wording and scope. Then
+compare subsequent original drafts and decisions for useful adaptation over
+several wakes. Keep discovery-route provenance and historical receipt recovery
+covered under ADR0285. Credit fresh sharing rounds only after reviewing actual
+usefulness and follow-ups. Continue the longitudinal memory, ongoing work,
+and platform service journeys below.
 
 1. **Finish the useful task lifecycle.** Advance genuinely unfinished work and
    necessary dependencies within the guided range using Core, carrying actual

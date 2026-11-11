@@ -108,3 +108,12 @@ ordinary cadence wait and uses a simulated eligibility clock to inspect the
 later decision. It exercises context flow with controlled model responses.
 Real-model association and writing quality, cold Gateway recovery, and fleet
 and production acceptance remain open.
+
+The exact development candidate `5ebc94eb9d5d9425dd39b8efde2d6a5f0a318f6e`
+passed the installed Core journey in r833. The later decision and source-led
+author received the exact feedback and its provenance. The controlled final
+review held the later draft and the controlled correction abstained. The
+journey made one local adapter submission and earned zero sharing rounds.
+An earlier run returned exit zero after the fixture raised an assertion in
+the correction call. The final fixture checks the correction result and
+fails on any fixture exception.
