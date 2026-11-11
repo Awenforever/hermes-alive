@@ -805,6 +805,23 @@ missing original could establish. This is a failed calibration of both model
 choices. Keep acquisition and judgment tests independent, and continue the
 parallel lifecycle and ongoing-work gates.
 
+Qualify a conversational opening by whether it gives enough context to
+understand the point and leaves the reader room to respond. For a technical
+demo, one concrete example may explain the capability. Model variants,
+training details and throughput figures each need a reason to appear.
+Use ordinary follow-ups to verify that omitted technical depth remains
+available with its sources and limits. For material where more detail earns
+its place, keep the depth. Sample-level feedback supplies calibration,
+with no lasting interest label.
+
+The installed-Core feedback test found a second path for one-off wording:
+an expression repair received the encrypted review snapshot after the initial
+author and reviewer had filtered it. Reusing the model-facing projection
+closed that path. The exact controlled rerun checked the later topic signal,
+the initial author, the final assessor and repair, and verified that erasure
+still removed dependent evidence while retaining unrelated artifacts.
+Real-model longitudinal feedback and withdrawal remain open.
+
 October 26–27 qualification notes are retained in
 [the October 27 archive](ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-27.md).
 Earlier execution notes and the original change log are retained in
