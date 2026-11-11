@@ -8,6 +8,44 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 
+async def exercise_unconsented(core, loaded, binding, runner, source, session):
+    from agent.turn_context import _collect_pre_llm_call_context
+    from gateway.run_inbound_consumer import run_post_admission_hook
+    from model_tools import handle_function_call
+
+    setup = importlib.import_module(loaded.module.__name__ + '.kernel_setup_bridge')
+    store = setup.setup_store(binding)
+    package = store.__class__.__module__.rsplit('.', 1)[0]
+    feedback = importlib.import_module(package + '.native_feedback')
+    assert feedback.permission(store, store.configuration())[0] is False
+
+    text = '这条挺有意思，可以再短一点。'
+    message_id = 'synthetic-feedback-without-consent'
+    event = SimpleNamespace(message_id=message_id, text=text)
+    assert await run_post_admission_hook(runner, event, source, session.session_key) == (False, None)
+    variables = core.set_session_vars(platform='telegram', chat_id=source.chat_id,
+        user_id=source.user_id, session_key=session.session_key, session_id=session.session_id)
+    task = 'native-feedback-without-consent'
+    try:
+        _collect_pre_llm_call_context(SimpleNamespace(session_id=session.session_id,
+            model='configured-primary', platform='telegram', _user_id=source.user_id),
+            effective_task_id=task, turn_id=task, original_user_message=text,
+            messages=[{'role': 'user', 'content': text, 'platform_message_id': message_id}],
+            conversation_history=[])
+        references = [handle for handle, item in binding._continuity._references.items() if item[1] == task]
+        assert len(references) == 1, references
+        result = json.loads(handle_function_call('alive_record_feedback', dict(reference=references[0],
+            evidence_span=text, association_reason='The current owner evaluates the preceding share.'),
+            task_id=task, session_id=session.session_id, turn_id=task,
+            tool_call_id='feedback-without-consent', enabled_tools=['alive_record_feedback']))
+        assert result.get('error') == 'alive_feedback_unavailable', result
+        assert not store.journal.read(event_type=feedback.EVENT)
+        assert not binding._feedback.turns
+    finally:
+        core.clear_session_vars(variables)
+    print('CORE_NATIVE_FEEDBACK_WITHOUT_CONSENT_DENIED', flush=True)
+
+
 async def exercise(core, loaded, binding, runner, source, session, command, before_forgetting=None):
     from gateway.run_inbound_consumer import run_post_admission_hook
     from agent.turn_context import _collect_pre_llm_call_context

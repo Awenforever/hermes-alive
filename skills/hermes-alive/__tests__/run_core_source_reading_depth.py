@@ -238,6 +238,9 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
         if fit_revision:assert 'DENSE_TEST_OPENING' not in sent[0][1]
         assert stages.count('reading')==stages.count('deepen')==1
         assert all(stage in stages for stage in ('interpret','select','author','semantic','final'))
+        if not feedback_case:
+            from core_native_feedback_case import exercise_unconsented
+            await exercise_unconsented(core,loaded,binding,runner,source,entry)
         if feedback_case:
             from core_native_feedback_case import exercise
             setup = importlib.import_module(loaded.module.__name__+'.kernel_setup_bridge')

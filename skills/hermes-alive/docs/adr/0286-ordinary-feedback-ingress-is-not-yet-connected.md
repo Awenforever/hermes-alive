@@ -343,3 +343,14 @@ while preserving appropriate progress signals, cancellation and native
 delivery ordering. Unrelated turns and profiles must keep their existing
 behavior. No output transform or streaming policy was installed by this
 probe.
+
+## Feedback tool without the guided grant
+
+The installed Core source-depth journey now also covers a profile that grants
+outbound retention and delivery without granting feedback capture. An admitted
+message supplies plausible feedback, and the actual main turn exposes a valid
+reference to the submitted share. A controlled call through Core dispatch with
+that reference and the exact current wording returns
+`alive_feedback_unavailable`. No feedback event or interpretation ticket is
+created. The ordinary inbound hook leaves the message available to Core. This
+qualifies the consent boundary under controlled inputs and model output.
