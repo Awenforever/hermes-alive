@@ -22,7 +22,7 @@ f9be399a3ab743d56465ae6c9aea0fa89fdb3d920641165e68d61529f79736f5  ./gateway_feed
 d6e59b1443910f968c0c8b0b6edce710032775365274f81a2d20de1cd42fe1b2  ./gateway_session_bridge.py
 cebf4d540d2e807aeab78e9e07c438befd23cfb4528908695d0c719d9b0fcffd  ./kernel_execution_bridge.py
 60c48fe2327e3ebc8acd7a85216a6396916b2b1f71f42da5f6ce6af081e0096a  ./kernel_setup_bridge.py
-daea04b455cdd023b18ddd516bbff55cefe378fe1cd685659b388c1b6c68a41e  ./metadata/hermes-alive-source.sha256
+a7641f0e811bddcf870c32e7d2f7b5e7f4453474034db9f64554bb6e457e993b  ./metadata/hermes-alive-source.sha256
 5cba4486635fe54faef4cbb05cfb645c315d9ad4dd3316817f12bc81c44b220e  ./metadata/hermes-alive.json
 555aace9e2596e50b73038cde123173f6cd37069a9a846d507911ddbf5c77be1  ./plugin.yaml
 b1a30cd4eb34352fbb75836646cbcfd9643ed478c7920c1ad5ca9de7536bbbb4  ./plugin_cli.py
@@ -637,7 +637,7 @@ b3bd07052614d76f2d8dcb611f86ff69e8766364b7ce29e33e686442788d4998  ./skills/herme
 8e441b45aaee6299dd29d8fffc3762145190cd9c1022069dab20b8015d3d465f  ./skills/hermes-alive/docs/adr/0283-conversational-depth-and-attribution.md
 6a18a43e266d332719e8a4643a4ff5b80ad36a8a24ae38326a0b1bd4408a572a  ./skills/hermes-alive/docs/adr/0284-source-witnesses-for-final-review.md
 bd411e42ca0d289c4d36892e6ae52d277e7de21c88580716291a1920ca7f0822  ./skills/hermes-alive/docs/adr/0285-discovery-routes-are-not-owner-requests.md
-5d7aefebaf96d643395ce9dce30576a8893d7ffafb7353605330d5cf5559e235  ./skills/hermes-alive/docs/adr/0286-ordinary-feedback-ingress-is-not-yet-connected.md
+5d344b938218bb3249c91ae8ea854d3e89c9a41e996311db30c1328d3854b456  ./skills/hermes-alive/docs/adr/0286-ordinary-feedback-ingress-is-not-yet-connected.md
 4d6108e5f522390a4f9008265a2681771192c500c4c34a02179e24a238b55332  ./skills/hermes-alive/docs/evidence/deepseek-seed-20261012.json
 40941e141314d626c51ad4d22ccc19c76dcf4b770a85daa0881d135089fb75ea  ./skills/hermes-alive/docs/evidence/qwen-route-20261012.json
 460cffae94c5494e13515ab9c2dc42331e9fd14260bf4182086d5f3bd9e19114  ./skills/hermes-alive/hooks/HOOK.yaml

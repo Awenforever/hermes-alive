@@ -389,3 +389,25 @@ the annotation. This keeps a presentation request such as “this time, lead
 with the result” out of later generation inputs while allowing a share's
 topic reaction to inform relevance. Real-model topic classification, choice,
 and withdrawal still need qualification.
+
+The r952 real-model regression qualified this boundary in one installed Core
+scenario. The actual main turn recorded zero associations for the attributed
+quotation and factual follow-up, and one positive topic reaction for the
+explicit evaluation. The next decision received the tentative topic signal and
+selected new installation evidence. The author stated the observable update
+and preserved the pending test, without repeating the one-off wording or
+creating a durable preference. After capture was turned off, the next
+candidate interpretation received neither the annotation nor the raw reply
+and selected unrelated material.
+
+The second wake also exposed a separate authoring failure. A library update
+added a list of things that the author claimed the announcement omitted.
+Only one omission was established by the retained passage. The actual
+reviewer flagged the unsupported absence claims, and the cycle ended in
+content review rather than a submission. Even the supported station update
+had a final sentence of optional source limitations. Test future openings
+for their positive contribution and keep only the caveats that matter to
+that contribution. Ground a claim about what a whole source omits in whole
+source evidence. Additional details can be recovered in an ordinary follow-up
+when they are relevant. This was a synthetic-source regression with actual
+models and no physical delivery. It adds no fresh sharing round.

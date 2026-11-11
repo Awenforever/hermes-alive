@@ -605,7 +605,7 @@ b3bd07052614d76f2d8dcb611f86ff69e8766364b7ce29e33e686442788d4998  ./docs/adr/028
 8e441b45aaee6299dd29d8fffc3762145190cd9c1022069dab20b8015d3d465f  ./docs/adr/0283-conversational-depth-and-attribution.md
 6a18a43e266d332719e8a4643a4ff5b80ad36a8a24ae38326a0b1bd4408a572a  ./docs/adr/0284-source-witnesses-for-final-review.md
 bd411e42ca0d289c4d36892e6ae52d277e7de21c88580716291a1920ca7f0822  ./docs/adr/0285-discovery-routes-are-not-owner-requests.md
-5d7aefebaf96d643395ce9dce30576a8893d7ffafb7353605330d5cf5559e235  ./docs/adr/0286-ordinary-feedback-ingress-is-not-yet-connected.md
+5d344b938218bb3249c91ae8ea854d3e89c9a41e996311db30c1328d3854b456  ./docs/adr/0286-ordinary-feedback-ingress-is-not-yet-connected.md
 4d6108e5f522390a4f9008265a2681771192c500c4c34a02179e24a238b55332  ./docs/evidence/deepseek-seed-20261012.json
 40941e141314d626c51ad4d22ccc19c76dcf4b770a85daa0881d135089fb75ea  ./docs/evidence/qwen-route-20261012.json
 460cffae94c5494e13515ab9c2dc42331e9fd14260bf4182086d5f3bd9e19114  ./hooks/HOOK.yaml
