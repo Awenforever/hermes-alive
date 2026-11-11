@@ -266,8 +266,18 @@ using the previous code. The current runtime opens both formats, persists
 a linked derivative and interrupts erasure before backup cleanup. The
 old runtime refuses the migrated store. The current runtime resumes the
 durable cleanup on cold open, then a newly created managed backup restores
-the tombstones and unrelated history. This qualifies the local storage
-boundary. The isolated Core service rollback with Alive dormant remains
-to be exercised. Independent exports, original Hermes history and complete
-volume snapshots outside the managed backup root remain outside the vault
-erasure boundary.
+the tombstones and unrelated history.
+
+Core r884 used separate processes for previous runtime, upgrade, rejected
+old activation, dormant rollback, and restoration. The old enabled plugin's
+startup failed at the storage version boundary. Core's hook dispatcher
+contained that failure. With Alive deselected, Core opened the same session
+through the same fixture adapter and registered no Alive command. The restored
+version retained the session, signed owner configuration, vault key and
+unrelated history. It completed the pending purge without restoring either
+body or creating a dispatch. The fixture uses local source trees and the
+profile configuration API for selection. Package-manager admission and
+platform service restart are separate fleet checks.
+
+Independent exports, original Hermes history and complete volume snapshots
+outside the managed backup root remain outside the vault erasure boundary.

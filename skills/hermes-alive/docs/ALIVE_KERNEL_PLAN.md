@@ -197,11 +197,11 @@ Exercise ordinary feedback with actual main models under ADR0286. Check that
 quoted opinions and follow-up questions remain ordinary conversation, and
 that an evaluation of one share retains its original wording and scope. Then
 compare subsequent original drafts and decisions for useful adaptation over
-several wakes. Exercise the installed service upgrade and dormant rollback.
-ADR0286 covers planning expiry, interrupted writes and vault-level cold
-recovery. It also records the storage version boundary that prevents an
-older runtime from writing upgraded state. Verify that the service handoff
-preserves structural lineage, action history and tombstones.
+several wakes. ADR0286 covers planning expiry, interrupted writes, vault
+recovery and the isolated Core startup sequence for dormant rollback.
+Verify the same boundary through package-manager admission and actual
+platform service restart during fleet qualification, retaining the same
+profile and erasure state.
 Keep discovery-route provenance and historical receipt recovery
 covered under ADR0285. Credit fresh sharing rounds only after reviewing actual
 usefulness and follow-ups. Continue the longitudinal memory, ongoing work,
