@@ -240,8 +240,10 @@ Registration does not prove execution, pending queue membership, delivery or use
 receipt. Only observed_outcomes supports its named stage; missing outcomes are
 unassessed, not failure, completion, absence of effects or permission to retry.
 This bounded view is not a complete lifetime inventory or user preference.
-recent_feedback_context preserves exact prior delivered wording and attributed
-user replies with time, not a model-written preference or new action permission.
+recent_feedback_context preserves prior wording and associated user input with
+time. Respect each entry's provenance: native main-turn semantic associations
+are interpretations, not verified quotes, delivery or human-seeing receipts.
+Neither kind is a permanent preference or new action permission.
 Interpret their meaning and scope rather than reply polarity. Politeness is not
 enthusiasm, and a situational refusal is not permanent dislike. Compare source
 times in explicit user_context with feedback time; do not silently let stale
@@ -396,8 +398,9 @@ statement. Current explicit corrections take precedence; do not recite its
 bookkeeping or convert it into public search queries or new permissions.
 learned_advisory and tentative feedback interpretations are
 retractable hypotheses, not confirmed preferences or independent observations.
-recent_feedback_context pairs literal delivered wording with attributed replies:
-politeness is not enthusiasm, temporary refusals are not lasting dislike. Preserve
+recent_feedback_context pairs earlier wording with user input, with per-entry
+provenance. Native main-turn associations remain tentative, not platform quote
+or delivery proof. Politeness is not enthusiasm, temporary refusals are not lasting dislike. Preserve
 ambiguity rather than guessing. Missing history is unknown, not never discussed.
 recent_expression_history proves generation only; recent_action_history records
 intent plus separately named observed outcomes. Neither proves delivery, queue
@@ -1120,6 +1123,8 @@ class OpportunitySynthesizer:
         authoring = method.get('discovery_authoring')
         source_review=method.get('discovery_source_review')
         assessment=method.get('reading_assessment')
+        if method.get('native_feedback_context') not in (None,'main-turn-association-v1'):
+            raise OpportunitySynthesisError('unknown native feedback context contract')
         if (assessment not in (None,*reading_assessment.METHODS)
                 or assessment is not None and (authoring!='source-led-v3'
                     or bundle.get('reading_assessment_method')!=assessment)
@@ -1384,6 +1389,9 @@ class OpportunitySynthesizer:
             if len(prompt)>budget:raise OpportunitySynthesisError('candidate eligibility exceeds source budget')
             system_prompt+='\nOnly eligible_primary_agenda_ids may anchor a new communication candidate. Other supplied sources remain factual context, not rejected facts or user dislikes.'
         method = dict(protocol='recipient-plan-v3' if recipient_meaning else 'legacy-draft-v1',
+            **({'native_feedback_context':'main-turn-association-v1'} if any(
+                f.to_prompt().get('status')=='native_main_turn_semantic_association_not_quote_proof'
+                for f in feedback) else {}),
             recipient_execution='expression-required-v1' if recipient_meaning else None,
             recipient_output='intent-only-v1' if recipient_meaning else None,
             editorial_context='origin-purpose-v1' if recipient_meaning else None,

@@ -57,7 +57,7 @@ class FeedbackRecallSelector:
             raise FeedbackSynthesisError('bounded archive window scope required')
         anchor=before_sequence or self.journal.last_sequence()+1
         allowed=tuple(v.value for v in list(Sensitivity)[:list(Sensitivity).index(clearance)+1])
-        where="subject=? AND event_type='outcome.recorded' AND sequence<? AND sensitivity IN ("+','.join('?' for _ in allowed)+')'
+        where="subject=? AND event_type IN ('outcome.recorded','feedback.native_associated') AND sequence<? AND sensitivity IN ("+','.join('?' for _ in allowed)+')'
         params=(subject,anchor,*allowed)
         with closing(self.journal._connect()) as connection:
             count=connection.execute('SELECT COUNT(*) FROM experience_events WHERE '+where,params).fetchone()[0]

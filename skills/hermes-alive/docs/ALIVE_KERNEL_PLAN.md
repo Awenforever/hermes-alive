@@ -3,7 +3,7 @@
 Audience: maintainers and QA. Purpose: active development planning and acceptance tracking.
 
 Status: active; development branch only, no production acceptance.
-Last reviewed: 2026-11-05 (Asia/Shanghai).
+Last reviewed: 2026-11-11 (Asia/Shanghai).
 
 ## Current product state
 
@@ -12,14 +12,14 @@ durable experience, layered memory, ongoing work, attributable learning and
 natural conversation. Discovery and sharing are one faculty, not its definition.
 The bounded qualifications and remaining obligations below still apply.
 
-**Immediate integration priority:** ordinary feedback is not yet connected to
-the existing interpretation/learning components. An actual installed-plugin
-Core post-admission probe observes three fresh inputs but produces no retained
-reply or attributable user outcome, even with synthetic retention/consolidation
-consents. Earlier seeded-outcome tests do not establish daily learning. Close
-this producer-to-consumer gap with guided consent and honest association
-provenance before further isolated share-style tuning; [ADR0286](adr/0286-ordinary-feedback-ingress-is-not-yet-connected.md)
-defines the required normal-turn, subsequent-cycle, recovery and erasure proof.
+Ordinary share feedback now has an opt-in path through the Hermes main turn.
+It associates the exact current input with a retained share and carries the
+association and its qualifications into Alive's next eligible decision and
+drafting context. The original diagnostic, the implementation evidence, and
+the remaining semantic and recovery checks are recorded in
+[ADR0286](adr/0286-ordinary-feedback-ingress-is-not-yet-connected.md).
+Actual model judgment on ambiguous replies, multi-turn adaptation, and
+production acceptance remain open.
 
 The latest runtime candidate separates factual support, communication fit and
 search-purpose alignment in one model assessment. Source witnesses establish

@@ -24,11 +24,21 @@ existing active runtime only after asking the operator. Migration is not automat
 Explain and obtain separate approval for model calls, proactive delivery, and
 saving the exact outbound shares for follow-up. Explain the chosen history
 retention (1–365 days), that configuration/recipient metadata stays until removed,
-and that inbound-history retention and automatic profile learning are NOT enabled.
+and that general inbound-history retention and automatic permanent profile learning are NOT enabled.
 Ask whether any public search topics/citation reads are approved; do not insert
 the developer's interests or infer externally disclosed searches from private chat.
 Model selection defaults to Hermes; only request an optional existing Core alias,
 never credentials. Translate ordinary choices into flags for the user.
+
+Separately offer optional `--confirm-share-feedback`: the normal main turn may
+identify clear evaluations of a retained Alive share and retain that exact
+current message, including qualifications, for no longer than the share's
+retention period. It records a tentative semantic association, not proof of a
+platform quote or a permanent preference. Unrelated chat is not captured by
+this feature. Declining is valid and older grants stay off. Explain
+`/alive feedback off` and `on`; enabling after an initial decline requires
+updated guided authorization. This development feature still needs real-model
+semantic and full lifecycle acceptance; do not promise proven daily learning.
 
 Before presenting kernel choices, read [the kernel setup guide](docs/ALIVE_KERNEL_SETUP.md).
 It owns the distinct ongoing-item, item-management, structural-observation and

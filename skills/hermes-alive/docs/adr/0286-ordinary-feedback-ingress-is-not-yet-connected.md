@@ -83,3 +83,28 @@ outcomes/context items, zero model calls and sends. r812 failed on the probe's
 embedded-module lookup; r813/r814 counted the activation observation among the
 test inputs. Failed traces are retained. r815 uses a pre-input event-ID baseline.
 These fixture repairs do not repair the product gap.
+
+## 2026-11-11 implementation and controlled qualification
+
+Guided setup now offers `--confirm-share-feedback` in a private owner
+conversation. The main turn can associate its current admitted input with an
+exact retained share through a turn-bound reference. The journal records a
+semantic association, linked to the original input and to an adapter success
+report. The record preserves the exact input in the content vault for up to
+the remaining share retention period. It grants neither profile writes nor
+external actions. `/alive feedback off` clears current turn evidence and
+withdraws the stored pairs from planning. Re-enabling permits fresh admissions.
+
+The subsequent decision reads the original feedback and its provenance. A
+versioned interpretation marker carries it into the drafting context even when
+archive recall was unnecessary. Earlier recorded interpretations retain their
+original feedback context contract.
+
+The installed Core journey starts with an actual local adapter submission,
+then runs an admitted synthetic user turn and a controlled main tool call.
+It checks exact wording, replay, foreign scope, disabling, reopening the store,
+erasure, and revocation during publication. The next-cycle case observes the
+ordinary cadence wait and uses a simulated eligibility clock to inspect the
+later decision. It exercises context flow with controlled model responses.
+Real-model association and writing quality, cold Gateway recovery, and fleet
+and production acceptance remain open.

@@ -23,6 +23,17 @@ topics are a separate choice: explain that those strings will be disclosed to
 Hermes' configured search service. Private profile and chat text do not become
 public queries automatically.
 
+Optional share-feedback handling is a separate choice (`--confirm-share-feedback`).
+Explain that the main conversation may retain its exact current message when
+it clearly evaluates a retained Alive share, including negations and situational
+qualifications. The period cannot exceed the share's remaining retention.
+Association is a model interpretation, not platform quote or human-seeing proof;
+there is no automatic permanent profile update. Other chat is not retained by
+this feature. `/alive feedback off` stops recording and use; `on` requires the
+original guided choice. Existing profile/outbound grants do not enable it.
+The first implementation is under development qualification, not production
+acceptance or a guarantee of model judgment.
+
 ## Enable without a content feed
 
 Public queries are optional. An owner may configure and confirm the native

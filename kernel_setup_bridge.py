@@ -46,6 +46,7 @@ def attach_configured_continuity(binding, configured=None):
                               router,clearance=Sensitivity.PRIVATE,replace=binding._continuity is not None)
     binding._continuity_configuration_id=configured.event_id
     binding.attach_agenda()
+    binding.attach_feedback()
     return True
 
 
@@ -59,7 +60,8 @@ def register_setup_command(context,binding):
         control=len(parts)==1 and parts[0] in ('enable','pause','status')
         agenda_command=parts[0]=='agenda'
         intake_command=parts[0]=='intake'
-        if not control and not agenda_command and not intake_command and (len(parts) != 2 or parts[0] != 'confirm'):
+        feedback_command=parts[0]=='feedback'
+        if not control and not agenda_command and not intake_command and not feedback_command and (len(parts) != 2 or parts[0] != 'confirm'):
             return '请使用 /alive confirm 确认配置，或 /alive enable、/alive pause、/alive status。'
         if not session_id or not session_key or source is None:
             return '当前会话尚无 Hermes 会话记录。请先发一句普通消息，再重试原确认命令。'
@@ -83,6 +85,20 @@ def register_setup_command(context,binding):
                 if len(parts)==3 and parts[1]=='stop-work':
                     return await asyncio.to_thread(binding._agenda.command,scope,parts[1:])
                 return binding._agenda.command(scope,parts[1:])
+            if feedback_command:
+                from .kernel_execution_bridge import configured_owner,kernel
+                store,configured=configured_owner(binding,scope)
+                feedback=kernel('native_feedback')
+                if len(parts)!=2 or parts[1] not in ('on','off','status'):
+                    return '请使用 /alive feedback on、off 或 status。'
+                if parts[1]=='status':
+                    return '分享反馈处理：'+('已开启。' if feedback.permission(store,configured)[0] else '已关闭。')
+                if parts[1]=='on' and configured.options.get(feedback.FLAG) is not True:
+                    return '请先通过安装引导授权分享反馈的原话保存期限与解释处理。'
+                feedback.set_permission(store,configured,parts[1]=='on')
+                if parts[1]=='off' and binding._feedback is not None:
+                    binding._feedback.close()
+                return '分享反馈处理'+('已开启。' if parts[1]=='on' else '已关闭。')
             if intake_command:
                 from .kernel_execution_bridge import configured_owner,kernel
                 store,configured=configured_owner(binding,scope)
@@ -166,6 +182,8 @@ def register_setup_command(context,binding):
             intake_summary=('明确交办自动接纳已授权，事项保留'+str(configured.options['outbound_retention_days'])
                 +'天；不留存全量聊天、不授权外部动作，可用 /alive intake off 关闭。'
                 if configured.options.get('accept_explicit_followups') is True else '')
+            if configured.options.get('interpret_share_feedback') is True:
+                intake_summary+='已允许识别对 Alive 分享的明确评价，并保存对应当前消息与语义关联，最长不超过分享保留期；不是自动永久画像，可用 /alive feedback off 关闭。'
             if configured.options.get('manage_explicit_followups') is True:
                 intake_summary+='也已授权理解明确的完成、取消、暂缓和恢复请求；议程状态变化本身不停止实际执行。明确要求停止已交办的Core工作时可请求取消执行；不撤销已发生操作或已发送消息。'
             if configured.options.get('retain_followup_source') is True:

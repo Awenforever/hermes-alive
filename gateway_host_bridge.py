@@ -13,6 +13,7 @@ class GatewayHostBinding:
         self.arguments=None
         self.task=None
         self.closed=False
+        self._feedback=None
         self.started=False
         self.control_lock=asyncio.Lock()
         self.startup_recovery=None
@@ -114,6 +115,28 @@ class GatewayHostBinding:
             raise ValueError('Core agenda tool registration unavailable')
         self._agenda = fresh
         self.context.register_hook('pre_llm_call',self._agenda_context)
+
+    def attach_feedback(self):
+        self._require_home()
+        if self.closed or self._continuity is None:
+            raise ValueError('configured continuity required for feedback')
+        if self._feedback is not None:return
+        from .gateway_feedback_bridge import CoreFeedbackBridge,FEEDBACK_SCHEMA
+        fresh=CoreFeedbackBridge(self)
+        if self.context.register_tool(name='alive_record_feedback',toolset='hermes_alive',
+                schema=FEEDBACK_SCHEMA,handler=fresh.tool,
+                check_fn=lambda:not self.closed and self._continuity is not None) is None:
+            fresh.close()
+            raise ValueError('Core feedback tool registration unavailable')
+        self._feedback=fresh
+        self.context.register_hook('pre_llm_call',self._feedback_context)
+
+    def _feedback_context(self,**values):
+        if self.closed or self._feedback is None:return None
+        try:return self._feedback.context(**values)
+        except Exception as exc:
+            logging.getLogger(__name__).warning('Alive feedback context unavailable: %s',type(exc).__name__)
+            return None
 
     def _read_reference(self, args, **values):
         result = {'error': 'alive_reference_unavailable'}
@@ -262,6 +285,7 @@ class GatewayHostBinding:
                 'error_class':type(error).__name__,'effects_undone':False,'results_deleted':False}
             logging.getLogger(__name__).warning('Alive Core work deactivation unavailable: %s',type(error).__name__)
         if self._agenda is not None:self._agenda.close()
+        if self._feedback is not None:self._feedback.close()
         if self._continuity is not None:self._continuity.close()
         for router in self._session_routers.values():router.close()
         self._session_routers.clear()

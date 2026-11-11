@@ -42,13 +42,20 @@ class FeedbackContextReader:
     @staticmethod
     def _scope(record,subject,clearance):
         return (record is not None and record.event.subject==subject
-            and record.event.event_type=='outcome.recorded'
             and list(Sensitivity).index(record.event.sensitivity)<=list(Sensitivity).index(clearance)
-            and record.event.payload.get('kind') in
-                ('user_replied','user_corrected','user_dismissed','explicit_feedback'))
+            and (record.event.event_type=='feedback.native_associated'
+                or record.event.event_type=='outcome.recorded' and record.event.payload.get('kind') in
+                    ('user_replied','user_corrected','user_dismissed','explicit_feedback')))
 
     def _value(self,record,subject,clearance):
         if not self._scope(record,subject,clearance):return None
+        if record.event.event_type=='feedback.native_associated':
+            from .native_feedback import NativeFeedbackStore
+            from .conversation_continuity import ShareContinuityStore
+            from .dispatch_outbox import DispatchOutbox
+            return NativeFeedbackStore(ShareContinuityStore(DispatchOutbox(self.journal,
+                content_vault=self.interpreter.vault,context_vault=self.interpreter.context_vault))).read(
+                    record,subject=subject,clearance=clearance)
         event=record.event
         try:
             # Authorize before resolving any private body, not only on return.
@@ -82,7 +89,7 @@ class FeedbackContextReader:
         clearance=Sensitivity(clearance)
         accepted=[]
         size=0
-        for record in self.journal.iter_reverse(event_types=('outcome.recorded',),
+        for record in self.journal.iter_reverse(event_types=('outcome.recorded','feedback.native_associated'),
                 subject=subject,batch_size=16,max_records=64):
             value=self._value(record,subject,clearance)
             if value is None:continue
@@ -111,7 +118,7 @@ class FeedbackContextReader:
                 or type(item_limit) is not int or not 1<=item_limit<=16
                 or before_sequence is not None and (type(before_sequence) is not int or before_sequence<1)):
             raise ValueError('bounded owner feedback page required')
-        rows=tuple(self.journal.iter_reverse(event_types=('outcome.recorded',),subject=subject,
+        rows=tuple(self.journal.iter_reverse(event_types=('outcome.recorded','feedback.native_associated'),subject=subject,
             batch_size=16,max_records=scan_limit+1,before_sequence=before_sequence))
         entries=[];size=0;inspected=0;cursor=before_sequence
         for record in rows[:scan_limit]:
@@ -122,6 +129,9 @@ class FeedbackContextReader:
                     delivered_preview=value.delivered_text[:256],reply_preview=value.feedback_text[:512],
                     preview_truncated=len(value.delivered_text)>256 or len(value.feedback_text)>512,
                     preview_is_not_profile_fact=True,complete_pair_required=True,action_authority=False)
+                if record.event.event_type=='feedback.native_associated':
+                    item['attribution']='main_turn_semantic_association_not_quote_proof'
+                    item['actual_human_seeing_proven']=False
                 length=len(json.dumps(item,ensure_ascii=False))
                 if size+length>24000:break
                 entries.append(item);size+=length

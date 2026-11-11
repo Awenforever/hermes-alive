@@ -213,10 +213,12 @@ class OpportunityExpressionStore(SemanticReviewStore):
             context['reading_assessment']=interpreter.reading_assessment_context(
                 subject=subject,receipt_event_id=start.event.event_id.removesuffix(':started') + ':completed',
                 clearance=source.event.sensitivity)
-        if start.event.payload.get('feedback_recall') is not None:
+        native_feedback=start.event.payload.get('interpreter_method',{}).get('native_feedback_context')=='main-turn-association-v1'
+        if start.event.payload.get('feedback_recall') is not None or native_feedback:
             context['literal_feedback_context']=[v.to_prompt() for v in interpreter.feedback_for_start(
                 start,subject=subject,clearance=source.event.sensitivity)]
-            context['feedback_scope']='Attributed prior pairs, not profile facts, current instructions or action permission.'
+            context['feedback_scope']=('Prior pairs with per-entry provenance; native semantic associations are tentative, not quote/delivery proof. No profile facts, current instructions or action permission.'
+                if native_feedback else 'Attributed prior pairs, not profile facts, current instructions or action permission.')
         return context
 
     @staticmethod

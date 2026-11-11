@@ -54,6 +54,10 @@ def register_admitted_inbound_hook(ctx, binding=None):
                 binding._agenda.admitted_input(scope,revision)
             _kernel_module('admitted_inbound').record_configured_input(
                 store,configured,scope.binding_document(),values)
+            if binding._feedback is not None:
+                revision=store.protector.authenticate_json('alive.feedback.admitted_revision.v1',{
+                    'message':values.get('message_id'),'text':values.get('text')})
+                binding._feedback.admitted_input(scope,revision)
         except Exception as exc:
             logger.warning('Hermes Alive configured input was not recorded: %s',type(exc).__name__)
         # Observe only. Enhance and independent consumers keep their own ingress

@@ -6,6 +6,7 @@ that optional display metadata cannot discard usable evidence. No actual provide
 round. In particular this does not use the old kernel-shadow setup surface.
 """
 import asyncio,importlib,json,os,shutil,sys,tempfile
+from datetime import timedelta,timezone
 from pathlib import Path
 from unittest.mock import patch
 import run_core_session_routing as core
@@ -13,6 +14,7 @@ from run_core_guided_setup import cli
 
 
 async def test(home,*,fit_revision=False,revoke_after_capture=False,search_alignment='matches'):
+    feedback_case=os.environ.get('HERMES_ALIVE_TEST_NATIVE_FEEDBACK')=='1'
     assert search_alignment in ('matches','justified_pivot','conflicts','uncertain')
     assert search_alignment=='matches' or not (fit_revision or revoke_after_capture)
     search_negative=search_alignment in ('conflicts','uncertain')
@@ -27,10 +29,12 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
     (home/'.env').write_text('OWNER_MAIN_KEY=SYNTHETIC_OWNER_KEY\n')
     rc,staged=cli(home,'setup','--confirm-model-calls','--confirm-delivery','--confirm-outbound-retention',
         '--public-query','synthetic public observation','--confirm-public-reads','--confirm-cited-reads',
-        '--confirm-public-refinement')
+        '--confirm-public-refinement',*(('--confirm-share-feedback',) if feedback_case else ()))
     assert rc==0 and cli(home,'install-runtime','--engine','kernel')[0]==0
     token=core.set_hermes_home_override(home);manager=None
     url='https://example.invalid/observation';reads=[];stages=[];sent=[]
+    feedback_probe={'expected':None,'seen':False,'author_seen':False}
+    fixture_errors=[]
     qualifier='The trial used an existing instrument, not a newly constructed one.'
     try:
         manager=core.get_plugin_manager();manager.discover_and_load()
@@ -86,9 +90,27 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
             elif 'sources' in data:
                 stage='reading';value=dict(source_refs=[data['sources'][0]['source_ref']],question='What was actually tried?',
                     value_hypothesis='A bounded understandable result.')
+            elif 'index_windows' in data:
+                stage='feedback_recall'
+                entries=[item for window in data['index_windows'] for item in window['entries']]
+                assert entries and entries[0]['attribution']=='main_turn_semantic_association_not_quote_proof'
+                value=dict(outcome_event_ids=[entries[0]['outcome_event_id']],continue_older=False,
+                    reason='Inspect the exact bounded prior feedback, preserving its one-off scope.')
             elif 'opportunities' in data:
                 stage='interpret';assert any(qualifier in excerpt(e) for e in data['opportunities'])
-                assert data['search_context']['current_owner_search_request_supplied'] is False
+                if feedback_probe['expected'] is not None:
+                    pairs=data.get('recent_feedback_context',[])
+                    assert any(pair.get('current_input')==feedback_probe['expected'] and
+                        pair.get('status')=='native_main_turn_semantic_association_not_quote_proof'
+                        and pair.get('automatic_profile_update') is False for pair in pairs),pairs
+                    feedback_probe['seen']=True
+                if 'search_context' in data:
+                    assert data['search_context']['current_owner_search_request_supplied'] is False
+                else:
+                    # A later wake can interpret retained opportunities without
+                    # doing another configured search. The first source-depth
+                    # journey must still exercise its explicit route contract.
+                    assert feedback_probe['expected'] is not None
                 item=next(e for e in data['opportunities'] if qualifier in excerpt(e))
                 assert item['provenance_metadata']['source_title_available'] is False
                 assert item['provenance_metadata']['title_is_placeholder'] is True
@@ -99,9 +121,11 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
             elif 'expression_binding' in data:
                 from final_review_fixture import controlled_final_findings
                 assert data['expression_binding']['final_assessment_scope'] == 'factual-support-and-communication-fit-v8'
-                assert data['search_context']['kind']=='configured-discovery-route-v1'
-                assert data['search_context']['current_owner_search_request_supplied'] is False
-                conflict=fit_revision and 'DENSE_TEST_OPENING' in data['candidate']['text']
+                if feedback_probe['expected'] is None or 'search_context' in data:
+                    assert data['search_context']['kind']=='configured-discovery-route-v1'
+                    assert data['search_context']['current_owner_search_request_supplied'] is False
+                conflict=(fit_revision and 'DENSE_TEST_OPENING' in data['candidate']['text']
+                    or feedback_probe['expected'] is not None)
                 stage='final';value=controlled_final_findings(data,
                     fit='conflicts' if conflict else 'fits',
                     reason='Synthetic whole-form mismatch.' if conflict else 'Synthetic form fits the situation.')
@@ -113,13 +137,30 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                     for x in data['meaning']['atoms']],added_claims_detected=False,speech_act_preserved=True,protected_literals_preserved=True)
             elif 'meaning' in data:
                 stage='author';assert qualifier in raw
-                assert data['expression_context']['search_context']['kind']=='configured-discovery-route-v1'
-                assert 'not a current research request' in body['messages'][0]['content']
-                assert any(e['provenance_metadata'].get('title_is_placeholder') is True
-                    for e in data['expression_context']['source_evidence'])
-                value=qualifier+' [Source](<'+url+'>)'
-                if search_negative and data.get('correction'):
-                    assert 'review-anchored' in body['messages'][0]['content'] or 'Repair the supplied' in body['messages'][0]['content']
+                if feedback_probe['expected'] is None:
+                    assert data['expression_context']['search_context']['kind']=='configured-discovery-route-v1'
+                    assert 'not a current research request' in body['messages'][0]['content']
+                    assert any(e['provenance_metadata'].get('title_is_placeholder') is True
+                        for e in data['expression_context']['source_evidence'])
+                if feedback_probe['expected'] is not None:
+                    pairs=data['expression_context'].get('literal_feedback_context',[])
+                    assert any(pair.get('current_input')==feedback_probe['expected'] and
+                        pair.get('status')=='native_main_turn_semantic_association_not_quote_proof' for pair in pairs),pairs
+                    feedback_probe['author_seen']=True
+                    feedback_probe['author_mode']=data['expression_context'].get('method')
+                source_url=url
+                if feedback_probe['expected'] is not None:
+                    urls={literal for atom in data['meaning']['atoms']
+                          for literal in atom['protected_literals']
+                          if literal.startswith('https://example.invalid/')}
+                    assert len(urls)==1,urls
+                    source_url=next(iter(urls))
+                value=qualifier+' [Source](<'+source_url+'>)'
+                if (search_negative or feedback_probe['expected'] is not None) and data.get('correction'):
+                    if search_negative:
+                        assert 'review-anchored' in body['messages'][0]['content'] or 'Repair the supplied' in body['messages'][0]['content']
+                    else:
+                        assert isinstance(data['correction'],dict)
                     stage='abstain';value={'abstain':True}
                 if fit_revision:
                     if data.get('correction'):
@@ -136,7 +177,8 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                     else json.dumps(value)),finish_reason='stop')],usage=dict(prompt_tokens=30,completion_tokens=30,total_tokens=60)))
         def checked(request):
             try:return respond(request)
-            except AssertionError:
+            except Exception as exc:
+                fixture_errors.append(type(exc).__name__)
                 import traceback;traceback.print_exc();raise
         async def send(client,request,*args,**kwargs):return checked(request)
         execution=importlib.import_module(loaded.module.__name__+'.kernel_execution_bridge')
@@ -195,6 +237,38 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
         if fit_revision:assert 'DENSE_TEST_OPENING' not in sent[0][1]
         assert stages.count('reading')==stages.count('deepen')==1
         assert all(stage in stages for stage in ('interpret','select','author','semantic','final'))
+        if feedback_case:
+            from core_native_feedback_case import exercise
+            async def next_cycle(text):
+                nonlocal url
+                feedback_probe['expected']=text
+                # Offer a fresh synthetic resource if collection is due. A
+                # normal wake may instead reason over retained opportunities.
+                url='https://example.invalid/next-public-observation'
+                waiting=await native.step(binding.arguments['build_parameters']())
+                assert waiting.disposition=='waiting_for_change',waiting.disposition
+                assert not feedback_probe['seen'],'normal cadence was bypassed'
+                cycle_clock=execution.kernel('autonomous_cycle_runtime')
+                actual_datetime=cycle_clock.datetime
+                class AfterCadence(actual_datetime):
+                    @classmethod
+                    def now(cls,tz=None):
+                        moment=actual_datetime.now(timezone.utc)+timedelta(hours=1,seconds=1)
+                        return moment.astimezone(tz) if tz is not None else moment.replace(tzinfo=None)
+                with patch.object(httpx.AsyncClient,'send',send),patch.object(httpx.Client,'send',lambda client,request,*a,**k:checked(request)),\
+                     patch.object(execution.kernel('core_discovery_tools').CoreDiscoveryTools,'allow_url',allowed),\
+                     patch.object(cycle_clock,'datetime',AfterCadence):
+                    following=await native.step(binding.arguments['build_parameters']())
+                assert feedback_probe['seen'], ('next Native cycle did not receive recorded feedback',following.disposition)
+                assert feedback_probe['author_seen'],'source-led author did not receive the feedback'
+                assert following.disposition=='content_review_attention' and len(sent)==1,following.disposition
+                assert stages.count('abstain')==1 and not fixture_errors,fixture_errors
+                print('CORE_NATIVE_FEEDBACK_NEXT_CYCLE_OK '+json.dumps(dict(
+                    disposition=following.disposition,main_turn_association_provenance_preserved=True,
+                    eligibility_clock_simulated=True,normal_cadence_wait_observed=True,
+                    feedback_reached_intent_and_author=True,author_mode=feedback_probe.get('author_mode'),
+                    actual_model_inference=False,quality_rounds=0)),flush=True)
+            await exercise(core,loaded,binding,runner,source,entry,command,next_cycle)
         print('HERMES_ALIVE_CORE_SOURCE_READING_DEPTH_OK '+json.dumps(dict(stages=stages,
             requested_windows=[6000,15000],local_adapter_submissions=1,physical_sends=0,actual_model_inference=False,
             qualification_after_old_window_preserved=True,untitled_extracts_retained=True,
