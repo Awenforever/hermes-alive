@@ -156,7 +156,12 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                         for e in data['expression_context']['source_evidence'])
                 if feedback_probe['expected'] is not None:
                     pairs=data['expression_context'].get('literal_feedback_context',[])
-                    assert not pairs and feedback_probe['expected'] not in raw
+                    assert not pairs, 'author received an old native feedback pair'
+                    assert feedback_probe['expected'] not in raw, (
+                        'old native wording reached the repair prompt' if data.get('correction')
+                        else 'old native wording reached the initial author prompt')
+                    if data.get('correction'):
+                        assert not data['correction']['grounding_context']['recent_feedback_context']
                     feedback_probe['author_seen']=True
                     feedback_probe['author_mode']=data['expression_context'].get('method')
                 source_url=url

@@ -125,9 +125,8 @@ class SourceSupportReviewer:
 
     def _assessment_request(self,snapshot,as_of=None,review_until=None):
         prompt=self.prompt_for_snapshot(snapshot)
-        from .feedback_context import NATIVE_TOPIC_METHOD, prospective_feedback
-        if snapshot.get('native_feedback_application')==NATIVE_TOPIC_METHOD:
-            snapshot={**snapshot,'recent_feedback_context':prospective_feedback(snapshot['recent_feedback_context'])}
+        from .feedback_context import source_review_prompt_snapshot
+        snapshot=source_review_prompt_snapshot(snapshot)
         if as_of is None:return prompt,snapshot
         if (snapshot.get('assessment_scope',{}).get('kind') not in (
                 'final_discovery_source_and_value', 'final_source_and_recipient_purpose')

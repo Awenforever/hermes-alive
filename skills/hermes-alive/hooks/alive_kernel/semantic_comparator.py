@@ -478,11 +478,14 @@ class SemanticComparator:
         # recovery, and an old unclocked start never acquires a new prompt.
         authoring_as_of=self._start_authoring(operation,subject,selection_event_id,
             source.event.sensitivity,discovery=discovery,claim=True)
+        from .feedback_context import source_review_prompt_snapshot
+        prompt_correction = ({**correction, 'grounding_context': source_review_prompt_snapshot(
+            correction['grounding_context'])} if correction else None)
         prompt = json.dumps({"meaning": meaning, "presentation": style,
                              "language": language,
                              **({'authoring_as_of':authoring_as_of} if authoring_as_of else {}),
                              **({'expression_context':self._author_context(expression_context)} if expression_context else {}),
-                             **({'correction':correction} if correction else {}),
+                             **({'correction':prompt_correction} if prompt_correction else {}),
                              **({'issues':correction['findings']['unsupported_claims']+
                                   correction['findings']['uncertainties']}
                                 if correction_method == LOCAL_CORRECTION_METHOD else {})},

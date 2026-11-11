@@ -31,6 +31,13 @@ def prospective_feedback(pairs, *, topic_signals=False):
     return result
 
 
+def source_review_prompt_snapshot(snapshot):
+    """Keep the retained audit snapshot out of model-facing review and repair."""
+    if snapshot.get('native_feedback_application') != NATIVE_TOPIC_METHOD:
+        return snapshot
+    return {**snapshot, 'recent_feedback_context': prospective_feedback(snapshot['recent_feedback_context'])}
+
+
 @dataclass(frozen=True,slots=True)
 class LiteralFeedback:
     outcome_event_id: str
