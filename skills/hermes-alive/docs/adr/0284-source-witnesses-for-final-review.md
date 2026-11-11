@@ -233,3 +233,24 @@ capability. No adapter submission or follow-up took place. This proves real
 use of the query-to-selection handoff and a review rejection, with no fresh
 quality credit. A useful unexpected discovery remains eligible under the
 existing justified-pivot contract, which needs further real calibration.
+
+In r921 the first search returned a topical listing and a general home page.
+The planner issued a follow-up query using the headline's wording and the
+institution, without reserving a citation. It read two institutional reports
+and neither contained the authors' distinction. The final scope judgment
+accepted a direct weakening claim attributed to one report. That passes
+literal attribution but fails material scope: the opening and the asserted
+implication of the measurement were stronger than the underlying result.
+Both ordinary follow-ups ran. The second explicitly admitted the absent paper,
+but its wording also turned the reports' silence about cross-instrument
+comparison into a negative claim about the study. This regression failed.
+
+The combined read option is qualified as a bounded capability. Real model
+selection and review are still open. A follow-up query derived from a report
+headline can retrieve more descriptions of the same strength; prioritization
+should carry a specific missing distinction or primary identifier into source
+selection. The factual evidence check must evaluate how the draft presents
+the reported finding and what it makes of it, including attributed prose.
+Further calibration needs both genuine overclaiming and legitimate concise
+attribution, along with independent fresh cases. A repeated solar case does
+not increase the sharing streak.

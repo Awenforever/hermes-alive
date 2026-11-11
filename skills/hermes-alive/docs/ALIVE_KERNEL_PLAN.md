@@ -787,6 +787,12 @@ dense for its request. That run earns no fresh-round credit. Continue fresh
 end-to-end trials separately. Improve acquisition of substantive evidence
 within the authorized budget and enforce claim scope from the opening in
 final assessment. Verify the two seams independently as described in ADR 0284.
+The first real regression after the new scope judgment and accessible-copy
+option still read two secondary reports. The assessor accepted an overstated
+finding under attribution, and an ordinary follow-up overstated what the
+missing original could establish. This is a failed calibration of both model
+choices. Keep acquisition and judgment tests independent, and continue the
+parallel lifecycle and ongoing-work gates.
 
 October 26–27 qualification notes are retained in
 [the October 27 archive](ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-27.md).
