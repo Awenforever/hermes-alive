@@ -10,7 +10,8 @@ from alive_kernel.content_vault import ContentReference
 from alive_kernel.expression_support import ExpressionSourceSupportReviewer
 from alive_kernel.review_contracts import (LEGACY_SPLIT_SOURCE_REVIEW, FIRST_FACTS_AND_FIT_REVIEW,
     FACTS_AND_FIT_ASSESSMENT, SPLIT_SOURCE_REVIEW, FIRST_FLAT_REVIEW, FLAT_FIT_ASSESSMENT,
-    FIRST_SEARCH_REVIEW, SEARCH_FIT_ASSESSMENT, CLAIM_SCOPE_REVIEW, CLAIM_SCOPE_ASSESSMENT)
+    FIRST_SEARCH_REVIEW, SEARCH_FIT_ASSESSMENT, CLAIM_SCOPE_REVIEW, CLAIM_SCOPE_ASSESSMENT,
+    CONTRIBUTION_REVIEW, CONTRIBUTION_ASSESSMENT)
 
 
 async def test(root, original_contract, original_scope):
@@ -50,4 +51,5 @@ if __name__ == '__main__':
         asyncio.run(test(Path(directory) / 'previous-flat', FIRST_FLAT_REVIEW, FLAT_FIT_ASSESSMENT))
         asyncio.run(test(Path(directory) / 'previous-search', FIRST_SEARCH_REVIEW, SEARCH_FIT_ASSESSMENT))
         asyncio.run(test(Path(directory) / 'previous-claim-scope', CLAIM_SCOPE_REVIEW, CLAIM_SCOPE_ASSESSMENT))
+        asyncio.run(test(Path(directory) / 'previous-contribution', CONTRIBUTION_REVIEW, CONTRIBUTION_ASSESSMENT))
     print('FINAL_VALUE_RECOVERY_OK')

@@ -268,6 +268,34 @@ def test_claim_scope_veto():
     assert validate_retained(conflict, witness_snapshot=snapshot) == conflict
 
 
+def test_only_explicit_communication_choices_shape_new_discovery_openings():
+    from alive_kernel.final_value_findings import PRESENTATION_PROMPT
+    from alive_kernel.review_contracts import PRESENTATION_ASSESSMENT, SPLIT_SOURCE_REVIEW, CONTRIBUTION_REVIEW
+    from alive_kernel.semantic_comparator import SemanticComparator
+    from alive_kernel.feedback_context import source_review_prompt_snapshot
+
+    choice = dict(predicate='profile.communication', kind='preference', value='Use plain language.')
+    interest = dict(predicate='profile.interests', kind='preference', value='Robotics and vision.')
+    recalled = dict(predicate='profile.external_memory', kind='preference', value='An inferred preference.')
+    facts = [choice, interest, recalled]
+    author = dict(semantic_source_contract=SPLIT_SOURCE_REVIEW, user_context=facts,
+                  literal_feedback_context=[{'feedback_text': 'A one-off comment.'}])
+    model_author = SemanticComparator._author_context(author)
+    assert model_author['user_context'] == [choice] and not model_author['literal_feedback_context']
+    historical = {**author, 'semantic_source_contract': CONTRIBUTION_REVIEW}
+    assert SemanticComparator._author_context(historical) == historical
+    assert author['user_context'] == facts and author['literal_feedback_context']
+
+    snapshot = dict(expression_binding={'final_assessment_scope': PRESENTATION_ASSESSMENT},
+                    explicit_context=facts, learned_advisory=[{'value': 'An inferred format.'}],
+                    recent_feedback_context=author['literal_feedback_context'])
+    assert object.__new__(ExpressionSourceSupportReviewer).prompt_for_snapshot(snapshot) == PRESENTATION_PROMPT
+    model_review = source_review_prompt_snapshot(snapshot)
+    assert model_review['explicit_context'] == [choice]
+    assert not model_review['learned_advisory'] and not model_review['recent_feedback_context']
+    assert snapshot['explicit_context'] == facts and snapshot['learned_advisory'] and snapshot['recent_feedback_context']
+
+
 if __name__ == '__main__':
     test_dimensions()
     test_old_and_new_contracts()
@@ -276,4 +304,5 @@ if __name__ == '__main__':
     test_independent_search_alignment()
     test_configured_route_provenance()
     test_claim_scope_veto()
+    test_only_explicit_communication_choices_shape_new_discovery_openings()
     print('FINAL_VALUE_DIMENSIONS_OK')

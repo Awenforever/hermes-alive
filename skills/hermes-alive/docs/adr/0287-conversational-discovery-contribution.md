@@ -56,3 +56,22 @@ each major point against the actual opening's purpose. For ordinary
 follow-ups, keep claims about what has and has not been demonstrated
 bounded to the material actually accessible. Test both failures with fresh
 material and the full emitted text before counting a round.
+
+## Separate presentation evidence from selection evidence
+
+Keep topic interests, recall and earlier reactions available to candidate
+selection. For new discovery authoring and final review, pass only verified
+explicit communication preferences from that context. Existing confirmed
+presentation settings still apply in authoring. The author and reviewer
+judge secondary detail by what the opening loses if it moves to a follow-up.
+An explanation can stay substantial where the context, evidence or explicit
+communication choice warrants it. The encrypted evidence and prior prompt
+contracts remain intact for replay and deletion. The same filtered review
+input is used when a draft needs repair.
+
+Ordinary follow-ups now label both inline and paged evidence as retained
+material. A page marked complete can be the entire retained excerpt while
+still representing only part of a source. The main turn should answer
+questions about missing experiments or comparisons at that scope. An explicit
+negative in the evidence can support a negative answer. An omitted passage
+calls for an uncertainty statement or a read of available evidence.

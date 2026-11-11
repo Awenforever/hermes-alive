@@ -15,7 +15,8 @@ READ_REFERENCE_SCHEMA = {
     'description': 'Read exact retained Alive text or one retained source excerpt in your current conversation. '
                    'Use a reference handle from Alive context. Paged fragments must be read in order; '
                    'text recovers what Alive prepared, not independent verification. Use source pages to inspect '
-                   'the collected evidence; its catalog identifies source indices. An excerpt is not a full source. '
+                   'the collected evidence; its catalog identifies source indices. Complete means the retained '
+                   'text fits in the returned page, with no claim about whole-source coverage. '
                    'These handles belong to prepared proactive shares, not agenda request events or Core jobs. '
                    'For a retained task original, use the original_request_lookup returned by alive_agenda. '
                    'A provenance source_event_id is not a read_reference handle. '
@@ -159,6 +160,7 @@ class CoreShareContinuity:
                     if len(json.dumps(catalog + [candidate], ensure_ascii=False)) <= 4096:
                         catalog.append(candidate)
                 metadata = {'content_kind': 'exact_prepared_share_not_source_verification',
+                            'completeness_applies_to': 'retained_share_text',
                             'source_catalog': catalog, 'source_catalog_complete': len(catalog) == item['source_count']}
             else:
                 if index >= item['source_count']:
@@ -167,7 +169,8 @@ class CoreShareContinuity:
                 text = source.pop('excerpt', None)
                 if not isinstance(text, str) or not text.strip():
                     raise ValueError('retained source excerpt unavailable')
-                metadata = {'content_kind': 'retained_source_excerpt', 'source_index': index, 'source': source}
+                metadata = {'content_kind': 'retained_source_excerpt', 'source_index': index, 'source': source,
+                            'completeness_applies_to': 'retained_excerpt'}
             if offset > len(text):
                 raise ValueError('page offset beyond the retained text')
             end = min(len(text), offset + count)

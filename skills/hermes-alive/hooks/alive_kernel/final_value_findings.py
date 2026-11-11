@@ -185,6 +185,17 @@ Treat what a passage leaves unaddressed and what an entire source omits as
 different assertions. Judge each absence claim on evidence of the stated scope.
 """
 
+PRESENTATION_PROMPT = CONTRIBUTION_PROMPT + """
+The explicit_context entries are communication choices. Interests and earlier
+feedback inform selection upstream. Do not infer a depth request from the topic,
+the collection query, an earlier message, or the amount of source material.
+For a substantial opening, identify what its secondary points contribute. If
+they could wait for a follow-up while the opening stays intelligible, useful
+and faithful to its material limits, treat a distracting cluster as a fit
+conflict even when every point is supported. Use the existing fit_reason
+to explain what belongs in the opening and what can wait.
+"""
+
 
 def _search_scope(snapshot):
     return (snapshot is not None and snapshot.get('expression_binding', {}).get(

@@ -92,3 +92,9 @@ def communication_situation(origin_kind):
     if origin_kind == 'commitment':
         return dict(kind='admitted_commitment',detail_from_original_request=True)
     return dict(kind='unclassified',requested_detail='unknown')
+
+
+def discovery_presentation_preferences(context):
+    """Select authenticated explicit communication choices from evidenced context."""
+    return [item for item in context if item['predicate'] == 'profile.communication'
+            and item['kind'] == 'preference']

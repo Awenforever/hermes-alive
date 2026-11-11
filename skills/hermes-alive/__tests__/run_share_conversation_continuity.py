@@ -223,7 +223,7 @@ async def test(home, mode, *, exercise=None, long_reference=False):
             expected_source = {
                 key:value for key,value in shares[0]['sources'][0].items()
                 if key not in ('event_id','excerpt_policy','reading_scope')}
-            expected_source['reading_scope'] = {'evidence_basis':'retained_excerpt'}
+            expected_source['reading_scope'] = {'evidence_basis':'retained_excerpt','coverage':'retained_material_only'}
             if not long_reference:
                 assert conversation['sources'][0] == expected_source
             # Operational diagnostics stay unchanged; only model-facing evidence
@@ -268,6 +268,7 @@ async def test(home, mode, *, exercise=None, long_reference=False):
                     assert page['content_kind'] == 'retained_source_excerpt'
                     assert page['source']['url'] == expected_source['url']
                     assert page['source']['reading_scope'] == expected_source['reading_scope']
+                    assert page['completeness_applies_to'] == 'retained_excerpt'
                     source_pages.append(page['text'])
                     if page['next_offset'] is None: break
                     offset = page['next_offset']
@@ -435,7 +436,7 @@ def test_collection_limits_are_not_world_negatives():
     references = json.loads(text.split('\n',1)[1])['alive_shares']
     assert references[0]['text'] == 'Exact shared words.'
     assert references[0]['sources'][0]['reading_scope'] == {
-        'evidence_basis':'retained_excerpt','reported_read_scope':'search_listing',
+        'evidence_basis':'retained_excerpt','coverage':'retained_material_only','reported_read_scope':'search_listing',
         'reported_content_representation':'machine_summary'}
     assert references[0]['sources'][1] == {'reading_status':'no_longer_retained'}
     assert 'independent_verification_proven' not in text and 'video_consumption_proven' not in text

@@ -432,6 +432,7 @@ def _conversation_source(source):
         reported = source.get('reading_scope') or {}
         result['reading_scope'] = {
             'evidence_basis': 'retained_excerpt',
+            'coverage': 'retained_material_only',
             **{key: reported[key] for key in (
                 'reported_read_scope', 'reported_content_representation') if key in reported}}
     return result
@@ -462,7 +463,10 @@ def continuation_context(shares, *, max_chars=None):
         'Frame useful possibilities as conditions. A caveat after a specific unsupported claim '
         'does not ground that claim. Separate the share’s wording from evidence in the source. '
         'A schedule establishes a plan. Match comparisons to the actual measure, baseline and '
-        'conditions. Keep effects and null results within tested conditions.\n')
+        'conditions. Keep effects and null results within tested conditions. '
+        'For whether a test, comparison or other event occurred, use positive evidence of what '
+        'the source reports. If retained material cannot settle it, state that uncertainty in '
+        'the answer itself. Silence in an excerpt does not establish a negative result.\n')
     if any('reference' in item for item in references):
         header = header.rstrip('\n') + (' Where available, alive_read_reference can read the exact retained '
             'text or source excerpts using its reference handle; handles are not delivery proof. '
