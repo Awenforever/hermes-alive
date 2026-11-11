@@ -129,3 +129,22 @@ The follow-up harness stopped before inference because its tool allow-list
 predated the authenticated feedback tool. Correct the fixture to account for
 the current tool contract while proving that unconsented feedback cannot be
 recorded. This round earns zero fresh quality credit.
+
+## Carry the evidence question into the final bounded read
+
+The optional refinement now asks what a technical claim rests on and whether
+the direct record could answer a material question. When it uses its one public
+query, the final reader receives that exact query and the public-only planning
+reason. It also sees the collector's scope for each input, so a listing is
+distinguishable from an extract. The reason guides selection and carries no
+authority or factual weight. The existing source references, read budget,
+consent and public-input checks still apply. Previously started choices retain
+their original input and prompt on replay.
+
+The controlled conflict fixture supplies a report that claims an effect was
+measured and a study that says only a proxy was measured. It checks that both
+extracts reach the retained reading group when the selector chooses the study,
+including after cold replay. The inaccessible-original fixture checks that a
+failed read does not become retained evidence. These checks establish the
+selection handoff and evidence retention. A real model must still show that it
+chooses the direct record and preserves the qualification in the final wording.

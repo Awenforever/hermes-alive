@@ -776,6 +776,14 @@ alongside the passing synthetic comparison. Subsequent trials must cover
 both focused questions and open-ended questions. A supported answer to
 one does not qualify the other.
 
+The bounded refinement passes the public research question to the final source
+selector, with listing and extract provenance. The solar trial in
+[ADR 0284](adr/0284-source-witnesses-for-final-review.md) showed why this matters:
+two institutional accounts left out a measurement qualification in the paper.
+The next real trial must test whether the model finds that underlying record
+and carries the qualification into both the share and an ordinary follow-up.
+The repeated solar case is a regression trial and earns no fresh-round credit.
+
 October 26–27 qualification notes are retained in
 [the October 27 archive](ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-27.md).
 Earlier execution notes and the original change log are retained in
