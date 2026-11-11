@@ -75,3 +75,17 @@ still representing only part of a source. The main turn should answer
 questions about missing experiments or comparisons at that scope. An explicit
 negative in the evidence can support a negative answer. An omitted passage
 calls for an uncertainty statement or a read of available evidence.
+
+The next real trial, r971, confirms the intended distinction in the actual
+review request: the explicit communication preference was supplied while
+topic interests were absent. The reviewer rejected a multiple-site roundup.
+The existing revision produced a two-paragraph share about one site and
+connected its archaeological evidence to a concrete idea. The short
+follow-up was still a dense sentence. The longer one correctly said that
+the retained material could not establish independent validation, but
+overstated what the publication omitted. The extractor had timed out and
+only search listings were retained. This trial earns no quality credit.
+Both inline and paged references now identify search-result excerpts
+explicitly. Where no page body was read, the reader must preserve that
+limit throughout its answer. Acquisition reliability remains a separate
+test of the configured Hermes web tools.

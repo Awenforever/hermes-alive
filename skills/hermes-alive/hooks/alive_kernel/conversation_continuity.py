@@ -435,6 +435,10 @@ def _conversation_source(source):
             'coverage': 'retained_material_only',
             **{key: reported[key] for key in (
                 'reported_read_scope', 'reported_content_representation') if key in reported}}
+        if reported.get('reported_read_scope') == 'search_listing':
+            result['reading_scope'].update(
+                evidence_basis='search_result_excerpt',
+                original_page_body_read=False)
     return result
 
 
@@ -466,7 +470,8 @@ def continuation_context(shares, *, max_chars=None):
         'conditions. Keep effects and null results within tested conditions. '
         'For whether a test, comparison or other event occurred, use positive evidence of what '
         'the source reports. If retained material cannot settle it, state that uncertainty in '
-        'the answer itself. Silence in an excerpt does not establish a negative result.\n')
+        'the answer itself. If only a search-result excerpt was retained, describe what the '
+        'excerpt supports. It cannot establish what the original page leaves out.\n')
     if any('reference' in item for item in references):
         header = header.rstrip('\n') + (' Where available, alive_read_reference can read the exact retained '
             'text or source excerpts using its reference handle; handles are not delivery proof. '

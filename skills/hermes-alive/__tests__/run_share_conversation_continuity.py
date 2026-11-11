@@ -436,7 +436,8 @@ def test_collection_limits_are_not_world_negatives():
     references = json.loads(text.split('\n',1)[1])['alive_shares']
     assert references[0]['text'] == 'Exact shared words.'
     assert references[0]['sources'][0]['reading_scope'] == {
-        'evidence_basis':'retained_excerpt','coverage':'retained_material_only','reported_read_scope':'search_listing',
+        'evidence_basis':'search_result_excerpt','coverage':'retained_material_only',
+        'original_page_body_read':False,'reported_read_scope':'search_listing',
         'reported_content_representation':'machine_summary'}
     assert references[0]['sources'][1] == {'reading_status':'no_longer_retained'}
     assert 'independent_verification_proven' not in text and 'video_consumption_proven' not in text

@@ -169,7 +169,9 @@ class CoreShareContinuity:
                 text = source.pop('excerpt', None)
                 if not isinstance(text, str) or not text.strip():
                     raise ValueError('retained source excerpt unavailable')
-                metadata = {'content_kind': 'retained_source_excerpt', 'source_index': index, 'source': source,
+                basis = source.get('reading_scope', {}).get('evidence_basis')
+                kind = 'retained_search_result_excerpt' if basis == 'search_result_excerpt' else 'retained_source_excerpt'
+                metadata = {'content_kind': kind, 'source_index': index, 'source': source,
                             'completeness_applies_to': 'retained_excerpt'}
             if offset > len(text):
                 raise ValueError('page offset beyond the retained text')

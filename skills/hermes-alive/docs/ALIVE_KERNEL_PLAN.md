@@ -835,6 +835,18 @@ missing experiments in a follow-up. The reviewer accepted the depth by
 inferring it from the recipient's topic interest. Keep that distinction in
 the next revision and the end-to-end gate. The trial adds no quality credit.
 
+Candidate selection retains topical preferences. New authoring and final
+assessment now receive explicit communication choices separately. Model
+review and repair see the same projection, while recovery retains the
+original evidence. The live conversation marks complete pages as complete
+retained material and leaves whole-source coverage open. Controlled
+installed tests exercised continuation, paging, consent and deletion.
+The next fresh trial narrowed a multi-topic draft to one concrete point
+but still overreached about what the publication omitted when only a
+search listing was available. Continue with evidence that distinguishes
+search excerpts, partial extracts and explicit source statements. Natural
+depth and bounded claims in ordinary conversation remain to be verified.
+
 October 26–27 qualification notes are retained in
 [the October 27 archive](ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-27.md).
 Earlier execution notes and the original change log are retained in
