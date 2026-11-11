@@ -47,11 +47,13 @@ Hermes 会用自然语言确认目标会话、地区、作息和内容偏好，�
 让 Hermes 的插件管理器安装依赖，确保依赖进入 Gateway 实际使用的 Python 环境：
 
 ```bash
-hermes plugins install Awenforever/hermes-alive --force --yes-deps --enable
+hermes plugins install Awenforever/hermes-alive --enable
 hermes alive install-runtime
 ```
 
-升级也使用上述命令；不要只执行 `git pull` 或向另一套系统 Python 手工安装依赖。
+首次安装时按 Hermes 提示确认依赖。如果安全扫描要求确认，先查看结果，再决定是否安装。
+在没有交互终端的环境里，请保留扫描结果并让用户确认。升级时由 Hermes 插件管理器替换
+已安装包并处理新依赖。不要只执行 `git pull` 或向另一套系统 Python 手工安装依赖。
 可擦除内容保险库使用 Hermes 受管环境中的 `cryptography`，兼容 50.x，不固定到某个补丁版本。
 
 安装脚本会写入标准 Hermes 数据目录并完成验证，但不会重启 Gateway：

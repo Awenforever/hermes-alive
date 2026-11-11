@@ -79,11 +79,13 @@ Hermes Gateway
 通过 Hermes 插件管理器安装完整仓库及其运行依赖：
 
 ```bash
-hermes plugins install Awenforever/hermes-alive --force --yes-deps --enable
+hermes plugins install Awenforever/hermes-alive --enable
 hermes alive install-runtime
 ```
 
-升级也使用同一组命令，不要只执行 `git pull` 或向另一套系统 Python 手工装包。
+首次安装时按 Hermes 提示确认依赖。如果安全扫描要求确认，先查看结果，再决定是否安装。
+在没有交互终端的环境里，请保留扫描结果并让用户确认。升级时由 Hermes 插件管理器替换
+已安装包并处理新依赖。不要只执行 `git pull` 或向另一套系统 Python 手工装包。
 可擦除内容保险库使用 Hermes 受管环境中的 `cryptography`，兼容 50.x，不固定到某个补丁版本。
 安装流程会部署技能源码和 Gateway Hook、继承 Hermes 当前模型、写入非敏感
 默认配置并执行验证，但不会重启 Gateway。命令行路径适合已有明确配置的运维者；

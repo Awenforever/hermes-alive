@@ -257,7 +257,7 @@ its declared cryptographic runtime is resolved in the same Python environment
 as Gateway:
 
 ```bash
-hermes plugins install Awenforever/hermes-alive --force --yes-deps --enable
+hermes plugins install Awenforever/hermes-alive --enable
 hermes alive install-runtime
 ```
 
@@ -278,10 +278,16 @@ HERMES_ALIVE_LIFECYCLE_INSTALL_OK
 Run the command a second time to verify idempotence. On failure, stop and surface
 the lifecycle error; never report success from partial output.
 
-On upgrade, use the same `plugins install --force --yes-deps --enable` command
-rather than plain `plugins update`: the latter reports newly declared Python
-dependencies but does not install them. Existing runtime state remains outside
-the plugin checkout and must be preserved.
+Let the user review Hermes' dependency and scan prompts. In a non-interactive
+session, preserve any caution report and ask the user whether to approve that
+exact revision. A dangerous verdict remains blocked.
+
+For an upgrade, use the package manager's replacement install at the reviewed
+revision. Only after confirming replacement and the scan decision may an
+automation use `plugins install --force` for that revision. Add `--yes-deps`
+only if the user has approved the displayed dependencies. A plain
+`plugins update` may report new Python dependencies without admitting them.
+Existing runtime state remains outside the plugin checkout and must be preserved.
 
 Package placement is not dependency admission. Hermes may print an installed
 banner while refusing enablement after a dependency failure. Before running
