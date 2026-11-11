@@ -828,8 +828,12 @@ read like a source audit. [ADR 0287](adr/0287-conversational-discovery-contribut
 records the new authoring and review contract. The installed Core tests
 passed an independent fit rejection and a complete revision, as well as
 feedback scoping and erasure through the new review. Cold recovery preserved
-the prior assessment scopes. A fresh public discovery and the two ordinary
-follow-ups still need review of their complete model output.
+the prior assessment scopes. The fresh public discovery reached a cited
+paper and completed two ordinary follow-ups. Inspection of the original
+text found excess depth in the opening and an overbroad statement about
+missing experiments in a follow-up. The reviewer accepted the depth by
+inferring it from the recipient's topic interest. Keep that distinction in
+the next revision and the end-to-end gate. The trial adds no quality credit.
 
 October 26–27 qualification notes are retained in
 [the October 27 archive](ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-27.md).

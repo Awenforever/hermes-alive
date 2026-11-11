@@ -33,3 +33,26 @@ can expand from retained evidence, and whether a short answer can respect
 uncertainty without reciting unrelated caveats. Controlled tests qualify
 the contract and historical recovery. Real user-facing quality is a
 separate gate.
+
+## Real trial after the change
+
+The installed r961 run searched a fresh domestic technical topic, reached
+the institutional announcement and the cited paper, then completed one
+local submission and two ordinary main-agent follow-ups. The opener led
+with a practical distinction about downstream training data. It then
+expanded into five paragraphs covering benchmark scores, downstream
+results, implementation, OCR and commercial deployment. The new review
+prompt was present on the actual request. The reviewer treated topic
+interest as evidence for depth and accepted the article-shaped result.
+The first follow-up answered in one sentence. The second asserted there
+had been no real-robot test and later said the available abstract could
+not settle that question.
+
+This round failed. Topic relevance may influence selection, while the
+appropriate depth must come from the actual conversational purpose or an
+explicit presentation choice. Preserve the paper and additional evidence
+for later turns. In a subsequent revision, qualify the decision to include
+each major point against the actual opening's purpose. For ordinary
+follow-ups, keep claims about what has and has not been demonstrated
+bounded to the material actually accessible. Test both failures with fresh
+material and the full emitted text before counting a round.
