@@ -229,8 +229,8 @@ def test_configured_route_provenance():
 
 
 def test_claim_scope_veto():
-    from alive_kernel.final_value_findings import CLAIM_SCOPE_PROMPT, ROUTE_FIT_PROMPT
-    from alive_kernel.review_contracts import CLAIM_SCOPE_ASSESSMENT, ROUTE_FIT_ASSESSMENT
+    from alive_kernel.final_value_findings import CLAIM_SCOPE_PROMPT, CONTRIBUTION_PROMPT, ROUTE_FIT_PROMPT
+    from alive_kernel.review_contracts import CLAIM_SCOPE_ASSESSMENT, CONTRIBUTION_ASSESSMENT, ROUTE_FIT_ASSESSMENT
 
     snapshot = {'expression_binding': {'final_assessment_scope': CLAIM_SCOPE_ASSESSMENT},
                 'candidate': {'text': 'The material cooled. The sensor registered an apparent drop.'},
@@ -260,6 +260,12 @@ def test_claim_scope_veto():
     snapshot['expression_binding']['final_assessment_scope'] = ROUTE_FIT_ASSESSMENT
     assert reviewer.prompt_for_snapshot(snapshot) == ROUTE_FIT_PROMPT
     assert parse(json.dumps(wire), witness_snapshot=snapshot)['verdict'] == 'supported'
+    snapshot['expression_binding']['final_assessment_scope'] = CONTRIBUTION_ASSESSMENT
+    assert reviewer.prompt_for_snapshot(snapshot) == CONTRIBUTION_PROMPT
+    conflict = parse(json.dumps(dict(wire, claim_scope='preserved', claim_scope_reason=reason,
+        fit='conflicts', fit_reason='The opening gets lost in peripheral details.')), witness_snapshot=snapshot)
+    assert conflict['verdict'] == 'unsupported' and conflict['factual_support']['assessment'] == 'supported'
+    assert validate_retained(conflict, witness_snapshot=snapshot) == conflict
 
 
 if __name__ == '__main__':

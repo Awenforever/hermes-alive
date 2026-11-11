@@ -126,7 +126,8 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                         for n in ('user_value','urgency','novelty','confidence','risk','interruption_cost')})]}
             elif 'expression_binding' in data:
                 from final_review_fixture import controlled_final_findings
-                assert data['expression_binding']['final_assessment_scope'] == 'factual-support-and-communication-fit-v9'
+                assert data['expression_binding']['final_assessment_scope'] == 'factual-support-and-communication-fit-v10'
+                assert 'test fit as an opening in a real conversation' in body['messages'][0]['content']
                 if feedback_probe['expected'] is not None:
                     assert not data['recent_feedback_context'] and feedback_probe['expected'] not in raw
                 if feedback_probe['expected'] is None or 'search_context' in data:
@@ -149,6 +150,8 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                     for x in data['meaning']['atoms']],added_claims_detected=False,speech_act_preserved=True,protected_literals_preserved=True)
             elif 'meaning' in data:
                 stage='author';assert qualifier in raw
+                if not data.get('correction'):
+                    assert body['messages'][0]['content'].startswith('Open a conversation with a worthwhile discovery.')
                 if feedback_probe['expected'] is None:
                     assert data['expression_context']['search_context']['kind']=='configured-discovery-route-v1'
                     assert 'not a current research request' in body['messages'][0]['content']

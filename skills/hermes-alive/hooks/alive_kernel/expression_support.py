@@ -107,8 +107,11 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
         from .review_contracts import (BOUNDARY_ASSESSMENT, FACTS_AND_FIT_ASSESSMENT,
             CONVERSATIONAL_FIT_ASSESSMENT, GROUNDED_FIT_ASSESSMENT, PASSAGE_FIT_ASSESSMENT,
             LABELLED_FIT_ASSESSMENT, FLAT_FIT_ASSESSMENT, SEARCH_FIT_ASSESSMENT, ROUTE_FIT_ASSESSMENT,
-            CLAIM_SCOPE_ASSESSMENT)
+            CLAIM_SCOPE_ASSESSMENT, CONTRIBUTION_ASSESSMENT)
         scope = snapshot.get('expression_binding', {}).get('final_assessment_scope')
+        if scope == CONTRIBUTION_ASSESSMENT:
+            from .final_value_findings import CONTRIBUTION_PROMPT
+            return CONTRIBUTION_PROMPT
         if scope == CLAIM_SCOPE_ASSESSMENT:
             from .final_value_findings import CLAIM_SCOPE_PROMPT
             return CLAIM_SCOPE_PROMPT
@@ -405,10 +408,12 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
                 GROUNDED_FIT_ASSESSMENT, PASSAGE_FIT_ASSESSMENT, LABELLED_FIT_ASSESSMENT,
                 FIRST_PASSAGE_REVIEW, FIRST_LABELLED_REVIEW, FIRST_FLAT_REVIEW, FIRST_SEARCH_REVIEW,
                 FLAT_FIT_ASSESSMENT, SEARCH_FIT_ASSESSMENT, ROUTE_FIT_ASSESSMENT, ROUTE_AWARE_REVIEW,
-                CLAIM_SCOPE_ASSESSMENT)
+                CLAIM_SCOPE_REVIEW, CLAIM_SCOPE_ASSESSMENT, CONTRIBUTION_ASSESSMENT)
             if method.get('discovery_source_review') in SPLIT_SOURCE_REVIEW_CONTRACTS:
                 data['expression_binding']['semantic_assessment_scope']=BOUNDARY_ASSESSMENT
                 if method['discovery_source_review'] == SPLIT_SOURCE_REVIEW:
+                    data['expression_binding']['final_assessment_scope']=CONTRIBUTION_ASSESSMENT
+                elif method['discovery_source_review'] == CLAIM_SCOPE_REVIEW:
                     data['expression_binding']['final_assessment_scope']=CLAIM_SCOPE_ASSESSMENT
                 elif method['discovery_source_review'] == ROUTE_AWARE_REVIEW:
                     data['expression_binding']['final_assessment_scope']=ROUTE_FIT_ASSESSMENT

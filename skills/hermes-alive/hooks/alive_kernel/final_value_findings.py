@@ -4,7 +4,7 @@ The host combines the model's explicit judgments; it does not classify prose or
 infer recipient preferences. Existing lifecycle consumers retain one verdict.
 """
 from .model_json import parse_model_json
-from .review_contracts import (CLAIM_SCOPE_ASSESSMENT, FLAT_ASSESSMENTS, SEARCH_ASSESSMENTS,
+from .review_contracts import (CLAIM_SCOPE_ASSESSMENTS, FLAT_ASSESSMENTS, SEARCH_ASSESSMENTS,
                                LABELLED_ASSESSMENTS, PASSAGE_FIT_ASSESSMENT)
 
 
@@ -171,6 +171,21 @@ characters). Overstated or unresolved prevents a supported verdict.
 """
 
 
+CONTRIBUTION_PROMPT = CLAIM_SCOPE_PROMPT + """
+For an unsolicited discovery share, test fit as an opening in a real conversation.
+Name what the recipient gets from hearing it now. Judge whether extra detail
+helps explain that point, changes a practical inference, or preserves a material
+qualification. A cluster of side details or source limitations that could be
+removed without losing any of those is a fit conflict when it appreciably
+distracts from the contribution. Explain the specific loss of focus in fit_reason.
+Absence of an explicit preference does not establish fit. A clear, substantial
+technical explanation may fit when its detail earns its place. Do not grade by
+length alone or require a hook, question, opinion or formulaic justification.
+Treat what a passage leaves unaddressed and what an entire source omits as
+different assertions. Judge each absence claim on evidence of the stated scope.
+"""
+
+
 def _search_scope(snapshot):
     return (snapshot is not None and snapshot.get('expression_binding', {}).get(
         'final_assessment_scope') in SEARCH_ASSESSMENTS)
@@ -178,7 +193,7 @@ def _search_scope(snapshot):
 
 def _claim_scope(snapshot):
     return (snapshot is not None and snapshot.get('expression_binding', {}).get(
-        'final_assessment_scope') == CLAIM_SCOPE_ASSESSMENT)
+        'final_assessment_scope') in CLAIM_SCOPE_ASSESSMENTS)
 
 
 def _with_search(findings, search, snapshot):
