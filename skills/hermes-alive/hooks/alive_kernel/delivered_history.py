@@ -146,7 +146,7 @@ class DeliveredHistoryStore:
             raise DeliveredHistoryError('historical retention already expired')
         ref = self.vault.put_json({'contract':contract.to_document()}, subject=subject,
             purpose='message.delivered-history', sensitivity=clearance, retention_until=until,
-            content_id='delivery-history-content:' + uuid4().hex)
+            content_id='delivery-history-content:' + uuid4().hex, withdraw_with=(content_id,))
         payload = {'attempt_id':attempt.event.payload['attempt_id'],
             'delivery_outcome_event_id':outcome.event.event_id, 'delivery_event_id':receipt.event.event_id,
             'consent_event_id':consent.event.event_id, 'dependencies':dependencies,

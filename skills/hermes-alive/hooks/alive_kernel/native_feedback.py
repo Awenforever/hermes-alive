@@ -169,7 +169,7 @@ def _legacy_feedback_dependents(journal, vault, subject, outcome_id):
         receipt = journal.get(receipts.pop()) if len(receipts) == 1 else None
         return receipt if receipt is not None and receipt.sequence < frame.sequence else None
 
-    dependents = set()
+    dependents, expressions = set(), set()
     for row in journal.iter_reverse(event_types=synthesis_types + review_types + expression_types + comparison_types,
                                     subject=subject):
         event = row.event
@@ -197,7 +197,69 @@ def _legacy_feedback_dependents(journal, vault, subject, outcome_id):
             ref = ContentReference.from_event_payload(event.payload['content'])
             if ref.sensitivity is event.sensitivity:
                 dependents.add(ref.content_id)
+                if event.event_type in expression_types:
+                    expressions.add(event.event_id)
+    if expressions:
+        dependents.update(_legacy_delivery_dependents(journal, subject, expressions))
     return tuple(sorted(dependents))
+
+
+def _legacy_delivery_dependents(journal, subject, expressions):
+    """Resolve protected content IDs from signed action and delivery receipts."""
+    from .conversation_continuity import _SIGNATURE
+    from .delivered_history import DeliveredHistoryStore
+    from .privacy import LocalIdentityProtector
+
+    protector = LocalIdentityProtector(journal.path.parent / 'identity.key')
+
+    def authenticated(record, event_type, source, actor, namespace):
+        if record is None:
+            return None
+        event = record.event
+        if (event.subject != subject or event.event_type != event_type
+                or event.source != source or event.actor != actor):
+            return None
+        payload = _thaw_json(event.payload)
+        signature = payload.pop('integrity_authenticator', None)
+        return payload if protector.verify_json(namespace, payload, signature) else None
+
+    authorizations, dependents = set(), set()
+    for row in journal.iter_reverse(event_types=('action.authorization_evaluated',), subject=subject):
+        if row.event.payload.get('expression_event_id') not in expressions:
+            continue
+        payload = authenticated(row, 'action.authorization_evaluated', 'alive.authorization',
+                                'system:alive-authorizer', 'action.authorization.v1')
+        if payload is not None:
+            authorizations.add(row.event.event_id)
+            if payload.get('executable_content_id'):
+                dependents.add(payload['executable_content_id'])
+    if not authorizations:
+        return dependents
+    for row in journal.iter_reverse(event_types=('message.delivery_history', 'conversation.share_prepared'),
+                                    subject=subject):
+        event = row.event
+        if event.event_type == 'message.delivery_history':
+            payload = authenticated(row, event.event_type, 'alive.delivered-history',
+                                    'system:alive-history', DeliveredHistoryStore.NAMESPACE)
+            authorization = payload.get('authorization_event_id') if payload is not None else None
+        else:
+            payload = authenticated(row, event.event_type, 'alive.conversation',
+                                    'system:alive-conversation', _SIGNATURE)
+            if payload is None or payload.get('start_event_id') != event.causation_id:
+                continue
+            start = authenticated(journal.get(event.causation_id), 'dispatch.started', 'alive.dispatch',
+                                  'system:alive-dispatch', 'dispatch.start.v1')
+            if start is None:
+                continue
+            attempt = journal.get('action.attempt:' + start['attempt_id'])
+            authorization = (attempt.event.payload.get('authorization_event_id')
+                             if attempt is not None and attempt.event.subject == subject
+                             and attempt.event.event_type == 'action.attempted' else None)
+        if authorization in authorizations:
+            ref = ContentReference.from_event_payload(payload['content'])
+            if ref.sensitivity is event.sensitivity:
+                dependents.add(ref.content_id)
+    return dependents
 
 
 def admitted_input(store, configured, text, message_id):

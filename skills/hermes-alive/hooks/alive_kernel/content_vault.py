@@ -267,6 +267,13 @@ class ContentVault:
                 );
                 CREATE INDEX IF NOT EXISTS idx_content_dependent
                     ON content_dependencies(dependent_id);
+                CREATE TABLE IF NOT EXISTS content_withdrawal_dependencies (
+                    parent_id TEXT NOT NULL,
+                    dependent_id TEXT NOT NULL,
+                    PRIMARY KEY(parent_id, dependent_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_content_withdrawal_dependent
+                    ON content_withdrawal_dependencies(dependent_id);
                 CREATE TABLE IF NOT EXISTS erasure_jobs (
                     job_id TEXT PRIMARY KEY,
                     selector_kind TEXT NOT NULL,
@@ -410,7 +417,9 @@ class ContentVault:
         retention_until: datetime | None = None,
         content_id: str | None = None,
         depends_on: tuple[str, ...] = (),
+        withdraw_with: tuple[str, ...] = (),
     ) -> ContentReference:
+        """Store ciphertext with retention dependencies or withdrawal-only links."""
         subject = str(subject).strip()
         purpose = str(purpose).strip()
         if not subject or not purpose:
@@ -420,10 +429,12 @@ class ContentVault:
         content_id = str(content_id or f"content_{uuid4().hex}").strip()
         if not content_id or len(content_id) > 255:
             raise ValueError("invalid content_id")
-        if (not isinstance(depends_on, tuple)
-                or any(not isinstance(parent, str) or not parent or parent == content_id for parent in depends_on)):
+        if (not isinstance(depends_on, tuple) or not isinstance(withdraw_with, tuple)
+                or any(not isinstance(parent, str) or not parent or parent == content_id
+                       for parent in (*depends_on, *withdraw_with))):
             raise ValueError("invalid content dependencies")
         parents = set(depends_on)
+        withdrawal_parents = set(withdraw_with) - parents
         payload = _canonical_json(value)
         key = self._key()
         digest = self._keyed_digest(key, payload)
@@ -449,7 +460,7 @@ class ContentVault:
                         "an erased content_id cannot be reused"
                     )
                 checked_at = datetime.now(timezone.utc)
-                for parent in parents:
+                for parent in parents | withdrawal_parents:
                     ancestor = connection.execute(
                         "SELECT subject,sensitivity,retention_until FROM content_items WHERE content_id=?",
                         (parent,),
@@ -463,13 +474,16 @@ class ContentVault:
                         until = datetime.fromisoformat(ancestor['retention_until'])
                         if until <= checked_at:
                             raise ContentExpiredError("content dependency has expired")
-                        retention_until = until if retention_until is None else min(until, retention_until)
+                        if parent in parents:
+                            retention_until = until if retention_until is None else min(until, retention_until)
                 existing = connection.execute(
                     "SELECT * FROM content_items WHERE content_id=?", (content_id,)
                 ).fetchone()
                 if existing is not None:
                     existing_parents = {row['parent_id'] for row in connection.execute(
                         "SELECT parent_id FROM content_dependencies WHERE dependent_id=?", (content_id,))}
+                    existing_withdrawal_parents = {row['parent_id'] for row in connection.execute(
+                        "SELECT parent_id FROM content_withdrawal_dependencies WHERE dependent_id=?", (content_id,))}
                     expected_retention = retention_until.isoformat() if retention_until else None
                     same = (
                         existing["subject"] == subject
@@ -479,6 +493,7 @@ class ContentVault:
                         and existing["digest"] == digest
                         and int(existing["size_bytes"]) == len(payload)
                         and existing_parents == parents
+                        and existing_withdrawal_parents == withdrawal_parents
                     )
                     if not same:
                         raise ContentIntegrityError(
@@ -505,6 +520,8 @@ class ContentVault:
                 )
                 connection.executemany("INSERT INTO content_dependencies VALUES (?,?)",
                     ((parent, content_id) for parent in sorted(parents)))
+                connection.executemany("INSERT INTO content_withdrawal_dependencies VALUES (?,?)",
+                    ((parent, content_id) for parent in sorted(withdrawal_parents)))
                 connection.execute("COMMIT")
             except Exception:
                 if connection.in_transaction:
@@ -653,9 +670,11 @@ class ContentVault:
                         """WITH RECURSIVE targets(content_id) AS (
                                SELECT ? UNION SELECT links.dependent_id FROM content_dependencies AS links
                                JOIN targets ON links.parent_id=targets.content_id
+                               UNION SELECT links.dependent_id FROM content_withdrawal_dependencies AS links
+                               JOIN targets ON links.parent_id=targets.content_id WHERE ?
                            ) SELECT targets.content_id, content_items.content_id IS NOT NULL AS live
                              FROM targets LEFT JOIN content_items USING (content_id)""",
-                        (selector_value,),
+                        (selector_value, selector_kind == 'item'),
                     ).fetchall()
                     ids = [str(row['content_id']) for row in dependencies]
                     live_ids = [str(row['content_id']) for row in dependencies if row['live']]

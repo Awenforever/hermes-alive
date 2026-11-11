@@ -69,7 +69,7 @@ async def exercise(root,mode):
             assert kwargs['timeout']<calls[0]['timeout']
             assert 'single permitted protocol correction' in kwargs['messages'][0]['content']
             if mode=='cancel':raise asyncio.CancelledError()
-            if mode=='timeout':await asyncio.sleep(2)
+            if mode=='timeout':await asyncio.sleep(60)
             if mode=='revoke-during-repair':change_source()
             if mode=='erase-during-repair':
                 recovery=journal.read(event_type='semantic.comparison_protocol_recovery')[-1]
@@ -82,7 +82,7 @@ async def exercise(root,mode):
                 output=json.dumps(fixed)
         return SimpleNamespace(model='synthetic/reviewer',choices=[SimpleNamespace(message=SimpleNamespace(content=output))])
     params={**original,'operation_id':'recovery','call':call}
-    if mode=='timeout':params['model_timeout_seconds']=1
+    if mode=='timeout':params['model_timeout_seconds']=10
     failing=mode in ('provider-error','revoke-before-repair','revoke-during-repair','erase-during-repair',
                     'cancel','timeout','twice-invalid','disabled','oversize')
     try:result=await runtime.run(**params)

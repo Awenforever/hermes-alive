@@ -206,10 +206,20 @@ snapshot while preserving a separate draft and review for the same owner.
 The semantic review receipt retains structured dispositions and risk labels
 for audit. Its eligibility check requires the candidate to remain available.
 
-Selection rationale, executable content and consented delivery history
-still need lifecycle proof. The delivery-history store already checks signed
-action, context and agenda dependencies for explicit erasure on read. That
-check alone does not remove the retained contract from its vault or backups.
+An executable contract now depends on its exact authored expression, so a
+withdrawal removes the compiled body before an already prepared launch can
+reuse it. A consented share context or delivery-history copy uses a
+withdrawal-only dependency. It retains its own authorized lifetime and
+survives routine expiration of the draft or executable contract. An explicit
+withdrawal still traverses expired ancestors and purges ciphertext and managed
+backups. The signed structural start and outcome receipts remain available.
+Legacy feedback forgetting traces authenticated authorization, share and
+delivery locators to remove records written before these links existed.
+Previously supported cross-vault retention reconciliation remains in place.
+
+Selection rationale and rollout/rollback proof remain open. In particular, an
+older runtime cannot create the new edges, and restoring a snapshot captured
+outside the managed backup boundary can bypass the current tombstones.
 Independent exports and original Hermes chat history remain outside the vault.
 An older writer that omits dependency metadata must not run alongside this
 runtime. Upgrade and rollback qualification must verify pending erasures

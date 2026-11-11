@@ -19,6 +19,7 @@ from .agenda import (
 from .content_vault import (
     ContentErasedError,
     ContentIntegrityError,
+    ContentReference,
     ContentUnavailableError,
     ContentVault,
 )
@@ -499,6 +500,8 @@ class SendTimeAuthorizer:
                     reasons.append("exact_expression_confirmation_required")
                 else:
                     try:
+                        if expression_header is None:
+                            raise SemanticReviewError("expression receipt unavailable")
                         if witness_text is not None:
                             expressed = OpportunityExpressionStore._text_action_contract(witness_text)
                             expiry = expression_header.event.expires_at
@@ -509,12 +512,14 @@ class SendTimeAuthorizer:
                                     expression_event_id=expression_event_id,
                                     selection_event_id=selection_event_id, subject=owner, as_of=current)
                         content_document = expressed.to_document()
+                        expression_ref = ContentReference.from_event_payload(expression_header.event.payload['content'])
                         reference = self.deliberation.content_vault.put_json(content_document,
                             subject=owner, purpose="deliberation.candidate", sensitivity=sensitivity,
-                            retention_until=expiry, content_id="expression-action:" +
-                            self.deliberation.content_vault.digest_json({'event_id': expression_event_id})[:40])
+                            retention_until=expiry, content_id="expression-action-linked:" +
+                            self.deliberation.content_vault.digest_json({'event_id': expression_event_id})[:40],
+                            depends_on=(expression_ref.content_id,))
                         executable_content_id = reference.content_id
-                    except SemanticReviewError:
+                    except (SemanticReviewError, ContentUnavailableError):
                         reasons.append("expression_not_current")
             try:
                 contract = parse_action_contract(

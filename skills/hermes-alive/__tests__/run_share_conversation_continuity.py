@@ -24,6 +24,7 @@ from alive_kernel.autonomous_cycle_runtime import AutonomousCycleRuntime
 from alive_kernel.action_delegation import ActionDelegationStore
 from alive_kernel.conversation_continuity import ShareContinuityStore, ContinuityUnavailable, continuation_context
 from alive_kernel.content_vault import ContentReference
+from alive_kernel.native_feedback import _legacy_delivery_dependents
 from alive_kernel.privacy import LocalIdentityProtector
 from alive_kernel.retention import RetentionDirection
 
@@ -379,6 +380,8 @@ async def test(home, mode, *, exercise=None, long_reference=False):
         assert retained[0]['text'] == expressed.text
         assert retained[0]['sources'][0]['reading_status'] == 'no_longer_retained'
         assert not store.vault.explicit_erasure_recorded(source_id)
+        share_content_id = ContentReference.from_event_payload(record.event.payload['content']).content_id
+        assert share_content_id in _legacy_delivery_dependents(journal, owner, {expressed.expression_event_id})
         # A later explicit forget request still invalidates that derived copy.
         if mode == 'false':
             # Stop disclosure immediately when the owner's erasure is durable,
@@ -387,6 +390,12 @@ async def test(home, mode, *, exercise=None, long_reference=False):
             with patch.object(reopened.vault,'resolve_json',side_effect=AssertionError('forgotten context decrypted')):
                 assert not reopened.read(scope=scope.binding_document(), clearance=Sensitivity.PRIVATE)
             store.retention.execute_erasure(request)
+        elif long_reference:
+            expression = journal.get(expressed.expression_event_id)
+            parent = ContentReference.from_event_payload(expression.event.payload['content']).content_id
+            assert not store.vault.explicit_erasure_recorded(parent)
+            store.vault.erase_item(parent)
+            assert store.vault.explicit_erasure_recorded(share_content_id)
         else:
             store.vault.erase_item(source_id)
         assert not reopened.read(scope=scope.binding_document(), clearance=Sensitivity.PRIVATE)
@@ -400,7 +409,7 @@ async def test(home, mode, *, exercise=None, long_reference=False):
                     'error':'alive_reference_unavailable'}
         finally:
             core.clear_session_vars(lookup_vars)
-        assert store.vault.explicit_erasure_recorded(ContentReference.from_event_payload(record.event.payload['content']).content_id)
+        assert store.vault.explicit_erasure_recorded(share_content_id)
         raw = journal.path.read_bytes()
         assert b'-1007654321' not in raw and b'bicycles, not cars' not in raw
         assert not journal.read(event_type='delivery.succeeded') and len(journal.read(event_type='dispatch.started')) == 1

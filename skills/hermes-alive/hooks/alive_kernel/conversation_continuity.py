@@ -147,10 +147,13 @@ class ShareContinuityStore:
         authorization = self.journal.get(attempt.event.payload['authorization_event_id'])
         expression_id = authorization.event.payload.get('expression_event_id')
         dependencies, sources = [], []
+        withdrawal_parents = ()
         if expression_id:
             from .opportunity_expression import OpportunityExpressionStore
             expression = self.journal.get(expression_id)
-            dependencies.append(ContentReference.from_event_payload(expression.event.payload['content']).content_id)
+            expression_content_id = ContentReference.from_event_payload(expression.event.payload['content']).content_id
+            dependencies.append(expression_content_id)
+            withdrawal_parents = (expression_content_id,)
             sources = OpportunityExpressionStore(self.journal, content_vault=self.vault,
                 context_vault=self.outbox.context_vault).continuity_sources_for_selection(
                     str(authorization.event.payload['selection_event_id']), owner)
@@ -169,7 +172,8 @@ class ShareContinuityStore:
                 'dependencies': dependencies, 'expression_event_id': expression_id}
         reference = self.vault.put_json(body, subject=owner, purpose=_PURPOSE,
             sensitivity=sensitivity, retention_until=expiry,
-            content_id='share_context_' + self.protector.authenticate_json(_SIGNATURE, {'start': execution.start_event_id}))
+            content_id='share_context_' + self.protector.authenticate_json(_SIGNATURE, {'start': execution.start_event_id}),
+            withdraw_with=withdrawal_parents)
         payload = {'start_event_id': execution.start_event_id, 'scope_fingerprint': fingerprint,
             'consent_event_id': policy.consent_event_id, 'content': reference.to_event_payload(),
             'external_delivery_proven': False, 'submission_may_not_have_occurred': True}

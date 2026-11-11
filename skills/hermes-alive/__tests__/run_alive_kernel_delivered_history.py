@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from pathlib import Path
 import sys
 import tempfile
+from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'hooks'))
 from alive_kernel import ExperienceJournal, EventEnvelope, Sensitivity, OutcomeProjection, OutcomeKind
 from alive_kernel.content_vault import ContentErasedError, ContentVault
@@ -16,6 +17,7 @@ from alive_kernel.recovery import KernelRecoverySupervisor
 from alive_kernel.retention_command import resume_retention_maintenance
 from alive_kernel.events import _thaw_json
 from alive_kernel.opportunity_expression import OpportunityExpressionStore
+from alive_kernel.native_feedback import _legacy_delivery_dependents
 from alive_kernel_testkit import authenticated_dispatch_receipt
 from run_alive_kernel_opportunity_execution import scenario
 
@@ -53,7 +55,16 @@ async def exercise(root, mode):
         except DeliveredHistoryError:
             return
         raise AssertionError('inbound-only consent retained outbound history')
-    history = store.capture(**args)
+    if mode in ('maintenance-forget','startup-forget','runtime-maintenance-forget'):
+        # Exercise recovery for copies written before transactional withdrawal.
+        write = store.vault.put_json
+        def legacy_write(value, **options):
+            options.pop('withdraw_with', None)
+            return write(value, **options)
+        with patch.object(store.vault, 'put_json', legacy_write):
+            history = store.capture(**args)
+    else:
+        history = store.capture(**args)
     assert store.capture(**args).event.event_id == history.event.event_id
     value = store.resolve(history.event.event_id, subject='user:test')
     assert value['text'] == text
@@ -66,7 +77,25 @@ async def exercise(root, mode):
     else:
         raise AssertionError('foreign history disclosed')
     compiled_id = journal.get(attempt.event.payload['authorization_event_id']).event.payload['executable_content_id']
-    if mode in ('expiry', 'expiry-maintenance'):
+    assert _legacy_delivery_dependents(journal, 'user:test', {expression.event_id}) == {compiled_id, value['content_id']}
+    assert not _legacy_delivery_dependents(journal, 'user:foreign', {expression.event_id})
+    if mode == 'withdrawal-after-expiry':
+        parent = journal.get(expression.event_id).event.payload['content']['content_id']
+        outbox.vault.erase_expired(now=expression.expires_at + timedelta(seconds=1))
+        assert store.resolve(history.event.event_id, subject='user:test')['text'] == text
+        backup = outbox.vault.create_managed_backup('retained-after-action-expiry')
+        assert backup.exists()
+        assert outbox.vault.erase_item(parent).newly_erased == 1
+        assert not backup.exists()
+        try:
+            outbox.vault.resolve_json(value['content_id'])
+        except ContentErasedError:
+            pass
+        else:
+            raise AssertionError('withdrawn text survived through expired ancestors')
+        assert journal.get(receipt.event_id).event == receipt
+        assert journal.get(delivered.event.event_id) is not None
+    elif mode in ('expiry', 'expiry-maintenance'):
         outbox.vault.erase_expired(now=expression.expires_at + timedelta(seconds=1))
         assert not outbox.vault.explicit_erasure_recorded(compiled_id)
         assert OpportunityExpressionStore(journal, content_vault=outbox.vault).resolve_model_candidate(expression.event_id) is None
@@ -181,7 +210,7 @@ async def exercise(root, mode):
     assert not journal.read(event_type='preference.observed')
 
 async def main(root):
-    for mode in ('unchanged','expiry','explicit-forget','revoke','inbound-only','archive-expiry','context-forget',
+    for mode in ('unchanged','expiry','withdrawal-after-expiry','explicit-forget','revoke','inbound-only','archive-expiry','context-forget',
                  'maintenance-forget','expiry-maintenance','startup-forget','runtime-maintenance-forget','forged-maintenance'):
         await exercise(root / mode, mode)
 

@@ -207,6 +207,8 @@ async def scenario(root, mode, custom_context=False, *, transport_route=None, re
     if mode == 'expression-erased-before-launch':
         header = journal.get(expression.event_id)
         coordinator.vault.erase_item(header.event.payload['content']['content_id'])
+        compiled = journal.get(decision.event_id).event.payload['executable_content_id']
+        assert coordinator.vault.explicit_erasure_recorded(compiled)
         try:
             outbox.validate_execution_for_launch(execution)
         except DispatchOutboxError:
