@@ -133,3 +133,10 @@ The subsequent admission guard binds the turn to the platform message ID
 from Core's structured current input. It retains the journal identity format.
 The installed Core test r837 passed after adding a replay case with identical
 text and different message IDs.
+
+Exact candidate `fe455b096da221dc0a6b71efcdf7663f45a706fe` passed the
+installed Core journey in r838. The real main turns in r839 used Core's
+persisted platform message ID and reproduced the association counts of
+zero, zero, and one. The follow-up again inferred unreported measurement
+details. The acknowledgment again extended a single-share evaluation to
+similar future shares. Both conversational issues remain qualification gaps.
