@@ -8,6 +8,8 @@ from pathlib import Path
 import json
 import re
 
+from .events import _thaw_json
+
 
 class CoreWorkEvidence:
     def __init__(self,work):self.work=work
@@ -26,8 +28,11 @@ class CoreWorkEvidence:
         request=work._read(work_id,'requested',subject)
         if request is None or request['configuration_event_id']!=configured.event_id:return None
         actual=work.status(work_id,subject=subject)
+        # Opportunity projections freeze JSON arrays as tuples. Compare their
+        # original JSON values to the live status without dropping any field.
+        observed=_thaw_json(state)
         if (actual.get('core_execution_state') not in ('completed','failed','unknown')
-                or any(state.get(k)!=v for k,v in actual.items())):return None
+                or any(k not in observed or observed[k]!=v for k,v in actual.items())):return None
         from .autonomy_policy import AutonomyPolicyProjection
         policies=AutonomyPolicyProjection(work.journal);policies.project_new()
         from .transport_reconciliation_runtime import TransportReconciliationRuntime

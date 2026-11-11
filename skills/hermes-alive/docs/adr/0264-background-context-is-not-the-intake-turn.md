@@ -117,3 +117,9 @@ work storage, execution and the internal evidence shape continue to use their
 existing contracts, so this vocabulary change cannot rewrite a retained work
 receipt or create a new permission. Review and contact language still
 require real ordinary-turn qualification.
+
+Installed review regression also exercised recovery through the immutable
+opportunity view. Its JSON arrays appear as tuples in memory. Restore their
+JSON representation before checking the actual Core status, and keep
+rejecting missing or changed fields. This lets the same authenticated
+historical window reopen without accepting a changed execution or result.

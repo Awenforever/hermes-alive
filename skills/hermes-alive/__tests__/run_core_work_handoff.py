@@ -652,6 +652,8 @@ async def test(home):
                 and 'INDEPENDENT_SYNTHETIC_ARTIFACT' in e['content'] for e in review['execution_records']['entries'])
             changed_view={**dict(evidence[0].content['core_work']),'record_review':{'fingerprint':'0'*64}}
             assert work_store.review_evidence(changed_view,subject=configured.subject) is None
+            changed_view={**dict(evidence[0].content['core_work']),'core_execution_state':'unknown'}
+            assert work_store.review_evidence(changed_view,subject=configured.subject) is None
         else:
             with patch('hermes_state.SessionDB',side_effect=AssertionError('legacy grant read Core bodies')):
                 assert 'record_review' not in work_store.observation_state(started['work_id'],subject=configured.subject)

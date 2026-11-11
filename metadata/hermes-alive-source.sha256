@@ -187,7 +187,7 @@ bf7c85dde6c33538fb9f881da417f99998c39b361aac8e3118e2a1692fbf2e51  ./__tests__/ru
 eab2086720203a066cefc5b8be314d5a8f9f3d982e30e8a7ed4f836d088756a1  ./__tests__/run_core_source_reading_depth.py
 b45530cad567ce53ec5725c97cd92f3df0adcf9f5aa3deac71636cca8a5b19b4  ./__tests__/run_core_task_contact_revision.py
 e42de53d729fa100cb1b66a9c64fbc672880e7f2b67d5b1dccda297e6f3297ea  ./__tests__/run_core_tool_observation.py
-661aa55b9d5b51b3e3528416fec185a17a0affa67cb179b8699ebc3b0e96cbaf  ./__tests__/run_core_work_handoff.py
+6e2b5fa4850150406a0525f7a9fc438bad26bef564e7b7ec0ee8ed2959240232  ./__tests__/run_core_work_handoff.py
 902235c2a594842fac9612339f3161b31f60ea69685b81f0ccc438eb1b9d82cc  ./__tests__/run_core_work_inspection_scope.py
 a134c78086212009d85865aeed24357c75232f34a98c7d5e99938cc0394d3025  ./__tests__/run_core_work_retirement.py
 f1626de6629c9ccd28e713459756e757fd60f5cbee86e02195dbeb729aed7975  ./__tests__/run_current_core_plugin_registration.py
@@ -583,7 +583,7 @@ c96a94952a5055ffba4bf2d67b95b6572196fe5343a580db8f550d033cd7d049  ./docs/adr/026
 6e5933eff3f4e5de232d73940c0af0a8715d91b3dcaa0322fd8a15fc4a4eeb6d  ./docs/adr/0261-distinct-continued-Core-work.md
 f3feb9936e8510940c0e5740b99b8e1715d8bbf988eab10ee2cce9fc4a24447c  ./docs/adr/0262-rejected-work-and-visible-waiting.md
 8e4c51d656f79b4769c822f5c8e152c6a52b81475d2f1f94d40c6bec23e0c8f6  ./docs/adr/0263-argument-feedback-and-typed-task-lookups.md
-60f973274d89b37fa4eb6dd32983da29069df8f81de9803aabea6baa5c08913f  ./docs/adr/0264-background-context-is-not-the-intake-turn.md
+dfde676eae07ef3d94a5ebad8497f5de4454917862c36e25da690146c33794aa  ./docs/adr/0264-background-context-is-not-the-intake-turn.md
 3c1bd17f968abcc3bd7e08a388494edc0c55ed447e7a44727d5ba6636e258e39  ./docs/adr/0265-empty-automatic-scope-is-model-only.md
 37f00d397edbe6c0505794fd34ef779a4d1cd32531d08b5b71fbe940b3095be4  ./docs/adr/0266-explicit-deactivation-retires-owned-core-work.md
 37664cb03002c3a3aa014ce02ecb5b0da1f4f5e3043306265f98bf23283702a0  ./docs/adr/0267-semantic-recall-is-not-execution-protocol.md
@@ -653,7 +653,7 @@ a4b84f6a02be4df7d2fa50d0cff38192c6a5f35c22737434bb65599cdb1cc3e5  ./hooks/alive_
 24a8c98aeb670fbcbb7e4f1bb340bc117e2ae4df5a465507b98e7e795359431b  ./hooks/alive_kernel/core_work.py
 3941921838284648eb04c01fe80d3f96e2853958a4508a7852f37b58fbb8bd69  ./hooks/alive_kernel/core_work_context.py
 782b7f087cbe9db251173a459716d6619bec6751f7e052d0bd72bb4c889978c8  ./hooks/alive_kernel/core_work_control.py
-bf2950e748bf7bbd6b8c3d508584e2fea1a6401444139a2c3e7ec08f19a2d2ef  ./hooks/alive_kernel/core_work_evidence.py
+be68a09035fb32355647e29e9f4469643c1e87ea53c856b34e2a292bfcaf7c21  ./hooks/alive_kernel/core_work_evidence.py
 3a7146a4ef282d839db528b9de2a0bd3744162ad0c0314cbeaae352a2549ae72  ./hooks/alive_kernel/core_work_outcomes.py
 4e298a40c9f93e3e96d38f74ad740ff1ba3e58b2bd748c6d4ed8eca7e0660682  ./hooks/alive_kernel/core_work_retirement.py
 8ee2e1588c8dd27c0a4fc1e773a72e4b81f432e8ee7ec1e8cec0b62d126d23fc  ./hooks/alive_kernel/core_work_source.py
