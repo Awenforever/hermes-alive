@@ -156,3 +156,36 @@ inference or web calls. Separately, the exact installed cba8a65 candidate on
 pinned Hermes Core ran the controlled source-depth journey through the final
 review and isolated adapter. It recovered a qualification beyond the old
 read window. That journey used synthetic sources and model responses.
+
+## Real replay reached the publication, with incomplete evidence
+
+The r914 replay selected the cited DOI directly under the same public budget.
+Core extracted 15,177 characters from the publisher page. They began with
+the data availability statement and included references, figures and citation
+metadata. The text omitted the paper's account of line-formation height and
+field redistribution. The current evidence therefore supports a visit to the
+paper and some details from it, but cannot supply its material interpretation.
+The [author manuscript](https://arxiv.org/abs/2610.33502) gives that distinction
+in its abstract.
+
+The draft opened with a direct field-weakening claim and added the word
+“apparent” later. The final assessment accepted both parts using the press
+release and the paper title. That is a factual acceptance failure. Qualifying
+the claim later did not correct the force of the opening, and a title was not
+evidence of the missing explanation. Two ordinary Core follow-ups ran. The
+first used the qualified result but stayed dense for a one-sentence request.
+The second distinguished instrument claims, observational data and simulation,
+and acknowledged the missing methods. Its claim about the comparison baseline
+still needs a direct witness. Feedback remained disabled with zero records.
+There was no physical delivery and this repeated query earned no fresh credit.
+
+The next changes should address two independent seams. Source acquisition
+must distinguish substantive passages from ancillary material and use an
+accessible copy when the already granted public reading budget permits it.
+Final assessment must evaluate the strongest claim the reader encounters,
+including its opening and any later qualification, using only the material
+actually retained. A weaker, attributed claim or abstention remains valid
+when the decisive evidence is unavailable. A new reading allowance would
+require its own explicit policy choice. Cover conflicting primary and
+secondary text, an incomplete publisher extract, a useful open alternative,
+and the absence of any usable alternative.

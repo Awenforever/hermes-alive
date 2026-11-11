@@ -301,7 +301,7 @@ fbabb024702d8394fe6af3f145afb25fcb11b0674369aa0d2ece030b485f9f64  ./__tests__/ru
 c820346cb0721a679f22c1e15a59f23616f6d7a70adf2511e45e4a15a13c0e2c  ./__tests__/run_transport_publisher_withdrawal.py
 6210bc2e2fb0f3c78fe10a87ac68b007982a555a90e5c3245924e2c6c71c372f  ./__tests__/run_transport_reconciliation_runtime.py
 ed5065f1271617efd9df6f0c5ef5473d73e343f122df77f5668aa292abca617e  ./__tests__/run_watcher_retention_maintenance.py
-75fa9606914215f23815c7f825955bf56fbdb9b7fa6d04dfd92560be4dcc51fd  ./docs/ALIVE_KERNEL_PLAN.md
+e29198777b5a4949589cfa09bf59ceec06591f93056784a1d53dc990a12adac6  ./docs/ALIVE_KERNEL_PLAN.md
 bb1240b8645d5bde807e126c36ee12164e2ad602609064402df28740e0e3b315  ./docs/ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-25.md
 a7115842a8cd05021e657b281efb86655a48bd86294b917a3a324935b8a5383b  ./docs/ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-27.md
 861ecc2a8cdee6d997501ac564de7d11c6ac94b1a202fd5d143c8520acd7f1e5  ./docs/ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-11-05.md
@@ -603,7 +603,7 @@ edddff011ff4662f598ec8364843ff5a07d5bef838740b84239e60174ea70145  ./docs/adr/027
 b3bd07052614d76f2d8dcb611f86ff69e8766364b7ce29e33e686442788d4998  ./docs/adr/0281-source-led-communication-fit-revision.md
 805263fc587d3dd31ac5bd732de0d16844573beee2f2860cdd068c3d19d63efa  ./docs/adr/0282-standard-channel-deadline.md
 8e441b45aaee6299dd29d8fffc3762145190cd9c1022069dab20b8015d3d465f  ./docs/adr/0283-conversational-depth-and-attribution.md
-2e90077b9631330c18d69ec7eb4336872194a3ce22f268b514db7dea2490c612  ./docs/adr/0284-source-witnesses-for-final-review.md
+4cb9efde34a73e4c6e47a51b77b43f9f85b0e9c97fc66c3d0433487b7f0e8042  ./docs/adr/0284-source-witnesses-for-final-review.md
 bd411e42ca0d289c4d36892e6ae52d277e7de21c88580716291a1920ca7f0822  ./docs/adr/0285-discovery-routes-are-not-owner-requests.md
 57790c95338c42abfc31da30a5e1fdae067d13762c3442f5c000504bd5541d39  ./docs/adr/0286-ordinary-feedback-ingress-is-not-yet-connected.md
 4d6108e5f522390a4f9008265a2681771192c500c4c34a02179e24a238b55332  ./docs/evidence/deepseek-seed-20261012.json

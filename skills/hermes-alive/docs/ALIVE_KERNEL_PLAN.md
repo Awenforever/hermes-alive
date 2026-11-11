@@ -3,7 +3,7 @@
 Audience: maintainers and QA. Purpose: active development planning and acceptance tracking.
 
 Status: active; development branch only, no production acceptance.
-Last reviewed: 2026-11-11 (Asia/Shanghai).
+Last reviewed: 2026-11-12 (Asia/Shanghai).
 
 ## Current product state
 
@@ -780,9 +780,13 @@ The bounded refinement passes the public research question to the final source
 selector, with listing and extract provenance. The solar trial in
 [ADR 0284](adr/0284-source-witnesses-for-final-review.md) showed why this matters:
 two institutional accounts left out a measurement qualification in the paper.
-The next real trial must test whether the model finds that underlying record
-and carries the qualification into both the share and an ordinary follow-up.
-The repeated solar case is a regression trial and earns no fresh-round credit.
+The repeated solar trial reached the cited DOI, but the publisher extract
+omitted the paper's decisive qualification and the final review accepted an
+overstated opening. Both ordinary follow-ups ran; the first remained too
+dense for its request. That run earns no fresh-round credit. Continue fresh
+end-to-end trials separately. Improve acquisition of substantive evidence
+within the authorized budget and enforce claim scope from the opening in
+final assessment. Verify the two seams independently as described in ADR 0284.
 
 October 26–27 qualification notes are retained in
 [the October 27 archive](ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-27.md).
