@@ -148,3 +148,11 @@ including after cold replay. The inaccessible-original fixture checks that a
 failed read does not become retained evidence. These checks establish the
 selection handoff and evidence retention. A real model must still show that it
 chooses the direct record and preserves the qualification in the final wording.
+
+The exact prior discovery implementation (3587aa7) wrote the older prompt
+snapshots and retained conflicting sources. A new discovery cycle using cba8a65
+reopened that journal and recovered the same reading receipts without model
+inference or web calls. Separately, the exact installed cba8a65 candidate on
+pinned Hermes Core ran the controlled source-depth journey through the final
+review and isolated adapter. It recovered a qualification beyond the old
+read window. That journey used synthetic sources and model responses.

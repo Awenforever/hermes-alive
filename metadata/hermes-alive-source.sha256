@@ -603,7 +603,7 @@ edddff011ff4662f598ec8364843ff5a07d5bef838740b84239e60174ea70145  ./docs/adr/027
 b3bd07052614d76f2d8dcb611f86ff69e8766364b7ce29e33e686442788d4998  ./docs/adr/0281-source-led-communication-fit-revision.md
 805263fc587d3dd31ac5bd732de0d16844573beee2f2860cdd068c3d19d63efa  ./docs/adr/0282-standard-channel-deadline.md
 8e441b45aaee6299dd29d8fffc3762145190cd9c1022069dab20b8015d3d465f  ./docs/adr/0283-conversational-depth-and-attribution.md
-bb980c17dbc84d11339271ce164401974952eb62c061a240077759ec1709ee33  ./docs/adr/0284-source-witnesses-for-final-review.md
+2e90077b9631330c18d69ec7eb4336872194a3ce22f268b514db7dea2490c612  ./docs/adr/0284-source-witnesses-for-final-review.md
 bd411e42ca0d289c4d36892e6ae52d277e7de21c88580716291a1920ca7f0822  ./docs/adr/0285-discovery-routes-are-not-owner-requests.md
 bed0d5761c83264eac56741c7e4ac366a93dc88d15b5e33d9d795a6ccefbeb3f  ./docs/adr/0286-ordinary-feedback-ingress-is-not-yet-connected.md
 4d6108e5f522390a4f9008265a2681771192c500c4c34a02179e24a238b55332  ./docs/evidence/deepseek-seed-20261012.json
