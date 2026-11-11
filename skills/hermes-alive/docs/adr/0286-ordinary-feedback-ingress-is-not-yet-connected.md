@@ -354,3 +354,23 @@ that reference and the exact current wording returns
 `alive_feedback_unavailable`. No feedback event or interpretation ticket is
 created. The ordinary inbound hook leaves the message available to Core. This
 qualifies the consent boundary under controlled inputs and model output.
+
+## Real feedback use across subsequent wakes
+
+The r938 run used synthetic source snapshots and the configured real model
+routes. The ordinary admitted turns produced no associations for a quotation
+or a factual question, and one for a direct evaluation of the preceding share.
+The acknowledgment correctly kept its “this time” request local to that share.
+The later Native interpretation and author received the exact retained input.
+The author opened the new draft with “The result first”, applying the
+explicitly one-off presentation request to a later unsolicited share. The
+draft also reused the earlier trial rather than the new synthetic resource.
+This is a use-of-feedback failure despite correct attribution and storage.
+
+The fixture advanced the cycle eligibility clock, but the real outbox rejected
+the attempted start before the elapsed interval. That protection behaved as
+designed. The withdrawal wake was not reached. The next diagnostic exercises
+the actual decision and authoring stages in shadow mode, preserving the
+outbox and its real clock. It must verify exposure in both directions and
+check the actual wording independently of whether a preference record exists.
+No physical delivery or fresh sharing credit follows from these runs.
