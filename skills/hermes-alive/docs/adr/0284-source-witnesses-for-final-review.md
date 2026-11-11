@@ -98,3 +98,34 @@ These tests establish propagation through the runtime, not the accuracy of the
 model's relevance judgment. An actual November accessibility search produced no
 candidate from its three results and stopped before final review; it earns no
 quality round and does not qualify that new assessment contract.
+
+## Fresh solar-observation trial
+
+Real Core r893 used a new public solar-observation query and inherited model
+routes. After two limited first reads, the bounded refinement returned two
+reports on the AIMS result. The final review accepted factual support, recipient
+fit and search alignment, and one unmodified draft reached the isolated local
+adapter. The private owner data stayed outside the public query-planning input.
+
+The source witnesses supported how the institutional report described the
+result. They did not surface the paper's distinction between apparent weakening,
+a change in the sampled height, and actual magnetic-field redistribution. The
+draft presented the weakening without that distinction. The authors explicitly
+leave the relative contributions unresolved in their
+[paper](https://arxiv.org/abs/2610.33502). Treat this as a failed factual
+qualification. A matching report excerpt establishes what was reported.
+Method, measurement and interpretation require the relevant original evidence
+or wording that retains the uncertainty of the narrower evidence.
+
+The retained inputs held report extracts and no paper extract. The refinement
+query was topical and sought another institutional source. Before spending a
+second review on the same report evidence, qualify the bounded refinement and
+read-selection stages on locating a named underlying study or technical record.
+Exercise cases where the underlying record is accessible, inaccessible, or
+disagrees with the report. The third case must show that final wording carries
+the relevant limitation. Keep the existing public-only scope and read limits.
+
+The follow-up harness stopped before inference because its tool allow-list
+predated the authenticated feedback tool. Correct the fixture to account for
+the current tool contract while proving that unconsented feedback cannot be
+recorded. This round earns zero fresh quality credit.

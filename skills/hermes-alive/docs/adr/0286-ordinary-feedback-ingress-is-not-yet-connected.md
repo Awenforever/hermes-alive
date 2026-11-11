@@ -276,8 +276,23 @@ through the same fixture adapter and registered no Alive command. The restored
 version retained the session, signed owner configuration, vault key and
 unrelated history. It completed the pending purge without restoring either
 body or creating a dispatch. The fixture uses local source trees and the
-profile configuration API for selection. Package-manager admission and
-platform service restart are separate fleet checks.
+profile configuration API for selection.
+
+The native Ubuntu consumer then upgraded via the public Git installer and
+confirmed an inactive configuration. The primary vault migrated on status
+access. The auxiliary experience vault retained its old storage version until
+opened. Core's package manager successfully disabled Alive before the downgrade.
+Two HTTPS clone attempts failed at transport negotiation. Using verified
+objects from the public branch, the same package manager installed the old
+revision without enabling it and then restored the new revision. The restore
+install returned zero while dependency admission had refused the pinned
+Misaki fetch. The actual enabled state and CLI command availability exposed
+the partial result. With that exact public dependency supplied via a
+per-process Git mirror, normal enable admission, runtime refresh, and
+inactive status checks passed. Three keys and 28 existing logical tables
+matched the pre-upgrade fingerprints. This evidence covers package-manager
+handoff on Ubuntu. Direct network rollback and platform daemon restart remain
+open.
 
 Independent exports, original Hermes history and complete volume snapshots
 outside the managed backup root remain outside the vault erasure boundary.

@@ -204,13 +204,14 @@ segments. Qualify a scoped pre-exposure seam before enabling a reply reviewer.
 Compare subsequent original drafts and decisions for useful adaptation over
 several wakes. ADR0286 covers planning expiry, interrupted writes, vault
 recovery and the isolated Core startup sequence for dormant rollback.
-Verify the same boundary through package-manager admission and actual
-platform service restart during fleet qualification, retaining the same
-profile and erasure state.
-Keep discovery-route provenance and historical receipt recovery
-covered under ADR0285. Credit fresh sharing rounds only after reviewing actual
-usefulness and follow-ups. Continue the longitudinal memory, ongoing work,
-and platform service journeys below.
+Ubuntu package-manager rollback and restoration passed with verified local
+mirrors of public objects during HTTPS failures. Verify direct network
+rollback and actual platform service restart during fleet qualification.
+Keep discovery-route provenance and historical receipt recovery under ADR0285.
+ADR0284 records a fresh draft that cited its report accurately but lost a
+material qualification from the underlying study. Qualify that evidence
+boundary and the actual follow-ups before crediting fresh sharing. Continue
+the longitudinal memory, ongoing work and platform service journeys below.
 
 1. **Finish the useful task lifecycle.** Advance genuinely unfinished work and
    necessary dependencies within the guided range using Core, carrying actual
