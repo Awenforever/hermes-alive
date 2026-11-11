@@ -123,3 +123,12 @@ opportunity view. Its JSON arrays appear as tuples in memory. Restore their
 JSON representation before checking the actual Core status, and keep
 rejecting missing or changed fields. This lets the same authenticated
 historical window reopen without accepting a changed execution or result.
+
+The real ordinary-turn regression r937 used the exact candidate after both
+changes. The two-process journey completed with one write per phase. The
+follow-up correctly distinguished configured private review, no result
+notification scheduled, and the next reconsideration opportunity. It also
+reported the observed stopped runtime and no pending action. The answer fit
+the requested three sentences, although its permission wording could more
+clearly convey that the existing grant is checked. This test used isolated
+synthetic work and controlled wake timing, with zero adapter sends.

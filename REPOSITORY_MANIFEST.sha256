@@ -22,7 +22,7 @@ a5ba76321da9a2ad83aeaa49f1f8f8a1097fbe66b4155521b67bf606489f97d4  ./gateway_feed
 d6e59b1443910f968c0c8b0b6edce710032775365274f81a2d20de1cd42fe1b2  ./gateway_session_bridge.py
 cebf4d540d2e807aeab78e9e07c438befd23cfb4528908695d0c719d9b0fcffd  ./kernel_execution_bridge.py
 60c48fe2327e3ebc8acd7a85216a6396916b2b1f71f42da5f6ce6af081e0096a  ./kernel_setup_bridge.py
-d2ceb2c5dee882940ba5af124a9fe50c5fa927dc4a31f45b55544aeaeedc517b  ./metadata/hermes-alive-source.sha256
+4c6960d1113e834dceeb1d84be1f4a85164711b3378bfe1e4b7bcf46dec2a74f  ./metadata/hermes-alive-source.sha256
 5cba4486635fe54faef4cbb05cfb645c315d9ad4dd3316817f12bc81c44b220e  ./metadata/hermes-alive.json
 555aace9e2596e50b73038cde123173f6cd37069a9a846d507911ddbf5c77be1  ./plugin.yaml
 b1a30cd4eb34352fbb75836646cbcfd9643ed478c7920c1ad5ca9de7536bbbb4  ./plugin_cli.py
@@ -615,7 +615,7 @@ c96a94952a5055ffba4bf2d67b95b6572196fe5343a580db8f550d033cd7d049  ./skills/herme
 6e5933eff3f4e5de232d73940c0af0a8715d91b3dcaa0322fd8a15fc4a4eeb6d  ./skills/hermes-alive/docs/adr/0261-distinct-continued-Core-work.md
 f3feb9936e8510940c0e5740b99b8e1715d8bbf988eab10ee2cce9fc4a24447c  ./skills/hermes-alive/docs/adr/0262-rejected-work-and-visible-waiting.md
 8e4c51d656f79b4769c822f5c8e152c6a52b81475d2f1f94d40c6bec23e0c8f6  ./skills/hermes-alive/docs/adr/0263-argument-feedback-and-typed-task-lookups.md
-dfde676eae07ef3d94a5ebad8497f5de4454917862c36e25da690146c33794aa  ./skills/hermes-alive/docs/adr/0264-background-context-is-not-the-intake-turn.md
+e456ef258105f1478858543c32b94cc97ce95789c0622ebbc62b28f23751da45  ./skills/hermes-alive/docs/adr/0264-background-context-is-not-the-intake-turn.md
 3c1bd17f968abcc3bd7e08a388494edc0c55ed447e7a44727d5ba6636e258e39  ./skills/hermes-alive/docs/adr/0265-empty-automatic-scope-is-model-only.md
 37f00d397edbe6c0505794fd34ef779a4d1cd32531d08b5b71fbe940b3095be4  ./skills/hermes-alive/docs/adr/0266-explicit-deactivation-retires-owned-core-work.md
 37664cb03002c3a3aa014ce02ecb5b0da1f4f5e3043306265f98bf23283702a0  ./skills/hermes-alive/docs/adr/0267-semantic-recall-is-not-execution-protocol.md
