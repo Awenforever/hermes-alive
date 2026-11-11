@@ -140,3 +140,16 @@ persisted platform message ID and reproduced the association counts of
 zero, zero, and one. The follow-up again inferred unreported measurement
 details. The acknowledgment again extended a single-share evaluation to
 similar future shares. Both conversational issues remain qualification gaps.
+
+In r841 the reply followed the recorded share-specific scope and kept future
+length flexible. It still inferred a measurement scale, skipped validation,
+and comparable results after reading the retained excerpt. A caveat about
+the source followed those assertions. This run qualifies the observed
+acknowledgment improvement and leaves factual follow-up open.
+
+The configured owner can now list recent records, inspect exact original
+wording and model interpretation by ID, and erase one feedback item. The
+commands use the signed owner association and existing vault erasure path.
+Controlled Core r842 verified inspection while processing is paused, refusal
+across owner scope, managed backup removal, repeat erasure, and replay after
+erasure. Hermes retains its own chat history under its history settings.

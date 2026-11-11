@@ -1,6 +1,7 @@
 """Core-registered conversation confirmation of operator-initiated choices."""
 import logging
 import asyncio
+import json
 
 from .tool_receipt_bridge import _kernel_module
 
@@ -89,8 +90,15 @@ def register_setup_command(context,binding):
                 from .kernel_execution_bridge import configured_owner,kernel
                 store,configured=configured_owner(binding,scope)
                 feedback=kernel('native_feedback')
+                if parts[1:] == ['list'] or (len(parts)==3 and parts[1]=='show'):
+                    selected=parts[2] if len(parts)==3 else None
+                    entries=feedback.inspect_feedback(store,configured.subject,selected)
+                    return json.dumps(entries,ensure_ascii=False,indent=2) if entries else '没有找到仍可读取的分享反馈。'
+                if len(parts)==3 and parts[1]=='forget':
+                    erased=await asyncio.to_thread(feedback.forget_feedback,store,configured.subject,parts[2])
+                    return '已遗忘这条分享反馈。' if erased is not None else '没有找到可遗忘的分享反馈。'
                 if len(parts)!=2 or parts[1] not in ('on','off','status'):
-                    return '请使用 /alive feedback on、off 或 status。'
+                    return '请使用 /alive feedback on、off、status、list、show <编号> 或 forget <编号>。'
                 if parts[1]=='status':
                     return '分享反馈处理：'+('已开启。' if feedback.permission(store,configured)[0] else '已关闭。')
                 if parts[1]=='on' and configured.options.get(feedback.FLAG) is not True:

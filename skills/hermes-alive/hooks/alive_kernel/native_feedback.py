@@ -55,6 +55,55 @@ def set_permission(store, configured, enabled):
             'enabled':enabled, 'automatic_profile_update':False})))
 
 
+def _owner_content(store, subject, record):
+    if record is None:
+        return None
+    event = record.event
+    if (event.event_type != EVENT or event.source != SOURCE or event.subject != subject
+            or event.actor != 'system:alive-native-feedback' or event.sensitivity is not Sensitivity.PRIVATE
+            or not _verified(store, event)):
+        return None
+    ref = ContentReference.from_event_payload(event.payload['content'])
+    if ref.sensitivity is not Sensitivity.PRIVATE or ref.retention_until != event.expires_at:
+        return None
+    return ref
+
+
+def inspect_feedback(store, subject, event_id=None):
+    """Explicit owner inspection remains available while learning is paused."""
+    rows = (store.journal.get(event_id),) if event_id is not None else store.journal.iter_reverse(
+        event_types=(EVENT,), subject=subject, max_records=32)
+    results = []
+    for row in rows:
+        ref = _owner_content(store, subject, row)
+        if ref is None:
+            continue
+        try:
+            body = store.vault.resolve_json(ref.content_id, expected_subject=subject,
+                expected_purpose='feedback.native_association', expected_sensitivity=Sensitivity.PRIVATE)
+        except ContentUnavailableError:
+            continue
+        if store.vault.digest_json(body) != ref.digest:
+            continue
+        result = dict(id=row.event.event_id, recorded_at=row.event.observed_at.isoformat(),
+            retained_until=ref.retention_until.isoformat())
+        if event_id is None:
+            result['preview'] = body['text'][:120]
+        else:
+            result.update(original_text=body['text'], model_association=body['association_reason'])
+        results.append(result)
+        if len(results) == 5:
+            break
+    return results
+
+
+def forget_feedback(store, subject, event_id):
+    ref = _owner_content(store, subject, store.journal.get(event_id))
+    if ref is None:
+        return None
+    return store.vault.erase_item(ref.content_id)
+
+
 def admitted_input(store, configured, text, message_id):
     """Only the newest observed input may support the normal turn association."""
     from .admitted_inbound import configured_input_identity

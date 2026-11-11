@@ -72,6 +72,12 @@ async def exercise(core, loaded, binding, runner, source, session, command, befo
         assert '已关闭' in await command('feedback off')
         assert call().get('error')=='alive_feedback_unavailable'
         assert not reader.read(subject=store.configuration().subject,clearance=Sensitivity.PRIVATE)
+        assert json.loads(await command('feedback list'))[0]['id']==saved['event_id']
+        shown=json.loads(await command('feedback show '+saved['event_id']))
+        assert shown[0]['original_text']==text
+        assert shown[0]['model_association']==arguments['association_reason']
+        assert not feedback.inspect_feedback(store,'user:foreign',saved['event_id'])
+        assert feedback.forget_feedback(store,'user:foreign',saved['event_id']) is None
         assert '已开启' in await command('feedback on')
         assert reader.read(subject=store.configuration().subject,clearance=Sensitivity.PRIVATE)==values
         # Commands have their own Core scope and clear session variables on
@@ -91,8 +97,20 @@ async def exercise(core, loaded, binding, runner, source, session, command, befo
         assert Reader(store.journal,content_vault=store.vault).read(
             subject=store.configuration().subject,clearance=Sensitivity.PRIVATE)==values
         ref=rows[0].event.payload['content']['content_id']
-        store.vault.erase_item(ref)
+        backup=store.vault.create_managed_backup('before-feedback-forget')
+        assert backup.exists()
+        assert '已遗忘' in await command('feedback forget '+saved['event_id'])
+        assert '已遗忘' in await command('feedback forget '+saved['event_id'])
+        assert not backup.exists() and store.vault.explicit_erasure_recorded(ref)
+        assert '没有找到' in await command('feedback show '+saved['event_id'])
         assert not reader.read(subject=store.configuration().subject,clearance=Sensitivity.PRIVATE)
+        core.clear_session_vars(variables)
+        variables=core.set_session_vars(platform='telegram',chat_id=source.chat_id,user_id=source.user_id,
+            session_key=session.session_key,session_id=session.session_id)
+        task='native-feedback-after-forget'
+        collect()
+        target=next(handle for handle,item in binding._continuity._references.items() if item[1]==task)
+        arguments={**arguments,'reference':target}
         assert call().get('error')=='alive_feedback_unavailable'
         assert len(store.journal.read(event_type=feedback.EVENT))==1
         # Revoke after body creation but before journal publication. This is

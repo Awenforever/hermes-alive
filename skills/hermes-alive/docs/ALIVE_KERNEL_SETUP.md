@@ -31,6 +31,13 @@ Association is a model interpretation, not platform quote or human-seeing proof;
 there is no automatic permanent profile update. Other chat is not retained by
 this feature. `/alive feedback off` stops recording and use; `on` requires the
 original guided choice. Existing profile/outbound grants do not enable it.
+Use `/alive feedback list` in the configured private conversation to see up
+to five recent feedback records and their IDs. `/alive feedback show <id>`
+shows the original words and the model's interpretation.
+`/alive feedback forget <id>` erases the selected feedback from the Alive content vault and
+its managed backups. The owner can use these controls while processing is
+paused. The vault retains an erasure receipt. Hermes manages the original chat
+under its own history settings.
 The first implementation is under development qualification, not production
 acceptance or a guarantee of model judgment.
 

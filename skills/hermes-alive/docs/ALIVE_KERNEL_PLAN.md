@@ -18,6 +18,8 @@ association and its qualifications into Alive's next eligible decision and
 drafting context. The original diagnostic, the implementation evidence, and
 the remaining semantic and recovery checks are recorded in
 [ADR0286](adr/0286-ordinary-feedback-ingress-is-not-yet-connected.md).
+The owner can inspect and erase individual feedback records through Core.
+Controlled tests cover paused inspection and managed backup erasure.
 Actual model judgment on ambiguous replies, multi-turn adaptation, and
 production acceptance remain open.
 
