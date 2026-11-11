@@ -11,7 +11,8 @@ FEEDBACK_SCHEMA = {
         'evidence_span from the current message. Explain why it concerns that share in association_reason. '
         'This is your semantic association, not proof of a platform quote or permanent preference. '
         'Do not record casual topical followups, third-party quotations or ambiguous evaluations; ask if unclear. '
-        'Preserve situational qualifications and negations. Never claim a profile or execution permission changed. '
+        'Preserve situational qualifications and negations. Acknowledge the evaluation at the scope in the '
+        'tool result. Reserve promises about future behavior for confirmed changes. '
         'The tool retains the exact current message for the guided bounded period, not other chat history.',
     'parameters':{'type':'object','properties':{
         'reference':{'type':'string'}, 'evidence_span':{'type':'string'},
@@ -125,6 +126,7 @@ class CoreFeedbackBridge:
                 evidence_span=args['evidence_span'],association_reason=args['association_reason'],
                 validate_current=validate)
             result=dict(status='recorded_tentative_share_feedback',event_id=recorded.event.event_id,
+                feedback_scope='referenced_share',future_behavior_committed=False,
                 automatic_profile_update=False,action_authority=False,
                 attribution='main_turn_semantic_association_not_quote_proof')
         except (ValueError,KeyError,TypeError,AttributeError):
