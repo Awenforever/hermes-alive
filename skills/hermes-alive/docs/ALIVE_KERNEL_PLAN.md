@@ -198,8 +198,9 @@ quoted opinions and follow-up questions remain ordinary conversation, and
 that an evaluation of one share retains its original wording and scope.
 Exercise factual follow-ups with known outcomes and evidence gaps across
 both configured routes. ADR0286 records the remaining unsupported-inference
-failure under the official route. Test response exposure at the Core
-streaming boundary before treating a reply reviewer as a user-facing guard.
+failure under the official route. The Core streaming probe also proved that
+final transforms run after exposure and that buffering still flushes tool
+segments. Qualify a scoped pre-exposure seam before enabling a reply reviewer.
 Compare subsequent original drafts and decisions for useful adaptation over
 several wakes. ADR0286 covers planning expiry, interrupted writes, vault
 recovery and the isolated Core startup sequence for dormant rollback.

@@ -309,3 +309,22 @@ short format, natural implications and unrelated turns. Any independent claim
 review must operate before the relevant wording is exposed, or the streaming
 boundary must be treated as an unresolved limitation. Run the two configured
 routes separately and retain the exact answer, scope and evidence they used.
+
+Pinned Core r891 exercised the actual chat completion SSE parser and gateway
+stream consumer with an isolated adapter. Ordinary streaming exposed the
+original assistant text before the final output transform ran. The transform
+returned a corrected result and the consumer subsequently showed it. In
+buffer-only mode without a segment boundary, the consumer first showed the
+corrected text. A simulated tool segment boundary flushed the original
+text even with buffering enabled. The test injects the segment marker that
+Core sends before tool progress and executes no external tool. Core also
+has separate callbacks for interim assistant text and local/API observers.
+
+The final-output transform is a persistence and final-response seam. It
+cannot serve as a first-exposure control. A qualified future Core integration
+needs to reserve the scoped turn before assistant prose reaches any sink.
+It needs to hold both answer deltas and content-bearing interim segments
+while preserving appropriate progress signals, cancellation and native
+delivery ordering. Unrelated turns and profiles must keep their existing
+behavior. No output transform or streaming policy was installed by this
+probe.
