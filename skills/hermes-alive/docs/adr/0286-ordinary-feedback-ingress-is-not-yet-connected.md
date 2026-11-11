@@ -217,9 +217,22 @@ Legacy feedback forgetting traces authenticated authorization, share and
 delivery locators to remove records written before these links existed.
 Previously supported cross-vault retention reconciliation remains in place.
 
-Selection rationale and rollout/rollback proof remain open. In particular, an
-older runtime cannot create the new edges, and restoring a snapshot captured
-outside the managed backup boundary can bypass the current tombstones.
+Model selection rationale now depends on the native feedback inputs of all
+admitted candidates in the selection prompt, including candidates that were
+considered and passed over. The older-format lookup uses the recorded
+exploration gate and the candidate-to-synthesis links from the authenticated
+frame. Controlled Core r868 and r869 each removed the rationale for both
+a selected draft and a subsequent model choice of silence on the same
+candidate pool. A separate rationale and its draft and review remained
+readable for the same owner.
+
+The serialized planning frame still contains model-written dimension
+reasons, and candidate content has separate storage. Erasing those bodies
+requires preserving the structural candidate-to-synthesis lineage so
+subsequent owner requests can still find legacy copies. Rollout and rollback
+proof also remain open. An older runtime cannot create the new edges, and a
+snapshot captured outside the managed backup boundary can bypass current
+tombstones.
 Independent exports and original Hermes chat history remain outside the vault.
 An older writer that omits dependency metadata must not run alongside this
 runtime. Upgrade and rollback qualification must verify pending erasures

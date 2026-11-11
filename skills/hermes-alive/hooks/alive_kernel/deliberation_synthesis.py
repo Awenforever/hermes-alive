@@ -444,8 +444,14 @@ class DeliberationSynthesizer:
         if len(stored.frame.candidates) > self.MAX_FRAME_CANDIDATES:
             raise DeliberationSynthesisError("deliberation frame exceeds candidate boundary")
         selection_as_of = datetime.now(timezone.utc)
-        recipient_plans=self.validate_candidate_sources(stored.frame.candidates,
+        recipient_plans, evidence = self._validate_candidate_sources(stored.frame.candidates,
             dict(stored.candidate_contents),owner,sensitivity)
+        from .native_feedback import native_feedback_dependencies
+        admitted = set(gate.admissible_ids)
+        feedback_dependencies = native_feedback_dependencies(self.journal, owner,
+            dict.fromkeys(pair.outcome_event_id for proof in evidence.values()
+                if any(item.action.candidate_id in admitted for item in proof.result.candidates)
+                for pair in proof.feedback))
         prompt = self._prompt(
             stored.frame,
             gate,
@@ -541,6 +547,7 @@ class DeliberationSynthesizer:
                 sensitivity=sensitivity,
                 selection_id=selection_id,
                 exploration_gate_event_id=gate_event_id,
+                depends_on=feedback_dependencies,
             )
             decision = self.deliberation.apply(selection_record)
             if decision.outcome != "validated":

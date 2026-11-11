@@ -219,6 +219,7 @@ class DeliberationProjection:
         sensitivity: Sensitivity = Sensitivity.PRIVATE,
         selection_id: str | None = None,
         exploration_gate_event_id: str | None = None,
+        depends_on: tuple[str, ...] = (),
     ) -> JournalRecord:
         selection_id = str(selection_id or uuid4()).strip()
         if not selection_id:
@@ -230,6 +231,7 @@ class DeliberationProjection:
             purpose="deliberation.selection",
             sensitivity=sensitivity,
             content_id=f"deliberation-selection:{selection_id}",
+            depends_on=depends_on,
         )
         event = EventEnvelope(
             event_id=f"deliberation.selection:{selection_id}",

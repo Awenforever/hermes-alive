@@ -8,6 +8,7 @@ round. In particular this does not use the old kernel-shadow setup surface.
 import asyncio,importlib,json,os,shutil,sys,tempfile
 from datetime import timedelta,timezone
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 import run_core_session_routing as core
 from run_core_guided_setup import cli
@@ -251,7 +252,8 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                 if options['purpose'] in ('opportunity.candidates', 'opportunity.protocol-failure',
                                           'opportunity.source-support', 'opportunity.source-support-invalid',
                                           'message.model_candidate', 'semantic.local-correction',
-                                          'semantic.source-revision', 'semantic.protocol-failure'):
+                                          'semantic.source-revision', 'semantic.protocol-failure',
+                                          'deliberation.selection'):
                     options.pop('depends_on', None)
                 return put_json(vault, value, **options)
 
@@ -280,6 +282,7 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                 assert feedback_probe['author_seen'],'source-led author did not receive the feedback'
                 assert following.disposition=='content_review_attention' and len(sent)==1,following.disposition
                 assert stages.count('abstain')==1 and not fixture_errors,fixture_errors
+                affected_selection = None
                 for row in store.journal.read(event_type='opportunity.source_support_completed'):
                     content_id = row.event.payload['content']['content_id']
                     document = store.vault.resolve_json(content_id, expected_subject=row.event.subject,
@@ -294,7 +297,36 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                     expression_ref = expression.event.payload['content']['content_id']
                     assert store.vault.resolve_json(expression_ref)['text']
                     group[expression_ref] = 'text'
-                assert affected and unrelated
+                    selection = store.journal.get(expression.event.causation_id)
+                    selection_ref = selection.event.payload['content']['content_id']
+                    assert store.vault.resolve_json(selection_ref)['rationale']
+                    group[selection_ref] = 'rationale'
+                    if has_input:
+                        affected_selection = selection
+                assert affected and unrelated and affected_selection is not None
+                selection = affected_selection.event.payload
+                frame = store.journal.get('deliberation.frame:' + selection['frame_id'])
+                silence_id = frame.event.payload['silence_id']
+
+                async def choose_silence(**kwargs):
+                    prompt = kwargs['messages'][1]['content']
+                    assert selection['candidate_id'] in prompt and silence_id in prompt
+                    choice = json.dumps(dict(candidate_id=silence_id, rationale='Synthetic rationale for silence.'))
+                    return SimpleNamespace(model='controlled/selector',
+                        choices=[SimpleNamespace(message=SimpleNamespace(content=choice))])
+
+                selector = execution.kernel('deliberation_synthesis').DeliberationSynthesizer(
+                    store.journal, content_vault=store.vault)
+                with patch.object(vault_type,'put_json',write_legacy if legacy else put_json):
+                    silent = await selector.run(frame_id=selection['frame_id'],
+                        gate_event_id=selection['exploration_gate_event_id'],
+                        subject=affected_selection.event.subject, operation_id='feedback-select-silence',
+                        call=choose_silence, attempts=1)
+                silent_row = store.journal.get(silent.selection_event_id)
+                assert silent_row.event.payload['candidate_id'] == silence_id
+                silent_ref = silent_row.event.payload['content']['content_id']
+                assert store.vault.resolve_json(silent_ref)['rationale']
+                affected[silent_ref] = 'rationale'
                 if legacy:
                     owner = store.configuration().subject
                     outcome = store.journal.read(event_type=feedback_module.EVENT)[0].event.event_id
