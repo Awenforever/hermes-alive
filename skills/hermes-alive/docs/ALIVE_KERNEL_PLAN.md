@@ -205,8 +205,13 @@ Compare subsequent original drafts and decisions for useful adaptation over
 several wakes. ADR0286 covers planning expiry, interrupted writes, vault
 recovery and the isolated Core startup sequence for dormant rollback.
 Ubuntu package-manager rollback and restoration passed with verified local
-mirrors of public objects during HTTPS failures. Verify direct network
-rollback and actual platform service restart during fleet qualification.
+mirrors of public objects during HTTPS failures. On the restored c8fff62
+profile, an isolated Ubuntu user service reached Gateway health before and
+after a real systemd restart, completed two planned stops, and preserved all
+three key fingerprints and 32 logical tables in that profile. It used a
+transient unit with loopback-only networking and inactive delivery. Direct
+network rollback, the release candidate's ordinary installed service and
+active-channel restart remain to be qualified.
 Keep discovery-route provenance and historical receipt recovery under ADR0285.
 ADR0284 records a fresh draft that cited its report accurately but lost a
 material qualification from the underlying study. Qualify that evidence
