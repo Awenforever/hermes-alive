@@ -5,6 +5,7 @@ import re
 
 from .action_authorization import SendTimeAuthorizer, ActionAuthorizationDecision
 from .expression_runtime import ExpressionRuntime, ExpressionRuntimeResult
+from .model_timeouts import CoreModelTemporarilyUnavailable
 from .outcomes import OutcomeProjection
 
 
@@ -262,6 +263,8 @@ manufactures them from model output or reviews, nor falls back to another body.
                             'final_semantic_rejected',initial_final,'completed')
                     final_event,quality=await self._review_final(corrected,expression_parameters)
                     expressed,repair=corrected,'completed'
+                except CoreModelTemporarilyUnavailable:
+                    raise  # The host closes a spent model cycle and resumes on its next wake.
                 except Exception:
                     return ExpressionQualityResult(expressed,initial_final,
                         'final_repair_unavailable',initial_final,'unavailable')

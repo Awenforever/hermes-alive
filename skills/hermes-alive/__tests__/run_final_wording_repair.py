@@ -19,6 +19,7 @@ from alive_kernel.send_preparation_runtime import SendPreparationRuntime
 from alive_kernel.expression_runtime import ExpressionRuntime
 from alive_kernel.events import EventEnvelope, _thaw_json
 from alive_kernel.localized_correction import METHOD, CORRECTION_PROMPT
+from alive_kernel.model_timeouts import CoreModelTemporarilyUnavailable
 from alive_kernel.source_support import SourceSupportError
 from alive_kernel_testkit import install_terminal_route
 from run_alive_kernel_expression_runtime import scenario
@@ -49,6 +50,8 @@ async def test(root, mode, *, initial_semantic_rejected=False):
         if task == 'alive_source_support':
             initial = data['candidate']['id'] == original.expression_event_id
             assert initial or 'I told you yesterday.' not in data['candidate']['text']
+            if not initial and mode=='review-timeout':
+                raise CoreModelTemporarilyUnavailable('synthetic settled model timeout')
             bad = initial or mode == 'rejected-again'
             value = {'verdict':'unsupported' if bad else 'supported',
                 'unsupported_claims':['Prior communication is not evidenced.'] if bad else [],
@@ -113,6 +116,11 @@ async def test(root, mode, *, initial_semantic_rejected=False):
     except asyncio.CancelledError:
         assert mode in ('cancel','review-cancel')
         prepared = None
+    except CoreModelTemporarilyUnavailable:
+        assert mode=='review-timeout' and calls[-1]=='alive_source_support' and len(calls)==4
+        assert not journal.read(event_type='dispatch.started')
+        assert DispatchOutbox(journal,content_vault=runtime.vault).acquire(worker_id='test') is None
+        return
     else:
         if mode in ('supported','proof-erased','legacy'):
             assert prepared.repair_disposition == 'completed'
@@ -224,7 +232,8 @@ async def test(root, mode, *, initial_semantic_rejected=False):
 
 if __name__ == '__main__':
     modes = ('supported','rejected-again','cancel','erase','confirmed','abstain','malformed',
-        'unanchored','whole-text','protected','injected-offset','proof-erased','legacy','legacy-failed','review-cancel')
+        'unanchored','whole-text','protected','injected-offset','proof-erased','legacy','legacy-failed','review-cancel',
+        'review-timeout')
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', choices=modes)
     args = parser.parse_args()

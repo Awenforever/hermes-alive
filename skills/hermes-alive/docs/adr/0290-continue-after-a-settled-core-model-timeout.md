@@ -22,3 +22,12 @@ Other exceptions, unsettled work, revoked authority and unqualified model
 responses follow their existing paths. A controlled test must establish the
 timeout classification, a distinct subsequent wake, no dispatch and unchanged
 failure handling. A new real trial is still needed for the quality streak.
+
+A subsequent real transit trial reached the first reviewer. The reviewer
+accepted source support and rejected a draft that had expanded into a full
+service bulletin. A timeout on the corrected draft's second review was then
+absorbed by the generic repair-error handler. The host received
+`content_review_attention` rather than the model-timeout outcome. Typed Core
+timeouts now propagate through both initial and corrected final reviews.
+Other repair failures keep their prior classification. This run has no
+submission, continuation or quality credit.
