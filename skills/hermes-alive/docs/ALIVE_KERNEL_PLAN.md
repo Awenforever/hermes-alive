@@ -239,11 +239,15 @@ pages. The configured discovery path now keeps unread search listings
 out of the draftable pool. Continue qualifying which leads become useful
 page evidence and how the model verifies the entities and relationship
 behind each material comparison.
-The independent Ubuntu consumer fetched the latest development artifact
-but Core blocked non-interactive installation at its community scan review.
-The previous installed version and inactive test profile remain in place.
-Qualification must exercise the supported review flow and then verify the
-installed candidate's state and real service startup.
+The independent Ubuntu consumer reached Core's community scan review in a
+real terminal. The existing checkout was pinned, so Core required its
+explicit pinned-replacement command. That path installed candidate
+`075ee63`, refreshed its runtime and preserved 37 prior state fingerprints.
+The installed candidate then passed two native service starts, a restart
+and two planned stops in a loopback-only transient unit. All three key
+fingerprints and 32 logical tables were preserved. The profile stayed
+inactive. Unpinned public update and active-channel service operation
+remain separate qualification.
 
 1. **Finish the useful task lifecycle.** Advance genuinely unfinished work and
    necessary dependencies within the guided range using Core, carrying actual
