@@ -44,6 +44,15 @@ Linux/Docker have bounded lifecycle and task qualifications; Windows Desktop
 service behavior, external transport and the complete four-platform acceptance
 remain open. WSL stays a thin check under the owner's scope decision.
 
+The isolated Windows Desktop now completes an actual `/alive setup` command
+over its Gateway after a managed Git upgrade and uninstall/reinstall. The
+separate Docker cross-Core trial from Hermes 0.21.3 to 0.22.5 preserved a
+synthetic session, pairing, user memory and legacy Alive state, and a separate
+snapshot restore reopened them on the old versions. Active Native cutover is
+still unqualified. The migration witness exposed a functional gap: retained
+legacy quiet hours do not constrain Native dispatch. [ADR0288](adr/0288-preserve-proactive-contact-hours-at-cutover.md)
+tracks guided contact-hour migration and checks at both planning and launch.
+
 The current test supplier is official Core 0.22.5. Production admission,
 other-plugin integration and the actual production state must be checked again
 before any deployment. No production approval or release follows from development
