@@ -30,7 +30,7 @@ async def test(home):
     assert staged['confirmation_summary']['communication_preference']=='Use plain language; depth follows the material.'
     assert staged['confirmation_summary']['explicit_communication_memory_until_updated_or_forgotten'] is True
     command=staged['confirmation_command'].removeprefix('/alive ')
-    rc,result=cli(home,'install-runtime','--engine','kernel')
+    rc,result=cli(home,'install-runtime')
     assert rc==0 and result['engine']=='kernel'
     token=core.set_hermes_home_override(home)
     manager=None

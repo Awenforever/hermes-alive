@@ -249,6 +249,14 @@ fingerprints and 32 logical tables were preserved. The profile stayed
 inactive. Unpinned public update and active-channel service operation
 remain separate qualification.
 
+The native Ubuntu clean-profile install also exercised the actual community
+scan and dependency confirmations without an override. It exposed a gap in
+the public installation command: the fresh engine default was legacy.
+The lifecycle now defaults a fresh profile to the native kernel, while
+existing runtime evidence and uninstall records retain their engine.
+Installing the native runtime leaves proactive behavior inactive until
+guided authorization.
+
 1. **Finish the useful task lifecycle.** Advance genuinely unfinished work and
    necessary dependencies within the guided range using Core, carrying actual
    earlier results forward. Project work and bounded capability/provenance

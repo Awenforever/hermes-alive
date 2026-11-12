@@ -64,6 +64,8 @@ $HERMES_HOME/hooks/hermes-alive
 $HERMES_HOME/plugin-data/hermes-alive/runtime
 ```
 
+全新安装默认使用新内核，完成引导和授权后才启用主动行为。升级和重装沿用此前选择的引擎。
+
 它不使用 `personal_folder`、工作目录或仓库目录保存运行数据。
 
 ## 控制与卸载

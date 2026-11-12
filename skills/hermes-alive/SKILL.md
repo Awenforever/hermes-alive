@@ -272,6 +272,11 @@ hermes plugins install Awenforever/hermes-alive --enable
 hermes alive install-runtime
 ```
 
+A fresh profile installs the native kernel by default. Install or reinstall
+an existing profile with its retained engine unless the owner has chosen an
+explicit migration. Runtime installation leaves proactive execution inactive
+until the guided setup and activation are complete.
+
 Do not replace this with a raw `git pull` or an unrelated system `pip`; Hermes'
 plugin manager owns dependency consent and environment selection. From an
 already package-managed repository checkout, the lifecycle implementation is:

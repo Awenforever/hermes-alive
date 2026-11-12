@@ -53,6 +53,17 @@ def main() -> int:
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
 
+            fresh = Path(raw) / 'fresh'
+            fresh_env = {'HERMES_HOME': str(fresh), 'HERMES_ALIVE_SHARED_DIR': str(
+                fresh / 'plugin-data' / 'hermes-alive' / 'runtime')}
+            with patch.dict(os.environ, fresh_env), patch.object(constants, 'get_hermes_home', lambda: fresh):
+                assert command(module, 'install-runtime')['engine'] == 'kernel'
+                status = command(module, 'status')
+                assert status['enabled'] is False and status['delivery_authority_activated'] is False
+                assert command(module, 'install-runtime')['engine'] == 'kernel'
+                assert command(module, 'uninstall-runtime')['user_state_preserved'] is True
+                assert command(module, 'install-runtime')['engine'] == 'kernel'
+
             assert command(module, "enable")["enabled"] is True
             state = home / "plugin-data" / "hermes-alive" / "runtime"
             assert (state / "enabled").read_text(encoding="utf-8") == "true\n"
@@ -71,6 +82,7 @@ def main() -> int:
             assert command(module, "status")["enabled"] is False
 
             installed = command(module, "install-runtime")
+            assert installed['engine'] == 'legacy'
             hook = home / "hooks" / "hermes-alive"
             assert Path(installed["hook"]) == hook
             assert (hook / "HOOK.yaml").is_file()

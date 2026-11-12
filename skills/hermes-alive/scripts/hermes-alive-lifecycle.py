@@ -427,9 +427,14 @@ def _write_manifest(
 
 def install(args: argparse.Namespace) -> int:
     paths = _paths(args)
-    previous_manifest=_read_json(paths.manifest_file,{})
-    removed=_read_json(paths.install_dir/'uninstalled.json',{})
-    engine=getattr(args,'engine',None) or previous_manifest.get('engine') or removed.get('engine','legacy')
+    tombstone = paths.install_dir / 'uninstalled.json'
+    previous_manifest = _read_json(paths.manifest_file, {})
+    removed = _read_json(tombstone, {})
+    engine = getattr(args, 'engine', None) or previous_manifest.get('engine') or removed.get('engine')
+    if engine is None:
+        prior_runtime = any(path.exists() for path in
+                            (paths.manifest_file, tombstone, paths.hook_target, paths.config_file))
+        engine = 'legacy' if prior_runtime else 'kernel'
     if engine not in ('legacy','kernel-shadow','kernel'):
         raise LifecycleError('Unknown installed engine; explicit recovery required')
     validation = _validate_source_tree(paths.source_root)
