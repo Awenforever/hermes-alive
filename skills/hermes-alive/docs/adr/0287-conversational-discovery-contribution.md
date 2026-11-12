@@ -129,3 +129,42 @@ the original evidence. The reader can be thorough without passing an editorial
 inventory to the writer. Old receipts reconstruct their original contract.
 This removes one demonstrated source of duplication. A real-model round must
 still establish that the opening is focused, useful and grounded.
+
+## A cited claim does not ground the rest of the draft
+
+In r1018, the new author input carried one search-result excerpt and no
+internal reading inventory. The actual cycle made one search and no page
+read. The author wrote four paragraphs about a boreal burned-area dataset.
+It added a 1 km MODIS burned-area comparison and an algorithm explanation
+that the retained excerpt could not establish. The same review explicitly
+recognized the difference between the 1 km active-fire input and the 500 m
+burned-area output, then called the comparison supported anyway. The
+structural check verified two authentic witness spans about the dataset;
+neither span covered the comparison. One local adapter submission passed.
+
+NASA's MCD64A1 user guide identifies the distinct resolutions. The original
+research announcement describes a 30 m Landsat comparison, reports the
+study's validation metrics and links the dataset directly. The page was
+available to this audit. It was never part of the agent's trial evidence.
+The July announcement also establishes the result as an older discovery,
+despite a search intended to find November releases.
+
+Both ordinary Hermes follow-ups ran. The first gave one dense sentence
+listing checks instead of explaining the most useful thing to look for.
+The second consistently limited its answer to the search excerpt, but
+repeated that limitation and recited extraction metadata. The trial fails
+the quality gate and had no physical delivery.
+
+For the next qualification, separate discovery leads from evidence usable
+in a share. A successful search provides leads. Candidate selection may
+choose to read one, switch to a supported item, or abstain. If the draft
+uses a comparison, the evidence must establish the named entities, values
+and relation that the text asserts. Authentic evidence for a different
+statement cannot cover it, and the reviewing model's background knowledge
+cannot replace a missing source. Reproduce the omission with an approving
+review before qualifying a correction. Include a supported comparison and
+a brief useful opening as positive controls. Keep the same policy for
+other subjects and retain the source boundary for subsequent replies.
+
+Primary records: [research announcement](https://www.slrss.cn/kycg/202607/t20260710_849344.html)
+and [NASA MCD64A1 user guide](https://www.earthdata.nasa.gov/s3fs-public/2025-04/MCD64_User_Guide_V61.pdf).

@@ -231,6 +231,16 @@ material qualification from the underlying study. Qualify that evidence
 boundary and the actual follow-ups before crediting fresh sharing. Continue
 the longitudinal memory, ongoing work and platform service journeys below.
 
+ADR0287 records a later false acceptance from search-only evidence: the
+review verified the dataset witnesses and overlooked a distinct comparison
+it knew was inaccurate. Require the evidence used for a discovery lead to
+support the actual claim and its comparison before a delivery can qualify.
+The independent Ubuntu consumer fetched the latest development artifact
+but Core blocked non-interactive installation at its community scan review.
+The previous installed version and inactive test profile remain in place.
+Qualification must exercise the supported review flow and then verify the
+installed candidate's state and real service startup.
+
 1. **Finish the useful task lifecycle.** Advance genuinely unfinished work and
    necessary dependencies within the guided range using Core, carrying actual
    earlier results forward. Project work and bounded capability/provenance
