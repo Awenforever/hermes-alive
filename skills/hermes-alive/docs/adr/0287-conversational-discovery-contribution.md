@@ -89,3 +89,23 @@ Both inline and paged references now identify search-result excerpts
 explicitly. Where no page body was read, the reader must preserve that
 limit throughout its answer. Acquisition reliability remains a separate
 test of the configured Hermes web tools.
+
+## Make the first answer carry its evidence limit
+
+A new public museum and conservation run reached the institutional article,
+produced a share about laser cleaning of paper records and completed two
+ordinary Core turns. The opener framed a concrete conservation problem. The
+first reply fit one sentence but repeated most of the caveats. The second
+opened with a categorical denial of a demonstration and later explained that
+retained text could not settle whether a demonstration took place. It also
+named internal source indices. The article confirms tests were reported and
+participants toured the lab. Its text does not establish what visitors saw
+or what a photograph shows. This round fails the continuation requirement.
+
+The main-turn context now asks that the first sentence match the level of
+evidence, including unresolved outcomes, rather than deferring a qualification
+until after a categorical answer. It asks for human-readable source names.
+The scoped read tool retains page and source coverage metadata and identifies
+indices as lookup arguments. This changes the instruction reaching the same
+Core main turn and keeps the excerpt and lookup budget. A fresh real-model
+check must verify the actual opening and source attribution in the response.

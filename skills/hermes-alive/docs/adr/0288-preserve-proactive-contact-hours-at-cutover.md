@@ -76,3 +76,24 @@ ordinary conversation continuity and is neither an adapter observation nor a
 delivery receipt. It can conservatively consume the original cadence reservation.
 The separate dynamic Circadian policy is previewed as requiring an explicit
 choice, with its state preserved for legacy rollback.
+
+## Isolated qualification
+
+On exact candidate `456633b`, actual Core 0.22.5 setup displayed the previous
+fixed window, required an explicit choice and persisted the owner-confirmed
+window without changing the legacy file. An offline two-process test then
+enabled Native in the confirmed conversation. Core's startup hook reopened
+the same session, configuration and activation from disk after the first
+process exited. With a controlled civil clock and an admitted synthetic public
+source, both processes recorded `contact_hours_closed` at 08:14. Work-state
+reconciliation ran and neither process attempted a model or adapter call while
+quiet. At 08:15 the supervisor reached one fresh synthesis with a controlled
+completion and chose silence, with zero adapter submissions throughout.
+
+The separate real-Core continuity and standard-channel tests covered a cutoff
+after share preparation and immediately before handoff. They confirmed no
+adapter observation, no replay of the consumed start and no held draft in the
+ordinary follow-up context. Windows passed the controlled schedule and
+standard-channel suites. Actual platform daemon restart, real-channel behavior,
+active background job progression across a cutoff and dynamic-policy migration
+remain open.

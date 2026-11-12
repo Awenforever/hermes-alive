@@ -606,8 +606,8 @@ b3bd07052614d76f2d8dcb611f86ff69e8766364b7ce29e33e686442788d4998  ./docs/adr/028
 6a18a43e266d332719e8a4643a4ff5b80ad36a8a24ae38326a0b1bd4408a572a  ./docs/adr/0284-source-witnesses-for-final-review.md
 bd411e42ca0d289c4d36892e6ae52d277e7de21c88580716291a1920ca7f0822  ./docs/adr/0285-discovery-routes-are-not-owner-requests.md
 5d344b938218bb3249c91ae8ea854d3e89c9a41e996311db30c1328d3854b456  ./docs/adr/0286-ordinary-feedback-ingress-is-not-yet-connected.md
-419759bad9e629d15c250d2d9f135d6916b40eb22f6f344948c51c6f51c03198  ./docs/adr/0287-conversational-discovery-contribution.md
-e229238395d1d5bb54dda33caaa12977a917123d4b57df0b5dd06f93926dbf0e  ./docs/adr/0288-preserve-proactive-contact-hours-at-cutover.md
+c516516bf02e0abfd0d4e74b0507766298a3689472c76313bce8529fda387f0c  ./docs/adr/0287-conversational-discovery-contribution.md
+bb79cd0a1bac9c1c06f0353d47dba34fc3a841b906e4ae2f4a30484cdb38fa03  ./docs/adr/0288-preserve-proactive-contact-hours-at-cutover.md
 4d6108e5f522390a4f9008265a2681771192c500c4c34a02179e24a238b55332  ./docs/evidence/deepseek-seed-20261012.json
 40941e141314d626c51ad4d22ccc19c76dcf4b770a85daa0881d135089fb75ea  ./docs/evidence/qwen-route-20261012.json
 460cffae94c5494e13515ab9c2dc42331e9fd14260bf4182086d5f3bd9e19114  ./hooks/HOOK.yaml
@@ -643,7 +643,7 @@ a20097e9e5927a954db8adb170906ba4f85905f70b77cab6c86eb5b6740081cc  ./hooks/alive_
 fbeef5fe4a387889979e7d061f39015785209bcb248ba05bdf943ab04cc15a8d  ./hooks/alive_kernel/consolidation_synthesis.py
 acac08f5031a95d2fdd841a943627b32d6964a88b3bae93b6e6ab35c8dedb27f  ./hooks/alive_kernel/contact_hours.py
 c260f8917856f8ba284b36c42f7949a7322d37d05e071a5260bbff26ad84077d  ./hooks/alive_kernel/content_vault.py
-5c9d2e391ca0b181c34abce3836b2b740334dcd8fdc280c3ecae5a55200307fd  ./hooks/alive_kernel/conversation_continuity.py
+c520503a130a3ae90a5f813c82c8fe11fd5d4e0dbb0ea2806224f6adb75ecda9  ./hooks/alive_kernel/conversation_continuity.py
 2c297b686cbcb38cf7b571757ffa22a91b215b4eb61601611d95bfe7b19a84a7  ./hooks/alive_kernel/core_autonomous_work.py
 aa78afaede8596b707478340de23b4af8f0eea118f1480e7dc10a32dbf96fb2d  ./hooks/alive_kernel/core_context_read.py
 45af21664a3c7cd152a55b3c12dd36f09e3bf32101a5b67a188aca4c1a230bd8  ./hooks/alive_kernel/core_discovery_tools.py
