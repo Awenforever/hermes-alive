@@ -109,3 +109,23 @@ The scoped read tool retains page and source coverage metadata and identifies
 indices as lookup arguments. This changes the instruction reaching the same
 Core main turn and keeps the excerpt and lookup budget. A fresh real-model
 check must verify the actual opening and source attribution in the response.
+
+## Keep reading notes out of discovery authoring
+
+The transit trial's protected meaning contained only the canonical source link.
+Its retained planning goal enumerated several practical topics, but the recorded
+`source-led-v3` path already removes that goal from the author request. The
+same path still injected a reading assessment with two lengthy quotations and
+summaries of station lists, operating hours, transfer rules and the airport
+shuttle. The first reviewer found the resulting bulletin factually supported
+and unfit for an unsolicited conversation. A retained revision focused on the
+free-trial window and the transfer rule, then timed out at re-review.
+
+For new source-led operations, a versioned author-input choice omits the
+internal reading assessment. The author still reads the actual excerpts and
+the owner's explicit presentation preferences. Selection and audit retain the
+reading findings, and factual review and later conversation retain access to
+the original evidence. The reader can be thorough without passing an editorial
+inventory to the writer. Old receipts reconstruct their original contract.
+This removes one demonstrated source of duplication. A real-model round must
+still establish that the opening is focused, useful and grounded.

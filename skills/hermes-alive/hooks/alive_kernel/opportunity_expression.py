@@ -205,11 +205,15 @@ class OpportunityExpressionStore(SemanticReviewStore):
             role = configured_route_context(start.event.payload.get('interpreter_method',{}).get('discovery_source_review'))
             if role is not None:
                 context['search_context'] = role
-        from .review_contracts import SPLIT_SOURCE_REVIEW_CONTRACTS
+        from .review_contracts import DISCOVERY_AUTHOR_SOURCE_INPUT,SPLIT_SOURCE_REVIEW_CONTRACTS
         review_contract=start.event.payload.get('interpreter_method',{}).get('discovery_source_review')
         if review_contract in ('bounded-group-source-v1',*SPLIT_SOURCE_REVIEW_CONTRACTS):
             context['semantic_source_contract']=review_contract
-        if start.event.payload.get('interpreter_method',{}).get('reading_assessment'):
+        method=start.event.payload.get('interpreter_method',{})
+        if (method.get('reading_assessment')
+                and method.get('discovery_author_input')!=DISCOVERY_AUTHOR_SOURCE_INPUT):
+            # Historical author inputs remain reproducible. New authors get
+            # the source, while the research receipt keeps its own notes.
             context['reading_assessment']=interpreter.reading_assessment_context(
                 subject=subject,receipt_event_id=start.event.event_id.removesuffix(':started') + ':completed',
                 clearance=source.event.sensitivity)

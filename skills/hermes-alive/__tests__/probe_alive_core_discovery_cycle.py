@@ -113,9 +113,8 @@ async def main():
             stage='author';assert data['expression_context']['method']=='discovery-source-authoring-v3'
             assert 'PRIMARY_READ_EVIDENCE' in raw and 'DEEP_READ_EVIDENCE' in raw
             assert 'INTERNAL_GOAL' not in raw
-            assessment=data['expression_context']['reading_assessment']
-            assert assessment['entries'][0]['status']=='partial' and 'INTERNAL_RESEARCH' in assessment['entries'][0]['question']
-            assert not assessment['source_truth_proven'] and not assessment['agenda_completion_proven']
+            assert 'reading_assessment' not in data['expression_context']
+            assert 'INTERNAL_RESEARCH' not in raw and 'reading_assessment records' not in body['messages'][0]['content']
             value='The museum describes observing before intervention: [conservation method]('+url+').'
         else:raise AssertionError('Unexpected model stage '+str(list(data)))
         requests.append(dict(stage=stage,model=body['model']))

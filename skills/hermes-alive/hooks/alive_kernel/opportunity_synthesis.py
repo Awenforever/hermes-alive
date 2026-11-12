@@ -36,7 +36,7 @@ from . import reading_assessment
 
 _DISCOVERY_AUTHORING = 'source-led-v2'
 _DISCOVERY_AUTHORING_MODES = ('source-led-v1','source-led-v2','source-led-v3')
-from .review_contracts import SPLIT_SOURCE_REVIEW, SPLIT_SOURCE_REVIEW_CONTRACTS
+from .review_contracts import DISCOVERY_AUTHOR_SOURCE_INPUT, SPLIT_SOURCE_REVIEW, SPLIT_SOURCE_REVIEW_CONTRACTS
 
 
 class OpportunitySynthesisError(ValueError):
@@ -1122,6 +1122,7 @@ class OpportunitySynthesizer:
         output = method.get('recipient_output')
         editorial = method.get('editorial_context')
         authoring = method.get('discovery_authoring')
+        author_input=method.get('discovery_author_input')
         source_review=method.get('discovery_source_review')
         assessment=method.get('reading_assessment')
         from .feedback_context import NATIVE_TOPIC_METHOD
@@ -1140,6 +1141,9 @@ class OpportunitySynthesizer:
                 or editorial not in (None, 'origin-purpose-v1')
                 or authoring != bundle.get('discovery_authoring')
                 or authoring not in (None,*_DISCOVERY_AUTHORING_MODES)
+                or author_input!=bundle.get('discovery_author_input')
+                or author_input not in (None,DISCOVERY_AUTHOR_SOURCE_INPUT)
+                or author_input is not None and authoring not in ('source-led-v2','source-led-v3')
                 or source_review!=bundle.get('discovery_source_review')
                 or source_review not in (None,'bounded-group-source-v1',*SPLIT_SOURCE_REVIEW_CONTRACTS)
                 or source_review=='bounded-group-source-v1' and authoring!='source-led-v3'
@@ -1406,6 +1410,8 @@ class OpportunitySynthesizer:
             discovery_authoring=('source-led-v3' if focus else _DISCOVERY_AUTHORING) if recipient_meaning else None,
             **({'discovery_source_review':SPLIT_SOURCE_REVIEW}
                if recipient_meaning and (focus or _DISCOVERY_AUTHORING=='source-led-v2') else {}),
+            **({'discovery_author_input':DISCOVERY_AUTHOR_SOURCE_INPUT}
+               if recipient_meaning and (focus or _DISCOVERY_AUTHORING=='source-led-v2') else {}),
             **({'reading_assessment':reading_assessment.REFERENCE_METHOD} if assess_reading else {}),
             kind='model_prompt' if candidate_evidence else 'system_candidate_deferred' if deferred else 'system_no_material',
             system_prompt_sha256=hashlib.sha256(system_prompt.encode()).hexdigest() if candidate_evidence else None,
@@ -1571,6 +1577,7 @@ class OpportunitySynthesizer:
                  "recipient_output":method['recipient_output'],
                  "editorial_context":method['editorial_context'],
                  "discovery_authoring":method['discovery_authoring'],
+                 **({'discovery_author_input':method['discovery_author_input']} if method.get('discovery_author_input') else {}),
                  **({'discovery_source_review':method['discovery_source_review']} if method.get('discovery_source_review') else {}),
                  **({'reading_assessment_method':reading_assessment.REFERENCE_METHOD,
                      'reading_assessment':assessment} if assess_reading else {}),

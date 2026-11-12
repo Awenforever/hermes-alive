@@ -248,15 +248,10 @@ async def exercise(root,mode,*,primary_url=None):
             elif task=='alive_semantic_render':
                 assert 'INTERNAL_GOAL' not in raw
                 if mode.startswith('reading-assessment'):
-                    assessment=data['expression_context']['reading_assessment']
-                    if mode in ('reading-assessment-invalid','reading-assessment-missing'):
-                        assert not assessment['entries'] and len(assessment['unassessed_questions'])==1
-                        assert assessment['rejected_count']==int(mode=='reading-assessment-invalid')
-                    else:
-                        assert assessment['entries'][0]['status']=='partial'
-                        assert 'INTERNAL_RESEARCH_QUESTION' in assessment['entries'][0]['question']
-                    assert not assessment['agenda_completion_proven'] and not assessment['source_truth_proven']
-                    assert 'unanswered question does not oblige' in kw['messages'][0]['content']
+                    assert 'reading_assessment' not in data['expression_context']
+                    assert 'INTERNAL_RESEARCH_QUESTION' not in raw
+                    assert 'DEEP_READ_EVIDENCE' in raw
+                    assert 'reading_assessment records' not in kw['messages'][0]['content']
                 else:assert 'INTERNAL_RESEARCH_QUESTION' not in raw
                 if pressure or mode in ('primary-read','replay','private-followup','erase-group-after-final'):
                     assert 'PRIMARY_READ_EVIDENCE' in raw and 'DEEP_READ_EVIDENCE' in raw
