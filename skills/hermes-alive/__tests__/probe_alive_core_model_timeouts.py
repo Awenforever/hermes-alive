@@ -48,13 +48,15 @@ async def main():
         requests.append(dict(endpoint=request.url.host,timeout=timeout))
         if request.url.host=='primary.invalid':
             assert request.headers['authorization']=='Bearer synthetic-primary-key'
-            await asyncio.sleep(timeout)
-            raise httpx.ReadTimeout('synthetic full request timeout',request=request)
-        assert request.url.host=='backup.invalid'
-        assert request.headers['authorization']=='Bearer synthetic-backup-key'
-        if unavailable[0]:
-            await asyncio.sleep(timeout)
-            raise httpx.ReadTimeout('synthetic fallback timeout',request=request)
+            if not a.expect_host_recovery or unavailable[0]:
+                await asyncio.sleep(timeout)
+                raise httpx.ReadTimeout('synthetic full request timeout',request=request)
+        else:
+            assert request.url.host=='backup.invalid'
+            assert request.headers['authorization']=='Bearer synthetic-backup-key'
+            if unavailable[0]:
+                await asyncio.sleep(timeout)
+                raise httpx.ReadTimeout('synthetic fallback timeout',request=request)
         await asyncio.sleep(.005)
         return httpx.Response(200,request=request,json=dict(id='synthetic',object='chat.completion',created=0,
             model=body['model'],choices=[dict(index=0,message=dict(role='assistant',content='OK'),finish_reason='stop')],
@@ -89,7 +91,7 @@ async def main():
                             assert len(operations)==1
                             unavailable[0]=False
                             raise
-                        assert len(operations)==2 and result.model=='synthetic-backup'
+                        assert len(operations)==2 and result.model=='synthetic-primary'
                         stop.set()
                         return SimpleNamespace(disposition='silence',reconciliation={'next_after_sequence':0},
                             external_delivery_proven=False)
@@ -97,6 +99,8 @@ async def main():
                 result=await host.run(build_parameters=dict,stop=stop,continuous=True,interval_seconds=.02)
                 assert result['exit_reason']=='stopped' and result['completed_cycles']==2 and qualified==[True],result
                 assert len(set(operations))==2 and not journal.read(event_type='dispatch.started')
+                assert {r['endpoint'] for r in requests}=={'primary.invalid','backup.invalid'}
+                assert requests[-1]['endpoint']=='primary.invalid'
                 assert [r.event.payload['disposition'] for r in journal.read(event_type='autonomous.host.closed')]==[
                     'model_temporarily_unavailable','silence']
                 print('HERMES_ALIVE_CORE_MODEL_TIMEOUT_RECOVERY_OK')

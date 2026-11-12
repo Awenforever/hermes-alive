@@ -15,7 +15,8 @@ provider and fallback attempts. The host records a signed
 scheduled wake uses a fresh operation, current evidence and current owner
 authority. The spent operation and any earlier job IDs stay in the journal.
 The old read-only transport receipt cursor can be observed again. There is no
-immediate extra provider request, renewed send permit or draft replay.
+immediate extra provider request, renewed send permit or draft replay. Core's
+existing fallback-health cooldown still applies to the next wake.
 
 Other exceptions, unsettled work, revoked authority and unqualified model
 responses follow their existing paths. A controlled test must establish the
