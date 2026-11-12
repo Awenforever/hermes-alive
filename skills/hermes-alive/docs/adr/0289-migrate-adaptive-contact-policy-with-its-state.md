@@ -1,7 +1,7 @@
 # ADR-0289 — Migrate adaptive contact policy with its state
 
-Status: read-only preview and owner-confirmed checkpoint staging implemented.
-Active state projection, ownership and cutover qualification remain open.
+Status: Native checkpoint projection and activation under isolated qualification.
+Production cutover and owner-directed learning and exceptions remain open.
 
 ## Why this differs from fixed quiet hours
 
@@ -76,5 +76,23 @@ conversation can confirm the choice. The confirmation summary reports the
 time zone and migration status. It does not display the checkpoint itself.
 The confirmed checkpoint can be recovered from the encrypted configuration,
 while the original legacy bytes stay available for rollback. An imported
-checkpoint grants no delivery authority. Activation stays unavailable until
-the Native projection consumes that checkpoint and passes cutover tests.
+checkpoint grants no delivery authority. The first explicit activation verifies
+that the captured source bytes still match and validates the detached decision
+before minting any grant. The old files remain rollback inputs.
+
+## Native checkpoint projection
+
+Each existing host wake advances the detached policy after checking the current
+activation. Changed checkpoints live in the owner vault. The journal appends a
+signed, configuration-scoped event with a compare-and-set check on the previous
+checkpoint and the current owner setup, activation and policy. Restarts use the
+confirmed baseline or last verified projection. Legacy history and the source
+file remain under legacy ownership. A discarded concurrent write has no journal
+authority, and its encrypted payload remains linked to the configuration for
+withdrawal.
+
+The adapter handoff only evaluates the current in-memory checkpoint at the
+current time. It does not open the old file or write a new checkpoint. A missing
+or invalid projection withholds proactive contact. Separately authorized work
+keeps its existing lifecycle. Future learning and temporary owner exceptions
+need their own admitted updates and cross-process fencing before qualification.

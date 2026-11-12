@@ -4,6 +4,9 @@ No legacy fallback, recipient discovery, provider router or physical queue.
 Only the admitted command path may create grants; startup only restores them.
 """
 from datetime import datetime,timezone
+import hashlib
+import logging
+import sqlite3
 from uuid import uuid4
 from importlib import import_module
 import json
@@ -29,7 +32,10 @@ def contact_hours(binding, configured):
 
 def contact_status(binding, configured):
     legacy=binding.home/'plugin-data/hermes-alive/runtime/config/hermes-alive.json'
-    return kernel('contact_hours').contact_status(configured.options,legacy,os.environ,datetime.now(timezone.utc))
+    now=datetime.now(timezone.utc)
+    if 'adaptive_contact' in configured.options:
+        return kernel('adaptive_contact').status(setup_store(binding),configured,now)
+    return kernel('contact_hours').contact_status(configured.options,legacy,os.environ,now)
 
 
 def configured_owner(binding,scope):
@@ -101,7 +107,22 @@ def enable(binding,scope):
     """Caller has verified an actual admitted Core /alive enable command."""
     store,configured=configured_owner(binding,scope)
     if runtime_engine(binding)!='kernel':raise ValueError('explicit native kernel installation required')
-    if contact_hours(binding,configured)[1]:
+    adaptive=configured.options.get('adaptive_contact')
+    if adaptive is not None:
+        # The first cutover must consume the same checkpoint shown at setup.
+        # Restarts use the Native journal and need no read of the rollback file.
+        projection=kernel('adaptive_contact').AdaptiveContactProjection(store,configured)
+        previous,checkpoint=projection.current()
+        if previous is None:
+            path=(binding.home/'plugin-data/hermes-alive/runtime/circadian_state.json').resolve()
+            if not path.is_relative_to(binding.home):
+                raise ValueError('legacy adaptive state is outside its owning profile')
+            with path.open('rb') as stream:
+                raw=stream.read(1024*1024+1)
+            if len(raw)>1024*1024 or hashlib.sha256(raw).hexdigest()!=adaptive['source_digest']:
+                raise ValueError('legacy adaptive state changed since confirmation')
+        projection.evaluate(checkpoint,datetime.now(timezone.utc))
+    elif contact_hours(binding,configured)[1]:
         raise kernel('contact_hours').ContactHoursClosed('explicit legacy contact hours choice required')
     _retired(binding)
     router=binding.session_router(scope.platform)
@@ -181,9 +202,15 @@ def assemble(binding):
         binding._require_home()
         if binding.closed or store.configuration()!=configured or store.activation()!=active:
             raise ValueError('current Alive execution authority changed or expired')
+    adaptive=(kernel('adaptive_contact').AdaptiveContactProjection(store,configured)
+        if 'adaptive_contact' in configured.options else None)
+    adaptive_checkpoint=[None]
     window,timing_choice_required=contact_hours(binding,configured)
     timing=kernel('contact_hours')
     def contact_open(at):
+        if adaptive is not None:
+            checkpoint=adaptive_checkpoint[0]
+            return checkpoint is not None and adaptive.evaluate(checkpoint,at)[0]
         return not timing_choice_required and timing.open_for_contact(window,at)
     runtime=kernel('autonomous_cycle_runtime').AutonomousCycleRuntime(store.journal,content_vault=store.vault)
     _complete_supersession(runtime,configured,active)
@@ -228,6 +255,12 @@ def assemble(binding):
                         configured,call=parameters['expression_parameters']['call'],
                         validate=current_work_authority,operation_id=cycle.operation_id)
                     kernel('core_work').CoreWorkStore(store).refresh_observations(configured,validate=current_work_authority)
+            if adaptive is not None:
+                adaptive_checkpoint[0]=None
+                try:
+                    adaptive_checkpoint[0]=adaptive.advance(active,datetime.now(timezone.utc))
+                except (ValueError,OSError,sqlite3.Error,kernel('content_vault').ContentVaultError) as exc:
+                    logging.getLogger(__name__).warning('Alive adaptive contact unavailable: %s',type(exc).__name__)
             authorization={'authorization_operation_id':'core-auth:'+store.vault.digest_json(
                 {'cycle':cycle.operation_id,'activation':active['activation_event_id']})[:40],
                 'route_binding_id':active['route_binding_id'],'delegation_event_id':active['delegation_event_id']}

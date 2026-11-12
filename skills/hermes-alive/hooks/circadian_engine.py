@@ -275,7 +275,10 @@ class CircadianEngine:
 
     def contact_checkpoint(self) -> dict[str, Any]:
         """Project the current timing inputs without advancing or saving them."""
-        return {key: self.state[key] for key in CONTACT_CHECKPOINT_FIELDS}
+        projected = {key: self.state[key] for key in CONTACT_CHECKPOINT_FIELDS}
+        if projected["last_transition_message"] != "forced_wake":
+            projected["last_transition_message"] = None
+        return projected
 
     def snapshot(self, *, update: bool = True, now: datetime | None = None) -> dict[str, Any]:
         current = self._local(now or self.now_fn())

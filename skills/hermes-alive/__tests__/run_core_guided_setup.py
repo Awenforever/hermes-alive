@@ -6,6 +6,7 @@ sources. This is not remote consumer dependency admission or live activation.
 import asyncio
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
+from importlib import import_module
 import json
 import os
 from pathlib import Path
@@ -83,6 +84,10 @@ async def test(home,*,public_refinement=False,adaptive_import=False):
         if adaptive_import:
             rc,refused=cli(home,*setup_args,'--stage-legacy-adaptive-contact')
             assert rc==2 and refused['adaptive_checkpoint_unavailable'] is True
+            protected=json.loads(raw)
+            protected['planned_sleep_at']=(now-timedelta(hours=1)).isoformat()
+            protected['planned_wake_at']=(now+timedelta(hours=3)).isoformat()
+            raw=json.dumps(protected).encode()
             circadian_state.write_bytes(raw)
             setup_args=(*setup_args,'--stage-legacy-adaptive-contact')
         else:
@@ -160,15 +165,39 @@ async def test(home,*,public_refinement=False,adaptive_import=False):
             assert snapshot['source_digest'].encode() not in store.journal.path.read_bytes()
             rc,status=cli(home,'status')
             assert rc==0 and status['contact_hours']['state']=='adaptive_staged' and not status['enabled']
-            response=await runner._hm_run_plugin_handler(handler,None,source,session_entry=entry,args='enable')
-            assert '动态作息迁移验证' in response and binding.native is None and not store.activation()
-            print('HERMES_ALIVE_CORE_ADAPTIVE_IMPORT_STAGED_OK')
+            async def command(argument):
+                return await runner._hm_run_plugin_handler(handler,None,source,session_entry=entry,args=argument)
+            circadian_state.write_bytes(raw+b' ')
+            assert '未完成' in await command('enable') and not store.activation()
+            assert not store.journal.read(event_type='action.delegation_granted')
+            circadian_state.write_bytes(raw)
+            assert '已启用' in await command('enable')
+            projection_type=import_module(loaded.module.__name__+'.kernel_execution_bridge').kernel(
+                'adaptive_contact').AdaptiveContactProjection
+            try:
+                async with asyncio.timeout(20):
+                    while not store.journal.read(event_type='autonomous.host.closed'):
+                        assert not binding.task.done(),binding.task.result()
+                        await asyncio.sleep(.03)
+                closed=store.journal.read(event_type='autonomous.host.closed')[-1].event
+                assert closed.payload['disposition']=='contact_hours_closed'
+                current,checkpoint=projection_type(setup_bridge.setup_store(binding),configured).current()
+                assert current is not None and checkpoint['phase'] in ('asleep','light_sleep')
+                assert checkpoint['learned_sleep_offset_minutes']==18
+                assert binding.native.last_call_count==0 and not store.journal.read(event_type='dispatch.started')
+                assert circadian_state.read_bytes()==raw
+                assert '动态免打扰' in await command('status')
+                rc,status=cli(home,'status')
+                assert rc==0 and status['contact_hours']['state']=='adaptive_quiet' and status['enabled']
+            finally:
+                binding.arguments['stop'].set()
+                await asyncio.wait_for(asyncio.shield(binding.task),10)
+            print('HERMES_ALIVE_CORE_ADAPTIVE_CUTOVER_OK')
             return
         if quiet:
             assert dict(configured.options['quiet_window'])==quiet
             assert '22:45–08:15' in reply and legacy_config.read_bytes()==legacy_bytes
         assert configured.options.get('refine_public_sources',False) is public_refinement
-        from importlib import import_module
         package=store.__class__.__module__.rsplit('.',1)[0]
         CognitionContextReader=import_module(package+'.cognition_context').CognitionContextReader
         Sensitivity=import_module(package+'.events').Sensitivity
