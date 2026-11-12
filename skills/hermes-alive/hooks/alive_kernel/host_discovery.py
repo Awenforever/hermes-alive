@@ -26,6 +26,11 @@ class HostReadUncertainError(HostDiscoveryError):
     """Host wait ended without proving that its physical read settled."""
 
 
+def host_read_event_prefix(vault, *, subject, operation_id):
+    digest = vault.digest_json(dict(subject=subject, operation_id=operation_id))[:40]
+    return 'discovery.host-read:' + digest
+
+
 def read_scope_metadata(content):
     """Collector-reported scope, never a claim of independent verification."""
     attrs=content.get('attributes')
@@ -235,8 +240,7 @@ class HostDiscoveryReader:
                                     item_ids=inquiry_item_ids) != inquiries:
                 raise HostDiscoveryError('reading task changed during host read')
         vault=self.ingestor.vault
-        operation=vault.digest_json(dict(subject=self.subject,operation_id=operation_id))[:40]
-        prefix='discovery.host-read:'+operation
+        prefix=host_read_event_prefix(vault,subject=self.subject,operation_id=operation_id)
         journal=self.ingestor.journal
         start=journal.get(prefix+':started')
         if start is not None:

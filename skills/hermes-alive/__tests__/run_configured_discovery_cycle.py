@@ -119,6 +119,10 @@ async def exercise(root,mode,*,primary_url=None):
         tools.append((name,args))
         if name=='web_search':
             assert args==dict(query='public museum methods',limit=3)
+            if mode=='search-failed':
+                return json.dumps(dict(success=False,error='synthetic unavailable'))
+            if mode=='search-empty':
+                return json.dumps(dict(success=True,data=dict(web=[])))
             entries=[dict(url=url,title='Conservation update',description='A public non-invasive conservation method is described.')]
             if pressure:
                 entries[0]['description']+=' Neutral listing.'*100
@@ -344,6 +348,14 @@ async def exercise(root,mode,*,primary_url=None):
             if mode in ('replay','legacy-replay','historical-followup-replay'):
                 assert (len(tools),len(models))==before
                 assert not journal.read(event_type='discovery.reading_assessment_opened')
+            if mode in ('search-failed','search-empty'):
+                expected='discovery_search_unavailable' if mode=='search-failed' else 'silence'
+                assert result.disposition==expected
+                closed,=journal.read(event_type='autonomous.host.closed')
+                assert host._validate(closed.event)['disposition']==expected
+                assert [name for name,_ in tools]==['web_search'] and not models
+                assert result.external_delivery_proven is False
+                return
             assert result.disposition==('paused' if mode=='paused' else 'silence' if mode=='abstain' else 'shadow_selected')
             assert len(journal.read(event_type='autonomous.host.closed'))==1
             if mode == 'primary-read':
@@ -474,7 +486,7 @@ selected_cases=parser.parse_args().case
 with tempfile.TemporaryDirectory(prefix='alive-configured-discovery-') as folder:
     modes=('budget-pressure',) if os.getenv('ALIVE_REPRODUCE_OLD_RECALL')=='1' else (
                  'share','reading-assessment','reading-assessment-no-followup','reading-assessment-budget-pressure','reading-assessment-invalid','reading-assessment-missing','reading-assessment-recovery','primary-read','private-followup','budget-pressure','fair-budget-pressure','erase-group-after-final','followup-failed','replay','legacy-replay','historical-followup-replay','unconsented-followup','page-failed','abstain','paused',
-                 'invalid-choice','revoked-choice','forgotten-choice','erased-choice','uncertain-read',
+                 'search-failed','search-empty','invalid-choice','revoked-choice','forgotten-choice','erased-choice','uncertain-read',
                  'invented-followup','foreign-followup','mixed-followup','malformed-followup','nonjson-followup',
                  'revoked-followup','forgotten-followup','erased-followup','interrupted-followup','historical-invalid-followup')
     if selected_cases:

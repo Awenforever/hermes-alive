@@ -660,6 +660,10 @@ for evidence, denominators, unknowns and limits; these definitions are not resul
 - user inspection, correction and disable friction;
 - latency, model calls, token cost and storage growth.
 
+Count a wake with a settled, wholly failed search and no other planning
+material as search unavailability, separately from silence quality. See
+[ADR-0291](adr/0291-distinguish-search-failure-from-silence.md).
+
 ## Assumption register
 
 | ID | Current hypothesis | How it can be disproved | Status |

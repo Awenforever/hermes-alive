@@ -15,6 +15,7 @@ from .content_vault import ContentVaultError
 from .feedback_assimilation import FeedbackAssimilationRuntime
 from .core_context_read import context_value
 from .contact_hours import ContactHoursClosed
+from .host_discovery import host_read_event_prefix
 
 
 @dataclass(frozen=True,slots=True)
@@ -33,11 +34,32 @@ class AutonomousCycleResult:
 
 class AutonomousCycleRuntime:
     def __init__(self,journal,*,content_vault=None,context_vault=None):
+        self.journal = journal
         self.preparation = SendPreparationRuntime(journal,content_vault=content_vault,context_vault=context_vault)
         self.outbox = DispatchOutbox(journal,content_vault=self.preparation.vault,context_vault=context_vault)
         self.reconciliation = TransportReconciliationRuntime(self.outbox)
         self.reconsideration = ReconsiderationStore(self.preparation, self.outbox.protector)
         self.feedback = FeedbackAssimilationRuntime(journal,content_vault=self.preparation.vault,context_vault=context_vault)
+
+    def _silence_disposition(self, planning, *, subject, operation_id):
+        synthesis = self.journal.get(planning.interpretation_event_id)
+        if synthesis is None or synthesis.event.payload.get('system_no_material') is not True:
+            return 'silence'
+        prefix = host_read_event_prefix(self.preparation.vault, subject=subject,
+            operation_id=operation_id+':search')
+        record = self.journal.get(prefix+':completed')
+        if record is None:
+            return 'silence'
+        event = record.event
+        outcomes = event.payload.get('read_outcomes', ())
+        if (event.event_type == 'discovery.host_read_completed'
+                and event.source == 'alive.host-discovery' and event.subject == subject
+                and event.causation_id == prefix+':started'
+                and event.payload.get('delivery_authority_granted') is False
+                and not event.payload['observations'] and outcomes
+                and all(kind == 'search' and status == 'read_failed' for kind, _, status in outcomes)):
+            return 'discovery_search_unavailable'
+        return 'silence'
 
     async def cycle(self,*,subject,operation_id,expression_parameters,resolve_binding,
             execute=False,authorization_parameters=None,send_parameters=None,worker_id=None,
@@ -138,11 +160,12 @@ class AutonomousCycleRuntime:
                 return AutonomousCycleResult('content_review_attention',reconciliation,
                     expression=expression,quality_assessment=assessed,content_rejection=rejection,
                     content_rejection_window_seconds=reconsider_after_seconds if rejection is not None else None)
-            if capture is not None and expression.planning.action_kind=='silence':
+            disposition = (self._silence_disposition(expression.planning, subject=subject, operation_id=operation_id)
+                if expression.planning.action_kind=='silence' else 'shadow_selected')
+            if capture is not None and disposition=='silence':
                 self.reconsideration.remember(subject=subject,configuration_id=cognition_configuration_id,
                     before=before,after=await capture(),planning=expression.planning)
-            return AutonomousCycleResult('silence' if expression.planning.action_kind=='silence'
-                else 'shadow_selected',reconciliation,expression=expression,
+            return AutonomousCycleResult(disposition,reconciliation,expression=expression,
                 quality_assessment=assessed if parameters.get('grounding',False) else None)
         if any(key in authorization_parameters for key in parameters):
             raise ValueError('authorization cannot override cycle planning')
@@ -150,10 +173,11 @@ class AutonomousCycleRuntime:
         if prepared.expression.planning.candidate_deferred:
             return AutonomousCycleResult('content_deferred',reconciliation,prepared=prepared)
         if prepared.expression.planning.action_kind=='silence':
-            if capture is not None:
+            disposition = self._silence_disposition(prepared.expression.planning, subject=subject, operation_id=operation_id)
+            if capture is not None and disposition=='silence':
                 self.reconsideration.remember(subject=subject,configuration_id=cognition_configuration_id,
                     before=before,after=await capture(),planning=prepared.expression.planning)
-            return AutonomousCycleResult('silence',reconciliation,prepared=prepared)
+            return AutonomousCycleResult(disposition,reconciliation,prepared=prepared)
         if prepared.quality_disposition.startswith('final_'):
             rejection=await context_value(expression_parameters.get('read_context'),
                 lambda:self.preparation.rejection_witness(prepared,parameters))
