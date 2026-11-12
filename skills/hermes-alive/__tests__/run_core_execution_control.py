@@ -331,6 +331,14 @@ async def test_native_wait(home,*,refinement=False):
                     message=SimpleNamespace(content=json.dumps(value)))])
         native.caller_factory=lambda **kw:Caller(**kw)
         execution=importlib.import_module(loaded.module.__name__+'.kernel_execution_bridge')
+        # The previous page read remains eligible even when the current
+        # search produces only an unread lead. Exercise both model stages.
+        discovery=execution.kernel('discovery_opportunities')
+        native.host.runtime.preparation.expression.planning.synth.reader.ingest(
+            discovery.DiscoveryCandidate(source='hermes.web.extract',title='Earlier synthetic page',
+                url='https://example.invalid/wait',
+                summary='The earlier source describes a non-urgent observation.',
+                attributes={'read_scope':'webpage_extract'}),subject=native.host.subject)
         async def allow(self,url):return url=='https://example.invalid/wait'
         with patch.object(execution.kernel('core_discovery_tools').CoreDiscoveryTools,'allow_url',allow):
             first=await native.step(build())
