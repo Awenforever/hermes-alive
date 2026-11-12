@@ -28,6 +28,7 @@ import sys
 import tempfile
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -1347,6 +1348,47 @@ def _add_common_paths(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--shared-dir")
 
 
+def preview_adaptive_contact(args: argparse.Namespace) -> int:
+    paths = _paths(args)
+    sys.path.insert(0, str(paths.source_root / "hooks"))
+    from circadian_engine import CIRCADIAN_ENV_KEYS, CircadianConfig, CircadianEngine
+    from circadian_sleep_quiet_policy import evaluate_sleep_quiet_live
+    from managed_config import MANAGED_AUTHORITATIVE_KEYS
+
+    keys = set(CIRCADIAN_ENV_KEYS.values()) | {"TZ", "HERMES_PROACTIVE_QUIET_START", "HERMES_PROACTIVE_QUIET_END"}
+    effective = {key: os.environ[key] for key in keys if os.environ.get(key)}
+    try:
+        try:
+            _must_be_under(paths.config_file, paths.shared_dir, "legacy configuration")
+            values = json.loads(paths.config_file.read_text(encoding="utf-8"))["values"]
+        except FileNotFoundError:
+            values = {}
+        for name, variable in MANAGED_ENV_KEYS.items():
+            if variable in keys and values.get(name) is not None:
+                if name in MANAGED_AUTHORITATIVE_KEYS or variable not in effective:
+                    effective[variable] = str(values[name])
+        config = CircadianConfig.from_env(effective)
+        if not config.enabled or config.mode != "live":
+            print(json.dumps({"state": "not_selected"}))
+            return 0
+        state_path = paths.shared_dir / "circadian_state.json"
+        _must_be_under(state_path, paths.shared_dir, "legacy circadian state")
+        with state_path.open("rb") as stream:
+            raw = stream.read(1024 * 1024 + 1)
+        if len(raw) > 1024 * 1024:
+            raise ValueError("legacy circadian state exceeds preview limit")
+        checkpoint = json.loads(raw)
+        engine = CircadianEngine(config=config, checkpoint=checkpoint)
+        now = datetime.now(timezone.utc)
+        decision = evaluate_sleep_quiet_live(engine.shadow_decision(now=now), now=now, environ=effective)
+    except (OSError, ValueError, TypeError, KeyError, AttributeError, OverflowError, LifecycleError):
+        print(json.dumps({"state": "unavailable"}))
+        return 0
+    print(json.dumps({"state": "open" if decision["would_allow_dynamic"] else "quiet",
+                      "timezone": config.timezone, "checkpoint_schema": checkpoint["schema_version"]}))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Hermes Alive lifecycle management"
@@ -1357,6 +1399,10 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common_paths(install_parser)
     install_parser.add_argument('--engine',choices=('legacy','kernel-shadow','kernel'),default=None)
     install_parser.set_defaults(func=install)
+
+    adaptive_parser = subparsers.add_parser("preview-adaptive-contact")
+    _add_common_paths(adaptive_parser)
+    adaptive_parser.set_defaults(func=preview_adaptive_contact)
 
     configure_parser = subparsers.add_parser("configure")
     _add_common_paths(configure_parser)

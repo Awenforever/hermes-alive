@@ -256,6 +256,14 @@ def alive_command(args: argparse.Namespace) -> int:
     if action == 'contact-hours':
         from .tool_receipt_bridge import _kernel_module
         preview=_kernel_module('contact_hours').legacy_preview(_config_file(),os.environ)
+        if preview['state']=='dynamic':
+            try:
+                result=subprocess.run([sys.executable,'-B',str(_source()/'scripts/hermes-alive-lifecycle.py'),
+                    'preview-adaptive-contact','--hermes-home',str(_home())],
+                    text=True,capture_output=True,timeout=15,check=True)
+                preview['adaptive_contact']=json.loads(result.stdout)
+            except (subprocess.SubprocessError,OSError,ValueError):
+                preview['adaptive_contact']={'state':'unavailable'}
         print(json.dumps({'ok':True,'legacy_contact_hours':preview}))
         return 0
     if action == 'setup':

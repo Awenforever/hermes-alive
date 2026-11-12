@@ -215,6 +215,7 @@ class CircadianEngine:
         config: CircadianConfig | dict[str, Any] | None = None,
         state_path: Path | None = None,
         now_fn: Callable[[], datetime] | None = None,
+        checkpoint: dict[str, Any] | None = None,
     ) -> None:
         self.config = (
             config.validated()
@@ -223,11 +224,49 @@ class CircadianEngine:
         )
         self.tz = _zone(self.config.timezone)
         self.now_fn = now_fn or (lambda: datetime.now(self.tz))
-        shared = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", DEFAULT_SHARED_DIR))
-        self.state_path = state_path or shared / "circadian_state.json"
+        if checkpoint is not None and state_path is not None:
+            raise ValueError("detached circadian checkpoints cannot have a state path")
         self.state_integrity_ok = True
-        self.state_integrity_reason = "missing_state"
-        self.state = self._load_state()
+        if checkpoint is None:
+            shared = Path(os.getenv("HERMES_ALIVE_SHARED_DIR", DEFAULT_SHARED_DIR))
+            self.state_path = state_path or shared / "circadian_state.json"
+            self.state_integrity_reason = "missing_state"
+            self.state = self._load_state()
+        else:
+            self.state_path = None
+            self.state_integrity_reason = "detached_checkpoint"
+            self.state = self._contact_checkpoint(checkpoint)
+
+    def _contact_checkpoint(self, checkpoint: dict[str, Any]) -> dict[str, Any]:
+        """Admit only data that the existing timing projection actually needs."""
+        if (not isinstance(checkpoint, dict)
+                or type(checkpoint.get("schema_version")) is not int
+                or checkpoint["schema_version"] != SCHEMA_VERSION
+                or checkpoint.get("phase") not in VALID_PHASES):
+            raise ValueError("unsupported circadian checkpoint")
+        projected = self._empty_state()
+        projected["phase"] = checkpoint["phase"]
+        day = checkpoint.get("schedule_date")
+        if not isinstance(day, str) or date.fromisoformat(day).isoformat() != day:
+            raise ValueError("circadian checkpoint is missing a valid schedule date")
+        projected["schedule_date"] = day
+        for key in ("planned_sleep_at", "planned_wake_at", "actual_sleep_at", "actual_wake_at", "pending_sleep_at"):
+            value = checkpoint.get(key)
+            if value is None and not key.startswith("planned_"):
+                continue
+            if not isinstance(value, str) or len(value) > 64 or datetime.fromisoformat(value).utcoffset() is None:
+                raise ValueError("invalid timestamp in circadian checkpoint")
+            projected[key] = value
+        if datetime.fromisoformat(projected["planned_wake_at"]) <= datetime.fromisoformat(projected["planned_sleep_at"]):
+            raise ValueError("circadian checkpoint has an inverted sleep plan")
+        for key in ("learned_sleep_offset_minutes", "learned_wake_offset_minutes", "sleep_debt_minutes"):
+            value = checkpoint.get(key)
+            if type(value) is not int or (key == "sleep_debt_minutes" and value < 0):
+                raise ValueError("invalid timing adjustment in circadian checkpoint")
+            projected[key] = value
+        if checkpoint.get("last_transition_message") == "forced_wake":
+            projected["last_transition_message"] = "forced_wake"
+        return projected
 
     def snapshot(self, *, update: bool = True, now: datetime | None = None) -> dict[str, Any]:
         current = self._local(now or self.now_fn())
@@ -574,6 +613,8 @@ class CircadianEngine:
         return migrated
 
     def _save_state(self) -> None:
+        if self.state_path is None:
+            return
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
         if locked_write_json is not None:
             locked_write_json(self.state_path, self.state, STATE_LOCK_NAME)

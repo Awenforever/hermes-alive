@@ -81,9 +81,13 @@ def legacy_preview(path, environ):
 
     start = setting('quiet_start', 'HERMES_PROACTIVE_QUIET_START')
     end = setting('quiet_end', 'HERMES_PROACTIVE_QUIET_END')
-    enabled = values.get('circadian_enabled', environ.get('HERMES_ALIVE_CIRCADIAN_ENABLED'))
-    mode = values.get('circadian_mode', environ.get('HERMES_ALIVE_CIRCADIAN_MODE'))
-    dynamic = str(enabled).lower() in ('1', 'true', 'yes', 'on') and mode == 'live'
+    enabled = values.get('circadian_enabled')
+    if enabled is None:
+        enabled = environ.get('HERMES_ALIVE_CIRCADIAN_ENABLED', 'true')
+    mode = values.get('circadian_mode')
+    if mode is None:
+        mode = environ.get('HERMES_ALIVE_CIRCADIAN_MODE')
+    dynamic = str(enabled).strip().lower() not in ('0', 'false', 'no', 'off') and str(mode).strip().lower() == 'live'
     if start is None and end is None and not dynamic:
         return {'state': 'absent'}
     window = {'start': start or '00:30', 'end': end or '08:30',
@@ -92,5 +96,7 @@ def legacy_preview(path, environ):
     try:
         quiet_window(window)
     except ValueError:
+        if dynamic:
+            return {'state': 'dynamic', 'window': None}
         return {'state': 'invalid'}
     return {'state': 'dynamic' if dynamic else 'fixed', 'window': window}

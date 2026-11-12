@@ -5,6 +5,7 @@ sources. This is not remote consumer dependency admission or live activation.
 """
 import asyncio
 from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path
@@ -58,6 +59,28 @@ async def test(home,*,public_refinement=False):
         legacy_config=legacy.parent/'config/hermes-alive.json'
         legacy_config.parent.mkdir()
         legacy_bytes=b'{"values":{"enabled":false,"quiet_start":"22:45","quiet_end":"08:15","timezone":"Asia/Shanghai"}}'
+        dynamic=json.loads(legacy_bytes)
+        dynamic['values'].update(circadian_enabled=True,circadian_mode='live',circadian_timezone='UTC')
+        legacy_config.write_text(json.dumps(dynamic),encoding='utf-8')
+        circadian_state=legacy.parent/'circadian_state.json'
+        now=datetime.now(timezone.utc)
+        schedule_date=(now-timedelta(days=int(now.hour<12))).date().isoformat()
+        raw=json.dumps({'schema_version':1,'phase':'awake','schedule_date':schedule_date,
+            'planned_sleep_at':(now+timedelta(hours=3)).isoformat(),
+            'planned_wake_at':(now+timedelta(hours=11)).isoformat(),
+            'learned_sleep_offset_minutes':18,'learned_wake_offset_minutes':-9,'sleep_debt_minutes':0,
+            'history':[{'private_note':'DO_NOT_EXPORT'}]}).encode()
+        circadian_state.write_bytes(raw)
+        rc,preview=cli(home,'contact-hours')
+        assert rc==0 and preview['legacy_contact_hours']['state']=='dynamic'
+        assert preview['legacy_contact_hours']['adaptive_contact']=={'state':'open','timezone':'UTC','checkpoint_schema':1}
+        assert circadian_state.read_bytes()==raw and not list(legacy.parent.glob('*.lock'))
+        assert 'DO_NOT_EXPORT' not in json.dumps(preview)
+        circadian_state.write_bytes(b'invalid fixture')
+        rc,preview=cli(home,'contact-hours')
+        assert rc==0 and preview['legacy_contact_hours']['adaptive_contact']=={'state':'unavailable'}
+        assert circadian_state.read_bytes()==b'invalid fixture'
+        circadian_state.unlink()
         legacy_config.write_bytes(legacy_bytes)
         rc,preview=cli(home,'contact-hours')
         assert rc==0 and preview['legacy_contact_hours']=={'state':'fixed','window':quiet}

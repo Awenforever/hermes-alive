@@ -5,7 +5,7 @@ import asyncio
 import json
 import os
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import MethodType, SimpleNamespace
 from typing import Any
@@ -26,7 +26,9 @@ _fixture_runtime = tempfile.TemporaryDirectory(prefix='alive-sleep-policy-')
 os.environ['HERMES_HOME'] = str(Path(_fixture_runtime.name) / 'home')
 os.environ['HERMES_ALIVE_SHARED_DIR'] = str(Path(_fixture_runtime.name) / 'runtime')
 
+from circadian_engine import CircadianConfig, CircadianEngine
 from circadian_sleep_quiet_policy import (
+    evaluate_sleep_quiet_live,
     evaluate_sleep_quiet_shadow,
     fixed_quiet_hours_snapshot,
 )
@@ -292,6 +294,50 @@ def test_observability_contains_no_secrets_or_raw_message() -> None:
     check(result["raw_message_stored"] is False, "privacy marker wrong")
 
 
+def test_detached_live_preview_matches_legacy() -> None:
+    for zone, day in (("Asia/Singapore", datetime(2026,7,12)),
+                      ("America/New_York", datetime(2026,10,31))):
+        with tempfile.TemporaryDirectory(prefix="alive-legacy-preview-") as directory:
+            root=Path(directory)
+            source=root/"source"/"circadian_state.json"
+            replay=root/"replay"/"circadian_state.json"
+            config=CircadianConfig(mode="live",timezone=zone)
+            start=day.replace(hour=20,tzinfo=ZoneInfo(zone))
+            legacy=CircadianEngine(config=config,state_path=source)
+            legacy.apply_learning_signal(sleep_offset_minutes=14,wake_offset_minutes=-8,
+                signal="explicit_user_preference",at=start)
+            legacy.apply_event("keep_awake",delay_minutes=35,at=start+timedelta(hours=2))
+            source_bytes=source.read_bytes()
+            state=json.loads(source_bytes)
+            state["history"]=[{"irrelevant":"PRIVATE_HISTORY_SENTINEL"}]
+            state["unrecognized_field"]="PRIVATE_RAW_SENTINEL"
+            detached=CircadianEngine(config=config,checkpoint=state)
+            assert "PRIVATE_" not in json.dumps(detached.snapshot(update=False))
+            replay.parent.mkdir()
+            replay.write_bytes(source_bytes)
+            reference=CircadianEngine(config=config,state_path=replay)
+            seen=set()
+            for hours in (2,3,4,5,6,7,8,11,14,17,27,33):
+                instant=start.astimezone(timezone.utc)+timedelta(hours=hours)
+                old=reference.shadow_decision(now=instant)
+                new=detached.shadow_decision(now=instant)
+                for key in ("phase","planned_sleep_at","planned_wake_at","sleep_debt_minutes"):
+                    assert old[key]==new[key],(zone,instant,key)
+                allowed=evaluate_sleep_quiet_live(new,now=instant)["would_allow_dynamic"]
+                assert allowed==evaluate_sleep_quiet_live(old,now=instant)["would_allow_dynamic"]
+                seen.add(allowed)
+            assert seen=={True,False}
+            assert source.read_bytes()==source_bytes
+            for broken in ({**state,"schema_version":2},{**state,"planned_sleep_at":"2026-01-01"},
+                           {**state,"sleep_debt_minutes":"not numeric"}):
+                try:
+                    CircadianEngine(config=config,checkpoint=broken)
+                except ValueError:
+                    pass
+                else:
+                    raise AssertionError("invalid adaptive checkpoint admitted")
+
+
 def main() -> int:
     tests = [
         test_fixed_quiet_cross_midnight_and_same_day,
@@ -306,6 +352,7 @@ def main() -> int:
         test_legacy_quiet_remains_authoritative,
         test_invalid_shadow_policy_fails_open_in_watcher,
         test_observability_contains_no_secrets_or_raw_message,
+        test_detached_live_preview_matches_legacy,
     ]
     failures: list[str] = []
     for test in tests:

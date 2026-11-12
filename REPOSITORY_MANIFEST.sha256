@@ -22,10 +22,10 @@ f9be399a3ab743d56465ae6c9aea0fa89fdb3d920641165e68d61529f79736f5  ./gateway_feed
 d6e59b1443910f968c0c8b0b6edce710032775365274f81a2d20de1cd42fe1b2  ./gateway_session_bridge.py
 1e8d0f98079db271c7338695090bea7df800f1e80dbe888ffb467d2443430405  ./kernel_execution_bridge.py
 f34ba779211ccbd3cd53a83e5112f770659102b9f69e855473c3d856427c3cf1  ./kernel_setup_bridge.py
-548142c30fd0fd6243b9e206ee497b34c536a5de5bfa13e832c415b5d8acf901  ./metadata/hermes-alive-source.sha256
+36f3bcbfee044b576dfcc1cd0660a6ce840f520cbdd5e92b18271f98f26bd744  ./metadata/hermes-alive-source.sha256
 5cba4486635fe54faef4cbb05cfb645c315d9ad4dd3316817f12bc81c44b220e  ./metadata/hermes-alive.json
 555aace9e2596e50b73038cde123173f6cd37069a9a846d507911ddbf5c77be1  ./plugin.yaml
-cae21a9485660b0b76da29aa2782cec72548d70e898217acfe6eec76f3d1dd2f  ./plugin_cli.py
+61300b71169347fff7f85ef2ac2ea13b03fcd86ec2e7dc3a77d9bd591b04ca8d  ./plugin_cli.py
 1abd5395e8cb5a88160ba7b6b97b5f41a2b9fcd13a8c5e6a18c8e7b5d5aba36b  ./scripts/bootstrap.sh
 3f945531be5757c0a638bddac203bd1a2d9f647b6e6fd3ad7596622fcb950333  ./scripts/portable-ci.sh
 acc205902d64993d163b7a7e2a89a0eb97e7561a2ac4f515313de2190181ee0e  ./scripts/update-manifests.py
@@ -188,7 +188,7 @@ a20613176055b19c39cfe808f941e7a8786c4be92d6ff846f62481db46fc9f93  ./skills/herme
 95baa6d296231f51e26217684ea4af630f7ed1b024398ff2cee1baca9edfe823  ./skills/hermes-alive/__tests__/run_circadian.py
 68c42184506304687c63ce955b77622e0994b4f225643fae7b75a08cd84266db  ./skills/hermes-alive/__tests__/run_circadian_intent_bridge.py
 7f2a8e958d0da9adbd29adc566976d04131d405b6ece4e92227883129fba86ac  ./skills/hermes-alive/__tests__/run_circadian_shadow.py
-bfc5d06019a6c3e7e60989b0a54023b5af80853c15f173d6a7949814451d512f  ./skills/hermes-alive/__tests__/run_circadian_sleep_quiet_policy.py
+1a14bb535de106ef771a506a1a87b364af29fdd82bd7ccefc451742a4c153cbf  ./skills/hermes-alive/__tests__/run_circadian_sleep_quiet_policy.py
 62b7e10b44ecba5a506d0802317c875f44623406a49f82399a00e9f0ea940520  ./skills/hermes-alive/__tests__/run_citation_selection.py
 a54e63e19fa87a87f60c6f987da50fb45a23f73f81443036f93e25a7a0a06dc9  ./skills/hermes-alive/__tests__/run_cli_execution_bridge.py
 6939f2a4b524b01e2cf1ca519787c2f6ee192fd4b502a4e8c702d1d4d5740d32  ./skills/hermes-alive/__tests__/run_cli_process.py
@@ -209,7 +209,7 @@ ef04f2593e31ba1e5f05fcf20b4500b8c3e11f3f4f54192b51c63d56eb6605ea  ./skills/herme
 1fce1dfd2f6cff4c53d9ac437017ea1776a475334769b3752d67563c5f17f678  ./skills/hermes-alive/__tests__/run_core_feedback_ingress.py
 4e8793bf67d9d3d9d63071f8a0915cc83af05802558dbfd4f68ebb8b2f24eca2  ./skills/hermes-alive/__tests__/run_core_feedback_rollback.py
 7209bf6e80f7b62cac226ce69fbf65f5359de88aa6bf19c349648e177f496b03  ./skills/hermes-alive/__tests__/run_core_followup_restart.py
-a3489990d353e9b9e2fc58c0935401ff07f6930570710b25200c4d4cc62f5aa6  ./skills/hermes-alive/__tests__/run_core_guided_setup.py
+6645f0b93e786ccb6b0e74e5d0a7209fb0da62b0089563944e1d9c616b6f9b28  ./skills/hermes-alive/__tests__/run_core_guided_setup.py
 9dc73b4df429445bbd1f3a3d898e2b1a23d6c41d3ffcfc0fcd861e24abe23c95  ./skills/hermes-alive/__tests__/run_core_memory_context.py
 72b8d72686d68fb4b3865174622330dffcb57a89b057375bec17ac5069b7c9cc  ./skills/hermes-alive/__tests__/run_core_native_memory.py
 569b7b5052a1361479d290df2f5d87248a4f804e65da42b6d84b07562fab5c46  ./skills/hermes-alive/__tests__/run_core_plugin_model_call.py
@@ -640,7 +640,7 @@ bd411e42ca0d289c4d36892e6ae52d277e7de21c88580716291a1920ca7f0822  ./skills/herme
 5d344b938218bb3249c91ae8ea854d3e89c9a41e996311db30c1328d3854b456  ./skills/hermes-alive/docs/adr/0286-ordinary-feedback-ingress-is-not-yet-connected.md
 c516516bf02e0abfd0d4e74b0507766298a3689472c76313bce8529fda387f0c  ./skills/hermes-alive/docs/adr/0287-conversational-discovery-contribution.md
 ca868f058b2d861ebc94e5d665aec066d6e8387d1b039b8f808864ca4b78502e  ./skills/hermes-alive/docs/adr/0288-preserve-proactive-contact-hours-at-cutover.md
-0e50b9991a5a4bfd50a8c3ee72cfa50f1ecb53c3c5656bb0f37469d6a563cc6d  ./skills/hermes-alive/docs/adr/0289-migrate-adaptive-contact-policy-with-its-state.md
+a63281d568d463d54afe4a8d9a1ca69793dd978500f5d5fa31c3a17bdd9df7b2  ./skills/hermes-alive/docs/adr/0289-migrate-adaptive-contact-policy-with-its-state.md
 4d6108e5f522390a4f9008265a2681771192c500c4c34a02179e24a238b55332  ./skills/hermes-alive/docs/evidence/deepseek-seed-20261012.json
 40941e141314d626c51ad4d22ccc19c76dcf4b770a85daa0881d135089fb75ea  ./skills/hermes-alive/docs/evidence/qwen-route-20261012.json
 460cffae94c5494e13515ab9c2dc42331e9fd14260bf4182086d5f3bd9e19114  ./skills/hermes-alive/hooks/HOOK.yaml
@@ -674,7 +674,7 @@ c7e7a7173de7c638902ecdb53a2e511e5d9217e25bb010fed9519eab60464e49  ./skills/herme
 0442126631b589ffcd952a3b6e9a7c503af6cf75d820ceaa1f6cba008001e45a  ./skills/hermes-alive/hooks/alive_kernel/consolidation.py
 a20097e9e5927a954db8adb170906ba4f85905f70b77cab6c86eb5b6740081cc  ./skills/hermes-alive/hooks/alive_kernel/consolidation_evaluation.py
 fbeef5fe4a387889979e7d061f39015785209bcb248ba05bdf943ab04cc15a8d  ./skills/hermes-alive/hooks/alive_kernel/consolidation_synthesis.py
-b8870dc0e17ae7b8c71f28740e5ffca68ee65ec93aac102793db6ab224db2cf7  ./skills/hermes-alive/hooks/alive_kernel/contact_hours.py
+421c70cf6802f2cf3472c7462aa2437b1ab04fa365f55ac4e770611fb9375d74  ./skills/hermes-alive/hooks/alive_kernel/contact_hours.py
 c260f8917856f8ba284b36c42f7949a7322d37d05e071a5260bbff26ad84077d  ./skills/hermes-alive/hooks/alive_kernel/content_vault.py
 c520503a130a3ae90a5f813c82c8fe11fd5d4e0dbb0ea2806224f6adb75ecda9  ./skills/hermes-alive/hooks/alive_kernel/conversation_continuity.py
 2c297b686cbcb38cf7b571757ffa22a91b215b4eb61601611d95bfe7b19a84a7  ./skills/hermes-alive/hooks/alive_kernel/core_autonomous_work.py
@@ -776,7 +776,7 @@ a90658cd30f71e120f77d4120ce9d46d499c0f7c789934a0486f4d304a7c30b0  ./skills/herme
 342bae76e446878a2be5d6227836d310ea4c070b72d7d4ff0dcfcc0aff923252  ./skills/hermes-alive/hooks/alive_kernel/transport_receipts.py
 bca712fd351f1ddec7dea67de0b4e41f5cd74635bb63d7c1052f4e28c33652ef  ./skills/hermes-alive/hooks/alive_kernel/transport_reconciliation_runtime.py
 12323df069ca9d61978d20147bc8739c6d997b5a6033641b122e4e2ca08d29e8  ./skills/hermes-alive/hooks/alive_state.py
-639d09034ffb5846beb07f1390405d82667955b08c7faa0f9dd029243d5a0d56  ./skills/hermes-alive/hooks/circadian_engine.py
+e048d0e4cda3a42a31a7023f83806cc84f8378ce2feada1559b4761ea8f7fd78  ./skills/hermes-alive/hooks/circadian_engine.py
 37523353aec9442b20638eefc1963e4eba3ef9c98639d9f7f953afe6291f319e  ./skills/hermes-alive/hooks/circadian_intent_bridge.py
 c09c0ca1fc4f9fdc6dd34b3d0c0dab5885f2d3c09944a27d0b9a4610f6bd7bba  ./skills/hermes-alive/hooks/circadian_sleep_quiet_policy.py
 7551ca740dcfa14c20a3f335931daab8223c3b661d0c0ff4cae025b8b70f2095  ./skills/hermes-alive/hooks/content_delivery.py
@@ -810,7 +810,7 @@ eaf39dcc0d7d54b1400cc1c5b6a94c9081fa1defcfb955d4ace450054c415f0b  ./skills/herme
 101342bbea10c50c42be40c5aca59301bf027969456f1dbf9bd8d4dee2dcb914  ./skills/hermes-alive/references/troubleshooting-silent-mode.md
 81a6e1e1131e5be20712e9ea20e8ad1daf9ade3814fd6f3a8a41dadecd869c12  ./skills/hermes-alive/scripts/deploy.sh
 0212ed61f64bd812aae9781d66be4efbf1499970f655ea3c27d52098b55affc2  ./skills/hermes-alive/scripts/hermes-alive-lifecycle
-cadad2f25e0881e64ae13e01a5fab790f919db69108300ac0a629d93b1a716b6  ./skills/hermes-alive/scripts/hermes-alive-lifecycle.py
+248caa08a3db352cdb01458ae5de574acd12f1ad2f68a51b8ba41413ec1eb4dc  ./skills/hermes-alive/scripts/hermes-alive-lifecycle.py
 2723476a0f5d1d11e3f8f55b1d56026679fbb63249575d475003c868abde9ed5  ./skills/hermes-alive/scripts/install.sh
 cda2433fecdf03da2690cdc97ce38ac6a84ff36db6ad7d72a964ebb8eff6fbca  ./skills/hermes-alive/scripts/legacy-history-corpus.py
 bd24578d3faf39fe8bd0926d2b9468b178676ce857ca6fa31e38486281a23ecb  ./skills/hermes-alive/scripts/logs.py

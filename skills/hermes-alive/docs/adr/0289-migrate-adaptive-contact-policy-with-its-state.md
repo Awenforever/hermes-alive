@@ -1,7 +1,7 @@
 # ADR-0289 — Migrate adaptive contact policy with its state
 
-Status: proposed. Required before an adaptive legacy profile can cut over
-with its timing behavior preserved.
+Status: read-only preview implemented. Active state import, ownership and
+cutover qualification remain open.
 
 ## Why this differs from fixed quiet hours
 
@@ -50,3 +50,19 @@ owner correction must be reversible and survive restart.
   generation and that no previously withheld draft is replayed.
 - Compare decisions without actual delivery before proceeding to a separately
   authorized channel trial. Record differences and why each is intended.
+
+## Read-only preview
+
+The existing `alive contact-hours` preview can report the adaptive policy's
+current open/quiet result on a detached copy of the released state shape. The
+copy accepts the plan, current transition, active timing adjustments and sleep
+debt. Preview does not copy history, user content or unrelated keys, create
+legacy locks, or advance the source file. Invalid or unavailable state reports
+`unavailable`. A legacy adaptive profile still needs an explicit setup choice.
+
+Controlled comparison replays the legacy file-backed evaluator and detached
+evaluator at the same instants through explicit delay, learned offsets, wake,
+daily rollover and a daylight-saving fallback. The released baseline engine
+and policy matched the previous candidate's bytes. This exercise compares
+timing decisions. It does not import learning history, run the Native contact
+gate or establish the effect of a real owner exception after cutover.
