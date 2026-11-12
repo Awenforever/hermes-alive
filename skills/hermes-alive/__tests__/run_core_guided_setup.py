@@ -50,12 +50,25 @@ async def test(home,*,public_refinement=False):
     explicit_interests='Scientific history and public infrastructure; other worthwhile discoveries are welcome.'
     public_options=('--public-query','public synthetic topic','--confirm-public-reads','--confirm-cited-reads',
                     '--confirm-public-refinement') if public_refinement else ()
-    rc,staged=cli(home,'setup','--confirm-model-calls','--confirm-delivery',
+    setup_args=('setup','--confirm-model-calls','--confirm-delivery',
                   '--confirm-outbound-retention','--retention-days','30',
                   '--interests',explicit_interests,'--confirm-hermes-profile-memory',*public_options)
+    quiet={'start':'22:45','end':'08:15','timezone':'Asia/Shanghai'} if public_refinement else None
+    if quiet:
+        legacy_config=legacy.parent/'config/hermes-alive.json'
+        legacy_config.parent.mkdir()
+        legacy_bytes=b'{"values":{"enabled":false,"quiet_start":"22:45","quiet_end":"08:15","timezone":"Asia/Shanghai"}}'
+        legacy_config.write_bytes(legacy_bytes)
+        rc,preview=cli(home,'contact-hours')
+        assert rc==0 and preview['legacy_contact_hours']=={'state':'fixed','window':quiet}
+        rc,required=cli(home,*setup_args)
+        assert rc==2 and required['contact_hours_choice_required'] is True
+        setup_args=(*setup_args,'--keep-legacy-quiet-window')
+    rc,staged=cli(home,*setup_args)
     assert rc==0 and staged['ok'] and staged['delivery_enabled'] is False
     assert staged['phase']=='awaiting_authorized_conversation_confirmation'
     assert staged['confirmation_summary']['interest_preferences']==explicit_interests
+    assert staged['confirmation_summary']['quiet_window']==quiet
     assert staged['confirmation_summary']['explicit_interest_memory_until_updated_or_forgotten'] is True
     assert staged['confirmation_summary']['public_queries']==(['public synthetic topic'] if public_refinement else [])
     assert staged['confirmation_summary']['public_source_refinement'] is public_refinement
@@ -100,6 +113,9 @@ async def test(home,*,public_refinement=False):
         store=setup_bridge.setup_store(binding)
         configured=store.configuration()
         assert configured is not None and configured.options['model'] is None
+        if quiet:
+            assert dict(configured.options['quiet_window'])==quiet
+            assert '22:45–08:15' in reply and legacy_config.read_bytes()==legacy_bytes
         assert configured.options.get('refine_public_sources',False) is public_refinement
         from importlib import import_module
         package=store.__class__.__module__.rsplit('.',1)[0]

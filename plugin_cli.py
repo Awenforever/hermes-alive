@@ -256,7 +256,7 @@ def alive_command(args: argparse.Namespace) -> int:
     if action == 'contact-hours':
         from .tool_receipt_bridge import _kernel_module
         preview=_kernel_module('contact_hours').legacy_preview(_config_file(),os.environ)
-        print(json.dumps({'legacy_contact_hours':preview}))
+        print(json.dumps({'ok':True,'legacy_contact_hours':preview}))
         return 0
     if action == 'setup':
         if (not args.confirm_model_calls or not args.confirm_delivery or not args.confirm_outbound_retention
