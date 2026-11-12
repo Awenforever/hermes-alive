@@ -606,7 +606,7 @@ b3bd07052614d76f2d8dcb611f86ff69e8766364b7ce29e33e686442788d4998  ./docs/adr/028
 6a18a43e266d332719e8a4643a4ff5b80ad36a8a24ae38326a0b1bd4408a572a  ./docs/adr/0284-source-witnesses-for-final-review.md
 bd411e42ca0d289c4d36892e6ae52d277e7de21c88580716291a1920ca7f0822  ./docs/adr/0285-discovery-routes-are-not-owner-requests.md
 5d344b938218bb3249c91ae8ea854d3e89c9a41e996311db30c1328d3854b456  ./docs/adr/0286-ordinary-feedback-ingress-is-not-yet-connected.md
-ca90d66ec3978eff06b66e86c36fb92b85552c93a0639961b1adade09b344904  ./docs/adr/0287-conversational-discovery-contribution.md
+486e64f1e222cd8105931d2610fca1281827df5514ecf2ebf3e20505bc780483  ./docs/adr/0287-conversational-discovery-contribution.md
 ca868f058b2d861ebc94e5d665aec066d6e8387d1b039b8f808864ca4b78502e  ./docs/adr/0288-preserve-proactive-contact-hours-at-cutover.md
 e44bcd3b9995612bc0f3631109bf167807e22631807d18ac19f5558a96f3de59  ./docs/adr/0289-migrate-adaptive-contact-policy-with-its-state.md
 2e54c74cbe6e0809acd6a2895186c19ea1fc29a2ac184c5151fc5265633777c2  ./docs/adr/0290-continue-after-a-settled-core-model-timeout.md
@@ -721,7 +721,7 @@ dfd2cf6fab0bef63456c2f53cdfb49c2423c9bbcd01534174e64c7b1de45d4df  ./hooks/alive_
 5760b66ea0f82e7308f85f1f4e6c61c872aaedd2b5702ae19b9d19867afa3c99  ./hooks/alive_kernel/public_source_refinement.py
 61621ca6ab0496b7d36e004e55ec21f673303c373d901502b729e30aa727e812  ./hooks/alive_kernel/published_channel_execution.py
 9ddbe5a42f80d01e54431a488d765154fdc4861359bc622c54960006cd70b21a  ./hooks/alive_kernel/reading_assessment.py
-813d8ee5944cde3421083332b607ec23001bed618a29d3452716de1beccda192  ./hooks/alive_kernel/reconsideration.py
+fe09eb122297f45c35962fd1be2f56180cf1db902cee979a92e2c789b5b32119  ./hooks/alive_kernel/reconsideration.py
 8d657be4dc2c93524fee153be8f30bd2b3aa6e07be220729717f4eb38e26d67f  ./hooks/alive_kernel/recovery.py
 f39eaf3ddafcea7a8c850ca2f66efea4b8db6b16c073551cb0b7927d194483a4  ./hooks/alive_kernel/reflection.py
 02106be713a4e3ebc0117677a51f0a0f38be247216d678b9f78b43ed02eb8ca1  ./hooks/alive_kernel/rejection_eligibility.py

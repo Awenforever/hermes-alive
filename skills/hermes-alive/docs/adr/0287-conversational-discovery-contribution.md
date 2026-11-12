@@ -207,3 +207,11 @@ cannot invalidate silence while a newly eligible item can. No extra read is
 forced merely because the reading model abstained. This is a boundary on
 what can be shared, and a future real-model trial still needs to demonstrate
 that the reader finds useful pages often enough.
+
+The installed Core refinement test also exposed repeated work after an
+unchanged search. Each wake wrote the read-depth protocol marker before
+checking the retained silence. That marker advanced the owner frontier even
+though the search snapshot and eligible evidence were unchanged. With a
+successful listing fingerprint, the marker now follows the same
+reconsideration rule as the other discovery control records. Changed
+sources, failed reads and owner input retain their wake behavior.
