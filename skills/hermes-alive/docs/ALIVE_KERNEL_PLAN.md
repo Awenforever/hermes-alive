@@ -53,6 +53,9 @@ still unqualified. The migration witness exposed a functional gap: retained
 legacy quiet hours did not constrain Native dispatch. The fixed-hour candidate
 adds guided migration and checks at both planning and launch. Platform and
 active migration qualification remain open. See [ADR0288](adr/0288-preserve-proactive-contact-hours-at-cutover.md).
+Adaptive legacy profiles need a separate plan/state import and cutover proof.
+[ADR0289](adr/0289-migrate-adaptive-contact-policy-with-its-state.md) records the
+read-only preview, ownership and replay requirements.
 
 The current test supplier is official Core 0.22.5. Production admission,
 other-plugin integration and the actual production state must be checked again

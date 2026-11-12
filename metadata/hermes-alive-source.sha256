@@ -301,7 +301,7 @@ fbabb024702d8394fe6af3f145afb25fcb11b0674369aa0d2ece030b485f9f64  ./__tests__/ru
 c820346cb0721a679f22c1e15a59f23616f6d7a70adf2511e45e4a15a13c0e2c  ./__tests__/run_transport_publisher_withdrawal.py
 6210bc2e2fb0f3c78fe10a87ac68b007982a555a90e5c3245924e2c6c71c372f  ./__tests__/run_transport_reconciliation_runtime.py
 ed5065f1271617efd9df6f0c5ef5473d73e343f122df77f5668aa292abca617e  ./__tests__/run_watcher_retention_maintenance.py
-0f77b873bc82672994a3955ff047da57583eea7ff6b37e513f7bb4e3880f9b9f  ./docs/ALIVE_KERNEL_PLAN.md
+32f9c57fd7a5852da841dfca5b657a05885d1c302d317d351b025c8723a92b30  ./docs/ALIVE_KERNEL_PLAN.md
 bb1240b8645d5bde807e126c36ee12164e2ad602609064402df28740e0e3b315  ./docs/ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-25.md
 a7115842a8cd05021e657b281efb86655a48bd86294b917a3a324935b8a5383b  ./docs/ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-27.md
 861ecc2a8cdee6d997501ac564de7d11c6ac94b1a202fd5d143c8520acd7f1e5  ./docs/ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-11-05.md
@@ -608,6 +608,7 @@ bd411e42ca0d289c4d36892e6ae52d277e7de21c88580716291a1920ca7f0822  ./docs/adr/028
 5d344b938218bb3249c91ae8ea854d3e89c9a41e996311db30c1328d3854b456  ./docs/adr/0286-ordinary-feedback-ingress-is-not-yet-connected.md
 c516516bf02e0abfd0d4e74b0507766298a3689472c76313bce8529fda387f0c  ./docs/adr/0287-conversational-discovery-contribution.md
 ca868f058b2d861ebc94e5d665aec066d6e8387d1b039b8f808864ca4b78502e  ./docs/adr/0288-preserve-proactive-contact-hours-at-cutover.md
+0e50b9991a5a4bfd50a8c3ee72cfa50f1ecb53c3c5656bb0f37469d6a563cc6d  ./docs/adr/0289-migrate-adaptive-contact-policy-with-its-state.md
 4d6108e5f522390a4f9008265a2681771192c500c4c34a02179e24a238b55332  ./docs/evidence/deepseek-seed-20261012.json
 40941e141314d626c51ad4d22ccc19c76dcf4b770a85daa0881d135089fb75ea  ./docs/evidence/qwen-route-20261012.json
 460cffae94c5494e13515ab9c2dc42331e9fd14260bf4182086d5f3bd9e19114  ./hooks/HOOK.yaml
