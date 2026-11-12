@@ -36,7 +36,7 @@ from . import reading_assessment
 
 _DISCOVERY_AUTHORING = 'source-led-v2'
 _DISCOVERY_AUTHORING_MODES = ('source-led-v1','source-led-v2','source-led-v3')
-from .review_contracts import DISCOVERY_AUTHOR_SOURCE_INPUT, SPLIT_SOURCE_REVIEW, SPLIT_SOURCE_REVIEW_CONTRACTS
+from .review_contracts import CLAIM_COVERAGE_REVIEW, DISCOVERY_AUTHOR_SOURCE_INPUT, SPLIT_SOURCE_REVIEW_CONTRACTS
 
 
 class OpportunitySynthesisError(ValueError):
@@ -1314,7 +1314,7 @@ class OpportunitySynthesizer:
             from .research_evidence import resolve_search_purpose, configured_route_context
             prompt_data['approved_search_queries'] = resolve_search_purpose(
                 self.reader, subject=subject, receipt_id=search_purpose_receipt_id)
-            role = configured_route_context(SPLIT_SOURCE_REVIEW) if recipient_meaning and (
+            role = configured_route_context(CLAIM_COVERAGE_REVIEW) if recipient_meaning and (
                 focus or _DISCOVERY_AUTHORING=='source-led-v2') else None
             if role is not None:
                 prompt_data['search_context'] = role
@@ -1408,7 +1408,7 @@ class OpportunitySynthesizer:
             recipient_output='intent-only-v1' if recipient_meaning else None,
             editorial_context='origin-purpose-v1' if recipient_meaning else None,
             discovery_authoring=('source-led-v3' if focus else _DISCOVERY_AUTHORING) if recipient_meaning else None,
-            **({'discovery_source_review':SPLIT_SOURCE_REVIEW}
+            **({'discovery_source_review':CLAIM_COVERAGE_REVIEW}
                if recipient_meaning and (focus or _DISCOVERY_AUTHORING=='source-led-v2') else {}),
             **({'discovery_author_input':DISCOVERY_AUTHOR_SOURCE_INPUT}
                if recipient_meaning and (focus or _DISCOVERY_AUTHORING=='source-led-v2') else {}),

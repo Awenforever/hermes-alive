@@ -168,3 +168,19 @@ other subjects and retain the source boundary for subsequent replies.
 
 Primary records: [research announcement](https://www.slrss.cn/kycg/202607/t20260710_849344.html)
 and [NASA MCD64A1 user guide](https://www.earthdata.nasa.gov/s3fs-public/2025-04/MCD64_User_Guide_V61.pdf).
+
+The new review contract preserves older receipts and adds a deterministic
+coverage check to the existing review. Each explicit digit-based number in
+the actual draft must be inside a verified claim span whose selected passage
+contains the number. Citation destinations and list numbering are excluded.
+A missing or unrelated witness yields an unresolved finding, so a model's
+overall approval cannot authorize the original draft. The existing review
+and correction paths still judge scope, attribution and meaning. No
+additional model call is required for the coverage check.
+
+This check establishes a minimum evidence link for explicit numbers. A
+matching number alone does not establish the unit, population, causal
+relationship or product it describes. Nonnumeric claims still require
+semantic review, and unsupported conversions need source support or
+revision. Search-to-page selection and useful, concise follow-ups remain
+separate real-model qualification work.

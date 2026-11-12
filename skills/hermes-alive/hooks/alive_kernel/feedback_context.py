@@ -33,8 +33,8 @@ def prospective_feedback(pairs, *, topic_signals=False):
 
 def source_review_prompt_snapshot(snapshot):
     """Keep the retained audit snapshot out of model-facing review and repair."""
-    from .review_contracts import PRESENTATION_ASSESSMENT
-    if snapshot.get('expression_binding', {}).get('final_assessment_scope') == PRESENTATION_ASSESSMENT:
+    from .review_contracts import PRESENTATION_ASSESSMENTS
+    if snapshot.get('expression_binding', {}).get('final_assessment_scope') in PRESENTATION_ASSESSMENTS:
         from .communication_plan import discovery_presentation_preferences
         return {**snapshot,
                 'explicit_context': discovery_presentation_preferences(snapshot['explicit_context']),

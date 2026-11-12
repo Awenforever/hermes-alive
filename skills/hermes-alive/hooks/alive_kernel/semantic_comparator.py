@@ -242,8 +242,8 @@ class SemanticComparator:
     @staticmethod
     def _author_context(context):
         from .feedback_context import NATIVE_TOPIC_METHOD, prospective_feedback
-        from .review_contracts import SPLIT_SOURCE_REVIEW
-        if context and context.get('semantic_source_contract') == SPLIT_SOURCE_REVIEW:
+        from .review_contracts import PRESENTATION_REVIEW_CONTRACTS
+        if context and context.get('semantic_source_contract') in PRESENTATION_REVIEW_CONTRACTS:
             from .communication_plan import discovery_presentation_preferences
             return {**context, 'user_context': discovery_presentation_preferences(context['user_context']),
                     'literal_feedback_context': [],
@@ -544,11 +544,11 @@ class SemanticComparator:
                                            FIRST_PASSAGE_REVIEW, FIRST_LABELLED_REVIEW,
                                            FIRST_FLAT_REVIEW, FIRST_SEARCH_REVIEW,
                                            ROUTE_AWARE_REVIEW, CLAIM_SCOPE_REVIEW, CONTRIBUTION_REVIEW,
-                                           SPLIT_SOURCE_REVIEW)
+                                           PRESENTATION_REVIEW_CONTRACTS)
             render_system = _RENDER_PROMPT
             if discovery:
                 contract = expression_context.get('semantic_source_contract')
-                if contract == SPLIT_SOURCE_REVIEW:
+                if contract in PRESENTATION_REVIEW_CONTRACTS:
                     render_system = _DISCOVERY_PRESENTATION_PROMPT
                 elif contract == CONTRIBUTION_REVIEW:
                     render_system = _DISCOVERY_CONTRIBUTION_PROMPT

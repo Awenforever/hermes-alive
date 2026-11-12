@@ -3,9 +3,12 @@
 The host combines the model's explicit judgments; it does not classify prose or
 infer recipient preferences. Existing lifecycle consumers retain one verdict.
 """
+import re
+from unicodedata import normalize
+
 from .model_json import parse_model_json
 from .review_contracts import (CLAIM_SCOPE_ASSESSMENTS, FLAT_ASSESSMENTS, SEARCH_ASSESSMENTS,
-                               LABELLED_ASSESSMENTS, PASSAGE_FIT_ASSESSMENT)
+                               CLAIM_COVERAGE_ASSESSMENT, LABELLED_ASSESSMENTS, PASSAGE_FIT_ASSESSMENT)
 
 
 PROMPT = """Assess this actual message under the supplied source evidence,
@@ -196,6 +199,60 @@ conflict even when every point is supported. Use the existing fit_reason
 to explain what belongs in the opening and what can wait.
 """
 
+CLAIM_COVERAGE_PROMPT = PRESENTATION_PROMPT + """
+Check every material assertion in the proposed wording, including secondary
+comparisons, mechanism details and interpretive examples. A correct central
+claim cannot cover a different unsupported assertion. Your own background
+knowledge is not supplied evidence. A search-result excerpt supports only
+what it actually says. Distinguish values attached to different products,
+inputs, populations, conditions or periods even when the units agree.
+For a supported decision, cite verbatim claim spans covering each explicit
+number, including the compared values, and cite passages that state those
+values. Include the associated entity or condition in each claim span.
+Numbers may keep the source's notation. If a material comparison depends on
+unavailable evidence or an unsupported conversion, flag it for revision.
+"""
+
+_NUMBER = re.compile(r'\d+(?:,\d{3})*(?:\.\d+)?')
+_NON_PROSE = re.compile(r'https?://[^\s<>\])]+|(?m:^[ \t]*\d+[.)][ \t]+)', re.IGNORECASE)
+
+
+def _normalized_numeric_text(text):
+    return _NON_PROSE.sub(lambda match: ' ' * len(match[0]), normalize('NFKC', text))
+
+
+def _number_value(match):
+    return match[0].replace(',', '')
+
+
+def _apply_numeric_coverage(findings, snapshot):
+    """Give each visible numeric occurrence a local evidence witness."""
+    text = _normalized_numeric_text(snapshot['candidate']['text'])
+    uncovered = {number.span(): _number_value(number) for number in _NUMBER.finditer(text)}
+    for witness in findings['source_witnesses']:
+        claim = _normalized_numeric_text(witness['claim'])
+        evidence_values = {_number_value(number)
+                           for number in _NUMBER.finditer(_normalized_numeric_text(witness['quote']))}
+        witnessed_numbers = [number for number in _NUMBER.finditer(claim)
+                             if _number_value(number) in evidence_values]
+        for occurrence in re.finditer(re.escape(claim), text):
+            for number in witnessed_numbers:
+                start, end = number.span()
+                offset = occurrence.start()
+                uncovered.pop((offset + start, offset + end), None)
+
+    missing = list(dict.fromkeys(uncovered.values()))
+    coverage = dict(assessment='unresolved' if missing else 'covered',
+        reason=('These numeric expressions lack an evidence witness at their occurrence: ' +
+                ', '.join(missing)[:1200] + '. Remove or source the affected assertions.'
+                if missing else 'Each explicit numeric occurrence has a matching passage witness.'))
+    return _with_finding(findings, 'numeric_evidence_coverage', coverage, 'unsupported', 'unresolved')
+
+
+def _coverage_scope(snapshot):
+    return (snapshot is not None and snapshot.get('expression_binding', {}).get(
+        'final_assessment_scope') == CLAIM_COVERAGE_ASSESSMENT)
+
 
 def _search_scope(snapshot):
     return (snapshot is not None and snapshot.get('expression_binding', {}).get(
@@ -375,6 +432,8 @@ def parse(text, *, witness_snapshot=None):
     if witness_snapshot is not None:
         findings['source_witnesses'] = _validate_witnesses(
             witnesses, witness_snapshot, findings['factual_support']['assessment'])
+    if _coverage_scope(witness_snapshot):
+        findings = _apply_numeric_coverage(findings, witness_snapshot)
     return findings
 
 
@@ -384,6 +443,8 @@ def validate_retained(findings, *, witness_snapshot=None):
         witness_fields.add('search_alignment')
     if _claim_scope(witness_snapshot):
         witness_fields.add('claim_scope')
+    if _coverage_scope(witness_snapshot):
+        witness_fields.add('numeric_evidence_coverage')
     if not isinstance(findings, dict) or set(findings) != {
             'verdict', 'unsupported_claims', 'uncertainties', 'reason',
             'factual_support', 'communication_fit'} | witness_fields:
@@ -396,6 +457,8 @@ def validate_retained(findings, *, witness_snapshot=None):
     if witness_snapshot is not None:
         rebuilt['source_witnesses'] = _validate_witnesses(
             findings['source_witnesses'], witness_snapshot, rebuilt['factual_support']['assessment'], retained=True)
+    if _coverage_scope(witness_snapshot):
+        rebuilt = _apply_numeric_coverage(rebuilt, witness_snapshot)
     if rebuilt != findings:
         raise ValueError('retained assessment contradicts its dimensions')
     return rebuilt

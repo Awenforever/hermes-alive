@@ -100,7 +100,8 @@ async def exercise(root,mode,*,historical=False,fit_revision=False):
     ingestor=DiscoveryOpportunityIngestor(journal)
     source=ingestor.ingest(DiscoveryCandidate(source='synthetic public source',title='Observation design',
         url='https://example.invalid/design',summary='FAMILY_SPEC_OPTIONAL. The project describes continuing '
-        'to observe when evidence is insufficient, rather than answering immediately.'),subject='user:test')
+        'to observe when evidence is insufficient, rather than answering immediately. '
+        'The trial used 3 observation sites.'),subject='user:test')
     interpreter=OpportunitySynthesizer(journal,content_vault=ingestor.vault)
     inquiries=DiscoveryInquiryContext(ingestor)
     inquiry=inquiries.remember(item_id='inquiry:private-research',subject='user:test',
@@ -163,6 +164,10 @@ async def exercise(root,mode,*,historical=False,fit_revision=False):
                 return response('The project keeps watching when evidence is insufficient. https://example.invalid/design')
             if mode=='code-citation':
                 return response('The project keeps watching. `[source](https://example.invalid/design)`')
+            if mode in ('numeric-sourced','numeric-unwitnessed'):
+                count = 3 if mode=='numeric-sourced' else 7
+                return response(f'The project describes continuing to observe. The trial used {count} sites. '
+                    '[Observation design](https://example.invalid/design).')
             return response(('DENSE_FIRST_OPENING. ' if fit_revision else 'I shared this yesterday. ' if mode=='repair' else '')+
                 'The project describes keeping watch when evidence is insufficient: '
                 '[observation design](https://example.invalid/design).')
@@ -246,7 +251,9 @@ async def exercise(root,mode,*,historical=False,fit_revision=False):
         assert not journal.read(event_type='expression.source_revision_completed')
         assert not journal.read(event_type='action.attempted') and not journal.read(event_type='dispatch.started')
         return
-    assert assessed.quality_disposition==('final_unsupported' if mode=='unsupported' or fit_revision=='reject-again' else 'supported')
+    expected_quality = ('final_uncertain' if mode=='numeric-unwitnessed'
+        else 'final_unsupported' if mode=='unsupported' or fit_revision=='reject-again' else 'supported')
+    assert assessed.quality_disposition==expected_quality
     assert 'FAMILY_SPEC_OPTIONAL' not in expressed.text and not expressed.delivery_authorized
     semantic=journal.get(expressed.review_event_id)
     assert (semantic.event.payload.get('assessment_scope')=='required-boundaries-v1') is (not historical)
@@ -298,7 +305,7 @@ async def exercise(root,mode,*,historical=False,fit_revision=False):
         interpretation_id=expressed.planning.interpretation_event_id.removeprefix(
             'opportunity.synthesis:').removesuffix(':completed'),require_independence=False)
     decision=runtime.authorizer.evaluate(operation_id='with-final',final_wording_witness=witness,**args)
-    assert decision.authorized is (mode!='unsupported' and fit_revision!='reject-again'),decision.reasons
+    assert decision.authorized is (expected_quality=='supported'),decision.reasons
     if decision.authorized:
         outbox=DispatchOutbox(journal,content_vault=ingestor.vault)
         authorized=journal.get(decision.event_id)
@@ -336,7 +343,7 @@ async def strict_scope(root):
 if __name__=='__main__':
     import argparse
     cases=('supported','unsupported','recovery','proposal-recovery','no-grounding','source-withdrawn','repair',
-           'bare-citation','code-citation','legacy-bare')
+           'bare-citation','code-citation','legacy-bare','numeric-sourced','numeric-unwitnessed')
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--case',choices=cases)
     selected=parser.parse_args().case

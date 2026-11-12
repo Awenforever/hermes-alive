@@ -5,7 +5,7 @@ def controlled_final_findings(snapshot, *, factual='supported', fit='fits', reas
     scope = snapshot.get('expression_binding', {}).get('final_assessment_scope')
     search_scopes = ('factual-support-and-communication-fit-v7', 'factual-support-and-communication-fit-v8',
                      'factual-support-and-communication-fit-v9', 'factual-support-and-communication-fit-v10',
-                     'factual-support-and-communication-fit-v11')
+                     'factual-support-and-communication-fit-v11', 'factual-support-and-communication-fit-v12')
     if scope in ('factual-support-and-communication-fit-v6', *search_scopes):
         witnesses = []
         if factual == 'supported':
@@ -16,7 +16,7 @@ def controlled_final_findings(snapshot, *, factual='supported', fit='fits', reas
         if scope in search_scopes:
             result.update(search_alignment='matches' if snapshot.get('approved_search_queries') else 'not_applicable',
                           scope_reason='Synthetic source answers the supplied synthetic search, if present.')
-        if scope in search_scopes[-3:]:
+        if scope in search_scopes[-4:]:
             result.update(claim_scope='preserved', claim_scope_reason='Synthetic assertion scope.')
         return result
     if scope in ('factual-support-and-communication-fit-v1', 'factual-support-and-communication-fit-v2',

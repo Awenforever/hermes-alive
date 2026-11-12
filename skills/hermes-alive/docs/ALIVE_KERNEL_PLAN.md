@@ -233,8 +233,10 @@ the longitudinal memory, ongoing work and platform service journeys below.
 
 ADR0287 records a later false acceptance from search-only evidence: the
 review verified the dataset witnesses and overlooked a distinct comparison
-it knew was inaccurate. Require the evidence used for a discovery lead to
-support the actual claim and its comparison before a delivery can qualify.
+it knew was inaccurate. The new final review adds an evidence-coverage veto
+for explicit numeric occurrences. Continue qualifying how the reader promotes
+a search lead to page evidence and how the model verifies the entities and
+relationship behind each material comparison.
 The independent Ubuntu consumer fetched the latest development artifact
 but Core blocked non-interactive installation at its community scan review.
 The previous installed version and inactive test profile remain in place.

@@ -11,7 +11,8 @@ from alive_kernel.expression_support import ExpressionSourceSupportReviewer
 from alive_kernel.review_contracts import (LEGACY_SPLIT_SOURCE_REVIEW, FIRST_FACTS_AND_FIT_REVIEW,
     FACTS_AND_FIT_ASSESSMENT, SPLIT_SOURCE_REVIEW, FIRST_FLAT_REVIEW, FLAT_FIT_ASSESSMENT,
     FIRST_SEARCH_REVIEW, SEARCH_FIT_ASSESSMENT, CLAIM_SCOPE_REVIEW, CLAIM_SCOPE_ASSESSMENT,
-    CONTRIBUTION_REVIEW, CONTRIBUTION_ASSESSMENT)
+    CONTRIBUTION_REVIEW, CONTRIBUTION_ASSESSMENT, PRESENTATION_ASSESSMENT,
+    CLAIM_COVERAGE_REVIEW, CLAIM_COVERAGE_ASSESSMENT)
 
 
 async def test(root, original_contract, original_scope):
@@ -21,13 +22,13 @@ async def test(root, original_contract, original_scope):
     async def historical_start(self, **kwargs):
         # Only interpretation generation runs with the previous default. Its
         # stored method must determine later author/review/recovery semantics.
-        with patch('alive_kernel.opportunity_synthesis.SPLIT_SOURCE_REVIEW', original_contract):
+        with patch('alive_kernel.opportunity_synthesis.CLAIM_COVERAGE_REVIEW', original_contract):
             return await original(self, **kwargs)
 
     with patch.object(OpportunitySynthesizer, 'run', historical_start):
         await exercise(root, 'supported')  # Includes cold completed recovery, no new calls.
     import alive_kernel.opportunity_synthesis as synthesis
-    assert synthesis.SPLIT_SOURCE_REVIEW == SPLIT_SOURCE_REVIEW
+    assert synthesis.CLAIM_COVERAGE_REVIEW == CLAIM_COVERAGE_REVIEW
     journal = ExperienceJournal(root / 'journal.sqlite3')
     starts = [r for r in journal.read() if 'interpreter_method' in r.event.payload]
     assert starts and any(r.event.payload['interpreter_method'].get('discovery_source_review')
@@ -52,4 +53,6 @@ if __name__ == '__main__':
         asyncio.run(test(Path(directory) / 'previous-search', FIRST_SEARCH_REVIEW, SEARCH_FIT_ASSESSMENT))
         asyncio.run(test(Path(directory) / 'previous-claim-scope', CLAIM_SCOPE_REVIEW, CLAIM_SCOPE_ASSESSMENT))
         asyncio.run(test(Path(directory) / 'previous-contribution', CONTRIBUTION_REVIEW, CONTRIBUTION_ASSESSMENT))
+        asyncio.run(test(Path(directory) / 'previous-presentation', SPLIT_SOURCE_REVIEW, PRESENTATION_ASSESSMENT))
+        asyncio.run(test(Path(directory) / 'current-coverage', CLAIM_COVERAGE_REVIEW, CLAIM_COVERAGE_ASSESSMENT))
     print('FINAL_VALUE_RECOVERY_OK')

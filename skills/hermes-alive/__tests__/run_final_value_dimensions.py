@@ -296,6 +296,38 @@ def test_only_explicit_communication_choices_shape_new_discovery_openings():
     assert snapshot['explicit_context'] == facts and snapshot['learned_advisory'] and snapshot['recent_feedback_context']
 
 
+def test_numeric_coverage_of_actual_draft():
+    from alive_kernel.review_contracts import CLAIM_COVERAGE_ASSESSMENT, PRESENTATION_ASSESSMENT
+
+    opening = 'The new terrain map has a 10 m resolution.'
+    comparison = 'The existing regional product uses 1,000 m cells.'
+    text = f'{opening}\n\n1. {comparison} [Data](<https://example.invalid/2026/map>)'
+    snapshot = dict(candidate={'text': text}, evidence=[
+        {'event_id': 'map', 'excerpt': 'The publisher released a 10 m terrain map.'},
+        {'event_id': 'baseline', 'excerpt': 'The existing regional product has 1000 m cells.'}])
+    wire = dict(facts='supported', fact_reason='The reviewer approves the draft.', fit='fits',
+        fit_reason='One concrete contribution.', recipient_evidence=[], search_alignment='not_applicable',
+        scope_reason='No query.', claim_scope='preserved', claim_scope_reason='The map is sourced.',
+        source_witnesses=[dict(claim=opening, passage_id='P1.1')])
+
+    def evaluate(scope, response):
+        bound = {**snapshot, 'expression_binding': {'final_assessment_scope': scope}}
+        result = parse(json.dumps(response), witness_snapshot=bound)
+        assert validate_retained(result, witness_snapshot=bound) == result
+        return result
+
+    assert evaluate(PRESENTATION_ASSESSMENT, wire)['verdict'] == 'supported'
+    result = evaluate(CLAIM_COVERAGE_ASSESSMENT, wire)
+    assert result['verdict'] == 'uncertain' and '1000' in result['reason']
+    assert evaluate(CLAIM_COVERAGE_ASSESSMENT, {**wire, 'source_witnesses': [
+        *wire['source_witnesses'], dict(claim=comparison, passage_id='P1.1')]})['verdict'] == 'uncertain'
+    witnessed = {**wire, 'source_witnesses': [
+        *wire['source_witnesses'], dict(claim=comparison, passage_id='P2.1')]}
+    assert evaluate(CLAIM_COVERAGE_ASSESSMENT, witnessed)['verdict'] == 'supported'
+    snapshot['candidate']['text'] += '\nThe sensors also operated at a depth of 10 m.'
+    assert evaluate(CLAIM_COVERAGE_ASSESSMENT, witnessed)['verdict'] == 'uncertain'
+
+
 if __name__ == '__main__':
     test_dimensions()
     test_old_and_new_contracts()
@@ -305,4 +337,5 @@ if __name__ == '__main__':
     test_configured_route_provenance()
     test_claim_scope_veto()
     test_only_explicit_communication_choices_shape_new_discovery_openings()
+    test_numeric_coverage_of_actual_draft()
     print('FINAL_VALUE_DIMENSIONS_OK')
