@@ -820,4 +820,4 @@ e5513e6351db39261bd8867b3974c4f1e054499910d9e97134b8432f7a8eff15  ./skills/herme
 7822450b5c4adf833ab203dabcc9d926367651e7528890efaac7047a620c9e9f  ./skills/hermes-alive/scripts/verify.sh
 9034087979453d4815041252bb92e15e497e0a0b77b819c06ad9a3f2686f46ea  ./skills/hermes-alive/templates/.env.template
 8a71d346e1a71f905631e918f3507564891331cd8c7bf1d2247ae1d36c7ab0c4  ./skills/hermes-alive/templates/sources.yaml
-9e3d8db1651bb883886f9cf8228ded91f0cbdc1ec3fa06376800f5d0873627f8  ./tool_receipt_bridge.py
+2692b29d75ef1b6b07b5225d75403655abfab63baf3ceefd448c3e2c636fae7c  ./tool_receipt_bridge.py
