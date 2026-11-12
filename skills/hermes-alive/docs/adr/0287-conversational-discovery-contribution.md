@@ -184,3 +184,26 @@ relationship or product it describes. Nonnumeric claims still require
 semantic review, and unsupported conversions need source support or
 revision. Search-to-page selection and useful, concise follow-ups remain
 separate real-model qualification work.
+
+## Keep search leads out of the authoring pool
+
+The audited r1018 reading decision completed successfully and selected
+zero pages. It judged that the three results did not establish a newly
+released November dataset. No extraction failed or timed out. The later
+opportunity stage independently drew from the general active evidence pool,
+which still treated the unread search results as draftable observations.
+
+For newly planned configured-discovery wakes, bind a material pool that
+excludes Hermes search listings before applying the evidence limit. The
+reader can still see listings to choose what to read, and their retained
+receipts still supply collection provenance. A page extract remains eligible
+even if a search listing for the same URL also exists. Independently
+collected evidence and commitments remain in the candidate pool. Existing
+rejection windows and exact scopes of already-started plans still apply.
+
+An empty filtered pool closes as silence when there is no other material.
+Recovery rechecks eligible evidence in that same scope, so an unread result
+cannot invalidate silence while a newly eligible item can. No extra read is
+forced merely because the reading model abstained. This is a boundary on
+what can be shared, and a future real-model trial still needs to demonstrate
+that the reader finds useful pages often enough.

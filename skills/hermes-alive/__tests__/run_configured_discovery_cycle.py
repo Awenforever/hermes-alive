@@ -111,6 +111,10 @@ async def exercise(root,mode,*,primary_url=None):
     state={'consent':True,'interrupt':mode in ('replay','legacy-replay','historical-followup-replay')}
     tools=[];models=[];unload=[];release=threading.Event();entered=threading.Event()
     url='https://example.invalid/conservation'
+    if mode=='abstain-with-prior-evidence':
+        ingestor.ingest(DiscoveryCandidate(source='synthetic verified page',title='Earlier conservation method',
+            url=url,summary='DEEP_READ_EVIDENCE. The museum describes observing without intervention.'),
+            subject='user:test')
     primary=primary_url or 'https://example.invalid/original-observations'
     backgrounds=(url+'/context-1',url+'/context-2')
     def dispatch(name,args):
@@ -178,8 +182,9 @@ async def exercise(root,mode,*,primary_url=None):
                     assert 'absent metadata date' in kw['messages'][0]['content']
                 refs=[s['source_ref'] for s in data['sources']]
                 if mode=='invalid-choice':refs=['https://private.invalid/not-a-supplied-reference']
-                value=dict(source_refs=[] if mode=='abstain' else refs[:1],
-                    question=None if mode=='abstain' else 'INTERNAL_RESEARCH_QUESTION: What changed in observation?',
+                abstains=mode in ('abstain','abstain-with-prior-evidence')
+                value=dict(source_refs=[] if abstains else refs[:1],
+                    question=None if abstains else 'INTERNAL_RESEARCH_QUESTION: What changed in observation?',
                     value_hypothesis='A tentative interesting conservation insight, not a user request.')
                 if mode=='revoked-choice':state['consent']=False
                 if mode=='forgotten-choice':
@@ -219,16 +224,18 @@ async def exercise(root,mode,*,primary_url=None):
                     assert data['approved_search_queries'] == ['public museum methods']
                 sources=[{**e,'summary_excerpt':e.get('summary_excerpt') or ''.join(p['text'] for p in e.get('summary_passages',[]))}
                          for e in data['opportunities']]
-                if mode=='abstain':value=dict(candidates=[],abstentions=[dict(agenda_item_id=e['agenda_item_id'],reason='No worthwhile contribution.') for e in sources])
+                assert not any('A public non-invasive conservation method is described.' in e['summary_excerpt'] for e in sources)
+                if mode in ('abstain','page-failed'):
+                    raise AssertionError('unread search listing reached opportunity generation')
                 else:
-                    assert data['tentative_discovery_tasks']
+                    assert bool(data.get('tentative_discovery_tasks')) is (mode!='abstain-with-prior-evidence')
                     if pressure or mode in ('primary-read','replay','private-followup','erase-group-after-final','historical-followup-replay','mixed-followup'):
                         if os.getenv('ALIVE_REPRODUCE_OLD_RECALL')=='1' and not any('PRIMARY_READ_EVIDENCE' in e['summary_excerpt'] for e in sources):
                             print('REGRESSION_OLD_RECALL_DROPPED_PRIMARY pool='+str(data['recall_window']['pool_size'])+' window='+str(len(sources)),flush=True)
                         assert any('PRIMARY_READ_EVIDENCE' in e['summary_excerpt'] for e in sources)
                     if pressure:
                         assert len(raw)>24000, 'fixture did not recreate the old packing pressure'
-                    if mode!='page-failed':assert any('DEEP_READ_EVIDENCE' in e['summary_excerpt'] for e in sources)
+                    assert any('DEEP_READ_EVIDENCE' in e['summary_excerpt'] for e in sources)
                     e=next((e for e in sources if 'DEEP_READ_EVIDENCE' in e['summary_excerpt']),sources[0])
                     value=dict(candidates=[dict(agenda_item_id=e['agenda_item_id'],kind='share',topic='conservation',
                         communication_plan=dict(version=3,recipient_goal='INTERNAL_GOAL',speech_act='share',contents=[],behavior_constraints=[]),
@@ -273,7 +280,8 @@ async def exercise(root,mode,*,primary_url=None):
                     assert data['search_context']['kind']=='configured-discovery-route-v1'
                     assert data['search_context']['current_owner_search_request_supplied'] is False
                 assert data['expression_binding']['assessment_mode']==('discovery-source-and-value-v2'
-                    if mode in ('page-failed','legacy-replay','unconsented-followup','historical-followup-replay') else 'discovery-source-and-value-v3')
+                    if mode in ('abstain-with-prior-evidence','legacy-replay','unconsented-followup','historical-followup-replay')
+                    else 'discovery-source-and-value-v3')
                 from alive_kernel_testkit import controlled_final_findings
                 value=controlled_final_findings(data)
             else:raise AssertionError(task)
@@ -348,15 +356,20 @@ async def exercise(root,mode,*,primary_url=None):
             if mode in ('replay','legacy-replay','historical-followup-replay'):
                 assert (len(tools),len(models))==before
                 assert not journal.read(event_type='discovery.reading_assessment_opened')
-            if mode in ('search-failed','search-empty'):
+            if mode in ('search-failed','search-empty','abstain','page-failed'):
                 expected='discovery_search_unavailable' if mode=='search-failed' else 'silence'
-                assert result.disposition==expected
+                assert result.disposition==expected, (result.disposition, models, [name for name,_ in tools])
                 closed,=journal.read(event_type='autonomous.host.closed')
                 assert host._validate(closed.event)['disposition']==expected
-                assert [name for name,_ in tools]==['web_search'] and not models
+                assert [name for name,_ in tools]==(['web_search','web_extract'] if mode=='page-failed' else ['web_search'])
+                assert models==(['alive_discovery_reading'] if mode in ('abstain','page-failed') else [])
+                if mode in ('abstain','page-failed'):
+                    search, *_ = journal.read(event_type='discovery.host_read_completed')
+                    assert ingestor.active_evidence(subject='user:test',clearance=Sensitivity.PRIVATE,
+                        observation_event_ids=tuple(search.event.payload['observations']))
                 assert result.external_delivery_proven is False
                 return
-            assert result.disposition==('paused' if mode=='paused' else 'silence' if mode=='abstain' else 'shadow_selected')
+            assert result.disposition==('paused' if mode=='paused' else 'shadow_selected')
             assert len(journal.read(event_type='autonomous.host.closed'))==1
             if mode == 'primary-read':
                 from alive_kernel.research_evidence import resolve_search_purpose
@@ -371,7 +384,11 @@ async def exercise(root,mode,*,primary_url=None):
                     else:
                         raise AssertionError('an unrelated receipt supplied the approved query scope')
             if mode=='paused':assert not tools and not models
-            elif mode!='abstain':
+            elif mode=='abstain-with-prior-evidence':
+                assert [name for name,_ in tools]==['web_search']
+                assert models.count('alive_discovery_reading')==models.count('alive_source_support')==1
+                assert url in result.expression.text
+            else:
                 assert url in result.expression.text
                 assert len(tools)==(3 if pressure or mode in ('primary-read','replay','followup-failed','private-followup','erase-group-after-final','historical-followup-replay','mixed-followup') else 2)
                 assert models.count('alive_discovery_reading')==1
@@ -473,7 +490,6 @@ async def exercise(root,mode,*,primary_url=None):
                         source_event_ids=(fresh.event.event_id,),confidence=1)
                     memory.apply(memory.append_proposal(change,actor='user:test'))
                     assert runtime.preparation.expression.planning.synth._source_cursor('user:test',Sensitivity.PRIVATE)==0
-            else:assert len(tools)==1
         assert not journal.read(event_type='action.attempted')
         assert not journal.read(event_type='dispatch.externally_delivered')
         assert not runner.pending
@@ -486,7 +502,7 @@ selected_cases=parser.parse_args().case
 with tempfile.TemporaryDirectory(prefix='alive-configured-discovery-') as folder:
     modes=('budget-pressure',) if os.getenv('ALIVE_REPRODUCE_OLD_RECALL')=='1' else (
                  'share','reading-assessment','reading-assessment-no-followup','reading-assessment-budget-pressure','reading-assessment-invalid','reading-assessment-missing','reading-assessment-recovery','primary-read','private-followup','budget-pressure','fair-budget-pressure','erase-group-after-final','followup-failed','replay','legacy-replay','historical-followup-replay','unconsented-followup','page-failed','abstain','paused',
-                 'search-failed','search-empty','invalid-choice','revoked-choice','forgotten-choice','erased-choice','uncertain-read',
+                 'search-failed','search-empty','abstain-with-prior-evidence','invalid-choice','revoked-choice','forgotten-choice','erased-choice','uncertain-read',
                  'invented-followup','foreign-followup','mixed-followup','malformed-followup','nonjson-followup',
                  'revoked-followup','forgotten-followup','erased-followup','interrupted-followup','historical-invalid-followup')
     if selected_cases:

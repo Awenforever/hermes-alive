@@ -231,7 +231,6 @@ class NativeCognitionHost:
                                 # expiry/hold to an already-started generation.
                                 old=_thaw_json(prior.event.payload.get('candidate_material_scope'))
                                 return {**prepared,**({'candidate_material_scope':old} if old is not None else {})}
-                            if not view.held:return prepared
                             focus=()
                             receipts=prepared.get('research_read_receipt_ids',())
                             if receipts:
@@ -241,7 +240,7 @@ class NativeCognitionHost:
                                     receipt_ids=receipts,inquiries=synth.inquiries.read(subject=self.host.subject,
                                         clearance=clearance,item_ids=prepared.get('inquiry_item_ids',())))
                             material=synth.material_scope(subject=self.host.subject,clearance=prepared.get('sensitivity','private'),
-                                focus=focus,excluded_urls=view.excluded_urls,
+                                focus=focus,excluded_urls=view.excluded_urls,exclude_search_listings=True,
                                 deferred_source_ids=tuple(dict.fromkeys(h.observation_event_id for h in view.held)))
                             return {**prepared,'candidate_material_scope':material}
                         return await context_value(prepared.get('read_context'),scope)

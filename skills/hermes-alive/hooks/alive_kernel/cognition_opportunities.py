@@ -205,9 +205,10 @@ class CognitionOpportunityReader(DiscoveryOpportunityIngestor):
             return tuple(by_id[e] for e in observation_event_ids if e in by_id)
         return self._merge_candidate_evidence(discoveries,commitments,limit,source_cursor)
 
-    def candidate_evidence(self,*,subject,clearance,limit=8,excluded_urls=(),source_cursor=None):
+    def candidate_evidence(self,*,subject,clearance,limit=8,excluded_urls=(),source_cursor=None,
+                           exclude_search_listings=False):
         discoveries=super().candidate_evidence(subject=subject,clearance=clearance,limit=limit,
-            excluded_urls=excluded_urls,source_cursor=source_cursor)
+            excluded_urls=excluded_urls,source_cursor=source_cursor,exclude_search_listings=exclude_search_listings)
         commitments=self.commitments(subject=subject,clearance=clearance,limit=limit)
         return self._merge_candidate_evidence(discoveries,commitments,limit,source_cursor)
 

@@ -536,7 +536,8 @@ class OpportunitySynthesizer:
         return self.vault.digest_json([dict(event=e.observation_event_id,content=_thaw_json(e.content),
             expires_at=e.expires_at.isoformat()) for e in values])
 
-    def source_pool(self,*,subject,clearance,focus=(),revision_event_ids=(),scope=None,excluded_urls=()):
+    def source_pool(self,*,subject,clearance,focus=(),revision_event_ids=(),scope=None,excluded_urls=(),
+                    exclude_search_listings=False):
         """One planned material window for recall and interpretation, not sends.
 
         Packing can admit only a bounded prefix later. Frozen scope retains the
@@ -548,6 +549,8 @@ class OpportunitySynthesizer:
             v2=isinstance(scope,Mapping) and scope.get('method')=='bound-material-pool-v2'
             keys={'method','cursor','origin_frontier','pool_ids','focus_ids','fair_pool_ids'}
             if v2:keys|={'eligible_primary_ids','deferred_source_ids'}
+            listings_excluded=isinstance(scope,Mapping) and scope.get('exclude_search_listings') is True
+            if listings_excluded:keys.add('exclude_search_listings')
             if (revision_event_ids or not isinstance(scope,Mapping)
                     or set(scope)!=keys
                     or scope['method'] not in ('bound-material-pool-v1','bound-material-pool-v2')
@@ -585,6 +588,8 @@ class OpportunitySynthesizer:
                 observation_event_ids=ids) if ids else ()
             if tuple(e.observation_event_id for e in pool)!=ids:
                 raise OpportunitySynthesisError('original material was withdrawn, expired or erased')
+            if listings_excluded and any(e.content['source']=='hermes.web.search' for e in pool):
+                raise OpportunitySynthesisError('search listing entered bound authoring evidence')
             by_id={e.observation_event_id:e for e in pool}
             if any(by_id[e.observation_event_id]!=e for e in focus):
                 raise OpportunitySynthesisError('research group differs from original material')
@@ -592,7 +597,8 @@ class OpportunitySynthesizer:
         cursor=self._source_cursor(subject,clearance) if not revision_event_ids else None
         pool=(self._revision_sources(revision_event_ids,subject,clearance) if revision_event_ids else
             self.reader.candidate_evidence(subject=subject,clearance=clearance,limit=32,
-                source_cursor=cursor,excluded_urls=excluded_urls) if excluded_urls else
+                source_cursor=cursor,excluded_urls=excluded_urls,exclude_search_listings=exclude_search_listings)
+            if excluded_urls or exclude_search_listings else
             self.reader.active_evidence(subject=subject,clearance=clearance,limit=32,source_cursor=cursor))
         fair_pool=pool[:32-len(focus)] if focus and not revision_event_ids else pool
         if focus:
@@ -601,11 +607,15 @@ class OpportunitySynthesizer:
             pool=tuple(focus)+tuple(e for e in fair_pool if e.observation_event_id not in focus_ids)
         return pool,cursor,fair_pool
 
-    def material_scope(self,*,subject,clearance,focus=(),excluded_urls=(),deferred_source_ids=()):
-        pool,cursor,fair=self.source_pool(subject=subject,clearance=clearance,focus=focus,excluded_urls=excluded_urls)
+    def material_scope(self,*,subject,clearance,focus=(),excluded_urls=(),deferred_source_ids=(),
+                       exclude_search_listings=False):
+        pool,cursor,fair=self.source_pool(subject=subject,clearance=clearance,focus=focus,
+            excluded_urls=excluded_urls,exclude_search_listings=exclude_search_listings)
         scope=dict(method='bound-material-pool-v1',cursor=cursor,origin_frontier=self.journal.last_sequence(),
             pool_ids=[e.observation_event_id for e in pool],focus_ids=[e.observation_event_id for e in focus],
             fair_pool_ids=[e.observation_event_id for e in fair])
+        if exclude_search_listings:
+            scope['exclude_search_listings']=True
         if deferred_source_ids:
             from .discovery_opportunities import canonicalize_discovery_url
             excluded={canonicalize_discovery_url(url) for url in excluded_urls}
@@ -620,6 +630,12 @@ class OpportunitySynthesizer:
         if scope is not None and scope.get('method')=='bound-material-pool-v2':
             return tuple(e for e in evidence if e.observation_event_id in scope['eligible_primary_ids'])
         return evidence
+
+    def _current_empty_scope_evidence(self, *, subject, clearance, scope):
+        if scope is not None and scope.get('exclude_search_listings') is True:
+            return self.reader.candidate_evidence(subject=subject,clearance=clearance,limit=1,
+                exclude_search_listings=True)
+        return self.reader.active_evidence(subject=subject,clearance=clearance,limit=32)
 
     def _validate_source_scan(self,start,receipt):
         scan=receipt.event.payload.get('source_scan')
@@ -953,7 +969,8 @@ class OpportunitySynthesizer:
         self._validate_source_scan(start,receipt)
         eligible_scope=start.event.payload.get('material_scope')
         scoped_eligibility=eligible_scope is not None and eligible_scope.get('method')=='bound-material-pool-v2'
-        if not original_ids and not scoped_eligibility and self.reader.active_evidence(subject=subject,clearance=clearance,limit=32):
+        if not original_ids and not scoped_eligibility and self._current_empty_scope_evidence(
+                subject=subject,clearance=clearance,scope=eligible_scope):
             raise OpportunitySynthesisError('new material invalidates an empty interpretation')
         try:
             evidence = self.reader.active_evidence(subject=subject, clearance=clearance, limit=32,
@@ -1472,7 +1489,8 @@ class OpportunitySynthesizer:
                 raise OpportunitySynthesisError('research evidence group changed during model wait')
             if (self.reader.active_evidence(subject=subject,clearance=clearance,limit=32,
                     observation_event_ids=tuple(e.observation_event_id for e in evidence)) if evidence else
-                    () if deferred else self.reader.active_evidence(subject=subject,clearance=clearance,limit=32)) != evidence:
+                    () if deferred else self._current_empty_scope_evidence(
+                        subject=subject,clearance=clearance,scope=material_scope)) != evidence:
                 raise OpportunityEvidenceChanged("opportunity evidence changed during model wait")
             if self._commitment_digest(subject,clearance)!=commitment_digest:
                 raise OpportunityEvidenceChanged('current commitments changed during model wait')
