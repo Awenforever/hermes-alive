@@ -447,6 +447,9 @@ def alive_command(args: argparse.Namespace) -> int:
                 setup_status={'setup_phase':('authorized_runtime_unverified' if active else 'configured_not_activated')
                                   if configured else ('awaiting_confirmation' if store else 'awaiting_setup'),
                               'enabled':bool(active),'delivery_authority_activated':bool(active),'legacy_identity_migrated':False}
+                if configured is not None:
+                    setup_status['contact_hours']=_kernel_module('contact_hours').contact_status(
+                        configured.options,_config_file(),os.environ,datetime.now(timezone.utc))
             except Exception:
                 setup_status={'setup_phase':'recovery_required','delivery_authority_activated':False,'enabled':False}
         print(

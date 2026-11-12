@@ -23,12 +23,13 @@ class ConfiguredOwnerMismatch(ValueError):
 
 
 def contact_hours(binding, configured):
-    timing=kernel('contact_hours')
-    if 'quiet_window' not in configured.options:
-        legacy=binding.home/'plugin-data/hermes-alive/runtime/config/hermes-alive.json'
-        return None, timing.legacy_preview(legacy,os.environ)['state']!='absent'
-    saved=configured.options['quiet_window']
-    return (timing.quiet_window(saved) if saved is not None else None), False
+    legacy=binding.home/'plugin-data/hermes-alive/runtime/config/hermes-alive.json'
+    return kernel('contact_hours').configured_window(configured.options,legacy,os.environ)
+
+
+def contact_status(binding, configured):
+    legacy=binding.home/'plugin-data/hermes-alive/runtime/config/hermes-alive.json'
+    return kernel('contact_hours').contact_status(configured.options,legacy,os.environ,datetime.now(timezone.utc))
 
 
 def configured_owner(binding,scope):

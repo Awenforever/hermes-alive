@@ -44,6 +44,25 @@ def open_for_contact(window, at):
     return not (local >= start or local < end)
 
 
+def configured_window(options, legacy_path, environ):
+    """Resolve the signed choice, or detect a legacy window needing an owner choice."""
+    if 'quiet_window' not in options:
+        return None, legacy_preview(legacy_path, environ)['state'] != 'absent'
+    saved = options['quiet_window']
+    return (quiet_window(saved) if saved is not None else None), False
+
+
+def contact_status(options, legacy_path, environ, at):
+    """Describe the timing gate only. Other authority and delivery checks are separate."""
+    window, choice_required = configured_window(options, legacy_path, environ)
+    if choice_required:
+        return {'state': 'choice_required', 'window': None}
+    if window is None:
+        return {'state': 'unrestricted', 'window': None}
+    return {'state': 'open' if open_for_contact(window, at) else 'quiet',
+            'window': dict(options['quiet_window'])}
+
+
 def legacy_preview(path, environ):
     """Read the fixed legacy inputs without modifying the profile or environment."""
     try:

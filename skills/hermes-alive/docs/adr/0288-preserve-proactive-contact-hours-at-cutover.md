@@ -94,6 +94,18 @@ The separate real-Core continuity and standard-channel tests covered a cutoff
 after share preparation and immediately before handoff. They confirmed no
 adapter observation, no replay of the consumed start and no held draft in the
 ordinary follow-up context. Windows passed the controlled schedule and
-standard-channel suites. Actual platform daemon restart, real-channel behavior,
-active background job progression across a cutoff and dynamic-policy migration
-remain open.
+standard-channel suites.
+
+A separate offline Core work fixture held an already authorized file job at
+its first provider request, then crossed the controlled cutoff. The job
+remained running during the quiet cycle and completed the exact file write
+and read. Alive reconciled the job result during quiet hours with no new
+proactive synthesis or dispatch. At opening, the next synthesis saw the
+completed but independently unverified result and chose silence. The fixture
+exercised actual Core job storage, runner and file tools against a local
+controlled provider. Actual platform daemon restart, real-channel behavior
+and dynamic-policy migration remain open.
+
+Owner-facing status reports the configured local window and whether the timing
+gate is quiet, open or awaiting a legacy choice. The timing state is reported
+separately from activation and delivery.

@@ -11,7 +11,7 @@ from alive_kernel.kernel_setup import KernelSetupStore,KernelSetupError
 from alive_kernel.retention import RetentionProjection,RetentionDirection,RetentionValidationError
 from alive_kernel.events import Sensitivity
 from alive_kernel.content_vault import ContentErasedError
-from alive_kernel.contact_hours import legacy_preview, open_for_contact, quiet_window
+from alive_kernel.contact_hours import contact_status, legacy_preview, open_for_contact, quiet_window
 
 SCOPE={'contract':'hermes-core-conversation-v1','runtime_profile':'default','transport_profile':'default',
     'platform':'telegram','chat_id':'PRIVATE_SETUP_PEER','chat_type':'dm','thread_id':'7',
@@ -259,6 +259,12 @@ def contact_schedule(root):
     legacy.write_text('{"values":{"quiet_start":"22:45","quiet_end":"08:15","timezone":"Asia/Shanghai"}}',encoding='utf-8')
     assert legacy_preview(legacy,{})=={'state':'fixed','window':window}
     assert legacy_preview(legacy,{'HERMES_PROACTIVE_QUIET_START':'bad'})=={'state':'invalid'}
+    before=datetime(2026,11,12,0,14,tzinfo=timezone.utc)
+    end=before+timedelta(minutes=1)
+    assert contact_status(reopened.options,legacy,{},before)=={'state':'quiet','window':window}
+    assert contact_status(reopened.options,legacy,{},end)=={'state':'open','window':window}
+    assert contact_status({},legacy,{},end)=={'state':'choice_required','window':None}
+    assert contact_status({'quiet_window':None},legacy,{},before)=={'state':'unrestricted','window':None}
 
 
 with tempfile.TemporaryDirectory(prefix='alive-guided-setup-') as directory:

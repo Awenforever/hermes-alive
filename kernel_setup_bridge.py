@@ -140,8 +140,19 @@ def register_setup_command(context,binding):
                         }
                         label = recovery_status.get(observed.get('exit_reason'),
                             recovery_status.get(observed['status'], observed['status']))
+                        timing=execution.contact_status(binding,configured)
+                        window=timing['window']
+                        if window is not None:
+                            hours=f"{window['start']}–{window['end']}（{window['timezone']}）"
+                            detail=('当前处于免打扰时段。' if timing['state']=='quiet' else '当前在免打扰时段之外。')
+                            detail+=f'设定时段为 {hours}。'
+                        elif timing['state']=='choice_required':
+                            detail='主动联系已暂缓，等待确认旧版免打扰设置。'
+                        else:
+                            detail='主动联系时段不限。'
                         return ('Alive 状态：'+label+'；当前发送授权：'
                             +('有效' if active else '未启用、已暂停或已到期')+'。'
+                            +detail
                             +'待收拢工作：'+str(observed.get('pending_work_count',0))+' 项。'
                             '运行状态不代表消息已送达。'
                             +('有任务停止结果尚未确认，请核查 Hermes 任务状态。' if retirement.get('needs_attention')

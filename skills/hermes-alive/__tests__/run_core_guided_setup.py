@@ -192,6 +192,13 @@ async def test(home,*,public_refinement=False):
         rc,status=cli(home,'status')
         assert rc==0 and status['setup_phase']=='configured_not_activated'
         assert status['enabled'] is False and status['live_runtime_verified'] is False
+        status_reply=await runner._hm_run_plugin_handler(handler,None,source,session_entry=entry,args='status')
+        if quiet:
+            assert status['contact_hours']['window']==quiet and status['contact_hours']['state'] in ('quiet','open')
+            assert '22:45–08:15（Asia/Shanghai）' in status_reply
+        else:
+            assert status['contact_hours']=={'state':'unrestricted','window':None}
+            assert '主动联系时段不限' in status_reply
         # Uninstall/reinstall preserves configuration, identity and confirmation,
         # without applying an installed-file overlay or reviving delivery.
         rc,removed=cli(home,'uninstall-runtime')
