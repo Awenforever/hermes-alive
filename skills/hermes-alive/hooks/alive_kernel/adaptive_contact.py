@@ -39,7 +39,9 @@ def status(store, configured, at):
         return result
     try:
         projection=AdaptiveContactProjection(store,configured)
-        _,checkpoint=projection.current()
+        latest,checkpoint=projection.current()
+        if latest is not None and at<latest.observed_at:
+            raise AdaptiveContactChanged('clock precedes last adaptive contact checkpoint')
         allowed,_=projection.evaluate(checkpoint,at)
         result['state']='adaptive_open' if allowed else 'adaptive_quiet'
     except (ValueError,OSError,sqlite3.Error,ContentVaultError):

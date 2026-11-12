@@ -172,8 +172,8 @@ async def test(home,*,public_refinement=False,adaptive_import=False):
             assert not store.journal.read(event_type='action.delegation_granted')
             circadian_state.write_bytes(raw)
             assert '已启用' in await command('enable')
-            projection_type=import_module(loaded.module.__name__+'.kernel_execution_bridge').kernel(
-                'adaptive_contact').AdaptiveContactProjection
+            projection_module=import_module(loaded.module.__name__+'.kernel_execution_bridge').kernel('adaptive_contact')
+            projection_type=projection_module.AdaptiveContactProjection
             try:
                 async with asyncio.timeout(20):
                     while not store.journal.read(event_type='autonomous.host.closed'):
@@ -192,6 +192,33 @@ async def test(home,*,public_refinement=False,adaptive_import=False):
             finally:
                 binding.arguments['stop'].set()
                 await asyncio.wait_for(asyncio.shield(binding.task),10)
+            # Interleave two owners of the same committed generation at the
+            # precise CAS boundary, without depending on thread scheduling.
+            first_store=setup_bridge.setup_store(binding)
+            second_store=setup_bridge.setup_store(binding)
+            first=projection_type(first_store,configured)
+            second=projection_type(second_store,configured)
+            authority=first_store.activation()
+            after_wake=current.observed_at.replace(hour=13,minute=0,second=0,microsecond=0)+timedelta(days=1)
+            original_append=first_store.journal.append
+            winner=[]
+            def competing_append(event, **kwargs):
+                if event.event_type==projection_type.EVENT:
+                    winner.append(second.advance(authority,after_wake+timedelta(seconds=1)))
+                return original_append(event,**kwargs)
+            with patch.object(first_store.journal,'append',competing_append):
+                try:
+                    first.advance(authority,after_wake)
+                except projection_module.AdaptiveContactChanged:
+                    pass
+                else:
+                    raise AssertionError('stale adaptive writer overwrote the new checkpoint')
+            reopened=projection_type(setup_bridge.setup_store(binding),configured)
+            final_event,final_checkpoint=reopened.current()
+            assert winner==[final_checkpoint] and final_event.causation_id==current.event_id
+            assert reopened.evaluate(final_checkpoint,after_wake+timedelta(seconds=1))[0]
+            assert len(store.journal.read(event_type=projection_type.EVENT))==2
+            assert circadian_state.read_bytes()==raw and not store.journal.read(event_type='dispatch.started')
             print('HERMES_ALIVE_CORE_ADAPTIVE_CUTOVER_OK')
             return
         if quiet:
