@@ -7,3 +7,7 @@ it neither retries work nor promises every configured ladder will fit.
 DEFAULT_REQUEST_SECONDS = 180
 DEFAULT_STAGE_SECONDS = 600
 MAX_STAGE_SECONDS = 600
+
+
+class CoreModelTemporarilyUnavailable(TimeoutError):
+    """The owning Core completion ended with a qualified transient timeout."""

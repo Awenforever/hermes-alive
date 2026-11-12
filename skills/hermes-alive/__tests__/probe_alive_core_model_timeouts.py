@@ -14,6 +14,7 @@ p.add_argument('--repo',type=Path,required=True)
 p.add_argument('--output',type=Path,required=True)
 p.add_argument('--expect-old-preemption',action='store_true')
 p.add_argument('--expect-stage-timeout',action='store_true')
+p.add_argument('--expect-host-recovery',action='store_true')
 a=p.parse_args();a.output.mkdir(parents=True,mode=0o700,exist_ok=False)
 home=a.output/'profile';home.mkdir(mode=0o700)
 os.environ['HERMES_HOME']=str(home)
@@ -38,6 +39,7 @@ async def main():
     from alive_kernel.core_plugin_model_call import CorePluginModelCaller
     from alive_kernel.native_host_caller import HostModelBinding
     requests=[]
+    unavailable=[a.expect_host_recovery]
     async def send(client,request,*args,**kwargs):
         if not request.url.path.endswith('/chat/completions'):
             return httpx.Response(503,request=request,json={'error':{'message':'synthetic metadata unavailable'}})
@@ -50,6 +52,9 @@ async def main():
             raise httpx.ReadTimeout('synthetic full request timeout',request=request)
         assert request.url.host=='backup.invalid'
         assert request.headers['authorization']=='Bearer synthetic-backup-key'
+        if unavailable[0]:
+            await asyncio.sleep(timeout)
+            raise httpx.ReadTimeout('synthetic fallback timeout',request=request)
         await asyncio.sleep(.005)
         return httpx.Response(200,request=request,json=dict(id='synthetic',object='chat.completion',created=0,
             model=body['model'],choices=[dict(index=0,message=dict(role='assistant',content='OK'),finish_reason='stop')],
@@ -62,6 +67,40 @@ async def main():
             context.register_auxiliary_task('hermes_alive_kernel',display_name='Synthetic timeout probe',
                 description='Controlled IO only',defaults={'provider':'auto','model':'','timeout':90,
                     'fallback_chain':config['fallback_providers']})
+            if a.expect_host_recovery:
+                from types import SimpleNamespace
+                from openai import APITimeoutError
+                from alive_kernel import DispatchOutbox,ExperienceJournal
+                from alive_kernel.autonomous_host_runtime import AutonomousHostRuntime
+                from alive_kernel.model_timeouts import CoreModelTemporarilyUnavailable
+                journal=ExperienceJournal(home/'model-recovery.sqlite3')
+                operations=[];stop=asyncio.Event();qualified=[]
+                class Driver:
+                    outbox=DispatchOutbox(journal)
+                    async def cycle(self,*,operation_id,**_):
+                        operations.append(operation_id)
+                        caller=CorePluginModelCaller(context,read_binding=lambda:HostModelBinding(
+                            'user:synthetic','profile:synthetic',operation_id,'revision:1'),max_calls=1)
+                        try:
+                            result=await caller(task='synthetic-timeout',model=None,
+                                messages=[{'role':'user','content':'synthetic'}],temperature=0,max_tokens=128,timeout=20)
+                        except CoreModelTemporarilyUnavailable as exc:
+                            qualified.append(isinstance(exc.__cause__,APITimeoutError) and not caller.pending)
+                            assert len(operations)==1
+                            unavailable[0]=False
+                            raise
+                        assert len(operations)==2 and result.model=='synthetic-backup'
+                        stop.set()
+                        return SimpleNamespace(disposition='silence',reconciliation={'next_after_sequence':0},
+                            external_delivery_proven=False)
+                host=AutonomousHostRuntime(Driver(),subject='user:synthetic',configuration_id='timeout-probe',execute=True)
+                result=await host.run(build_parameters=dict,stop=stop,continuous=True,interval_seconds=.02)
+                assert result['exit_reason']=='stopped' and result['completed_cycles']==2 and qualified==[True],result
+                assert len(set(operations))==2 and not journal.read(event_type='dispatch.started')
+                assert [r.event.payload['disposition'] for r in journal.read(event_type='autonomous.host.closed')]==[
+                    'model_temporarily_unavailable','silence']
+                print('HERMES_ALIVE_CORE_MODEL_TIMEOUT_RECOVERY_OK')
+                return
             caller=CorePluginModelCaller(context,read_binding=lambda:HostModelBinding(
                 'user:synthetic','profile:synthetic','operation:timeout-probe','revision:1'),max_calls=1)
             result=None;error=None

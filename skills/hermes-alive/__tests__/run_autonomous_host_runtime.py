@@ -11,6 +11,7 @@ from types import SimpleNamespace
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'hooks'))
 from alive_kernel import DispatchOutbox,ExperienceJournal,EventEnvelope
 from alive_kernel.autonomous_host_runtime import AutonomousHostRuntime
+from alive_kernel.model_timeouts import CoreModelTemporarilyUnavailable
 
 
 class Driver:
@@ -19,6 +20,7 @@ class Driver:
         self.operations = []
         self.fail = False
         self.change = False
+        self.model_timeout = False
         self.block = False
         self.entered = asyncio.Event()
         self.cleaned = False
@@ -26,6 +28,9 @@ class Driver:
         self.operations.append(kwargs['operation_id'])
         self.entered.set()
         if self.fail: raise RuntimeError('synthetic private failure')
+        if self.model_timeout:
+            self.model_timeout=False
+            raise CoreModelTemporarilyUnavailable('synthetic provider timeout')
         if self.change:
             self.change=False
             from alive_kernel.opportunity_synthesis import OpportunityEvidenceChanged
@@ -103,6 +108,15 @@ async def test(root):
     assert continuous_driver.operations[-2]!=continuous_driver.operations[-1]
     closed=journal.read(event_type='autonomous.host.closed')
     assert [r.event.payload['disposition'] for r in closed][-2:]==['evidence_changed','silence']
+    continuous_driver.model_timeout=True
+    changed_stop.clear();prior_count=len(continuous_driver.operations)
+    result=await continuous_host.run(build_parameters=lambda:{},stop=changed_stop,
+        continuous=True,interval_seconds=.001,cycle_step=changed_step)
+    assert result['completed_cycles']==2 and result['exit_reason']=='stopped'
+    assert continuous_driver.operations[-2]!=continuous_driver.operations[-1]
+    closed=journal.read(event_type='autonomous.host.closed')
+    assert [r.event.payload['disposition'] for r in closed][-2:]==['model_temporarily_unavailable','silence']
+    assert not journal.read(event_type='dispatch.started')
     async def paused_step(parameters):return SimpleNamespace(disposition='paused')
     result=await continuous_host.run(build_parameters=lambda:{},stop=asyncio.Event(),
         continuous=True,interval_seconds=.001,cycle_step=paused_step)

@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'hooks'))
 from alive_kernel.core_plugin_model_call import CorePluginModelCaller
+from alive_kernel.model_timeouts import CoreModelTemporarilyUnavailable
 from alive_kernel.native_worker_protocol import NativeWorkerError
 from alive_kernel.core_shadow_assembly import normalize_settings
 
@@ -28,7 +29,7 @@ async def main(home):
         choice=NS(index=0,message=message,finish_reason=finish,model_fields_set={'message','finish_reason'} if fields else set())
         return NS(model='synthetic-served',choices=[choice],model_fields_set={'model','choices'})
     class Facade:
-        response=reply();blocked=False;calls=0;alter_text=False
+        response=reply();blocked=False;calls=0;alter_text=False;failure=None
         def _gate(self,*args):
             assert args[-1] is None,'stage deadline must not override Core request timeout'
             if args[1]=='denied':raise PermissionError('synthetic Core override refusal')
@@ -36,6 +37,7 @@ async def main(home):
         async def _invoke_async(self,kw):
             self.calls+=1;entered.set()
             if self.blocked:await release.wait()
+            if self.failure is not None:raise self.failure
             return 'synthetic-provider',self.response.model,self.response
         def _finish(self,*args):
             return NS(text='altered' if self.alter_text else self.response.choices[0].message.content,
@@ -45,6 +47,17 @@ async def main(home):
     params=dict(task='synthetic-task',model=None,messages=[{'role':'user','content':'synthetic'}],
         temperature=.1,max_tokens=128)
     modules={'hermes_constants':constants,'agent':ModuleType('agent'),'agent.secret_scope':secrets}
+    try:
+        from openai import APITimeoutError
+        import httpx
+        api_timeout=APITimeoutError(request=httpx.Request('POST','https://example.invalid'))
+    except ImportError:
+        # The portable unit suite deliberately lacks Core's provider SDK.
+        class APITimeoutError(Exception):
+            pass
+        sdk=ModuleType('openai');sdk.APITimeoutError=APITimeoutError
+        modules['openai']=sdk
+        api_timeout=APITimeoutError('synthetic provider timeout')
     with patch.dict(sys.modules,modules),patch.object(CorePluginModelCaller,'_configuration',lambda self:config[0]):
         c=caller();route={};result=await c(route_info=route,**params)
         assert result.model=='synthetic-served' and route['provider']=='synthetic-provider'
@@ -74,9 +87,16 @@ async def main(home):
         assert not c.pending
         release.clear();c=caller()
         try:await c(**{**params,'timeout':.01})
-        except TimeoutError:pass
+        except CoreModelTemporarilyUnavailable:pass
         else:raise AssertionError('deadline not enforced')
         assert not c.pending
+        facade.failure=api_timeout
+        facade.blocked=False;c=caller();before=facade.calls
+        try:await c(**params)
+        except CoreModelTemporarilyUnavailable as exc:
+            assert exc.__cause__ is facade.failure
+        else:raise AssertionError('provider timeout did not return a qualified unavailable result')
+        assert facade.calls==before+1 and not c.pending
 
 with tempfile.TemporaryDirectory(prefix='alive-core-model-call-') as folder:
     asyncio.run(main(Path(folder)))

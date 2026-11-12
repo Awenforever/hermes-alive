@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 from .native_worker_protocol import NativeWorkerError,canonical
 from .native_host_snapshot import CONFIG_FIELDS,AGENT_FIELDS,_validate_model_overrides
-from .model_timeouts import DEFAULT_STAGE_SECONDS,MAX_STAGE_SECONDS
+from .model_timeouts import CoreModelTemporarilyUnavailable,DEFAULT_STAGE_SECONDS,MAX_STAGE_SECONDS
 
 
 class CorePluginModelCaller:
@@ -78,11 +78,18 @@ class CorePluginModelCaller:
             raise NativeWorkerError('Core model call requires a bounded timeout')
         # Mirror Core's public acomplete pipeline, preserving raw metadata before
         # _finish drops it. Core still performs every override/task trust check.
+        from openai import APITimeoutError
         agent,kw=facade._gate(None,model,None,None,self.task_key,messages,temperature,max_tokens,None)
         current();self.calls+=1
         self._active=asyncio.create_task(facade._invoke_async(kw))
         try:
-            invoked=await asyncio.wait_for(self._active,timeout=limits)
+            try:
+                invoked=await asyncio.wait_for(self._active,timeout=limits)
+            except (APITimeoutError,TimeoutError) as exc:
+                current()
+                if self.pending:
+                    raise
+                raise CoreModelTemporarilyUnavailable('Core completion timed out') from exc
             response=invoked[2]
             current()
             # Recheck current Core override permissions, without another request.
