@@ -15,6 +15,7 @@ from .cli_send_contract import compile_text_cli_plan
 from .conversation_continuity import BoundShareContinuity, ShareContinuityStore
 from .dispatch_outbox import DispatchOutboxError
 from .published_channel_execution import _renderer_metadata
+from .contact_hours import ContactHoursClosed
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,7 +28,7 @@ class StandardChannelExecution:
 
 async def execute_standard_text_once(outbox, lease, *, resolve_channel, clearance,
         profile_id, hermes_home, resolve_target, extract_media, observe_profile_home,
-        continuity=None,
+        continuity=None, contact_open=None,
         clock=lambda: datetime.now(timezone.utc)):
     """Consume a start, validate the exact body/route, submit once, observe return.
 
@@ -41,6 +42,8 @@ async def execute_standard_text_once(outbox, lease, *, resolve_channel, clearanc
     """
     if not callable(resolve_channel):
         raise ValueError('current canonical host channel resolver required')
+    if contact_open is not None and not contact_open(clock()):
+        raise ContactHoursClosed('contact window closed before dispatch start')
     execution = outbox.begin_execution(lease, clearance=clearance, now=clock())
     plan = compile_text_cli_plan(execution.content, execution.route,
         profile_id=profile_id, hermes_home=hermes_home, resolve_target=resolve_target,
@@ -98,8 +101,12 @@ async def execute_standard_text_once(outbox, lease, *, resolve_channel, clearanc
         raise DispatchOutboxError('channel launch deadline passed during verification')
     # Another process can revoke authority while the proof is rebuilt.
     outbox._validate_execution_identity(execution, now=clock())
-    if clock() >= min(execution.lease.lease_until, execution.lease.execute_by):
+    launch_time=clock()
+    if launch_time >= min(execution.lease.lease_until, execution.lease.execute_by):
         raise DispatchOutboxError('channel launch deadline passed during verification')
+    if contact_open is not None and not contact_open(launch_time):
+        outbox.record_contact_hours_hold(execution,now=launch_time)
+        raise ContactHoursClosed('contact window closed before adapter submission')
     result = await adapter.send(chat_id=execution.route['chat_id'], content=plan.stdin_text,
                                 metadata=metadata)
     observation = outbox.record_adapter_observation(execution, result=result, now=clock())

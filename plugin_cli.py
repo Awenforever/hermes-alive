@@ -82,6 +82,11 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
     setup.add_argument('--language',help='Optional conversation language tag; otherwise follows Hermes locale')
     setup.add_argument('--communication-preference',help='Explicit communication preference, stored privately after owner confirmation')
     setup.add_argument('--interests',help='Optional interests in the owner\'s words; soft preferences, privately retained after confirmation')
+    timing=setup.add_mutually_exclusive_group()
+    timing.add_argument('--quiet-window',nargs=3,metavar=('START','END','TIMEZONE'),
+        help='Protect an interval of local time, using HH:MM and an IANA time zone')
+    timing.add_argument('--keep-legacy-quiet-window',action='store_true',help='Keep the fixed interval reported by alive contact-hours')
+    timing.add_argument('--unrestricted-contact',action='store_true',help='Explicitly allow proactive contact at any hour')
     setup.add_argument('--confirm-hermes-profile-memory',action='store_true',
         help='Confirm this Hermes profile is personal and allow its curated user profile as advice in the private target conversation')
     setup.add_argument('--confirm-hermes-external-memory',action='store_true',
@@ -94,6 +99,7 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
     setup.add_argument('--confirm-public-refinement',action='store_true',
         help='Additionally authorize one source-only public query within the bounded followup budget; requires cited reads')
     setup.add_argument('--replace',action='store_true',help='Explicitly replace a prior pending/configured setup; preserves history')
+    actions.add_parser('contact-hours',help='Preview legacy proactive contact hours before setup')
     actions.add_parser("uninstall-runtime", help="Remove owned runtime code while preserving user state")
     actions.add_parser("enable", help="Enable proactive delivery")
     actions.add_parser("disable", help="Disable proactive delivery")
@@ -247,6 +253,11 @@ def alive_command(args: argparse.Namespace) -> int:
     action = getattr(args, "alive_action", None)
     if action == "install-runtime":
         return _install_runtime(getattr(args,'engine',None))
+    if action == 'contact-hours':
+        from .tool_receipt_bridge import _kernel_module
+        preview=_kernel_module('contact_hours').legacy_preview(_config_file(),os.environ)
+        print(json.dumps({'legacy_contact_hours':preview}))
+        return 0
     if action == 'setup':
         if (not args.confirm_model_calls or not args.confirm_delivery or not args.confirm_outbound_retention
                 or bool(args.public_query) != args.confirm_public_reads
@@ -277,7 +288,32 @@ def alive_command(args: argparse.Namespace) -> int:
         if setup.activation():
             print(json.dumps({'ok':False,'existing_runtime_must_be_paused':True,'delivery_enabled':False}))
             return 2
+        timing=_kernel_module('contact_hours')
+        previous=setup.configuration()
+        window={}
+        if getattr(args,'quiet_window',None):
+            window['quiet_window']=dict(zip(('start','end','timezone'),args.quiet_window))
+        elif getattr(args,'unrestricted_contact',False):
+            window['quiet_window']=None
+        elif not getattr(args,'keep_legacy_quiet_window',False) and previous is not None and 'quiet_window' in previous.options:
+            saved=previous.options['quiet_window']
+            window['quiet_window']=dict(saved) if saved is not None else None
+        else:
+            preview=timing.legacy_preview(_config_file(),os.environ)
+            if getattr(args,'keep_legacy_quiet_window',False) and preview['state']=='fixed':
+                window['quiet_window']=preview['window']
+            elif preview['state']!='absent' or getattr(args,'keep_legacy_quiet_window',False):
+                print(json.dumps({'ok':False,'contact_hours_choice_required':True,
+                    'legacy_contact_hours':preview,'delivery_enabled':False}))
+                return 2
+        if window.get('quiet_window') is not None:
+            try:
+                timing.quiet_window(window['quiet_window'])
+            except ValueError as exc:
+                print(json.dumps({'ok':False,'contact_hours_error':str(exc),'delivery_enabled':False}))
+                return 2
         intent,code=setup.stage({'model_calls':True,'delivery':True,
+            **window,
             'outbound_retention_days':args.retention_days,'outbound_retention_confirmed':True,'model':args.model,
             'public_queries':args.public_query,'cited_reads':args.confirm_cited_reads,
             **({'accept_explicit_followups':True,'retain_followup_source':True} if getattr(args,'confirm_explicit_followup_intake',False)
@@ -309,6 +345,7 @@ def alive_command(args: argparse.Namespace) -> int:
         print(json.dumps({'ok':True,'confirmation_command':'/alive confirm '+code,
             'expires_in_seconds':900,'restart_required':True,'delivery_enabled':False,'model_calls_started':False,
             'confirmation_summary':{'model':args.model or 'inherit_hermes','outbound_history_days':args.retention_days,
+                'quiet_window':window.get('quiet_window'),
                 'inbound_history':False,'automatic_profile_learning':False,'public_queries':args.public_query,
                 'explicit_followup_intake':bool(getattr(args,'confirm_explicit_followup_intake',False) or getattr(args,'confirm_followup_management',False)),
                 'explicit_followup_management':bool(getattr(args,'confirm_followup_management',False)),

@@ -130,7 +130,12 @@ async def test(root, mode):
             extract_media=lambda text:([],text),observe_profile_home=lambda:root if profile_changed[0] else home,
             clock=clock))
     prepared_executions=[]
-    if mode in ('prepare-delay','prepare-expired','prepare-revoked'):
+    if mode in ('quiet-early','quiet-before-launch'):
+        def contact_open(_):
+            return mode!='quiet-early' and not prepared_executions
+        cycle_args['contact_open']=contact_open
+        cycle_args['send_parameters']['contact_open']=contact_open
+    if mode in ('prepare-delay','prepare-expired','prepare-revoked','quiet-before-launch'):
         class LocalPreparation:
             def prepare(self,execution,**kwargs):
                 prepared_executions.append(execution)
@@ -152,6 +157,23 @@ async def test(root, mode):
             assert isinstance(exc, DispatchOutboxError)
             assert str(exc)=='authenticated channel launch deadline expired before verification'
     else:
+        if mode in ('quiet-early','quiet-before-launch'):
+            assert result.disposition=='contact_hours_closed' and result.submission is None and not received
+            assert not journal.read(event_type='transport.adapter.observed')
+            holds=journal.read(event_type='transport.adapter.withheld')
+            assert len(holds)==int(mode=='quiet-before-launch')
+            assert len(journal.read(event_type='dispatch.started'))==len(holds)
+            if holds:
+                assert holds[0].event.payload['adapter_invoked'] is False
+                assert holds[0].event.payload['external_delivery_proven'] is False
+                # Cold replay after hours must not send the consumed start.
+                def reopened_hours(_):return True
+                cold=AutonomousCycleRuntime(ExperienceJournal(journal.path))
+                replay=await cold.cycle(**{**cycle_args,'contact_open':reopened_hours,
+                    'send_parameters':{**cycle_args['send_parameters'],'contact_open':reopened_hours}})
+                assert replay.disposition=='attempt_unavailable' and not received
+            print('standard_channel_case='+mode+':PASS')
+            return
         assert successful and result.disposition=='submitted' and not result.external_delivery_proven
         assert result.submission.adapter_result is returned
         observation = result.submission.observation
@@ -263,7 +285,8 @@ async def main():
     with tempfile.TemporaryDirectory(prefix='alive-standard-channel-') as directory:
         for mode in ('success','false','unknown','long','cancel','exception','missing','disconnected',
                      'wrong-thread','forged-model','wrong-platform','wrong-profile','revoked','write-failure',
-                     'prepare-delay','prepare-expired','prepare-revoked','verify-expired','verify-revoked'):
+                     'prepare-delay','prepare-expired','prepare-revoked','verify-expired','verify-revoked',
+                     'quiet-early','quiet-before-launch'):
             await test(Path(directory)/mode,mode)
 
 

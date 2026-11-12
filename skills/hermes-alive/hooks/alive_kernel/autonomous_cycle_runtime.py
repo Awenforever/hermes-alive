@@ -14,6 +14,7 @@ from .reconsideration import ReconsiderationStore
 from .content_vault import ContentVaultError
 from .feedback_assimilation import FeedbackAssimilationRuntime
 from .core_context_read import context_value
+from .contact_hours import ContactHoursClosed
 
 
 @dataclass(frozen=True,slots=True)
@@ -43,7 +44,7 @@ class AutonomousCycleRuntime:
             reconciliation_cursor=0,binding_limit=16,receipt_limit=128,
             reconsider_after_seconds=None,cognition_configuration_id=None,
             interpret_feedback=False,feedback_model=None,channel_execution='publisher',defer_until_eligible=False,
-            prepare_expression=None,listing_fingerprint=None,reuse_reconsideration=True):
+            prepare_expression=None,listing_fingerprint=None,reuse_reconsideration=True,contact_open=None):
         if (type(execute) is not bool or type(interpret_feedback) is not bool or type(defer_until_eligible) is not bool
                 or type(reuse_reconsideration) is not bool
                 or defer_until_eligible and (not execute or channel_execution!='standard')
@@ -51,6 +52,8 @@ class AutonomousCycleRuntime:
                 or (feedback_model is not None and (not interpret_feedback or not isinstance(feedback_model,str)
                     or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}',feedback_model)))
                 or prepare_expression is not None and not callable(prepare_expression)
+                or contact_open is not None and (not callable(contact_open) or not execute or channel_execution!='standard'
+                    or not isinstance(send_parameters,dict) or send_parameters.get('contact_open') is not contact_open)
                 or not isinstance(expression_parameters,dict)
                 or not isinstance(operation_id,str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}',operation_id)
                 or any(key in expression_parameters for key in ('subject','operation_id','policy_context'))):
@@ -65,6 +68,8 @@ class AutonomousCycleRuntime:
             return AutonomousCycleResult('paused',reconciliation)
         if reconciliation['failed_bindings']:
             return AutonomousCycleResult('reconciliation_attention',reconciliation)
+        if contact_open is not None and not contact_open(datetime.now(timezone.utc)):
+            return AutonomousCycleResult('contact_hours_closed',reconciliation)
         if defer_until_eligible:
             now=datetime.now(timezone.utc)
             ready=self.outbox.next_delegated_start(authorization_parameters.get('delegation_event_id'),
@@ -157,6 +162,8 @@ class AutonomousCycleRuntime:
                 content_rejection_window_seconds=reconsider_after_seconds if rejection is not None else None)
         if prepared.authorization is None or not prepared.authorization.authorized:
             return AutonomousCycleResult('not_authorized',reconciliation,prepared=prepared)
+        if contact_open is not None and not contact_open(datetime.now(timezone.utc)):
+            return AutonomousCycleResult('contact_hours_closed',reconciliation,prepared=prepared)
         lease = self.outbox.acquire(worker_id=worker_id,subject=subject,
             attempt_id=prepared.attempt_event_id.removeprefix('action.attempt:'),
             # Standard submission includes bounded local context persistence.
@@ -167,5 +174,8 @@ class AutonomousCycleRuntime:
             return AutonomousCycleResult('attempt_unavailable',reconciliation,prepared=prepared)
         submit = (self.preparation.execute_prepared_with_channel if channel_execution == 'standard'
                   else self.preparation.execute_prepared_with_publisher)
-        submission = await submit(prepared,lease,**send_parameters)
+        try:
+            submission = await submit(prepared,lease,**send_parameters)
+        except ContactHoursClosed:
+            return AutonomousCycleResult('contact_hours_closed',reconciliation,prepared=prepared)
         return AutonomousCycleResult('submitted',reconciliation,prepared=prepared,submission=submission)

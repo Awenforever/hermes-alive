@@ -11,6 +11,7 @@ from alive_kernel.kernel_setup import KernelSetupStore,KernelSetupError
 from alive_kernel.retention import RetentionProjection,RetentionDirection,RetentionValidationError
 from alive_kernel.events import Sensitivity
 from alive_kernel.content_vault import ContentErasedError
+from alive_kernel.contact_hours import legacy_preview, open_for_contact, quiet_window
 
 SCOPE={'contract':'hermes-core-conversation-v1','runtime_profile':'default','transport_profile':'default',
     'platform':'telegram','chat_id':'PRIVATE_SETUP_PEER','chat_type':'dm','thread_id':'7',
@@ -29,6 +30,8 @@ def refuse(fn,kind=KernelSetupError):
 def test(root):
     store=KernelSetupStore(root,initialize=True)
     assert store.configuration() is None
+    refuse(lambda:store.stage({**OPTIONS,'quiet_window':{'start':'08:00','end':'08:00','timezone':'UTC'}}))
+    refuse(lambda:store.stage({**OPTIONS,'quiet_window':{'start':'08:00','end':'09:00','timezone':'../UTC'}}))
     refuse(lambda:store.stage({**OPTIONS,'model_calls':False}))
     refuse(lambda:store.stage({**OPTIONS,'review_core_work_results':True}))
     refuse(lambda:store.stage({**OPTIONS,'review_core_work_results':'true'}))
@@ -239,6 +242,25 @@ def preserve_legacy(root):
     assert store.journal.get(configured.event_id).event.payload['legacy_subjects_migrated'] is False
 
 
+def contact_schedule(root):
+    window={'start':'22:45','end':'08:15','timezone':'Asia/Shanghai'}
+    store=KernelSetupStore(root,initialize=True)
+    intent,code=store.stage({**OPTIONS,'quiet_window':window})
+    store.confirm(intent.event.event_id,code,scope=SCOPE)
+    reopened=KernelSetupStore(root).configuration()
+    assert dict(reopened.options['quiet_window'])==window
+    saved=quiet_window(reopened.options['quiet_window'])
+    for hour,minute,expected in ((14,44,True),(14,45,False),(16,0,False),(0,14,False),(0,15,True)):
+        assert open_for_contact(saved,datetime(2026,11,12,hour,minute,tzinfo=timezone.utc)) is expected
+    repeated=quiet_window({'start':'01:10','end':'01:50','timezone':'America/New_York'})
+    for hour in (5,6):  # both folds of the same local interval
+        assert not open_for_contact(repeated,datetime(2026,11,1,hour,25,tzinfo=timezone.utc))
+    legacy=root/'legacy.json'
+    legacy.write_text('{"values":{"quiet_start":"22:45","quiet_end":"08:15","timezone":"Asia/Shanghai"}}',encoding='utf-8')
+    assert legacy_preview(legacy,{})=={'state':'fixed','window':window}
+    assert legacy_preview(legacy,{'HERMES_PROACTIVE_QUIET_START':'bad'})=={'state':'invalid'}
+
+
 with tempfile.TemporaryDirectory(prefix='alive-guided-setup-') as directory:
     test(Path(directory)/'setup')
     recovery(Path(directory)/'recovery')
@@ -248,4 +270,5 @@ with tempfile.TemporaryDirectory(prefix='alive-guided-setup-') as directory:
     communication(Path(directory)/'communication')
     communication(Path(directory)/'interests','interest_preferences','profile.interests')
     personal_profile_scope(Path(directory)/'personal-profile-scope')
+    contact_schedule(Path(directory)/'contact-schedule')
 print('HERMES_ALIVE_KERNEL_SETUP_OK')

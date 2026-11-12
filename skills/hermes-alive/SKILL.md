@@ -132,6 +132,17 @@ After approval, stage configuration with the confirmed values:
 hermes alive setup --confirm-model-calls --confirm-delivery --confirm-outbound-retention --retention-days <approved-days>
 ```
 
+Ask when the owner wants proactive messages to stay quiet. On upgrade, first
+run `hermes alive contact-hours` and show the previous fixed interval and time
+zone privately when available. Use `--keep-legacy-quiet-window` for an agreed
+fixed interval, `--quiet-window START END TIMEZONE` for a new interval (24-hour
+HH:MM and IANA time zone), or `--unrestricted-contact` when the owner chooses
+any hour. If the prior policy was dynamic or invalid, guide an explicit choice
+instead of carrying over a guessed interval. Show the actual interval, or the
+choice to allow any hour, before providing the confirmation code. Quiet hours
+apply to new proactive submissions, while user replies and separately delegated
+work retain their ordinary behavior.
+
 Only when separately approved, add `--public-query "<approved text>"` (up to three)
 with `--confirm-public-reads`, and optionally `--confirm-cited-reads`. For an
 intentional replacement, explain that old data/grants remain separate before

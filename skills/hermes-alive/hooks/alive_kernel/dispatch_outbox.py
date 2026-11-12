@@ -1537,6 +1537,36 @@ class DispatchOutbox:
             raise DispatchOutboxError("CLI observation does not own an authenticated start")
         return lease,start
 
+    def record_contact_hours_hold(self, execution, *, now):
+        """Retain the local decision to withhold a consumed start before adapter IO."""
+        current=self._utc(now)
+        lease,_=self._channel_observation_context(execution,current,allow_uncertain=True)
+        payload={'start_event_id':execution.start_event_id,'dispatch_id':lease.dispatch_id,
+            'attempt_id':lease.attempt_id,'lease_generation':lease.generation,
+            'reason':'contact_hours_closed','adapter_invoked':False,'external_delivery_proven':False}
+        payload['integrity_authenticator']=self.protector.authenticate_json('transport.adapter.withheld.v1',payload)
+        return self.journal.append(EventEnvelope(event_id=execution.start_event_id+':contact-hours-held',
+            event_type='transport.adapter.withheld',source='alive.dispatch',actor='system:alive-dispatch',
+            subject=lease.subject,sensitivity=lease.sensitivity,causation_id=execution.start_event_id,
+            occurred_at=current,observed_at=current,payload=payload))
+
+    def contact_hours_withheld(self, start, *, now):
+        """A local hold is evidence about this exact start, independent of delivery."""
+        event_id=start.event.event_id
+        record=self.journal.get(event_id+':contact-hours-held')
+        if record is None:
+            return False
+        event=record.event
+        payload=_thaw_json(event.payload)
+        signature=payload.pop('integrity_authenticator',None)
+        return (event.event_type=='transport.adapter.withheld' and event.source=='alive.dispatch'
+            and event.actor=='system:alive-dispatch' and event.subject==start.event.subject
+            and event.sensitivity==start.event.sensitivity and event.causation_id==event_id
+            and start.event.observed_at<=event.observed_at<=now
+            and payload.get('start_event_id')==event_id and payload.get('adapter_invoked') is False
+            and payload.get('reason')=='contact_hours_closed'
+            and self.protector.verify_json('transport.adapter.withheld.v1',payload,signature))
+
     def record_adapter_observation(self, execution, *, result, now=None):
         """Observe a normal standard-adapter return, never remote delivery.
 

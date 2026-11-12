@@ -202,6 +202,8 @@ class ShareContinuityStore:
                 or self.outbox._authenticated_start_payload(start) is None
                 or start.event.observed_at > event.observed_at):
             raise ContinuityUnavailable('share lacks its authenticated original start')
+        if self.outbox.contact_hours_withheld(start,now=now):
+            raise ContinuityUnavailable('share was withheld before adapter submission')
         reference = ContentReference.from_event_payload(payload['content'])
         if reference.retention_until != event.expires_at or reference.sensitivity != event.sensitivity:
             raise ContinuityUnavailable('share retention metadata changed')

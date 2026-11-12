@@ -50,8 +50,9 @@ separate Docker cross-Core trial from Hermes 0.21.3 to 0.22.5 preserved a
 synthetic session, pairing, user memory and legacy Alive state, and a separate
 snapshot restore reopened them on the old versions. Active Native cutover is
 still unqualified. The migration witness exposed a functional gap: retained
-legacy quiet hours do not constrain Native dispatch. [ADR0288](adr/0288-preserve-proactive-contact-hours-at-cutover.md)
-tracks guided contact-hour migration and checks at both planning and launch.
+legacy quiet hours did not constrain Native dispatch. The fixed-hour candidate
+adds guided migration and checks at both planning and launch. Platform and
+active migration qualification remain open. See [ADR0288](adr/0288-preserve-proactive-contact-hours-at-cutover.md).
 
 The current test supplier is official Core 0.22.5. Production admission,
 other-plugin integration and the actual production state must be checked again

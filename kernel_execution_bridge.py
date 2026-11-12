@@ -7,6 +7,7 @@ from datetime import datetime,timezone
 from uuid import uuid4
 from importlib import import_module
 import json
+import os
 
 from .tool_receipt_bridge import _kernel_module
 from .kernel_setup_bridge import setup_store,attach_configured_continuity
@@ -19,6 +20,15 @@ def kernel(name):
 
 class ConfiguredOwnerMismatch(ValueError):
     """A valid Core scope is outside the configured Alive owner conversation."""
+
+
+def contact_hours(binding, configured):
+    timing=kernel('contact_hours')
+    if 'quiet_window' not in configured.options:
+        legacy=binding.home/'plugin-data/hermes-alive/runtime/config/hermes-alive.json'
+        return None, timing.legacy_preview(legacy,os.environ)['state']!='absent'
+    saved=configured.options['quiet_window']
+    return (timing.quiet_window(saved) if saved is not None else None), False
 
 
 def configured_owner(binding,scope):
@@ -90,6 +100,8 @@ def enable(binding,scope):
     """Caller has verified an actual admitted Core /alive enable command."""
     store,configured=configured_owner(binding,scope)
     if runtime_engine(binding)!='kernel':raise ValueError('explicit native kernel installation required')
+    if contact_hours(binding,configured)[1]:
+        raise kernel('contact_hours').ContactHoursClosed('explicit legacy contact hours choice required')
     _retired(binding)
     router=binding.session_router(scope.platform)
     attach_configured_continuity(binding,configured)
@@ -168,6 +180,10 @@ def assemble(binding):
         binding._require_home()
         if binding.closed or store.configuration()!=configured or store.activation()!=active:
             raise ValueError('current Alive execution authority changed or expired')
+    window,timing_choice_required=contact_hours(binding,configured)
+    timing=kernel('contact_hours')
+    def contact_open(at):
+        return not timing_choice_required and timing.open_for_contact(window,at)
     runtime=kernel('autonomous_cycle_runtime').AutonomousCycleRuntime(store.journal,content_vault=store.vault)
     _complete_supersession(runtime,configured,active)
     host=kernel('autonomous_host_runtime').AutonomousHostRuntime(runtime,subject=configured.subject,
@@ -237,7 +253,7 @@ def assemble(binding):
             # uses the exposed binder and phases to reconcile/wait FIRST.
             parameters=await self.bind_parameters(cycle=cycle,parameters=parameters,read_binding=read_binding)
             now=datetime.now(timezone.utc)
-            if runtime.outbox.next_delegated_start(active['delegation_event_id'],subject=configured.subject,
+            if not contact_open(now) or runtime.outbox.next_delegated_start(active['delegation_event_id'],subject=configured.subject,
                     policy_event_id=active['policy_event_id'],route_binding_id=active['route_binding_id'],now=now)>now:
                 return parameters
             return await discovery(cycle=cycle,parameters=parameters,call=call,read_binding=read_binding)
@@ -263,8 +279,9 @@ def assemble(binding):
             'recipient_meaning':True,'require_independent_grounding':False,
             'model_timeout_seconds':kernel('model_timeouts').DEFAULT_STAGE_SECONDS},
             resolve_binding=lambda _:None,channel_execution='standard',worker_id='core-native',
-            authorization_parameters={},send_parameters=router.standard_send_parameters(target(),
-                continuity=binding._continuity,clearance=Sensitivity.PRIVATE),
+            authorization_parameters={},contact_open=contact_open,
+            send_parameters={**router.standard_send_parameters(target(),
+                continuity=binding._continuity,clearance=Sensitivity.PRIVATE),'contact_open':contact_open},
             interpret_feedback=False,reconsider_after_seconds=600)
     return native,dict(build_parameters=parameters,continuous=True,max_cycles=None,interval_seconds=600)
 

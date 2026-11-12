@@ -173,6 +173,8 @@ class NativeCognitionHost:
                         if not isinstance(authorization,dict):
                             raise NativeWorkerError('cadence wait needs current qualified authorization metadata')
                         now=datetime.now(timezone.utc)
+                        contact_open=bound.get('contact_open')
+                        if contact_open is not None and not contact_open(now):return validated(bound)
                         ready=self.host.runtime.outbox.next_delegated_start(
                             authorization.get('delegation_event_id'),subject=self.host.subject,
                             policy_event_id=self.host.runtime.reconciliation._owner_policy(self.host.subject).event_id,

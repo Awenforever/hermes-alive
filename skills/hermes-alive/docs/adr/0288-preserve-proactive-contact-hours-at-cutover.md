@@ -1,6 +1,6 @@
 # ADR-0288 — Preserve proactive contact hours at cutover
 
-Status: migration evidence verified in isolation. Native timing policy remains open.
+Status: migration evidence verified in isolation. Native fixed-hour candidate under qualification.
 
 ## Evidence
 
@@ -57,3 +57,22 @@ queue and makes no claim about the later delivery time.
   or false submitted/delivered record.
 - Repeat the legacy profile cutover with observable transport in a test
   environment before claiming that quiet-hour behavior migrates.
+
+## Candidate behavior
+
+The setup CLI previews legacy timing and records the chosen fixed interval or
+explicit unrestricted choice in the confirmed owner configuration. A previously
+confirmed interval survives replacement setup unless the owner changes it.
+An older Native configuration without an explicit choice cannot enable proactive
+contact when legacy timing is present. An already active older configuration in
+that state withholds proactive submissions until the owner reconfigures it.
+
+The runtime checks contact timing before preparing a proactive candidate, after
+draft preparation and before entering the real adapter. It closes the cycle
+with `contact_hours_closed` and leaves the existing timer responsible for the
+next wake. A cutoff after the durable dispatch start leaves that permit consumed
+and records an authenticated local hold. The hold keeps that draft out of
+ordinary conversation continuity and is neither an adapter observation nor a
+delivery receipt. It can conservatively consume the original cadence reservation.
+The separate dynamic Circadian policy is previewed as requiring an explicit
+choice, with its state preserved for legacy rollback.

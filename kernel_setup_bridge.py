@@ -158,6 +158,8 @@ def register_setup_command(context,binding):
                     if execution.runtime_engine(binding)!='kernel':
                         return ('请先让 Hermes 执行 alive install-runtime --engine kernel 并按引导重启网关。'
                                 '影子模式保持不发送，不会自动切换为正式执行。')
+                    if execution.contact_hours(binding,configured)[1]:
+                        return '旧版有免打扰设置。请先让 Hermes 在 Alive 设置中引导你保留、调整或明确取消时段。'
                     enable_attempted=True
                     execution.attach(binding,execution.enable(binding,scope))
                     result=await binding.startup()
@@ -219,6 +221,9 @@ def register_setup_command(context,binding):
                 if configured.options.get('core_work_request_retention') is True:
                     intake_summary+='每次交办还会将当前这条用户消息原文（最多6000字符）保留在Core任务记录中；Alive不另存正文，不收集整段聊天。'
                 else:intake_summary+='再次交接工作前需确认新版当前交办原文保留说明；旧授权不自动扩大。'
+            window=configured.options.get('quiet_window')
+            if window is not None:
+                intake_summary+=f"主动消息免打扰时段为 {window['start']}–{window['end']}（{window['timezone']}）。"
             return ('目标会话和所选权限已确认，分享接续读取已接入。'+intake_summary+
                     '当前仍未启用模型调用和主动发送。可发送 /alive enable 启用；公开检索是可选能力，'
                     '授权持续有效直到暂停或撤销，最多每日3次且间隔至少1小时；'

@@ -36,7 +36,7 @@ def validate_options(options):
     required={'model_calls','delivery','outbound_retention_days','outbound_retention_confirmed',
               'model','public_queries','cited_reads'}
     if (not isinstance(options, dict) or not required<=set(options)
-            or set(options)-required-{'language','communication_preference','interest_preferences','use_hermes_user_profile','use_hermes_external_memory','interpret_share_feedback',
+            or set(options)-required-{'quiet_window','language','communication_preference','interest_preferences','use_hermes_user_profile','use_hermes_external_memory','interpret_share_feedback',
                                      'refine_public_sources','accept_explicit_followups','manage_explicit_followups','revise_explicit_followups','observe_core_tools',
                                      'core_background_work','core_work_request_retention','core_work_context_version','core_work_continuation_version','automatic_core_toolsets','retain_followup_source','review_core_work_results','inspect_core_work_files','autonomous_core_work','manage_core_work_outcomes'}
             or options['model_calls'] is not True or options['delivery'] is not True
@@ -95,6 +95,12 @@ def validate_options(options):
                 or len(json.dumps(options[key],ensure_ascii=False))>1500)
                 for key in ('communication_preference','interest_preferences'))):
         raise KernelSetupError('bounded explicit communication choices required')
+    if options.get('quiet_window') is not None:
+        from .contact_hours import quiet_window
+        try:
+            quiet_window(options['quiet_window'])
+        except ValueError as exc:
+            raise KernelSetupError(str(exc)) from exc
     return {**options, 'public_queries':list(queries)}
 
 

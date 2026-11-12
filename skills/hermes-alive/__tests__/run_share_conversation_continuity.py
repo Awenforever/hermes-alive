@@ -118,15 +118,28 @@ async def test(home, mode, *, exercise=None, long_reference=False):
             maximum_sensitivity=Sensitivity.PRIVATE, expires_at=datetime.now(timezone.utc)+timedelta(hours=1),
             operation_id='delegate', allow_natural_expression=True)
         expression = {k:v for k,v in parameters.items() if k not in ('subject','operation_id','policy_context')}
+        contact_open=None
+        if mode=='quiet-after-capture':
+            def contact_open(_):
+                return not journal.read(event_type='conversation.share_prepared')
+            send_parameters['contact_open']=contact_open
         try:
             result = await runtime.cycle(subject=owner, operation_id='one', expression_parameters=expression,
                 resolve_binding=lambda _:None, execute=True, channel_execution='standard', worker_id='worker',
                 authorization_parameters={'authorization_operation_id':'authorize', 'route_binding_id':'selected',
                                           'delegation_event_id':delegation.event.event_id},
-                send_parameters=send_parameters)
+                send_parameters=send_parameters,contact_open=contact_open)
         except (ContinuityUnavailable, TimeoutError):
             assert mode in ('no-consent','wrong-direction','late-off','exception')
         else:
+            if mode=='quiet-after-capture':
+                assert result.disposition=='contact_hours_closed' and not received
+                assert len(journal.read(event_type='conversation.share_prepared'))==1
+                assert len(journal.read(event_type='transport.adapter.withheld'))==1
+                reopened=ShareContinuityStore(AutonomousCycleRuntime(ExperienceJournal(journal.path)).outbox)
+                assert not reopened.read(scope=scope.binding_document(),clearance=Sensitivity.PRIVATE)
+                print('share_conversation_case=' + mode + ':PASS')
+                return
             assert mode in ('success','false') and result.disposition == 'submitted'
         if mode in ('no-consent','wrong-direction','late-off'):
             assert not received and not journal.read(event_type='conversation.share_prepared')
@@ -493,7 +506,7 @@ if __name__ == '__main__':
     test_atomic_context_budget()
     with tempfile.TemporaryDirectory(prefix='alive-share-continuity-') as directory:
         try:
-            for mode in ('success','false','exception','no-consent','wrong-direction','late-off'):
+            for mode in ('success','false','exception','no-consent','wrong-direction','late-off','quiet-after-capture'):
                 asyncio.run(test(Path(directory)/mode, mode))
             asyncio.run(test(Path(directory)/'long-reference', 'success', long_reference=True))
         finally:
