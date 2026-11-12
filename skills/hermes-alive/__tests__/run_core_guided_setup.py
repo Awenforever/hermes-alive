@@ -34,7 +34,7 @@ def cli(home,*arguments):
     raise AssertionError('actual Core plugin CLI did not return a result')
 
 
-async def test(home,*,public_refinement=False):
+async def test(home,*,public_refinement=False,adaptive_import=False):
     home.mkdir()
     installed=home/'plugins/hermes-alive'
     shutil.copytree(core.repo,installed)
@@ -80,18 +80,28 @@ async def test(home,*,public_refinement=False):
         rc,preview=cli(home,'contact-hours')
         assert rc==0 and preview['legacy_contact_hours']['adaptive_contact']=={'state':'unavailable'}
         assert circadian_state.read_bytes()==b'invalid fixture'
-        circadian_state.unlink()
-        legacy_config.write_bytes(legacy_bytes)
-        rc,preview=cli(home,'contact-hours')
-        assert rc==0 and preview['legacy_contact_hours']=={'state':'fixed','window':quiet}
-        rc,required=cli(home,*setup_args)
-        assert rc==2 and required['contact_hours_choice_required'] is True
-        setup_args=(*setup_args,'--keep-legacy-quiet-window')
+        if adaptive_import:
+            rc,refused=cli(home,*setup_args,'--stage-legacy-adaptive-contact')
+            assert rc==2 and refused['adaptive_checkpoint_unavailable'] is True
+            circadian_state.write_bytes(raw)
+            setup_args=(*setup_args,'--stage-legacy-adaptive-contact')
+        else:
+            circadian_state.unlink()
+            legacy_config.write_bytes(legacy_bytes)
+            rc,preview=cli(home,'contact-hours')
+            assert rc==0 and preview['legacy_contact_hours']=={'state':'fixed','window':quiet}
+            rc,required=cli(home,*setup_args)
+            assert rc==2 and required['contact_hours_choice_required'] is True
+            setup_args=(*setup_args,'--keep-legacy-quiet-window')
     rc,staged=cli(home,*setup_args)
     assert rc==0 and staged['ok'] and staged['delivery_enabled'] is False
     assert staged['phase']=='awaiting_authorized_conversation_confirmation'
     assert staged['confirmation_summary']['interest_preferences']==explicit_interests
-    assert staged['confirmation_summary']['quiet_window']==quiet
+    assert staged['confirmation_summary']['quiet_window']==(None if adaptive_import else quiet)
+    if adaptive_import:
+        assert staged['confirmation_summary']['adaptive_contact']=={
+            'state':'staged','timezone':'UTC','activation_ready':False}
+        assert 'source_digest' not in json.dumps(staged) and 'planned_sleep_at' not in json.dumps(staged)
     assert staged['confirmation_summary']['explicit_interest_memory_until_updated_or_forgotten'] is True
     assert staged['confirmation_summary']['public_queries']==(['public synthetic topic'] if public_refinement else [])
     assert staged['confirmation_summary']['public_source_refinement'] is public_refinement
@@ -101,8 +111,9 @@ async def test(home,*,public_refinement=False):
     assert staged['confirmation_summary']['external_memory_provider_recall_enabled'] is False
     command=staged['confirmation_command'].removeprefix('/alive ')
     token_text=command.split()[1]
-    rc,installed_result=cli(home,'install-runtime','--engine','kernel-shadow')
-    assert rc==0 and installed_result['engine']=='kernel-shadow'
+    engine='kernel' if adaptive_import else 'kernel-shadow'
+    rc,installed_result=cli(home,'install-runtime','--engine',engine)
+    assert rc==0 and installed_result['engine']==engine
     token=core.set_hermes_home_override(home)
     manager=None
     try:
@@ -136,6 +147,23 @@ async def test(home,*,public_refinement=False):
         store=setup_bridge.setup_store(binding)
         configured=store.configuration()
         assert configured is not None and configured.options['model'] is None
+        if adaptive_import:
+            assert '旧版动态作息检查点已私下保存' in reply
+            snapshot=configured.options['adaptive_contact']
+            assert snapshot['checkpoint']['learned_sleep_offset_minutes']==18
+            assert snapshot['checkpoint']['pending_sleep_at'] is None
+            assert 'history' not in snapshot['checkpoint'] and 'DO_NOT_EXPORT' not in repr(snapshot)
+            from hashlib import sha256
+            assert snapshot['source_digest']==sha256(raw).hexdigest()
+            assert circadian_state.read_bytes()==raw
+            assert not store.activation() and not store.journal.read(event_type='action.delegation_granted')
+            assert snapshot['source_digest'].encode() not in store.journal.path.read_bytes()
+            rc,status=cli(home,'status')
+            assert rc==0 and status['contact_hours']['state']=='adaptive_staged' and not status['enabled']
+            response=await runner._hm_run_plugin_handler(handler,None,source,session_entry=entry,args='enable')
+            assert '动态作息迁移验证' in response and binding.native is None and not store.activation()
+            print('HERMES_ALIVE_CORE_ADAPTIVE_IMPORT_STAGED_OK')
+            return
         if quiet:
             assert dict(configured.options['quiet_window'])==quiet
             assert '22:45–08:15' in reply and legacy_config.read_bytes()==legacy_bytes
@@ -275,6 +303,7 @@ if __name__=='__main__':
         try:
             asyncio.run(test(Path(directory)/'profile'))
             asyncio.run(test(Path(directory)/'refinement-profile',public_refinement=True))
+            asyncio.run(test(Path(directory)/'adaptive-profile',public_refinement=True,adaptive_import=True))
         finally:
             from hermes_state_registry import close_all_under
             close_all_under(directory)

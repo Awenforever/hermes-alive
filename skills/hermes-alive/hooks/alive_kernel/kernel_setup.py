@@ -36,7 +36,7 @@ def validate_options(options):
     required={'model_calls','delivery','outbound_retention_days','outbound_retention_confirmed',
               'model','public_queries','cited_reads'}
     if (not isinstance(options, dict) or not required<=set(options)
-            or set(options)-required-{'quiet_window','language','communication_preference','interest_preferences','use_hermes_user_profile','use_hermes_external_memory','interpret_share_feedback',
+            or set(options)-required-{'quiet_window','adaptive_contact','language','communication_preference','interest_preferences','use_hermes_user_profile','use_hermes_external_memory','interpret_share_feedback',
                                      'refine_public_sources','accept_explicit_followups','manage_explicit_followups','revise_explicit_followups','observe_core_tools',
                                      'core_background_work','core_work_request_retention','core_work_context_version','core_work_continuation_version','automatic_core_toolsets','retain_followup_source','review_core_work_results','inspect_core_work_files','autonomous_core_work','manage_core_work_outcomes'}
             or options['model_calls'] is not True or options['delivery'] is not True
@@ -99,6 +99,14 @@ def validate_options(options):
         from .contact_hours import quiet_window
         try:
             quiet_window(options['quiet_window'])
+        except ValueError as exc:
+            raise KernelSetupError(str(exc)) from exc
+    if 'adaptive_contact' in options:
+        from .contact_hours import validate_adaptive_import
+        if 'quiet_window' in options:
+            raise KernelSetupError('only one contact-hours policy can be confirmed')
+        try:
+            validate_adaptive_import(options['adaptive_contact'])
         except ValueError as exc:
             raise KernelSetupError(str(exc)) from exc
     return {**options, 'public_queries':list(queries)}
@@ -371,6 +379,8 @@ class KernelSetupStore:
         if self.vault.digest_json(options) != reference.digest:
             raise KernelSetupError('setup choices changed')
         options = validate_options(options)
+        if 'adaptive_contact' in options and document['chat_type'] != 'dm':
+            raise KernelSetupError('adaptive contact state requires the private owner conversation')
         if any(options.get(key) is True for key in ('use_hermes_user_profile','use_hermes_external_memory','interpret_share_feedback')) and document['chat_type'] != 'dm':
             raise KernelSetupError('personal Core profile memory requires a private target conversation')
         content = self.vault.put_json({'scope':document, 'options':options}, subject=owner,

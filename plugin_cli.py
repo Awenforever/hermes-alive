@@ -86,6 +86,8 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
     timing.add_argument('--quiet-window',nargs=3,metavar=('START','END','TIMEZONE'),
         help='Protect an interval of local time, using HH:MM and an IANA time zone')
     timing.add_argument('--keep-legacy-quiet-window',action='store_true',help='Keep the fixed interval reported by alive contact-hours')
+    timing.add_argument('--stage-legacy-adaptive-contact',action='store_true',
+        help='Stage a private checkpoint of the legacy adaptive schedule for migration review')
     timing.add_argument('--unrestricted-contact',action='store_true',help='Explicitly allow proactive contact at any hour')
     setup.add_argument('--confirm-hermes-profile-memory',action='store_true',
         help='Confirm this Hermes profile is personal and allow its curated user profile as advice in the private target conversation')
@@ -193,6 +195,20 @@ def _read_config() -> dict:
         return {}
 
 
+def _adaptive_contact_preview(*, prepare_import=False):
+    try:
+        result=subprocess.run([sys.executable,'-B',str(_source()/'scripts/hermes-alive-lifecycle.py'),
+            'preview-adaptive-contact','--hermes-home',str(_home()),'--shared-dir',str(_shared_target()),
+            *(['--prepare-import'] if prepare_import else [])],
+            text=True,capture_output=True,timeout=15,check=True)
+        document=json.loads(result.stdout)
+        if isinstance(document,dict):
+            return document
+    except (subprocess.SubprocessError,OSError,ValueError):
+        pass
+    return {'state':'unavailable'}
+
+
 def _set_enabled(enabled: bool) -> None:
     from hermes_cli.config import load_config_readonly
     core=load_config_readonly()
@@ -257,13 +273,7 @@ def alive_command(args: argparse.Namespace) -> int:
         from .tool_receipt_bridge import _kernel_module
         preview=_kernel_module('contact_hours').legacy_preview(_config_file(),os.environ)
         if preview['state']=='dynamic':
-            try:
-                result=subprocess.run([sys.executable,'-B',str(_source()/'scripts/hermes-alive-lifecycle.py'),
-                    'preview-adaptive-contact','--hermes-home',str(_home())],
-                    text=True,capture_output=True,timeout=15,check=True)
-                preview['adaptive_contact']=json.loads(result.stdout)
-            except (subprocess.SubprocessError,OSError,ValueError):
-                preview['adaptive_contact']={'state':'unavailable'}
+            preview['adaptive_contact']=_adaptive_contact_preview()
         print(json.dumps({'ok':True,'legacy_contact_hours':preview}))
         return 0
     if action == 'setup':
@@ -303,6 +313,17 @@ def alive_command(args: argparse.Namespace) -> int:
             window['quiet_window']=dict(zip(('start','end','timezone'),args.quiet_window))
         elif getattr(args,'unrestricted_contact',False):
             window['quiet_window']=None
+        elif getattr(args,'stage_legacy_adaptive_contact',False):
+            imported=_adaptive_contact_preview(prepare_import=True).get('migration_checkpoint')
+            try:
+                timing.validate_adaptive_import(imported)
+            except ValueError:
+                print(json.dumps({'ok':False,'adaptive_checkpoint_unavailable':True,'delivery_enabled':False}))
+                return 2
+            window['adaptive_contact']=imported
+        elif not getattr(args,'keep_legacy_quiet_window',False) and previous is not None and 'adaptive_contact' in previous.options:
+            saved=previous.options['adaptive_contact']
+            window['adaptive_contact']={**saved,'config':dict(saved['config']),'checkpoint':dict(saved['checkpoint'])}
         elif not getattr(args,'keep_legacy_quiet_window',False) and previous is not None and 'quiet_window' in previous.options:
             saved=previous.options['quiet_window']
             window['quiet_window']=dict(saved) if saved is not None else None
@@ -354,6 +375,8 @@ def alive_command(args: argparse.Namespace) -> int:
             'expires_in_seconds':900,'restart_required':True,'delivery_enabled':False,'model_calls_started':False,
             'confirmation_summary':{'model':args.model or 'inherit_hermes','outbound_history_days':args.retention_days,
                 'quiet_window':window.get('quiet_window'),
+                **({'adaptive_contact':{'state':'staged','timezone':window['adaptive_contact']['config']['timezone'],
+                    'activation_ready':False}} if 'adaptive_contact' in window else {}),
                 'inbound_history':False,'automatic_profile_learning':False,'public_queries':args.public_query,
                 'explicit_followup_intake':bool(getattr(args,'confirm_explicit_followup_intake',False) or getattr(args,'confirm_followup_management',False)),
                 'explicit_followup_management':bool(getattr(args,'confirm_followup_management',False)),

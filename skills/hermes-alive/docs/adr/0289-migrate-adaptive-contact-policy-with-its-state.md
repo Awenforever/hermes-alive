@@ -1,7 +1,7 @@
 # ADR-0289 — Migrate adaptive contact policy with its state
 
-Status: read-only preview implemented. Active state import, ownership and
-cutover qualification remain open.
+Status: read-only preview and owner-confirmed checkpoint staging implemented.
+Active state projection, ownership and cutover qualification remain open.
 
 ## Why this differs from fixed quiet hours
 
@@ -66,3 +66,15 @@ daily rollover and a daylight-saving fallback. The released baseline engine
 and policy matched the previous candidate's bytes. This exercise compares
 timing decisions. It does not import learning history, run the Native contact
 gate or establish the effect of a real owner exception after cutover.
+
+## Owner confirmation
+
+The setup command can stage a narrow, timestamped checkpoint of the selected
+legacy adaptive configuration with its source fingerprint. It uses the
+existing private setup vault and challenge. Only the admitted private owner
+conversation can confirm the choice. The confirmation summary reports the
+time zone and migration status. It does not display the checkpoint itself.
+The confirmed checkpoint can be recovered from the encrypted configuration,
+while the original legacy bytes stay available for rollback. An imported
+checkpoint grants no delivery authority. Activation stays unavailable until
+the Native projection consumes that checkpoint and passes cutover tests.

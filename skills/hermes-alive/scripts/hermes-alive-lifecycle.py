@@ -1380,12 +1380,20 @@ def preview_adaptive_contact(args: argparse.Namespace) -> int:
         checkpoint = json.loads(raw)
         engine = CircadianEngine(config=config, checkpoint=checkpoint)
         now = datetime.now(timezone.utc)
+        captured = None
+        if args.prepare_import:
+            from dataclasses import asdict
+            captured = {"version": 1, "captured_at": now.isoformat(), "source_digest": hashlib.sha256(raw).hexdigest(),
+                        "config": asdict(config), "checkpoint": engine.contact_checkpoint()}
         decision = evaluate_sleep_quiet_live(engine.shadow_decision(now=now), now=now, environ=effective)
     except (OSError, ValueError, TypeError, KeyError, AttributeError, OverflowError, LifecycleError):
         print(json.dumps({"state": "unavailable"}))
         return 0
-    print(json.dumps({"state": "open" if decision["would_allow_dynamic"] else "quiet",
-                      "timezone": config.timezone, "checkpoint_schema": checkpoint["schema_version"]}))
+    result = {"state": "open" if decision["would_allow_dynamic"] else "quiet",
+              "timezone": config.timezone, "checkpoint_schema": checkpoint["schema_version"]}
+    if captured is not None:
+        result["migration_checkpoint"] = captured
+    print(json.dumps(result))
     return 0
 
 
@@ -1402,6 +1410,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     adaptive_parser = subparsers.add_parser("preview-adaptive-contact")
     _add_common_paths(adaptive_parser)
+    adaptive_parser.add_argument("--prepare-import", action="store_true", help=argparse.SUPPRESS)
     adaptive_parser.set_defaults(func=preview_adaptive_contact)
 
     configure_parser = subparsers.add_parser("configure")

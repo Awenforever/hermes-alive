@@ -42,6 +42,11 @@ VALID_PHASES = {
     "overslept",
     "recovering",
 }
+CONTACT_CHECKPOINT_FIELDS = (
+    "schema_version", "phase", "schedule_date", "planned_sleep_at", "planned_wake_at",
+    "actual_sleep_at", "actual_wake_at", "pending_sleep_at", "last_transition_message",
+    "learned_sleep_offset_minutes", "learned_wake_offset_minutes", "sleep_debt_minutes",
+)
 HARD_EXEMPT_CLASSES = {
     "system_error",
     "service_alert",
@@ -267,6 +272,10 @@ class CircadianEngine:
         if checkpoint.get("last_transition_message") == "forced_wake":
             projected["last_transition_message"] = "forced_wake"
         return projected
+
+    def contact_checkpoint(self) -> dict[str, Any]:
+        """Project the current timing inputs without advancing or saving them."""
+        return {key: self.state[key] for key in CONTACT_CHECKPOINT_FIELDS}
 
     def snapshot(self, *, update: bool = True, now: datetime | None = None) -> dict[str, Any]:
         current = self._local(now or self.now_fn())

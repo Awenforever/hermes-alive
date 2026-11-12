@@ -148,6 +148,8 @@ def register_setup_command(context,binding):
                             detail+=f'设定时段为 {hours}。'
                         elif timing['state']=='choice_required':
                             detail='主动联系已暂缓，等待确认旧版免打扰设置。'
+                        elif timing['state']=='adaptive_staged':
+                            detail=f"旧版动态作息已保存（{timing['timezone']}），等待迁移验证。"
                         else:
                             detail='主动联系时段不限。'
                         return ('Alive 状态：'+label+'；当前发送授权：'
@@ -169,6 +171,8 @@ def register_setup_command(context,binding):
                     if execution.runtime_engine(binding)!='kernel':
                         return ('请先让 Hermes 执行 alive install-runtime --engine kernel 并按引导重启网关。'
                                 '影子模式保持不发送，不会自动切换为正式执行。')
+                    if 'adaptive_contact' in configured.options:
+                        return '已保存动态作息检查点，主动发送需等动态作息迁移验证完成后启用。'
                     if execution.contact_hours(binding,configured)[1]:
                         return '旧版有免打扰设置。请先让 Hermes 在 Alive 设置中引导你保留、调整或明确取消时段。'
                     enable_attempted=True
@@ -235,6 +239,9 @@ def register_setup_command(context,binding):
             window=configured.options.get('quiet_window')
             if window is not None:
                 intake_summary+=f"主动消息免打扰时段为 {window['start']}–{window['end']}（{window['timezone']}）。"
+            if 'adaptive_contact' in configured.options:
+                return ('目标会话和所选权限已确认。'+intake_summary+
+                        '旧版动态作息检查点已私下保存，正在等待迁移验证。主动发送仍未启用。')
             return ('目标会话和所选权限已确认，分享接续读取已接入。'+intake_summary+
                     '当前仍未启用模型调用和主动发送。可发送 /alive enable 启用；公开检索是可选能力，'
                     '授权持续有效直到暂停或撤销，最多每日3次且间隔至少1小时；'
