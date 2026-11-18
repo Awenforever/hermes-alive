@@ -57,7 +57,15 @@ Adaptive legacy profiles need a separate plan/state import and cutover proof.
 [ADR0289](adr/0289-migrate-adaptive-contact-policy-with-its-state.md) records the
 read-only preview, ownership and replay requirements.
 
-The current test supplier is official Core 0.22.5. Production admission,
+Existing installed-Core qualifications use official Core 0.22.5. The official
+latest stable release checked on 2026-11-18 is 0.23.2. Qualify its actual APIs
+and managed installation before updating the supported range or completing
+distribution acceptance. No production upgrade follows from this check.
+Its held-output transform is a prospective pre-exposure seam, but its declared
+hold covers every session in a profile. Source inspection alone does not
+qualify a selective conversation reviewer or justify changing ordinary stream
+behavior. Existing source-context improvements remain under real-model test.
+Production admission,
 other-plugin integration and the actual production state must be checked again
 before any deployment. No production approval or release follows from development
 tests. The earlier search-alignment runtime passed the complete portable suite.
@@ -914,3 +922,22 @@ pass. A same-query real-model regression is running separately; it earns no
 fresh-round credit. The preceding complete portable-suite result applies to
 the preceding runtime baseline, with these changed reading paths separately
 qualified. It is not a final platform or product acceptance.
+
+The later real reading regression reached original project documentation,
+then exposed a settled model timeout wrapped as ordinary synthesis failure.
+ADR0290 records propagation through the required cognitive stages. Its exact
+runtime passed the full portable suite and installed-Core recovery controls.
+Subsequent original ordinary replies mixed related versions or opened with
+an absence claim their own later caveat could not establish. Citation-role
+metadata now survives scoped references and packing (ADR0230); the repeated
+real conversation still fails quality. Do not replace that failure with the
+metadata test's success.
+
+Native Windows public updates preserved twelve existing state fingerprints.
+Installed Core controls finished, but final cleanup failed on a deep backup
+tree with the system long-path setting disabled. ADR0291 records an independent
+reproduction, the lifecycle removal helper and the native filesystem control.
+Windows CI lifecycle checks pass; the installed-Core whole-run cleanup still
+needs a rerun. CI also exposed an undeclared HTTP test dependency that the
+Core-supplied development environment had supplied implicitly. Its corrected
+clean-environment CI is a separate pending gate.
