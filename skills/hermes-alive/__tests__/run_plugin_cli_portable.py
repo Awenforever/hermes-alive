@@ -15,6 +15,19 @@ from unittest.mock import patch
 
 REPO = Path(__file__).resolve().parents[3]
 CLI = REPO / "plugin_cli.py"
+_fs_spec=importlib.util.spec_from_file_location('alive_cli_filesystem',
+    REPO/'skills/hermes-alive/scripts/portable_filesystem.py')
+_filesystem=importlib.util.module_from_spec(_fs_spec)
+_fs_spec.loader.exec_module(_filesystem)
+
+
+@contextlib.contextmanager
+def owned_temporary_directory():
+    temporary=tempfile.TemporaryDirectory(prefix='alive-plugin-cli-')
+    try:yield temporary.name
+    finally:
+        if os.name=='nt':_filesystem.remove_tree(temporary.name)
+        temporary.cleanup()
 
 
 def command(module, action: str) -> dict:
@@ -26,7 +39,7 @@ def command(module, action: str) -> dict:
 
 
 def main() -> int:
-    with tempfile.TemporaryDirectory(prefix="alive-plugin-cli-") as raw:
+    with owned_temporary_directory() as raw:
         home = Path(raw) / "profile"
         isolated_environment = {
             "HERMES_HOME": str(home),

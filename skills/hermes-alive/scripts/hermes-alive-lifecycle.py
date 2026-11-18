@@ -32,6 +32,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+_filesystem_spec=importlib.util.spec_from_file_location('alive_lifecycle_filesystem',
+    Path(__file__).resolve().with_name('portable_filesystem.py'))
+_filesystem=importlib.util.module_from_spec(_filesystem_spec)
+_filesystem_spec.loader.exec_module(_filesystem)
+remove_tree=_filesystem.remove_tree
+
 try:
     import yaml
 except Exception:  # pragma: no cover - Hermes normally ships PyYAML
@@ -291,7 +297,7 @@ def _tree_manifest(root: Path) -> dict[str, str]:
 
 def _copy_tree(source: Path, destination: Path) -> None:
     if destination.exists():
-        shutil.rmtree(destination)
+        remove_tree(destination)
     shutil.copytree(
         source,
         destination,
@@ -375,7 +381,7 @@ def _swap_directory(stage: Path, target: Path, rollback_dir: Path) -> Path | Non
         _ensure_directory(rollback_dir, 0o700)
         previous = rollback_dir / f"{target.name}.previous"
         if previous.exists():
-            shutil.rmtree(previous)
+            remove_tree(previous)
         os.replace(target, previous)
     try:
         os.replace(stage, target)
@@ -517,20 +523,20 @@ def install(args: argparse.Namespace) -> int:
         # fails, including manifest/config/template persistence.
         if hook_activated:
             if paths.hook_target.exists():
-                shutil.rmtree(paths.hook_target, ignore_errors=True)
+                remove_tree(paths.hook_target, ignore_errors=True)
             if hook_previous is not None and hook_previous.exists():
                 os.replace(hook_previous, paths.hook_target)
         if source_activated:
             if paths.source_target.exists():
-                shutil.rmtree(paths.source_target, ignore_errors=True)
+                remove_tree(paths.source_target, ignore_errors=True)
             if source_previous is not None and source_previous.exists():
                 os.replace(source_previous, paths.source_target)
         raise
     finally:
         if source_stage.exists():
-            shutil.rmtree(source_stage, ignore_errors=True)
+            remove_tree(source_stage, ignore_errors=True)
         if hook_stage.exists():
-            shutil.rmtree(hook_stage, ignore_errors=True)
+            remove_tree(hook_stage, ignore_errors=True)
 
     print("HERMES_ALIVE_LIFECYCLE_INSTALL_OK")
     print(f"source_target={paths.source_target}")
@@ -551,7 +557,7 @@ def _prune_backups(root: Path, keep: int) -> None:
         reverse=True,
     )
     for path in entries[keep:]:
-        shutil.rmtree(path, ignore_errors=True)
+        remove_tree(path, ignore_errors=True)
 
 
 def _hermes_cli() -> list[str] | None:
@@ -1288,7 +1294,7 @@ def uninstall(args: argparse.Namespace, *, purge: bool) -> int:
     ) or _detect_source_owner(paths)
 
     if paths.hook_target.exists():
-        shutil.rmtree(paths.hook_target)
+        remove_tree(paths.hook_target)
     # Normal uninstall removes executable code only. The managed config is
     # user-owned state and must survive uninstall/reinstall just like learned
     # preferences, cooldowns, and delivery history. Purge is the sole path
@@ -1308,7 +1314,7 @@ def uninstall(args: argparse.Namespace, *, purge: bool) -> int:
                 + source_message[:800]
             )
     elif paths.source_target.exists():
-        shutil.rmtree(paths.source_target)
+        remove_tree(paths.source_target)
         source_removed = True
         source_message = "lifecycle-owned source removed"
     else:
@@ -1316,7 +1322,7 @@ def uninstall(args: argparse.Namespace, *, purge: bool) -> int:
         source_message = "source already absent"
 
     if purge and paths.shared_dir.exists():
-        shutil.rmtree(paths.shared_dir)
+        remove_tree(paths.shared_dir)
     elif paths.shared_dir.exists():
         tombstone = {
             "uninstalled_at_utc": time.strftime(

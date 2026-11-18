@@ -7,6 +7,7 @@ import importlib
 import json
 from pathlib import Path
 import shutil
+import os
 import tempfile
 from datetime import datetime,timezone,timedelta
 from types import SimpleNamespace
@@ -407,3 +408,9 @@ if __name__=='__main__':
         finally:
             from hermes_state_registry import close_all_under
             close_all_under(directory)
+            if os.name=='nt':
+                spec=importlib.util.spec_from_file_location('alive_control_filesystem',
+                    core.repo/'skills/hermes-alive/scripts/portable_filesystem.py')
+                filesystem=importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(filesystem)
+                filesystem.remove_tree(directory)
