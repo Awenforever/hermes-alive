@@ -26,7 +26,8 @@ def owned_temporary_directory():
     temporary=tempfile.TemporaryDirectory(prefix='alive-plugin-cli-')
     try:yield temporary.name
     finally:
-        if os.name=='nt':_filesystem.remove_tree(temporary.name)
+        if os.name=='nt':
+            tempfile.TemporaryDirectory._rmtree(_filesystem.filesystem_path(temporary.name))
         temporary.cleanup()
 
 

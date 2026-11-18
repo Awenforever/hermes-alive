@@ -413,4 +413,4 @@ if __name__=='__main__':
                     core.repo/'skills/hermes-alive/scripts/portable_filesystem.py')
                 filesystem=importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(filesystem)
-                filesystem.remove_tree(directory)
+                tempfile.TemporaryDirectory._rmtree(filesystem.filesystem_path(directory))
