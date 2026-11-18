@@ -1,4 +1,4 @@
-# ADR 0291 — Remove Windows trees without a global long-path setting
+# ADR 0292 — Remove Windows trees without a global long-path setting
 
 Audience: maintainers and QA. Purpose: preserve lifecycle cleanup on native Windows.
 

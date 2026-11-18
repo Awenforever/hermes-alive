@@ -935,7 +935,7 @@ metadata test's success.
 
 Native Windows public updates preserved twelve existing state fingerprints.
 Installed Core controls finished, but final cleanup failed on a deep backup
-tree with the system long-path setting disabled. ADR0291 records an independent
+tree with the system long-path setting disabled. [ADR0292](adr/0292-windows-long-tree-removal.md) records an independent
 reproduction, the lifecycle removal helper and the native filesystem control.
 Windows CI lifecycle checks pass; the installed-Core whole-run cleanup still
 needs a rerun. CI also exposed an undeclared HTTP test dependency that the
