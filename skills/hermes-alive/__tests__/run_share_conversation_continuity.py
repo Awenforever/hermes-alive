@@ -198,6 +198,9 @@ async def test(home, mode, *, exercise=None, long_reference=False):
         assert 'bicycles, not cars' in shares[0]['sources'][0]['excerpt']
         assert shares[0]['sources'][0]['reading_status'] == 'retained_excerpt'
         assert shares[0]['sources'][0]['reading_scope'] == {'collector_scope_reported': False}
+        assert type(shares[0]['sources'][0]['linked_in_share']) is bool
+        if mode=='success' and not long_reference:
+            assert shares[0]['sources'][0]['linked_in_share'] is False
         original_reads = journal.read(event_type='opportunity.synthesis_started')
         assert len(original_reads) == 1
         assert shares[0]['sources'][0]['excerpt_policy'] == original_reads[0].event.payload.get(

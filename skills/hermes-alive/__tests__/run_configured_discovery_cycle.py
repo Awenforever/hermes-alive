@@ -382,7 +382,7 @@ async def exercise(root,mode,*,primary_url=None):
                 assert not journal.read(event_type='autonomous.host.failed')
                 assert not runner.pending
                 second=await runner.step(parameters)
-                assert second.disposition in ('shadow_selected','silence','waiting_for_change'),second.disposition
+                assert second.disposition=='shadow_selected',second.disposition
                 closed=journal.read(event_type='autonomous.host.closed')
                 assert len(closed)==2 and host._validate(closed[-1].event)['operation_id']!=original_operation
                 assert host._validate(first_closed.event)['disposition']=='model_temporarily_unavailable'

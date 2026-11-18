@@ -412,6 +412,7 @@ class ShareContinuityStore:
                 result.append({'event_id': source['event_id'], 'reading_status': 'no_longer_retained'})
                 continue
             result.append({'event_id': source['event_id'], 'title': content['title'], 'url': content['url'],
+                'linked_in_share':has_inline_citation(body['text'],content['url']),
                 'excerpt': source_prompt_excerpt(content, policy=source.get('excerpt_policy')),
                 'excerpt_policy': source.get('excerpt_policy'), 'reading_status': 'retained_excerpt',
                 'reading_scope': read_scope_metadata(content) or {'collector_scope_reported': False},
@@ -429,7 +430,7 @@ def _conversation_source(source):
     """
     result = {key: source[key] for key in (
         'title', 'url', 'excerpt', 'reading_status', 'published_at',
-        'reference_kind', 'reference_role') if key in source}
+        'reference_kind', 'reference_role', 'linked_in_share') if key in source}
     if source.get('reading_status') == 'retained_excerpt':
         reported = source.get('reading_scope') or {}
         result['reading_scope'] = {
@@ -464,7 +465,10 @@ def continuation_context(shares, *, max_chars=None):
         'depth. Calibrate the first sentence: if these excerpts cannot settle whether something happened, '
         'say that up front. Absence from an excerpt is no evidence of absence from the event or whole source. '
         'Refer to sources by name, not by index. Distinguish plans, observations and inference; '
-        'ground comparisons in their measure, baseline and tested conditions.\n')
+        'ground comparisons in their measure, baseline and tested conditions. '
+        'Follow the actual share topic. linked_in_share records a citation relationship, not truth or authority. '
+        'Other retained reading can concern different objects or versions; preserve that distinction when using it. '
+        'A resource link or descriptive label alone does not establish what its uninspected content shows.\n')
     if any('reference' in item for item in references):
         header = header.rstrip('\n') + (' Use alive_read_reference with the turn’s handle for omitted '
             'text, or part=source and source_index for evidence. Read later pages as needed. '

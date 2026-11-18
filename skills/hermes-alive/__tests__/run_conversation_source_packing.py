@@ -9,9 +9,11 @@ from alive_kernel.conversation_continuity import continuation_context
 
 def test_cited_source_before_background():
     background = {'url': 'https://example.invalid/background', 'title': 'Background',
-                  'excerpt': 'background evidence ' * 100, 'reading_status': 'retained_excerpt'}
+                  'excerpt': 'background evidence ' * 100, 'reading_status': 'retained_excerpt',
+                  'linked_in_share':False}
     cited = {'url': 'https://example.invalid/result', 'title': 'Actual result',
-             'excerpt': 'direct evidence ' * 100, 'reading_status': 'retained_excerpt'}
+             'excerpt': 'direct evidence ' * 100, 'reading_status': 'retained_excerpt',
+             'linked_in_share':True}
     for sources in ([background, cited], [cited, background]):
         share = {'prepared_at': '2026-01-01T00:00:00+00:00',
                  'text': 'One [reported result](https://example.invalid/result).', 'sources': sources}
@@ -25,6 +27,10 @@ def test_cited_source_before_background():
         by_url = {s['url']: s for s in packed['sources']}
         assert by_url[cited['url']]['excerpt'] == cited['excerpt']
         assert by_url[background['url']]['excerpt_in_context'] is False
+        assert by_url[cited['url']]['linked_in_share'] is True
+        assert by_url[background['url']]['linked_in_share'] is False
+        full=json.loads(continuation_context([share]).split('\n',1)[1])['alive_shares'][0]
+        assert [s['linked_in_share'] for s in full['sources']]==[s['linked_in_share'] for s in sources]
         assert json.dumps(share) == original
 
 

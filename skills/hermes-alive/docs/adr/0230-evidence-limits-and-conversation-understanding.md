@@ -3,6 +3,32 @@
 Date: 2026-10-25 (Asia/Shanghai).
 Status: structurally qualified; actual main-model overclaim remains unresolved.
 
+## Additional qualification — source relationships in a follow-up
+
+A later real official-model trial revised an overlong, overbroad video-model
+draft into a source-supported explanation of chaining generated clips. The
+share cited a cloud documentation page about one model version. The first
+ordinary follow-up recommended two demos from an additionally read repository
+about a different version, and assigned both clips functions that the retained
+README did not establish. The second reply acknowledged the version difference
+and the absence of video inspection, but that did not repair the first answer.
+The complete round receives no quality credit.
+
+The continuity reader now reports whether each retained public resource is
+actually linked in the exact share. This is a lexical citation relationship,
+not semantic entailment, authenticity or authority. An unlinked resource may
+still be useful; it cannot silently inherit the cited resource's object,
+version or observed result. The field is computed from the protected original
+share and retained URL, preserved through full context, budgeted catalogs and
+source-reading tools. It does not rewrite the stored source or widen retrieval.
+
+Conversation guidance retains the actual share as the focus and separates a
+resource's description from evidence of what uninspected content shows. No
+product names, domains, demo keywords or versions are used as a filter. Verify
+the field through actual Core source reads and cold reopening, then qualify
+natural replies using real models. A passing metadata check does not settle
+the semantic boundary or advance the fresh sharing streak.
+
 Fresh real-source trials establish two distinct product problems. One scientific
 share was understandable but did not clearly convey what made its central
 relationship interesting. A different technical share explained a concrete
