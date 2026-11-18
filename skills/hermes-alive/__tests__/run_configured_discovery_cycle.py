@@ -78,6 +78,17 @@ for context,expected in ((dict(method='discovery-source-authoring-v3'),'semantic
     assert ('source_context' in original)==(expected=='semantic-source-findings-v1')
 
 
+TIMEOUT_STAGES={
+    'timeout-reading':'alive_discovery_reading',
+    'timeout-followup':'alive_discovery_followup',
+    'timeout-opportunity':'alive_opportunity_candidates',
+    'timeout-selection':'alive_deliberation',
+    'timeout-render':'alive_semantic_render',
+    'timeout-semantic-review':'alive_semantic_review',
+    'timeout-source-review':'alive_source_support',
+}
+
+
 async def exercise(root,mode,*,primary_url=None):
     pressure=mode in ('budget-pressure','fair-budget-pressure','reading-assessment-budget-pressure')
     journal=ExperienceJournal(root/'journal.sqlite3')
@@ -109,6 +120,8 @@ async def exercise(root,mode,*,primary_url=None):
     policy.apply(policy.append_update(subject='user:test',actor='user:test',expected_revision=0,
         enabled=mode!='paused',context=PolicyContext(can_interrupt=True),operation_id='enable'))
     state={'consent':True,'interrupt':mode in ('replay','legacy-replay','historical-followup-replay')}
+    timeout_stage=TIMEOUT_STAGES.get(mode)
+    timeout_fired=[False]
     tools=[];models=[];unload=[];release=threading.Event();entered=threading.Event()
     url='https://example.invalid/conservation'
     if mode=='abstain-with-prior-evidence':
@@ -172,6 +185,10 @@ async def exercise(root,mode,*,primary_url=None):
         async def __call__(self,**kw):
             assert self.read_binding().operation_id==self.cycle.operation_id
             self.calls+=1;models.append(kw['task'])
+            if kw['task']==timeout_stage and not timeout_fired[0]:
+                from alive_kernel.model_timeouts import CoreModelTemporarilyUnavailable
+                timeout_fired[0]=True
+                raise CoreModelTemporarilyUnavailable('synthetic settled Core completion timeout')
             task=kw['task'];raw=kw['messages'][1]['content']
             data=json.loads(raw) if task!='alive_deliberation' else None
             if task=='alive_opportunity_candidates' and isinstance(data,dict) and 'original_evidence' in data:
@@ -356,6 +373,23 @@ async def exercise(root,mode,*,primary_url=None):
             if mode=='historical-invalid-followup':
                 assert not journal.read(event_type='discovery.citation_selection_opened')
         else:
+            if timeout_stage:
+                first=await runner.step(parameters)
+                assert timeout_fired[0] and first.disposition=='model_temporarily_unavailable'
+                assert models.count(timeout_stage)==1,'stage retried a settled Core failure immediately'
+                first_closed,=journal.read(event_type='autonomous.host.closed')
+                original_operation=host._validate(first_closed.event)['operation_id']
+                assert not journal.read(event_type='autonomous.host.failed')
+                assert not runner.pending
+                second=await runner.step(parameters)
+                assert second.disposition in ('shadow_selected','silence','waiting_for_change'),second.disposition
+                closed=journal.read(event_type='autonomous.host.closed')
+                assert len(closed)==2 and host._validate(closed[-1].event)['operation_id']!=original_operation
+                assert host._validate(first_closed.event)['disposition']=='model_temporarily_unavailable'
+                assert not journal.read(event_type='dispatch.externally_delivered')
+                assert not journal.read(event_type='action.attempted') and not runner.pending
+                print('SETTLED_CORE_TIMEOUT_NEXT_WAKE='+timeout_stage,flush=True)
+                return
             if mode in ('replay','legacy-replay','historical-followup-replay'):
                 try:await runner.step(parameters)
                 except RuntimeError:pass
@@ -514,7 +548,7 @@ with tempfile.TemporaryDirectory(prefix='alive-configured-discovery-') as folder
     modes=('budget-pressure',) if os.getenv('ALIVE_REPRODUCE_OLD_RECALL')=='1' else (
                  'share','reading-assessment','reading-assessment-no-followup','reading-assessment-budget-pressure','reading-assessment-invalid','reading-assessment-missing','reading-assessment-recovery','primary-read','private-followup','budget-pressure','fair-budget-pressure','erase-group-after-final','followup-failed','replay','legacy-replay','historical-followup-replay','unconsented-followup','page-failed','abstain','paused',
                  'search-failed','search-empty','abstain-with-prior-evidence','invalid-choice','revoked-choice','forgotten-choice','erased-choice','uncertain-read',
-                 'invented-followup','foreign-followup','mixed-followup','malformed-followup','nonjson-followup',
+                 *TIMEOUT_STAGES,'invented-followup','foreign-followup','mixed-followup','malformed-followup','nonjson-followup',
                  'revoked-followup','forgotten-followup','erased-followup','interrupted-followup','historical-invalid-followup')
     if selected_cases:
         if set(selected_cases)-set(modes):raise ValueError('unknown configured-discovery test case')

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from .model_timeouts import MAX_STAGE_SECONDS
+from .model_timeouts import CoreModelTemporarilyUnavailable, MAX_STAGE_SECONDS
 import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -728,6 +728,8 @@ class SemanticComparator:
             self._receipt(operation, "failed", subject, selection_event_id,
                           source.event.sensitivity, status=f"{stage}_failed",
                           model=actual_model, error=type(exc).__name__)
+            if isinstance(exc, CoreModelTemporarilyUnavailable):
+                raise
             raise SemanticReviewError(f"shadow {stage} failed") from exc
 
 

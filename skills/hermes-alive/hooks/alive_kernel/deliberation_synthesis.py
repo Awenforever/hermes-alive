@@ -21,6 +21,7 @@ from .event_store import EventConflictError, ExperienceJournal, JournalRecord
 from .events import EventEnvelope, Sensitivity, _thaw_json
 from .exploration import validate_exploratory_selection
 from .exploration_store import ExplorationProjection
+from .model_timeouts import CoreModelTemporarilyUnavailable
 
 
 _ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,127}$")
@@ -522,6 +523,8 @@ class DeliberationSynthesizer:
                     error_class=type(exc).__name__,
                 )
                 receipts.append(receipt.event.event_id)
+                if isinstance(exc, CoreModelTemporarilyUnavailable):
+                    raise
                 if isinstance(exc, DeliberationContextChanged):
                     raise error
                 continue

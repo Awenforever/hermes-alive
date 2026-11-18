@@ -29,7 +29,7 @@ from .expression_history import ExpressionHistoryReader
 from .action_history import ActionHistoryReader
 from .host_discovery import read_scope_metadata, source_prompt_excerpt, SOURCE_EXCERPT_POLICY, provenance_metadata
 from .markdown_citations import INLINE_CITATION_POLICY
-from .model_timeouts import MAX_STAGE_SECONDS
+from .model_timeouts import CoreModelTemporarilyUnavailable, MAX_STAGE_SECONDS
 from .core_context_read import context_value
 from . import reading_assessment
 
@@ -1639,7 +1639,8 @@ class OpportunitySynthesizer:
                 payload={"error_class": ("OpportunityEvidenceChanged" if isinstance(exc, ContentUnavailableError)
                                          else type(exc).__name__), "raw_response_stored": False},
             ))
-            if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt, SystemExit, OpportunityEvidenceChanged)):
+            if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt, SystemExit,
+                                OpportunityEvidenceChanged, CoreModelTemporarilyUnavailable)):
                 raise
             if isinstance(exc, ContentUnavailableError):
                 raise OpportunityEvidenceChanged("opportunity evidence became unavailable") from exc

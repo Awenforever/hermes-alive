@@ -50,3 +50,36 @@ snapshot. A hard external termination still remains a failed observation,
 never a successful pause, a recovered cycle or delivery evidence. This
 changes diagnostic collection, not provider timeouts, the fallback ladder,
 production model configuration or the product's existing stage allowance.
+
+## A settled timeout must survive the cognitive stages
+
+The later OCR regression read the official project post and then its README.
+It completed its reading decisions, so the initial configured-route correction
+was exercised with real sources. Opportunity synthesis subsequently received a
+qualified `CoreModelTemporarilyUnavailable`. It recorded that class but wrapped
+it in `OpportunitySynthesisError`. The host therefore reported `cycle_failed`
+and stopped, instead of recording the model-unavailable outcome. This was a
+product failure, unlike the earlier diagnostic deadline. It had no draft,
+adapter submission or ordinary follow-up and earns no quality credit.
+
+Required candidate synthesis, deliberation and semantic rendering/review now
+retain their failed/rejected stage receipts and propagate that same typed Core
+exception. Deliberation does not spend its own repair attempt on a settled
+provider timeout. Initial/corrected source review already propagates it. Public
+reading, private-memory question planning and the work-decision model paths
+also preserve the exception. Optional feedback assimilation continues recording
+an unresolved item according to its separate existing policy.
+
+The classification is still narrow: the Core caller must have established
+settlement and unchanged authority. Generic deadlines, uncertain physical work,
+malformed model output, missing sources and revoked permissions keep their
+existing handling. The change adds neither a provider retry nor a new send
+permit. A new host wake receives a new operation and current evidence.
+
+Qualification now crosses the full configured discovery path at reading,
+follow-up, opportunity, selection, rendering, semantic review and final source
+review. Each injected qualified timeout must close as model unavailable with
+no immediate duplicate request, no pending work or send, followed by a distinct
+normal wake. An installed Core journey separately exercises the Native wrapper
+and original candidate-synthesis failure. Controlled responses qualify recovery,
+not real-model usefulness or a sharing round.

@@ -265,7 +265,7 @@ async def test(home):
         core.reset_hermes_home_override(token)
 
 
-async def test_native_wait(home,*,refinement=False):
+async def test_native_wait(home,*,refinement=False,settled_timeout=False):
     """Exercise the REAL installed Core wrapper, not a directly injected preparer."""
     home.mkdir()
     shutil.copytree(core.repo,home/'plugins/hermes-alive')
@@ -313,6 +313,7 @@ async def test_native_wait(home,*,refinement=False):
         binding.arguments['stop'].set();await binding.task
         native=binding.native;build=binding.arguments['build_parameters']
         assert native.context_reads is not None
+        timeout_pending=[settled_timeout]
         class Caller:
             pending=()
             def __init__(self,*,cycle,read_binding):self.calls=0;self.read_binding=read_binding
@@ -325,7 +326,13 @@ async def test_native_wait(home,*,refinement=False):
                 if isinstance(kw.get('route_info'),dict):kw['route_info']['provider']='synthetic-provider'
                 if kw['task']=='alive_discovery_reading':
                     value={'source_refs':[],'question':None,'value_hypothesis':'No useful new reading in this synthetic case.'}
-                elif kw['task']=='alive_opportunity_candidates':value={'candidates':[]}
+                elif kw['task']=='alive_opportunity_candidates':
+                    if timeout_pending[0]:
+                        timeout_pending[0]=False
+                        execution=importlib.import_module(loaded.module.__name__+'.kernel_execution_bridge')
+                        raise execution.kernel('model_timeouts').CoreModelTemporarilyUnavailable(
+                            'synthetic settled Core completion timeout')
+                    value={'candidates':[]}
                 else:raise AssertionError('unexpected native model task '+kw['task'])
                 return SimpleNamespace(model='synthetic-model',choices=[SimpleNamespace(
                     message=SimpleNamespace(content=json.dumps(value)))])
@@ -341,6 +348,14 @@ async def test_native_wait(home,*,refinement=False):
                 attributes={'read_scope':'webpage_extract'}),subject=native.host.subject)
         async def allow(self,url):return url=='https://example.invalid/wait'
         with patch.object(execution.kernel('core_discovery_tools').CoreDiscoveryTools,'allow_url',allow):
+            if settled_timeout:
+                timed=await native.step(build())
+                assert timed.disposition=='model_temporarily_unavailable' and not native.pending
+                assert models==['alive_discovery_reading','alive_opportunity_candidates']
+                closed=native.host.journal.read(event_type='autonomous.host.closed')[-1]
+                assert closed.event.payload['disposition']=='model_temporarily_unavailable'
+                assert not native.host.journal.read(event_type='autonomous.host.failed')
+                models.clear();reads.clear()
             first=await native.step(build())
             assert first.disposition=='silence'
             assert models==['alive_discovery_reading','alive_opportunity_candidates']
@@ -388,6 +403,7 @@ if __name__=='__main__':
             asyncio.run(test(Path(directory)/'profile'))
             asyncio.run(test_native_wait(Path(directory)/'native-wait-profile'))
             asyncio.run(test_native_wait(Path(directory)/'refinement-wait-profile',refinement=True))
+            asyncio.run(test_native_wait(Path(directory)/'settled-timeout-profile',settled_timeout=True))
         finally:
             from hermes_state_registry import close_all_under
             close_all_under(directory)
