@@ -215,3 +215,22 @@ though the search snapshot and eligible evidence were unchanged. With a
 successful listing fingerprint, the marker now follows the same
 reconsideration rule as the other discovery control records. Changed
 sources, failed reads and owner input retain their wake behavior.
+
+## Read-page trial: a correct rejection is not a useful completed round
+
+The next real chart/document-VLM trial read a roundup and two model cards.
+The author no longer received unread listings or the internal reading
+inventory. Its opening still grew into five paragraphs, including model
+components and a benchmark aside. It also changed a model-card comparison
+with Qwen Chat into a comparison with the language initialization model.
+The final assessor identified both the comparator error and the distracting
+secondary inventory. It rejected the original wording rather than admitting
+an unrelated source witness as support for the whole draft.
+
+A corrected authoring call completed. The subsequent review had not returned
+when the diagnostic's total observation budget expired. No adapter submission
+or ordinary follow-up took place. This establishes useful reading and one
+grounded rejection, but no successful conversational contribution or quality
+round. The missing second review response cannot establish that its correction
+was good or that the live host would have failed. See ADR 0290 for the
+distinction between diagnostic and model-stage timeouts.

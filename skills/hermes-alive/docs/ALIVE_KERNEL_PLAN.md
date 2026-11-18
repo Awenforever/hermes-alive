@@ -895,3 +895,12 @@ October 26–27 qualification notes are retained in
 Earlier execution notes and the original change log are retained in
 [the progress archive](ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-25.md).
 See Git history and ADRs for subsequent code and design changes.
+
+The chart/document-VLM trial read original model cards and rejected a wrong
+comparison and an unfocused opening. Its corrected review outlived the test's
+whole-cycle observation allowance. This is an incomplete real round with no
+submission or ordinary continuation, not evidence of a successfully recovered
+provider timeout. ADR 0290 separates those outcomes. Preserve pending review
+inputs and settle a requested pause before retaining offline state in the
+next bounded diagnostic. Continue assessing the original wording and ordinary
+follow-ups; the fresh quality streak remains 0/10.

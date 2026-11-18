@@ -31,3 +31,22 @@ absorbed by the generic repair-error handler. The host received
 timeouts now propagate through both initial and corrected final reviews.
 Other repair failures keep their prior classification. This run has no
 submission, continuation or quality credit.
+
+## Diagnostic deadline is a separate observation boundary
+
+The real chart/document-VLM probe ended at its 1800-second whole-cycle
+observation deadline. Several individual Core requests timed out; the
+official fallback then completed two authoring stages. One factual/fit
+review completed and rejected the first draft. The corrected draft's review
+was still in flight when observation ended. The probe recorded no settled
+kernel snapshot. An overall diagnostic TimeoutError therefore does not prove
+a settled CoreModelTemporarilyUnavailable outcome or a failure of its next
+scheduled wake.
+
+Subsequent real probes must retain the exact review request before awaiting
+its response. On their finite whole-cycle deadline they request pause and
+allow a separate, bounded settling interval before attempting an offline
+snapshot. A hard external termination still remains a failed observation,
+never a successful pause, a recovered cycle or delivery evidence. This
+changes diagnostic collection, not provider timeouts, the fallback ladder,
+production model configuration or the product's existing stage allowance.
