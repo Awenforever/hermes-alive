@@ -1631,6 +1631,8 @@ class DiscoveryEngine:
         """Check if enough time has passed since the last discovery run."""
         if self._in_progress:
             return False
+        if self._last_fetch <= 0:
+            return True
         elapsed = time.monotonic() - self._last_fetch
         return elapsed >= self.interval_seconds
 
@@ -1903,7 +1905,7 @@ class DiscoveryEngine:
 
     def has_fresh(self) -> bool:
         """Check if we have cached results that are still within the interval."""
-        if self._cached is None:
+        if self._cached is None or self._last_fetch <= 0:
             return False
         elapsed = time.monotonic() - self._last_fetch
         return elapsed < self.interval_seconds

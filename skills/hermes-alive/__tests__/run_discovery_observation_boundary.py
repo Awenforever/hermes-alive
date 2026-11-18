@@ -76,8 +76,13 @@ async def exercise(root):
     # Stale or missing observation snapshots are not replaced with a gated batch.
     engine._last_fetch = 0
     before = len(calls)
-    with patch('alive_kernel.discovery_opportunities.discovery_shadow_enabled', return_value=True), \
+    with patch('discovery.time.monotonic',return_value=10), \
+         patch('alive_kernel.discovery_opportunities.discovery_shadow_enabled', return_value=True), \
          patch('alive_kernel.discovery_opportunities.mirror_legacy_discovery_batch', side_effect=record):
+        assert not engine.has_fresh() and engine.should_run()
+        engine._in_progress=True
+        assert not engine.should_run()
+        engine._in_progress=False
         watcher._mirror_discovery_kernel_shadow(chat_id='synthetic-owner', discovery_context=result)
     assert len(calls) == before
 

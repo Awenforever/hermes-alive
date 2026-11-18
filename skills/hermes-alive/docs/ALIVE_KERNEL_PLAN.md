@@ -941,3 +941,11 @@ Windows CI lifecycle checks pass; the installed-Core whole-run cleanup still
 needs a rerun. CI also exposed an undeclared HTTP test dependency that the
 Core-supplied development environment had supplied implicitly. Its corrected
 clean-environment CI is a separate pending gate.
+
+The clean CI then reproduced a legacy discovery bug that long-running hosts
+had hidden: a zero last-fetch marker could appear fresh, or defer the first
+collection, while machine uptime was shorter than the collection interval.
+Treat zero as uninitialized in both freshness and scheduling. The observation
+test now fixes the monotonic clock at a low uptime and checks initial
+eligibility, stale-cache exclusion and the in-progress guard. Recheck the clean
+CI after this correction; earlier partial CI runs remain failed evidence.
