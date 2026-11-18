@@ -3,7 +3,7 @@
 Audience: maintainers and QA. Purpose: active development planning and acceptance tracking.
 
 Status: active; development branch only, no production acceptance.
-Last reviewed: 2026-11-12 (Asia/Shanghai).
+Last reviewed: 2026-11-18 (Asia/Shanghai).
 
 ## Current product state
 
@@ -904,3 +904,13 @@ provider timeout. ADR 0290 separates those outcomes. Preserve pending review
 inputs and settle a requested pause before retaining offline state in the
 next bounded diagnostic. Continue assessing the original wording and ordinary
 follow-ups; the fresh quality streak remains 0/10.
+
+The next OCR trial exposed the same route/request confusion before any page
+read. New initial reading snapshots now carry the configured-route context;
+old reading receipts retain their original prompt. The complete controlled
+discovery matrix passes, including replay and legacy recovery. Installed Core
+control, ordinary and refinement waits, and the public-refinement matrix also
+pass. A same-query real-model regression is running separately; it earns no
+fresh-round credit. The preceding complete portable-suite result applies to
+the preceding runtime baseline, with these changed reading paths separately
+qualified. It is not a final platform or product acceptance.
