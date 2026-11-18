@@ -21,7 +21,9 @@ from .host_discovery import (HostDiscoveryReader, HostDiscoveryError, HostReadUn
 from .model_json import parse_model_json, ModelJSONError
 from .model_timeouts import DEFAULT_STAGE_SECONDS
 from .core_context_read import context_value
-from .research_evidence import SEARCH_PURPOSE_PREFIX, SEARCH_PURPOSE_EVENT, SEARCH_PURPOSE_METHOD
+from .research_evidence import (SEARCH_PURPOSE_PREFIX, SEARCH_PURPOSE_EVENT, SEARCH_PURPOSE_METHOD,
+                               ROUTE_SEARCH_GUIDANCE, configured_route_context)
+from .review_contracts import CLAIM_COVERAGE_REVIEW
 from . import citation_selection
 from . import public_source_refinement
 from . import source_reading_depth
@@ -306,6 +308,15 @@ class ConfiguredDiscoveryCycle:
             if deeper_reading:prompt+='\n'+source_reading_depth.GUIDANCE
         if search_purpose:
             prompt += _SEARCH_PURPOSE_GUIDANCE
+        # This entry point collects configured discovery routes, not current
+        # owner research orders. Bind that distinction at the first read too.
+        # Already-started operations reconstruct their original input/prompt.
+        route_context=(original.get('search_context') if original is not None else
+            configured_route_context(CLAIM_COVERAGE_REVIEW) if search_purpose else None)
+        if route_context is not None:
+            if route_context != configured_route_context(CLAIM_COVERAGE_REVIEW):
+                raise HostDiscoveryError('reading search context changed')
+            prompt += ROUTE_SEARCH_GUIDANCE
         # Existing receipts keep their original prompt and input shape.
         public_evidence_focus=(original.get('public_evidence_focus') if original is not None else
             (2 if deeper_reading else 1) if source_refinement or public_refinement is not None else None)
@@ -330,6 +341,8 @@ class ConfiguredDiscoveryCycle:
                 snapshot['public_refinement']=public_refinement
         if search_purpose:
             snapshot['approved_search_queries'] = list(self.queries)
+        if route_context is not None:
+            snapshot['search_context'] = route_context
         if followup:
             snapshot['already_read_urls']=list(visited)
         elif not public_only:

@@ -180,6 +180,12 @@ async def exercise(root,mode,*,primary_url=None):
                 if mode in ('share', 'primary-read', 'replay'):
                     assert data['approved_search_queries'] == ['public museum methods']
                     assert 'absent metadata date' in kw['messages'][0]['content']
+                    assert data['search_context']==dict(kind='configured-discovery-route-v1',
+                        current_owner_search_request_supplied=False,queries_are_collection_routes=True,
+                        useful_unexpected_findings_remain_eligible=True)
+                    assert 'not a current research request' in kw['messages'][0]['content']
+                if mode=='legacy-replay':
+                    assert 'search_context' not in data
                 refs=[s['source_ref'] for s in data['sources']]
                 if mode=='invalid-choice':refs=['https://private.invalid/not-a-supplied-reference']
                 abstains=mode in ('abstain','abstain-with-prior-evidence')
@@ -314,6 +320,11 @@ async def exercise(root,mode,*,primary_url=None):
             # Emulate an operation begun before the new durable research mode.
             # Reopen with the actual new code, not the patched historical mode.
             runner.preparation._research_enabled=lambda cycle:False
+            original_select=runner.preparation._select
+            async def historical_select(**kw):
+                with patch('alive_kernel.configured_discovery_cycle.configured_route_context',return_value=None):
+                    return await original_select(**kw)
+            runner.preparation._select=historical_select
         if mode in ('historical-followup-replay','historical-invalid-followup'):
             runner.preparation._bundle_enabled=lambda cycle:False
             runner.preparation._citation_references_enabled=lambda cycle:False

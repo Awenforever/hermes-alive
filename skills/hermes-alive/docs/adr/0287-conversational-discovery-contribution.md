@@ -234,3 +234,25 @@ grounded rejection, but no successful conversational contribution or quality
 round. The missing second review response cannot establish that its correction
 was good or that the live host would have failed. See ADR 0290 for the
 distinction between diagnostic and model-stage timeouts.
+
+## Preserve discovery intent at the first reading decision
+
+The next fresh OCR search returned three public leads, including two
+substantive project descriptions. The initial reader selected none solely
+because their stated dates preceded the month in the configured query. It
+called that month a requested development. The configured route was not a
+current recipient research request. The later selection, author and review
+already received this distinction, but the first reading decision did not.
+
+New reading snapshots now bind the existing configured-route context and
+guidance before the initial page choice. The same distinction reaches bounded
+public refinement. The model can read a concretely useful unexpected result;
+it can still abstain, cannot invent recency, and cannot count an older source
+as finding a requested release. Collection queries, URL admission, read counts
+and disclosure consent are unchanged. This entry point does not accept a
+current research request and therefore does not silently relax one.
+
+Already-started snapshots without that context reconstruct their original
+prompt and input. Controlled qualifications cover new reading input,
+unchanged-result replay and the old reader's receipt recovery. Real-model
+reading and a useful completed conversation remain separate quality gates.
