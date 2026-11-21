@@ -33,6 +33,23 @@ evidence cannot support a worthwhile revision, {"abstain":true}. The message
 will be reviewed again in full. You cannot send or grant any authority.'''
 
 
+def configured_route_author_view(author_context, correction):
+    """Keep collection-route adjudication with the reviewer during a rewrite.
+
+    This projection leaves the persisted review and original route untouched.
+    It applies only to unsolicited discovery, with no current search request.
+    """
+    internal_collection_fields = ('approved_search_queries', 'search_context')
+    author = {key: value for key, value in author_context.items()
+              if key not in internal_collection_fields}
+    grounding = {key: value for key, value in correction['grounding_context'].items()
+                 if key not in internal_collection_fields}
+    findings = {key: value for key, value in correction['findings'].items()
+                if key != 'search_alignment'}
+    grounding['collection_scope'] = 'unsolicited discovery, use the source’s positively supported role'
+    return author, {**correction, 'grounding_context': grounding, 'findings': findings}
+
+
 def eligible(context):
     if not isinstance(context, dict):
         return False

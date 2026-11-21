@@ -980,3 +980,17 @@ question through Core's normal web tools. In the retained-only case, the
 answer must still express uncertainty in its first sentence. Do not require a
 live lookup that the conversation does not authorize. Preserve normal
 streaming outside any future opt-in review path.
+
+The full controlled external-memory chain now passes on 0.23.3, including an
+update and a removal through Core's provider. The test reads a public source
+before candidate cognition and checks that recall stays private. This does
+not establish long-term noise filtering or actual user feedback outcomes.
+
+A new real discovery trial was halted after the revision asserted a negative
+model classification that the sources did not establish. The first review
+had exposed the configured route's mismatch verdict to the revision author.
+For a configured discovery route, the rewrite now receives the sources,
+ordinary communication preferences and factual and fit findings. The original
+route and alignment finding stay with review and audit, including the second
+review. A current user search request retains its original scope. This change
+needs separate real-model qualification for natural drafting and scope.

@@ -13,7 +13,7 @@ from alive_kernel.events import _thaw_json
 from alive_kernel.expression_support import ExpressionSourceSupportReviewer
 from alive_kernel.source_support import SourceSupportError
 from alive_kernel.final_value_findings import combine
-from alive_kernel.source_revision import eligible, revised_text, METHOD
+from alive_kernel.source_revision import configured_route_author_view, eligible, revised_text, METHOD
 from alive_kernel.review_contracts import FACTS_AND_FIT_ASSESSMENT
 
 
@@ -24,6 +24,20 @@ def pure():
         'expression_binding':{'final_assessment_scope':FACTS_AND_FIT_ASSESSMENT},
         'assessment_scope':{'kind':'final_discovery_source_and_value'},'evidence':[{'source':'synthetic'}]}}
     assert eligible(context)
+    route = {'kind': 'configured-discovery-route-v1'}
+    author = {'search_context': route, 'approved_search_queries': ['internal route'],
+              'source_evidence': [{'excerpt': 'Authors describe a prototype.'}]}
+    correction = copy.deepcopy(context)
+    correction['grounding_context'].update(search_context=route, approved_search_queries=['internal route'])
+    correction['findings']['search_alignment'] = {'assessment': 'conflicts', 'reason': 'internal adjudication'}
+    original = copy.deepcopy(correction)
+    author_view, correction_view = configured_route_author_view(author, correction)
+    assert author_view == {'source_evidence': author['source_evidence']}
+    assert 'search_alignment' not in correction_view['findings']
+    assert correction_view['findings']['communication_fit'] == original['findings']['communication_fit']
+    assert correction_view['findings']['factual_support'] == original['findings']['factual_support']
+    assert correction_view['grounding_context']['evidence'] == original['grounding_context']['evidence']
+    assert 'search_context' not in correction_view['grounding_context'] and correction == original
     for alteration in ('missing-source','protected-purpose','legacy','fits','only-factual','uncertain','malformed'):
         value=copy.deepcopy(context)
         if alteration=='missing-source':value['grounding_context']['evidence']=[]

@@ -517,10 +517,17 @@ class SemanticComparator:
         from .feedback_context import source_review_prompt_snapshot
         prompt_correction = ({**correction, 'grounding_context': source_review_prompt_snapshot(
             correction['grounding_context'])} if correction else None)
+        author_context = self._author_context(expression_context) if expression_context else None
+        configured_route = bool(discovery and expression_context.get('search_context', {}).get(
+            'kind') == 'configured-discovery-route-v1')
+        configured_rewrite = configured_route and correction_method == SOURCE_REVISION_METHOD
+        if configured_rewrite:
+            from .source_revision import configured_route_author_view
+            author_context, prompt_correction = configured_route_author_view(author_context, prompt_correction)
         prompt = json.dumps({"meaning": meaning, "presentation": style,
                              "language": language,
                              **({'authoring_as_of':authoring_as_of} if authoring_as_of else {}),
-                             **({'expression_context':self._author_context(expression_context)} if expression_context else {}),
+                             **({'expression_context':author_context} if author_context else {}),
                              **({'correction':prompt_correction} if prompt_correction else {}),
                              **({'issues':correction['findings']['unsupported_claims']+
                                   correction['findings']['uncertainties']}
@@ -560,8 +567,6 @@ class SemanticComparator:
                                 FIRST_LABELLED_REVIEW, FIRST_FLAT_REVIEW, FIRST_SEARCH_REVIEW,
                                 ROUTE_AWARE_REVIEW, CLAIM_SCOPE_REVIEW):
                     render_system += _DISCOVERY_CHAT_GUIDANCE
-            configured_route = bool(discovery and expression_context.get('search_context',{}).get(
-                'kind')=='configured-discovery-route-v1')
             if discovery and 'approved_search_queries' in expression_context and not configured_route:
                 render_system += ('\nUse the original search scope to distinguish a matching discovery '
                     'from background. Do not imply the source is current or in scope without evidence.')
@@ -569,7 +574,7 @@ class SemanticComparator:
                 render_system=CORRECTION_PROMPT
             elif correction_method == SOURCE_REVISION_METHOD:
                 render_system += '\n' + SOURCE_REVISION_PROMPT
-            if configured_route:
+            if configured_route and not configured_rewrite:
                 from .research_evidence import ROUTE_SEARCH_GUIDANCE
                 render_system += ROUTE_SEARCH_GUIDANCE
             response = await asyncio.wait_for(call(
