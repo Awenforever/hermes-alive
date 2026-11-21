@@ -165,3 +165,20 @@ The changed candidate needs its own qualification. This remains an isolated
 synthetic Core fixture, not ordinary live activation, an external send, consumer
 installation, restart/compaction/older-quote qualification or a clean quality
 round. The original full product and ten-round gates remain open.
+
+## 2026-11-21 evidence limits in ordinary follow-ups
+
+A complete isolated discovery and live-model follow-up exercise correctly
+recovered a paper's retained excerpts. The excerpts skipped its experiments
+section. The model identified the omission, then still turned incomplete evidence
+into claims about missing validation and independence. It also answered narrow
+questions at report length. The continuity contract now calls for a direct
+answer and material limit, distinguishes publisher claims from newly verified
+observations and inference, and points to an already-permitted Core lookup of
+the exact public source when further evidence is needed. The reference reader
+never grants network permission, executes a lookup, or writes into Core history.
+
+Both ordinary turns with a Core web tool and turns without it need real-model
+qualification. The former can read the exact public source and support a richer
+answer. The latter must answer honestly from the available material. A passing
+reference retrieval or a structurally complete turn proves neither behavior.

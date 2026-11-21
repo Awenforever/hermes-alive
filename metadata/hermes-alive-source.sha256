@@ -531,7 +531,7 @@ f261dfc31f46da3551420d5e9e65195dd7852d01f03bd6d43011dfcec60f467c  ./docs/adr/020
 80bdee61db3895ab41830ab4f56f4074f151b5e11e97a57da47d0deb4623f4ff  ./docs/adr/0207-current-core-channel-lifecycle.md
 c0b4d13b3bf1c3965697ff282b7d09ef1ca7f0138fa4a2755704c0406b3806c2  ./docs/adr/0208-submission-authority-and-standard-channel.md
 f923612bda1dea7ff30a8ec357a4f3cc54e3799e48ec4f072b43f605b45e86b8  ./docs/adr/0209-core-channel-capability-lifetime.md
-07efe84140269f2e2c91ae3955123c8e83acccb112ee0256bffa1f101087b919  ./docs/adr/0210-share-to-main-conversation-continuity.md
+34cc48da5a44809b3955a74c6da5e14bef5edbfae145e8bea72a47e724a9c6dc  ./docs/adr/0210-share-to-main-conversation-continuity.md
 495e032c5667125c2cb1f3069e98b169e078fe794c73824392316a8d2d39cd2e  ./docs/adr/0211-guided-setup-before-live-activation.md
 ad611304248ebca9d2cacc2772dc098730f5d96a4c9139efffda777d8a98ca2d  ./docs/adr/0212-explicit-continuous-native-lifetime.md
 bb0ee5b80ef45d72fc2a84405c818f710660caf51f23f0e8268d0d0bc96c1b26  ./docs/adr/0213-core-execution-control-and-finite-activation.md
@@ -650,7 +650,7 @@ a20097e9e5927a954db8adb170906ba4f85905f70b77cab6c86eb5b6740081cc  ./hooks/alive_
 fbeef5fe4a387889979e7d061f39015785209bcb248ba05bdf943ab04cc15a8d  ./hooks/alive_kernel/consolidation_synthesis.py
 4f368bf4676d21b97e240f0a2ff72704babed8b8a0f7651838235198f230f016  ./hooks/alive_kernel/contact_hours.py
 c260f8917856f8ba284b36c42f7949a7322d37d05e071a5260bbff26ad84077d  ./hooks/alive_kernel/content_vault.py
-74f2fce248503e21601aec22f1529918b3a1a5a9b630ddc626a2c46a8c86318a  ./hooks/alive_kernel/conversation_continuity.py
+0a52306a2c6ac715c920bccf02985c0de88b7cea875cdda7cbb941c76b1ff158  ./hooks/alive_kernel/conversation_continuity.py
 2c297b686cbcb38cf7b571757ffa22a91b215b4eb61601611d95bfe7b19a84a7  ./hooks/alive_kernel/core_autonomous_work.py
 aa78afaede8596b707478340de23b4af8f0eea118f1480e7dc10a32dbf96fb2d  ./hooks/alive_kernel/core_context_read.py
 45af21664a3c7cd152a55b3c12dd36f09e3bf32101a5b67a188aca4c1a230bd8  ./hooks/alive_kernel/core_discovery_tools.py
