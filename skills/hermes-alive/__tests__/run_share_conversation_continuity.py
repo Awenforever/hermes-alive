@@ -79,8 +79,9 @@ async def test(home, mode, *, exercise=None, long_reference=False):
                                                             clearance=Sensitivity.PUBLIC))
         send_parameters=router.standard_send_parameters(scope,continuity=bridge,
                                                         clearance=Sensitivity.PRIVATE)
-        from tools.send_message_targets import resolve_send_target
-        assert send_parameters['resolve_target'] is resolve_send_target
+        from gateway.outbound import targets
+        assert Path(targets.__file__).resolve().is_relative_to(core.args.core.resolve())
+        assert send_parameters['resolve_target'] is targets.resolve_send_target
         assert send_parameters['extract_media'] is core.BasePlatformAdapter.extract_media
         assert send_parameters['resolve_target']('telegram','-1007654321:7')==('-1007654321','7',None)
         assert not received  # assembly and parser validation perform no send

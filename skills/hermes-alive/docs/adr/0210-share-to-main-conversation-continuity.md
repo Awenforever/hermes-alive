@@ -189,3 +189,12 @@ though the current request listed Core web tools. Continuation guidance now
 binds capability statements to the current turn and keeps explicit response
 limits in view. Verify changes to tool access in both directions. An answer
 that cites a retained link can be useful without claiming a fresh verification.
+
+## Core 0.23.3 outbound routing
+
+Native Windows qualification found an import failure when an owner enabled
+Alive. The send bridge now uses the outbound resolver from
+`gateway.outbound.targets`, the same resolver Core uses for its own sends.
+The integration test checks the module comes from the selected Core checkout
+so a module left behind by an earlier installation cannot satisfy the test.
+The active session and its authorized channel still determine the route.

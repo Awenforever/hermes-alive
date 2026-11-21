@@ -92,7 +92,7 @@ if mode == 'skip':
     os.environ['HERMES_CRON_AUTO_DELIVER_CHAT_ID'] = 'fixture-chat'
 from alive_kernel.cli_send_contract import CliSendContractError, compile_text_cli_plan
 from gateway.platforms.base import BasePlatformAdapter
-from tools.send_message_targets import resolve_send_target
+from gateway.outbound.targets import resolve_send_target
 chat = 'other-chat' if mode == 'wrong_route' else 'fixture-chat'
 document = {'schema_version': 1, 'capability': 'hermes.channel.send',
             'operation': {'text': sys.stdin.read(), 'format': 'markdown'}}

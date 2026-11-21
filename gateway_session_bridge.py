@@ -198,8 +198,8 @@ class CoreSessionRouter:
         authority and performs no model call or send.
         """
         from .gateway_conversation_bridge import CoreShareContinuity
+        from gateway.outbound.targets import resolve_send_target
         from gateway.platforms.base import BasePlatformAdapter
-        from tools.send_message_targets import resolve_send_target
         from hermes_constants import get_hermes_home
         if (not isinstance(continuity,CoreShareContinuity) or continuity.router is not self
                 or continuity._closed or continuity.clearance!=clearance):
