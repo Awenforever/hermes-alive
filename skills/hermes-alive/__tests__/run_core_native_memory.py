@@ -112,6 +112,15 @@ async def exercise(home):
         registry.register(name='web_search',toolset='web',schema={'name':'web_search',
             'description':'Public synthetic no-network search','parameters':{'type':'object'}},
             handler=public_search,override=True,scope=str(home))
+        def public_extract(arguments, **kwargs):
+            url = 'https://example.invalid/memory-context'
+            assert arguments['urls'] == [url]
+            assert not any(term in json.dumps(arguments) for term in ('amber counters', 'blue wooden blocks', 'Sable'))
+            return json.dumps({'results': [{'url': url, 'title': 'Synthetic classroom resource',
+                'content': f'A public arithmetic exercise uses numbered cards. Edition {phase["number"]}.'}]})
+        registry.register(name='web_extract', toolset='web', schema={'name': 'web_extract',
+            'description': 'Public synthetic no-network extract', 'parameters': {'type': 'object'}},
+            handler=public_extract, override=True, scope=str(home))
         class Caller:
             def __init__(self,**kwargs):self.calls=0;self.pending=()
             async def reap_pending(self,**kwargs):return {'closed':0,'remaining':0}
@@ -150,7 +159,10 @@ async def exercise(home):
                         'reason':'Hold execution while qualifying private context.','reconsider_after_seconds':3600}
                 elif kwargs['task']=='alive_discovery_reading':
                     assert 'amber counters' not in text,'private recall entered public reading planner'
-                    document={'source_refs':[],'question':None,'value_hypothesis':'No new material in this public synthetic search.'}
+                    sources = json.loads(kwargs['messages'][-1]['content'])['sources']
+                    document={'source_refs':[sources[0]['source_ref']],
+                        'question':'What public arithmetic exercise does this resource describe?',
+                        'value_hypothesis':'Check the original resource before testing candidate cognition.'}
                 elif kwargs['task']=='alive_opportunity_candidates':
                     if mode=='updates':
                         observed={fact:fact in text for fact in ('amber counters','blue wooden blocks')}
