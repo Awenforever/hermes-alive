@@ -33,12 +33,12 @@ READ_REFERENCE_SCHEMA = {
         'required': ['reference'], 'additionalProperties': False}}
 
 
-def _context_budget(store):
+def _context_budget(store, config=None):
     """Respect Core's resolved per-hook cap without writing its configuration."""
     from hermes_cli.config import load_config_readonly
     from tools.hook_output_spill import DEFAULT_ENABLED, DEFAULT_MAX_CHARS
     from tools.tool_output_limits import _coerce_positive_int
-    config = load_config_readonly() or {}
+    config = (load_config_readonly() or {}) if config is None else config
     hooks = config.get('hooks') if isinstance(config, dict) else None
     section = hooks.get('output_spill') if isinstance(hooks, dict) else None
     section = section if isinstance(section, dict) else {}
@@ -88,21 +88,30 @@ class CoreShareContinuity:
         # Otherwise a large source bundle can hide the newest share even before
         # the final hook-budget projection sees it.
         shares = self.store.read(scope=scope.binding_document(), clearance=self.clearance, include_sources=False)
+        if not shares:
+            return None
+        from hermes_cli.config import load_config_readonly
+        from hermes_cli.tools_config import _get_platform_tools
+
+        config = load_config_readonly() or {}
+        task = values.get('task_id')
+        can_page = (isinstance(task, str) and 0 < len(task) <= 4096
+                    and 'hermes_alive' in _get_platform_tools(config, scope.platform))
         expanded = []
         for share in shares:
             item = self.store.read_reference(scope=scope.binding_document(), clearance=self.clearance,
                                              share_id=share['share_id'])
             if item is None:
                 continue
-            task = values.get('task_id')
-            if isinstance(task, str) and 0 < len(task) <= 4096:
+            if can_page:
                 item['reference'] = self._reference(scope, task, share['share_id'])
             expanded.append(item)
         shares = expanded
         # Use this exact embedded build, never import an unrelated installed one.
         from importlib import import_module
         module = import_module(self.store.__class__.__module__)
-        text = module.continuation_context(shares, max_chars=_context_budget(self.store))
+        text = module.continuation_context(
+            shares, max_chars=_context_budget(self.store, config), inline_source_excerpts=not can_page)
         if shares and not text:
             import logging
             logging.getLogger(__name__).warning('Alive conversation reference cannot fit the active Core hook budget')

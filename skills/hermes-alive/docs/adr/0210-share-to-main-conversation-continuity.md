@@ -215,3 +215,13 @@ current continuity hook on Core's normal reply path until that scope can be
 enforced. A separate held profile can validate a reviewer without changing
 ordinary behavior for existing users. Such a profile does not qualify the
 general follow-up path.
+
+The astronomy trial attached roughly 9,100 characters to each short user
+message, repeating the same excerpt across ordinary turns. The model still
+turned non-detection into an absence claim. An ordinary turn with the Alive
+reference tool admitted by Core now starts with the exact share and a source
+catalog. The model can page the original retained excerpt when the question
+needs it. A configuration that disables the reader keeps the bounded inline
+evidence path. The change preserves source identity and retention rules. It
+needs fresh ordinary-turn qualification for answer scope, useful depth and
+successful source retrieval.

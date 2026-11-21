@@ -243,13 +243,16 @@ async def test(home, mode, *, exercise=None, long_reference=False):
             expected_source['reading_scope'] = {'evidence_basis':'retained_excerpt','coverage':'retained_material_only',
                 'available_material':'text','linked_media':'appearance_unverified_by_this_excerpt'}
             if not long_reference:
-                assert conversation['sources'][0] == expected_source
+                assert conversation['sources'][0] == {
+                    **{key:value for key,value in expected_source.items() if key != 'excerpt'},
+                    'source_index':0,'excerpt_in_context':False}
+                assert expected_source['excerpt'] not in text
             # Operational diagnostics stay unchanged; only model-facing evidence
             # is projected. A negative proof flag is not a negative world fact.
             assert shares[0]['sources'][0]['reading_scope'] == {'collector_scope_reported':False}
             assert 'submission_status' not in text and 'success_reported' not in text
             assert shares[0]['submission_status'] and shares[0]['share_id']
-            assert (long_reference or 'bicycles, not cars' in text) and json.dumps(messages) == original
+            assert json.dumps(messages) == original
             if mode == 'success':
                 # Real Core platform defaults admit a newly registered plugin
                 # toolset. Its saved/global suppression remains authoritative.
@@ -261,6 +264,12 @@ async def test(home, mode, *, exercise=None, long_reference=False):
                     assert 'hermes_alive' not in _get_platform_tools(excluded, surface)
                     assert 'hermes_alive' not in _get_platform_tools(
                         {'agent':{'disabled_toolsets':['hermes_alive']}}, surface)
+                if not long_reference:
+                    disabled = {'agent': {'disabled_toolsets': ['hermes_alive']}}
+                    with patch('hermes_cli.config.load_config_readonly', return_value=disabled):
+                        inline = json.loads(collect().split('\n',1)[1])['alive_shares'][0]
+                    assert inline['sources'][0] == expected_source
+                    assert 'reference' not in inline
                 sequence = journal.last_sequence()
                 handle = conversation['reference']
                 def read_reference(arguments=None, **ids):
