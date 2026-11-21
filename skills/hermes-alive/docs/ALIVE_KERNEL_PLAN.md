@@ -3,7 +3,7 @@
 Audience: maintainers and QA. Purpose: active development planning and acceptance tracking.
 
 Status: active; development branch only, no production acceptance.
-Last reviewed: 2026-11-18 (Asia/Shanghai).
+Last reviewed: 2026-11-22 (Asia/Shanghai).
 
 ## Current product state
 
@@ -33,16 +33,27 @@ exact retained passage identity, not independent truth or semantic entailment.
 Controlled actual-Core cases cover matched-source correction, search conflict,
 uncertainty, and revoked authority before adapter submission. Real model
 judgment, natural usefulness and source-grounded followups remain unqualified.
-The first scoped November search returned no candidate; silence earns no credit.
+The November trials exercised active source lookup, bounded silence, a
+source-led rewrite, and ordinary conversation with changing web access.
+The last same-topic conversation still missed a requested length and listed
+fewer experimental groups than it promised. In a new post-training topic,
+both drafts stopped on unresolved numeric evidence. [ADR0281](adr/0281-source-led-communication-fit-revision.md)
+records the replay and the single rewrite used to address it. An archaeology
+trial stayed silent while using a remote-sensing-only test profile. Qualify
+exploration with the full explicitly approved interests, using test inputs
+outside the public repository. A focused research fixture supports focused
+claims about that fixture's behavior.
 **Fresh complete sharing-quality streak remains 0/10.** Non-sharing journeys,
 longitudinal memory and the full production gates are independently required.
 
-Native Windows public-Git upgrade and the original installed controlled chain
-now pass on the isolated VM, preserving ten baseline state/key fingerprints
-and the default launcher. The 30-second send permit remains unchanged. Native
-Linux/Docker have bounded lifecycle and task qualifications; Windows Desktop
-service behavior, external transport and the complete four-platform acceptance
-remain open. WSL stays a thin check under the owner's scope decision.
+With official Core 0.23.3, the Windows VM has passed public-Git install,
+upgrade, removal and reinstall with twelve state fingerprints unchanged.
+It also passed lifecycle controls and each installed continuation case after
+fixing the outdated outbound import. The WSL2 profile separately preserved its
+twelve state fingerprints across the public-Git lifecycle. The Windows Desktop
+source build is a separate lane. The signed stable Desktop distribution,
+independent Linux/Docker service exercises, external transport and the final
+platform matrix remain open.
 
 The isolated Windows Desktop now completes an actual `/alive setup` command
 over its Gateway after a managed Git upgrade and uninstall/reinstall. The
