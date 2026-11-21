@@ -388,6 +388,30 @@ def test_named_identifiers_do_not_supply_measurements():
     assert wrong_score['verdict'] == 'uncertain' and '3.8' in wrong_score['reason']
 
 
+def test_rejection_survives_invalid_factual_witness():
+    from alive_kernel.review_contracts import CLAIM_COVERAGE_ASSESSMENT, IDENTIFIER_COVERAGE_ASSESSMENT
+
+    text = 'The experiment ran for 12 hours.'
+    snapshot = dict(candidate={'text': text}, evidence=[
+        {'event_id': 'experiment', 'excerpt': text}])
+    wire = dict(facts='supported', fact_reason='The duration is stated.', fit='conflicts',
+        fit_reason='The reader asked for the result, not the setup.', recipient_evidence=[],
+        search_alignment='not_applicable', scope_reason='No query.',
+        claim_scope='preserved', claim_scope_reason='Explicit duration.',
+        source_witnesses=[dict(claim='the experiment lasted for 12 hours', passage_id='P1.1')])
+    current = {**snapshot, 'expression_binding': {'final_assessment_scope': CLAIM_COVERAGE_ASSESSMENT}}
+    result = parse(json.dumps(wire), witness_snapshot=current)
+    assert result['verdict'] == 'unsupported' and result['reason'] == wire['fit_reason']
+    assert result['factual_support']['assessment'] == 'uncertain'
+    assert not result['source_witnesses'] and result['numeric_evidence_coverage']['assessment'] == 'unresolved'
+    assert validate_retained(result, witness_snapshot=current) == result
+    old = {**snapshot, 'expression_binding': {'final_assessment_scope': IDENTIFIER_COVERAGE_ASSESSMENT}}
+    for bound, response in ((old, wire), (current, {**wire, 'fit': 'fits'})):
+        try: parse(json.dumps(response), witness_snapshot=bound)
+        except ValueError: pass
+        else: raise AssertionError('the invalid witness escaped its review contract')
+
+
 if __name__ == '__main__':
     test_dimensions()
     test_old_and_new_contracts()
@@ -400,4 +424,5 @@ if __name__ == '__main__':
     test_numeric_coverage_of_actual_draft()
     test_visible_markdown_claim_witness()
     test_named_identifiers_do_not_supply_measurements()
+    test_rejection_survives_invalid_factual_witness()
     print('FINAL_VALUE_DIMENSIONS_OK')

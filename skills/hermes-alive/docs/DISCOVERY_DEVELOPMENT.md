@@ -41,6 +41,12 @@ Measurements still need local evidence in the cited passage. The source review
 also checks whether that measurement applies to the named model, track and
 conditions. Retained decisions use the contract under which they were made.
 
+Factual witnesses and conversational fit are checked independently. An
+explicit fit conflict can trigger the existing single source-led rewrite
+when the factual witnesses are invalid. The rejected draft retains an
+uncertain factual judgment and no accepted witnesses. Its rewritten text
+must pass the full source and fit review before it can be delivered.
+
 ## Topic identity
 
 Identity combines:

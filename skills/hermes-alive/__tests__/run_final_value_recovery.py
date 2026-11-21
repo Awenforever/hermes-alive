@@ -13,7 +13,7 @@ from alive_kernel.review_contracts import (LEGACY_SPLIT_SOURCE_REVIEW, FIRST_FAC
     FIRST_SEARCH_REVIEW, SEARCH_FIT_ASSESSMENT, CLAIM_SCOPE_REVIEW, CLAIM_SCOPE_ASSESSMENT,
     CONTRIBUTION_REVIEW, CONTRIBUTION_ASSESSMENT, PRESENTATION_ASSESSMENT,
     CLAIM_COVERAGE_REVIEW, CLAIM_COVERAGE_ASSESSMENT, FIRST_CLAIM_COVERAGE_REVIEW,
-    FIRST_CLAIM_COVERAGE_ASSESSMENT)
+    FIRST_CLAIM_COVERAGE_ASSESSMENT, IDENTIFIER_COVERAGE_REVIEW, IDENTIFIER_COVERAGE_ASSESSMENT)
 
 
 async def test(root, original_contract, original_scope):
@@ -56,5 +56,6 @@ if __name__ == '__main__':
         asyncio.run(test(Path(directory) / 'previous-contribution', CONTRIBUTION_REVIEW, CONTRIBUTION_ASSESSMENT))
         asyncio.run(test(Path(directory) / 'previous-presentation', SPLIT_SOURCE_REVIEW, PRESENTATION_ASSESSMENT))
         asyncio.run(test(Path(directory) / 'initial-coverage', FIRST_CLAIM_COVERAGE_REVIEW, FIRST_CLAIM_COVERAGE_ASSESSMENT))
+        asyncio.run(test(Path(directory) / 'identifier-coverage', IDENTIFIER_COVERAGE_REVIEW, IDENTIFIER_COVERAGE_ASSESSMENT))
         asyncio.run(test(Path(directory) / 'current-coverage', CLAIM_COVERAGE_REVIEW, CLAIM_COVERAGE_ASSESSMENT))
     print('FINAL_VALUE_RECOVERY_OK')

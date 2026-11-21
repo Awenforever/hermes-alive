@@ -201,12 +201,15 @@ async def exercise(root,mode,*,historical=False,fit_revision=False):
             unsupported=(mode=='unsupported' or mode=='repair' and
                 ('I shared this yesterday.' in data['candidate']['text'] or
                  fit_revision and ('DENSE_FIRST_OPENING.' in data['candidate']['text'] or fit_revision=='reject-again')))
-            return response(controlled_final_findings(data,
+            finding = controlled_final_findings(data,
                 factual='unsupported' if unsupported and mode=='repair' and not fit_revision else 'supported',
                 fit='conflicts' if unsupported and (mode!='repair' or fit_revision) else 'fits',
                 reason='The opening and overall structure conflict with this conversational situation.'
                     if unsupported and fit_revision else 'I shared this yesterday. is unsupported prior conversation.'
-                    if unsupported and mode=='repair' else 'Synthetic purpose assessment, not satisfaction.'))
+                    if unsupported and mode=='repair' else 'Synthetic purpose assessment, not satisfaction.')
+            if unsupported and fit_revision == 'invalid-witness':
+                finding['source_witnesses'][0]['claim'] = 'Words absent from the original draft.'
+            return response(finding)
         raise AssertionError(task)
     runtime=SendPreparationRuntime(journal,content_vault=ingestor.vault)
     params=dict(subject='user:test',operation_id='one',call=call,

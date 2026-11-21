@@ -9,7 +9,7 @@ from unicodedata import normalize
 from .model_json import parse_model_json
 from .review_contracts import (CLAIM_SCOPE_ASSESSMENTS, FLAT_ASSESSMENTS, SEARCH_ASSESSMENTS,
                                CLAIM_COVERAGE_ASSESSMENT, COVERAGE_ASSESSMENTS, LABELLED_ASSESSMENTS,
-                               PASSAGE_FIT_ASSESSMENT)
+                               PASSAGE_FIT_ASSESSMENT, TYPED_COVERAGE_ASSESSMENTS)
 
 
 PROMPT = """Assess this actual message under the supplied source evidence,
@@ -239,7 +239,7 @@ def _coverage_tokens(text, typed):
 
 def _apply_numeric_coverage(findings, snapshot):
     """Give each visible numeric occurrence a local evidence witness."""
-    typed = snapshot['expression_binding']['final_assessment_scope'] == CLAIM_COVERAGE_ASSESSMENT
+    typed = snapshot['expression_binding']['final_assessment_scope'] in TYPED_COVERAGE_ASSESSMENTS
     text = _normalized_numeric_text(snapshot['candidate']['text'])
     uncovered = dict(_coverage_tokens(text, typed))
     sources = {}
@@ -443,6 +443,7 @@ def _validate_witnesses(witnesses, snapshot, assessment, *, retained=False):
 def parse(text, *, witness_snapshot=None):
     value = parse_model_json(text, max_chars=32000)
     witnesses = value.pop('source_witnesses', None) if witness_snapshot is not None and isinstance(value, dict) else None
+    assessment_scope = (witness_snapshot or {}).get('expression_binding', {}).get('final_assessment_scope')
     search = None
     scope = None
     if _search_scope(witness_snapshot) and isinstance(value, dict):
@@ -451,8 +452,7 @@ def parse(text, *, witness_snapshot=None):
     if _claim_scope(witness_snapshot) and isinstance(value, dict):
         scope = {'assessment': value.pop('claim_scope', None),
                  'reason': value.pop('claim_scope_reason', None)}
-    if (witness_snapshot is not None and witness_snapshot.get('expression_binding', {}).get(
-            'final_assessment_scope') in FLAT_ASSESSMENTS):
+    if assessment_scope in FLAT_ASSESSMENTS:
         if not isinstance(value, dict) or set(value) != {
                 'facts', 'fact_reason', 'fit', 'fit_reason', 'recipient_evidence'}:
             raise ValueError('invalid final review fields')
@@ -472,13 +472,26 @@ def parse(text, *, witness_snapshot=None):
                 'communication_fit': {**fit, 'recipient_evidence': value['recipient_evidence']},
             }
     findings = combine(value)
+    if witness_snapshot is not None:
+        try:
+            verified = _validate_witnesses(witnesses, witness_snapshot, findings['factual_support']['assessment'])
+        except ValueError:
+            if (assessment_scope != CLAIM_COVERAGE_ASSESSMENT
+                    or findings['communication_fit']['assessment'] != 'conflicts'):
+                raise
+            # A communication veto can guide rewriting. It cannot certify
+            # any of the facts whose references failed validation.
+            findings = combine({
+                'factual_support': {'assessment': 'uncertain',
+                                    'reason': 'The factual witnesses could not be verified.'},
+                'communication_fit': findings['communication_fit'],
+            })
+            verified = []
+        findings['source_witnesses'] = verified
     if _search_scope(witness_snapshot):
         findings = _with_search(findings, search, witness_snapshot)
     if _claim_scope(witness_snapshot):
         findings = _with_claim_scope(findings, scope)
-    if witness_snapshot is not None:
-        findings['source_witnesses'] = _validate_witnesses(
-            witnesses, witness_snapshot, findings['factual_support']['assessment'])
     if _coverage_scope(witness_snapshot):
         findings = _apply_numeric_coverage(findings, witness_snapshot)
     return findings

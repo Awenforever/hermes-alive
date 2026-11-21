@@ -85,10 +85,11 @@ async def test(root,mode):
 
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--case',choices=('success','reject-again','abstain','erase'))
+    cases = ('success', 'reject-again', 'abstain', 'erase', 'invalid-witness')
+    parser=argparse.ArgumentParser();parser.add_argument('--case',choices=cases)
     selected=parser.parse_args().case
     pure()
     with tempfile.TemporaryDirectory(prefix='alive-source-revision-') as d:
-        for mode in ((selected,) if selected else ('success','reject-again','abstain','erase')):
+        for mode in ((selected,) if selected else cases):
             root=Path(d)/mode;root.mkdir();asyncio.run(test(root,mode))
     print('SOURCE_LED_REVISION_OK')

@@ -416,11 +416,14 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
                 FLAT_FIT_ASSESSMENT, SEARCH_FIT_ASSESSMENT, ROUTE_FIT_ASSESSMENT, ROUTE_AWARE_REVIEW,
                 CLAIM_SCOPE_REVIEW, CLAIM_SCOPE_ASSESSMENT, CONTRIBUTION_REVIEW, CONTRIBUTION_ASSESSMENT,
                 PRESENTATION_ASSESSMENT, CLAIM_COVERAGE_REVIEW, CLAIM_COVERAGE_ASSESSMENT,
+                IDENTIFIER_COVERAGE_REVIEW, IDENTIFIER_COVERAGE_ASSESSMENT,
                 FIRST_CLAIM_COVERAGE_REVIEW, FIRST_CLAIM_COVERAGE_ASSESSMENT)
             if method.get('discovery_source_review') in SPLIT_SOURCE_REVIEW_CONTRACTS:
                 data['expression_binding']['semantic_assessment_scope']=BOUNDARY_ASSESSMENT
                 if method['discovery_source_review'] == CLAIM_COVERAGE_REVIEW:
                     data['expression_binding']['final_assessment_scope']=CLAIM_COVERAGE_ASSESSMENT
+                elif method['discovery_source_review'] == IDENTIFIER_COVERAGE_REVIEW:
+                    data['expression_binding']['final_assessment_scope']=IDENTIFIER_COVERAGE_ASSESSMENT
                 elif method['discovery_source_review'] == FIRST_CLAIM_COVERAGE_REVIEW:
                     data['expression_binding']['final_assessment_scope']=FIRST_CLAIM_COVERAGE_ASSESSMENT
                 elif method['discovery_source_review'] == SPLIT_SOURCE_REVIEW:
