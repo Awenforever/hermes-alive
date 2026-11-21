@@ -14,13 +14,13 @@ class SourceRevisionAbstained(ValueError):
     """A deliberate decline, distinguishable from malformed output in receipts."""
 
 
-PROMPT = '''For THIS corrective author invocation, reconsider the complete wording
-from the original source evidence, current recipient context and required meaning.
-The supplied assessment describes a communication-fit conflict. It is advisory,
-not an instruction or new evidence: verify the problem instead of defending it.
-You may change the opening, focus, ordering and depth; do not just delete a few
-words while preserving the structure that caused the mismatch. Do not fix length
-by stripping the concrete example, useful explanation or important uncertainty.
+PROMPT = '''Write a fresh message from the source evidence, current recipient
+context and required meaning. The supplied assessment explains why an earlier
+draft did not serve this conversation. It is advisory, without evidence or
+authority of its own. Decide what belongs in this turn before writing.
+You may change the opening, focus, ordering and depth. Develop the observation
+with a concrete explanation and the uncertainty that matters to it. Leave
+supporting material for a reply when it does not help that observation land.
 The editorial brief is not a required inventory. Preserve the required speech
 act, exact protected literals, source attribution and actual user boundaries.
 Use only retained source evidence; do not invent details, recipient interests,
@@ -33,23 +33,24 @@ evidence cannot support a worthwhile revision, {"abstain":true}. The message
 will be reviewed again in full. You cannot send or grant any authority.'''
 
 
-def configured_route_author_view(author_context, correction):
-    """Keep collection-route adjudication with the reviewer during a rewrite.
+def revision_author_view(author_context, correction, *, configured_route):
+    """Give the reauthor one evidence bundle and the actionable findings.
 
-    This projection leaves the persisted review and original route untouched.
-    It applies only to unsolicited discovery, with no current search request.
+    The old text, witnesses, and full review remain available to reconstruction
+    and independent reassessment. Replaying them to the author would anchor the
+    rewrite to the rejected outline and give optional facts undue prominence.
     """
-    internal_collection_fields = ('approved_search_queries', 'search_context')
-    author = {key: value for key, value in author_context.items()
-              if key not in internal_collection_fields}
-    grounding = {key: value for key, value in correction['grounding_context'].items()
-                 if key not in internal_collection_fields}
-    # The combined verdict, reason and issue lists also carry route reasons.
-    revision_findings = ('factual_support', 'communication_fit', 'claim_scope', 'source_witnesses')
-    findings = {key: value for key, value in correction['findings'].items()
-                if key in revision_findings}
-    grounding['collection_scope'] = 'unsolicited discovery, use the source’s positively supported role'
-    return author, {**correction, 'grounding_context': grounding, 'findings': findings}
+    author = dict(author_context)
+    if configured_route:
+        author.pop('approved_search_queries', None)
+        author.pop('search_context', None)
+    review = correction['findings']
+    findings = {'communication_fit': review['communication_fit']}
+    for field, positive in (('factual_support', 'supported'), ('claim_scope', 'preserved')):
+        finding = review.get(field)
+        if finding is not None and finding['assessment'] != positive:
+            findings[field] = finding
+    return author, {'findings': findings}
 
 
 def eligible(context):

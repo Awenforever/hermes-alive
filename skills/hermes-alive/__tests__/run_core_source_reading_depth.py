@@ -160,7 +160,8 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                         findings = data['correction']['findings']
                         assert findings['communication_fit']['assessment'] == 'conflicts'
                         assert findings['factual_support']['assessment'] == 'uncertain'
-                        assert not findings['source_witnesses']
+                        assert set(data['correction']) == {'findings'}
+                        assert 'source_witnesses' not in findings
                     else:
                         assert data['expression_context']['search_context']['kind']=='configured-discovery-route-v1'
                         assert 'not a current research request' in body['messages'][0]['content']

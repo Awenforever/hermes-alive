@@ -115,3 +115,19 @@ The existing failure receipt identifies only the exception class. The follow-up
 isolated diagnosis records exact review inputs and outputs behind the audit gate.
 The audited result archive survives an ordinary host restart. Fresh semantic
 quality and production acceptance remain open.
+
+## 2026-11-22 — One evidence bundle for a fresh opening
+
+In the isolated WeMM-Video trial, both drafts explained one useful mechanism
+before adding a release inventory. The second draft reduced the inventory but
+kept its structure. The rewrite request repeated the source evidence inside the
+prior review and replayed the rejected wording alongside the new authoring
+context. That request gave the model two competing jobs: reconsider the opening
+and preserve the footprint of the old draft.
+
+Give the source-led author one evidence bundle, the negative communication
+finding and any unresolved factual or scope findings. Keep the prior text,
+witnesses and full judgment in the durable review for audit and reconstruction.
+Both fresh post-revision reviews still run before any delivery authorization.
+The change caps neither length nor technical depth and uses the existing single
+rewrite slot. Actual-model behavior requires a fresh qualification.

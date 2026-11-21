@@ -515,15 +515,18 @@ class SemanticComparator:
         authoring_as_of=self._start_authoring(operation,subject,selection_event_id,
             source.event.sensitivity,discovery=discovery,claim=True)
         from .feedback_context import source_review_prompt_snapshot
-        prompt_correction = ({**correction, 'grounding_context': source_review_prompt_snapshot(
-            correction['grounding_context'])} if correction else None)
         author_context = self._author_context(expression_context) if expression_context else None
         configured_route = bool(discovery and expression_context.get('search_context', {}).get(
             'kind') == 'configured-discovery-route-v1')
         configured_rewrite = configured_route and correction_method == SOURCE_REVISION_METHOD
-        if configured_rewrite:
-            from .source_revision import configured_route_author_view
-            author_context, prompt_correction = configured_route_author_view(author_context, prompt_correction)
+        prompt_correction = None
+        if correction_method == SOURCE_REVISION_METHOD:
+            from .source_revision import revision_author_view
+            author_context, prompt_correction = revision_author_view(
+                author_context, correction, configured_route=configured_route)
+        elif correction:
+            prompt_correction = {**correction, 'grounding_context': source_review_prompt_snapshot(
+                correction['grounding_context'])}
         prompt = json.dumps({"meaning": meaning, "presentation": style,
                              "language": language,
                              **({'authoring_as_of':authoring_as_of} if authoring_as_of else {}),

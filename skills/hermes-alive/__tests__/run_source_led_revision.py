@@ -13,7 +13,7 @@ from alive_kernel.events import _thaw_json
 from alive_kernel.expression_support import ExpressionSourceSupportReviewer
 from alive_kernel.source_support import SourceSupportError
 from alive_kernel.final_value_findings import combine
-from alive_kernel.source_revision import configured_route_author_view, eligible, revised_text, METHOD
+from alive_kernel.source_revision import revision_author_view, eligible, revised_text, METHOD
 from alive_kernel.review_contracts import FACTS_AND_FIT_ASSESSMENT
 
 
@@ -29,18 +29,22 @@ def pure():
               'source_evidence': [{'excerpt': 'Authors describe a prototype.'}]}
     correction = copy.deepcopy(context)
     correction['grounding_context'].update(search_context=route, approved_search_queries=['internal route'])
+    correction['grounding_context']['candidate'] = {'text': 'Rejected scaffold.'}
     correction['findings']['search_alignment'] = {'assessment': 'conflicts', 'reason': 'internal adjudication'}
     correction['findings']['unsupported_claims'].append('internal adjudication')
     correction['findings']['reason'] = 'internal adjudication'
     original = copy.deepcopy(correction)
-    author_view, correction_view = configured_route_author_view(author, correction)
+    author_view, correction_view = revision_author_view(author, correction, configured_route=True)
     assert author_view == {'source_evidence': author['source_evidence']}
     assert 'search_alignment' not in correction_view['findings']
     assert 'internal adjudication' not in repr(correction_view)
     assert correction_view['findings']['communication_fit'] == original['findings']['communication_fit']
-    assert correction_view['findings']['factual_support'] == original['findings']['factual_support']
-    assert correction_view['grounding_context']['evidence'] == original['grounding_context']['evidence']
-    assert 'search_context' not in correction_view['grounding_context'] and correction == original
+    assert correction_view == {'findings': {'communication_fit': original['findings']['communication_fit']}}
+    assert correction == original
+    correction['findings']['factual_support'] = {'assessment': 'uncertain', 'reason': 'Source did not say that.'}
+    explicit_author, explicit_review = revision_author_view(author, correction, configured_route=False)
+    assert explicit_author == author
+    assert explicit_review['findings']['factual_support'] == correction['findings']['factual_support']
     for alteration in ('missing-source','protected-purpose','legacy','fits','only-factual','uncertain','malformed'):
         value=copy.deepcopy(context)
         if alteration=='missing-source':value['grounding_context']['evidence']=[]
