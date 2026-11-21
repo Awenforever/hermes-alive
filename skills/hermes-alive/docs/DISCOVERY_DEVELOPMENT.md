@@ -21,6 +21,14 @@ collect batch
 The complete cached batch is not mutated when an item is shared. Exhausted
 caches return no external candidates instead of replaying old content.
 
+## Final source witnesses
+
+A source reviewer can cite the exact Markdown wording or the contiguous visible
+inline wording of a claim. The host derives visible wording with the CommonMark
+parser and retains the original message and passage identifiers. A witness
+cannot join separate blocks or span an image. Evidence quotations and numeric
+occurrence coverage still use the original retained material.
+
 ## Topic identity
 
 Identity combines:

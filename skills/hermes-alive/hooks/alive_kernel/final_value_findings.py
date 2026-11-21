@@ -342,6 +342,25 @@ def combine(value):
             'communication_fit': {**fit, 'recipient_evidence': list(evidence)}}
 
 
+def _visible_claim_runs(text):
+    """Yield contiguous visible inline text without hiding non-text content."""
+    from markdown_it import MarkdownIt
+
+    parser = MarkdownIt('commonmark', {'html': False, 'linkify': False})
+    for block in parser.parse(text):
+        if block.type != 'inline':
+            continue
+        parts = []
+        for token in block.children or ():
+            if token.type in ('text', 'code_inline'):
+                parts.append(token.content)
+            elif token.type not in ('strong_open', 'strong_close', 'em_open', 'em_close',
+                                    'link_open', 'link_close'):
+                yield ''.join(parts)
+                parts.clear()
+        yield ''.join(parts)
+
+
 def _validate_witnesses(witnesses, snapshot, assessment, *, retained=False):
     if not isinstance(witnesses, list) or len(witnesses) > 8 or (assessment == 'supported' and not witnesses):
         raise ValueError('source witnesses required for supported wording')
@@ -363,6 +382,7 @@ def _validate_witnesses(witnesses, snapshot, assessment, *, retained=False):
     if retained or not (indexed or labelled):
         fields.add('quote')
     verified = []
+    visible_runs = None
     for witness in witnesses:
         if not isinstance(witness, dict) or set(witness) != fields:
             raise ValueError('invalid source witness')
@@ -387,8 +407,13 @@ def _validate_witnesses(witnesses, snapshot, assessment, *, retained=False):
             quote = witness['quote']
         if (not all(isinstance(part, str) and part.strip() and len(part) <= 600
                     for part in (claim, source_id, quote))
-                or claim not in text or quote not in sources.get(source_id, '')):
+                or quote not in sources.get(source_id, '')):
             raise ValueError('source witness does not match retained wording and excerpt')
+        if claim not in text:
+            if labelled and visible_runs is None:
+                visible_runs = tuple(_visible_claim_runs(text))
+            if not visible_runs or not any(claim in run for run in visible_runs):
+                raise ValueError('source witness does not match retained wording and excerpt')
         verified.append({**witness, 'source_event_id': source_id, 'quote': quote})
     return verified
 

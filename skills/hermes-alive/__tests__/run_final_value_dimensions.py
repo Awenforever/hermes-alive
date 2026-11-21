@@ -328,6 +328,34 @@ def test_numeric_coverage_of_actual_draft():
     assert evaluate(CLAIM_COVERAGE_ASSESSMENT, witnessed)['verdict'] == 'uncertain'
 
 
+def test_visible_markdown_claim_witness():
+    from alive_kernel.review_contracts import CLAIM_COVERAGE_ASSESSMENT
+
+    snapshot = dict(
+        expression_binding={'final_assessment_scope': CLAIM_COVERAGE_ASSESSMENT},
+        candidate={'text': 'The museum opens **Quiet Gardens**. [Details](https://example.invalid/exhibit)\n\nBring a coat.'},
+        evidence=[{'event_id': 'museum', 'excerpt': 'The museum opens its Quiet Gardens exhibition.'}],
+    )
+    response = dict(facts='supported', fact_reason='The title appears in the source.', fit='fits',
+        fit_reason='One opening to discuss.', recipient_evidence=[], search_alignment='not_applicable',
+        scope_reason='No query.', claim_scope='preserved', claim_scope_reason='The title is exact.',
+        source_witnesses=[dict(claim='The museum opens Quiet Gardens', passage_id='P1.1')])
+    findings = parse(json.dumps(response), witness_snapshot=snapshot)
+    assert findings['verdict'] == 'supported'
+    assert validate_retained(findings, witness_snapshot=snapshot) == findings
+    for changed in ('The museum closes **Quiet Gardens**.',
+                    'The museum opens\n\n**Quiet Gardens**.',
+                    'The museum opens ![Quiet Gardens](https://example.invalid/image).'):
+        bound = {**snapshot, 'candidate': {'text': changed}}
+        try: parse(json.dumps(response), witness_snapshot=bound)
+        except ValueError: pass
+        else: raise AssertionError('a changed claim was accepted as presentation-only')
+
+    snapshot['candidate']['text'] += '\nEntry costs **10 dollars**.'
+    response['source_witnesses'].append(dict(claim='Entry costs 10 dollars', passage_id='P1.1'))
+    assert parse(json.dumps(response), witness_snapshot=snapshot)['verdict'] == 'uncertain'
+
+
 if __name__ == '__main__':
     test_dimensions()
     test_old_and_new_contracts()
@@ -338,4 +366,5 @@ if __name__ == '__main__':
     test_claim_scope_veto()
     test_only_explicit_communication_choices_shape_new_discovery_openings()
     test_numeric_coverage_of_actual_draft()
+    test_visible_markdown_claim_witness()
     print('FINAL_VALUE_DIMENSIONS_OK')
