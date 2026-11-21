@@ -314,7 +314,8 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                     # when they were absent at the test's input boundary.
                     assert bound.pop('defer_until_eligible') is True
                     assert bound.pop('authorization_parameters')
-                    bound.pop('send_parameters', None)
+                    send = bound.pop('send_parameters')
+                    assert bound.pop('contact_open') is send['contact_open']
                     bound.pop('worker_id', None)
                     return bound
                 with patch.object(httpx.AsyncClient,'send',send),patch.object(httpx.Client,'send',lambda client,request,*a,**k:checked(request)),\

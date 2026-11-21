@@ -15,9 +15,9 @@ READ_REFERENCE_SCHEMA = {
     'description': 'Read exact retained Alive text or one retained source excerpt in your current conversation. '
                    'Use a reference handle from Alive context. Paged fragments must be read in order; '
                    'text recovers what Alive prepared, not independent verification. Use source pages to inspect '
-                   'the collected evidence; its catalog identifies source indices. Complete means the retained '
-                   'text fits in the returned page. Even a complete excerpt cannot establish what happened '
-                   'outside it. Cite the source name; source indices are for tool calls. '
+                   'the collected evidence; its catalog identifies source indices. A null next_offset ends '
+                   'the retained text. Image links and alt text are textual references; the image itself '
+                   'requires separate inspection to say what it shows. Cite the source name. '
                    'These handles belong to prepared proactive shares, not agenda request events or Core jobs. '
                    'For a retained task original, use the original_request_lookup returned by alive_agenda. '
                    'A provenance source_event_id is not a read_reference handle. '
@@ -161,7 +161,6 @@ class CoreShareContinuity:
                     if len(json.dumps(catalog + [candidate], ensure_ascii=False)) <= 4096:
                         catalog.append(candidate)
                 metadata = {'content_kind': 'exact_prepared_share_not_source_verification',
-                            'completeness_applies_to': 'retained_share_text',
                             'source_catalog': catalog, 'source_catalog_complete': len(catalog) == item['source_count']}
             else:
                 if index >= item['source_count']:
@@ -172,8 +171,7 @@ class CoreShareContinuity:
                     raise ValueError('retained source excerpt unavailable')
                 basis = source.get('reading_scope', {}).get('evidence_basis')
                 kind = 'retained_search_result_excerpt' if basis == 'search_result_excerpt' else 'retained_source_excerpt'
-                metadata = {'content_kind': kind, 'source_index': index, 'source': source,
-                            'completeness_applies_to': 'retained_excerpt'}
+                metadata = {'content_kind': kind, 'source_index': index, 'source': source}
             if offset > len(text):
                 raise ValueError('page offset beyond the retained text')
             end = min(len(text), offset + count)
@@ -182,7 +180,6 @@ class CoreShareContinuity:
                 raise ValueError('conversation scope changed during read')
             return {'reference': args['reference'], 'part': part, 'prepared_at': item['prepared_at'],
                     'offset': offset, 'text': text[offset:end], 'next_offset': end if end < len(text) else None,
-                    'total_characters': len(text), 'complete': offset == 0 and end == len(text),
                     'source_count': item['source_count'], **metadata}
         except (ValueError, KeyError, TypeError):
             # No caller IDs, body, exception text or existence oracle crosses a

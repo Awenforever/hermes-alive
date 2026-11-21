@@ -994,3 +994,13 @@ ordinary communication preferences and factual and fit findings. The original
 route and alignment finding stay with review and audit, including the second
 review. A current user search request retains its original scope. This change
 needs separate real-model qualification for natural drafting and scope.
+
+The next actual share passed its fact and fit reviews but its first main
+reply treated an image link adjacent to text as a confirmed photo of the
+object. The next reply corrected this, and the authorized public lookup
+found a more specific article without independently inspecting its image.
+That is a failed full round. The reference tool now exposes text and
+unverified linked media as separate evidence and keeps only the cursor
+needed for paging. Reading the last page of an excerpt does not establish
+coverage of the original. No account or vision tool is required to use
+retained references, and this change claims no semantic pass.

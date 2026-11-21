@@ -471,6 +471,8 @@ def _conversation_source(source):
         result['reading_scope'] = {
             'evidence_basis': 'retained_excerpt',
             'coverage': 'retained_material_only',
+            'available_material': 'text',
+            'linked_media': 'appearance_unverified_by_this_excerpt',
             **{key: reported[key] for key in (
                 'reported_read_scope', 'reported_content_representation',
                 'extract_has_omitted_middle') if key in reported}}

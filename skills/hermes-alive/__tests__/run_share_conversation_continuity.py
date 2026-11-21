@@ -239,7 +239,8 @@ async def test(home, mode, *, exercise=None, long_reference=False):
             expected_source = {
                 key:value for key,value in shares[0]['sources'][0].items()
                 if key not in ('event_id','excerpt_policy','reading_scope')}
-            expected_source['reading_scope'] = {'evidence_basis':'retained_excerpt','coverage':'retained_material_only'}
+            expected_source['reading_scope'] = {'evidence_basis':'retained_excerpt','coverage':'retained_material_only',
+                'available_material':'text','linked_media':'appearance_unverified_by_this_excerpt'}
             if not long_reference:
                 assert conversation['sources'][0] == expected_source
             # Operational diagnostics stay unchanged; only model-facing evidence
@@ -284,7 +285,7 @@ async def test(home, mode, *, exercise=None, long_reference=False):
                     assert page['content_kind'] == 'retained_source_excerpt'
                     assert page['source']['url'] == expected_source['url']
                     assert page['source']['reading_scope'] == expected_source['reading_scope']
-                    assert page['completeness_applies_to'] == 'retained_excerpt'
+                    assert not {'complete','total_characters','completeness_applies_to'} & page.keys()
                     source_pages.append(page['text'])
                     if page['next_offset'] is None: break
                     offset = page['next_offset']
@@ -449,7 +450,8 @@ async def test(home, mode, *, exercise=None, long_reference=False):
 def test_collection_limits_are_not_world_negatives():
     shares = [{'prepared_at':'2026-01-01T00:00:00+00:00','text':'Exact shared words.',
         'sources':[{'event_id':'private-source-id','title':'Observed result',
-            'url':'https://example.invalid/result','excerpt':'An author reports a result.',
+            'url':'https://example.invalid/result',
+            'excerpt':'An author reports a result. ![Figure](https://example.invalid/figure.png)',
             'reading_status':'retained_excerpt','reading_scope':{
                 'reported_read_scope':'search_listing','independent_verification_proven':False,
                 'video_consumption_proven':False,'reported_content_representation':'machine_summary'}},
@@ -460,8 +462,10 @@ def test_collection_limits_are_not_world_negatives():
     assert references[0]['text'] == 'Exact shared words.'
     assert references[0]['sources'][0]['reading_scope'] == {
         'evidence_basis':'search_result_excerpt','coverage':'retained_material_only',
+        'available_material':'text','linked_media':'appearance_unverified_by_this_excerpt',
         'original_page_body_read':False,'reported_read_scope':'search_listing',
         'reported_content_representation':'machine_summary'}
+    assert references[0]['sources'][0]['excerpt'] == shares[0]['sources'][0]['excerpt']
     assert references[0]['sources'][1] == {'reading_status':'no_longer_retained'}
     assert 'independent_verification_proven' not in text and 'video_consumption_proven' not in text
     assert 'private-source-id' not in text and 'private-erased-id' not in text
