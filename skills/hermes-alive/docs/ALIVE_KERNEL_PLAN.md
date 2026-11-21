@@ -64,6 +64,15 @@ source attribution and evidence-of-reading in the quality rubric, separately
 from message length and answer relevance. ADR0210 records the remaining output
 boundary.
 
+An isolated ordinary owner conversation exercised first-grant intake,
+task revision, one model-only Core submission and cancellation of pending
+execution, with the item still active and no outbound activity. A comparable
+run also showed the model could save the constraints of a one-time run as
+standing agenda text before invoking work. The Main tool now states the
+distinction at the operation and field boundaries, and the Core job applies
+each request to its originating turn. Inspect the actual agenda version as
+well as the job toolsets, status and result in the next qualification.
+
 The creator-video trial initially followed an unrelated voice-model page.
 Replaying the original search results against the bounded recovery path made
 one live reformulation that found platform-specific results without reading

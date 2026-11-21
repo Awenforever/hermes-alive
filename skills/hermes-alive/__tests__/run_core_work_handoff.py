@@ -202,7 +202,9 @@ async def test(home):
         assert tool(payload)['work_id']==started['work_id']
         assert len(jobs.list_jobs(include_disabled=True))==1
         job=jobs.get_job(started['job_id'])
-        assert json.loads(job['prompt'].rsplit('\n',1)[1])['current_owner_message']==text
+        worker_request = json.loads(job['prompt'].rsplit('\n',1)[1])
+        assert worker_request['current_owner_message']==text and worker_request['assignment']==row['details']
+        assert tool({'operation':'list','item_id':row['item_id']})['items'][0]['item_version']==row['item_version']
         work_store=execution.kernel('core_work').CoreWorkStore(store)
         configured=store.configuration()
         receipt=work_store._read(started['work_id'],'requested',configured.subject)

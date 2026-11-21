@@ -92,3 +92,20 @@ selection, independent task-specific verification and feedback changing later
 decisions, safe resolution/cancellation of uncertain operations, project context,
 complete original-source traceability, Core-context/noise boundaries, lifecycle,
 four-platform distribution, migration/rollback and production qualification.
+
+## Attribute limits to the assignment or to a specific run
+
+Actual ordinary turns accepted and revised a synthetic continuing item. One
+run also submitted and stopped a pending Core job while leaving the item active.
+A separate run used Core's actual scheduler and model, then the ordinary agent
+read the stored result without rerunning the job or closing the agenda item.
+Both jobs had an empty effective toolset and local result delivery.
+
+In separate runs the model first copied a one-run instruction into the standing
+agenda constraint. Launch already gives Core the stored assignment and the
+exact current request separately. Make this distinction explicit in the Main
+tool's operation and field contracts and in the worker request. A later start
+can end an earlier registration-only restriction without changing the standing
+assignment. A genuine amendment changes its version. Preserve that version on
+work-only turns and keep the full current owner words in Core's job request.
+Current guidance still needs real-model verification of this distinction.
