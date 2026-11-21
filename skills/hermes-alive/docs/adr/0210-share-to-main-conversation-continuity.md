@@ -225,3 +225,21 @@ needs it. A configuration that disables the reader keeps the bounded inline
 evidence path. The change preserves source identity and retention rules. It
 needs fresh ordinary-turn qualification for answer scope, useful depth and
 successful source retrieval.
+
+## Keep continuing-work diagnostics available on demand
+
+The subsequent SenseNova trial reached actual Main turns with three source
+catalog entries and no inline excerpts. Requests still gained about 7,900
+characters each. The continuing-work hook was adding its whole operation
+contract and profile runtime report during every ordinary owner turn. The
+assistant could follow the topic but contradicted its own attribution of a
+technical detail across two turns with the original lookup still in history.
+
+Current-turn context now conveys the direct intake disposition and where to
+look for operation details. `alive_agenda` exposes `capabilities` as a scoped,
+read-only operation that re-evaluates the current permission and includes the
+operation contract, configured choices and runtime observation. The existing
+intake and work validators still verify authority before action. The shorter
+context reduces interference. Continuation accuracy still requires live
+evidence, including whether Main uses the best available source when an
+earlier answer and the original evidence diverge.

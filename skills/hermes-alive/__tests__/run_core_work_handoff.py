@@ -131,7 +131,13 @@ async def test(home):
                 platform='telegram',_user_id=source.user_id),effective_task_id=name,turn_id=name,
                 original_user_message=text,messages=[{'role':'user','content':text}],conversation_history=[])
             assert 'alive_agenda' in context
-            contract=json.JSONDecoder().raw_decode(context[context.index('{"tool":"alive_agenda"'):])[0]
+            assert len(context)<900 and 'operation_set_is_complete' not in context
+            def tool(args):
+                return json.loads(model_tools.handle_function_call('alive_agenda',args,task_id=name,
+                    session_id=entry.session_id,turn_id=name,tool_call_id=name+'-call',enabled_tools=['alive_agenda']))
+            sequence=store.journal.last_sequence()
+            contract=tool({'operation':'capabilities'})
+            assert store.journal.last_sequence()==sequence
             turn.last_contract=contract
             bridge=importlib.import_module(loaded.module.__name__+'.gateway_agenda_bridge')
             assert set(contract['operations'])==set(bridge._OPERATION_FIELDS)==set(bridge._OPERATION_EFFECTS)
@@ -145,9 +151,6 @@ async def test(home):
                 assert not contract['operations']['record']['eligible_for_request_evaluation']
                 assert not contract['operations']['work']['eligible_for_request_evaluation']
                 assert contract['operations']['list']['eligible_for_request_evaluation']
-            def tool(args):
-                return json.loads(model_tools.handle_function_call('alive_agenda',args,task_id=name,
-                    session_id=entry.session_id,turn_id=name,tool_call_id=name+'-call',enabled_tools=['alive_agenda']))
             return tool
         if os.environ.get('ALIVE_WORK_CONTRACT_TEST')=='1':
             before=store.journal.last_sequence()

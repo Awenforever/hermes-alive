@@ -182,7 +182,8 @@ async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_cap
                         'old native wording reached the repair prompt' if data.get('correction')
                         else 'old native wording reached the initial author prompt')
                     if data.get('correction'):
-                        assert not data['correction']['grounding_context']['recent_feedback_context']
+                        prior_grounding = data['correction'].get('grounding_context', {})
+                        assert not prior_grounding.get('recent_feedback_context')
                     feedback_probe['author_seen']=True
                     feedback_probe['author_mode']=data['expression_context'].get('method')
                 source_url=url

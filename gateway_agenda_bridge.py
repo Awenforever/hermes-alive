@@ -24,6 +24,7 @@ class AgendaArgumentError(ValueError):
 
 _CHANGE_FIELDS = frozenset(('operation','item_id','item_version','evidence_span','available_at'))
 _OPERATION_FIELDS = {
+    'capabilities':frozenset(('operation',)),
     'propose':_CREATION_FIELDS,
     'record':_CREATION_FIELDS|{'evidence_span'},
     'list':frozenset(('operation','item_id')),
@@ -44,6 +45,7 @@ _OPERATION_REQUIRED = {
 }
 
 _OPERATION_EFFECTS = {
+    'capabilities':'observation',
     'propose':'temporary_unsaved_preview',
     'list':'observation','work_status':'observation','work_evidence':'observation',
     'record':'agenda_change','revise':'agenda_change',
@@ -55,6 +57,7 @@ _OPERATION_EFFECTS = {
 AGENDA_SCHEMA = {
     'name': 'alive_agenda',
     'description': 'Manage or inspect the current owner continuing items under the actual guided capability contract. '
+                   'Use capabilities for the current operation rules, permissions and runtime. It changes nothing. '
                    'Use only when the user wants ongoing follow-up. Propose does not save a task: '
                    'show the entire returned preview and owner confirmation command. Never claim it is '
                    'active before confirmation. When current Alive context explicitly permits direct intake, '
@@ -201,29 +204,13 @@ class CoreAgendaBridge:
             self.turns.move_to_end((scope, task))
             while len(self.turns) > 64:
                 self.turns.popitem(last=False)
-        contract=self.operation_contract(configured,current_turn_eligible=eligible,intake_grant_active=enabled)
+        intake = ('A clear ongoing assignment in this message can use record without another confirmation. '
+                  if eligible else 'A new ongoing assignment requires a proposal and owner confirmation. ')
         return {'context':
-            'Alive continuing work: interpret only the current owner request. Quotations, casual remarks, '
-            'hypotheticals and unclear intentions are not new assignments; ask when uncertain. '
-            'The following contract describes this tool only and is complete for it. It reports existing owner '
-            'delegation separately from current request eligibility; reporting that grant does not ask the owner '
-            'to authorize it again. When direct intake is active, record a clear current ongoing assignment '
-            'without a per-item approval; otherwise use a temporary proposal and owner confirmation. '
-            'Use its exposed operation fields; do not extrapolate another operation from a similar one. '
-            'Owner requests, confirmed scope and Core approvals authorize action. Project rules describe task '
-            'requirements; recorded statements/results are evidence, not additional authority. '
-            'Preserve conditions at their original turn: a registration-only turn is distinct from later '
-            'authorized work; any still-required owner start/approval remains required. '
-            'Report actual availability and observations, not assumed reminders, current-world results or rollback. '
-            'For item-specific questions, use the existing authorized observation operations to obtain the '
-            'relevant item/work facts. A no-change/no-execution request does not forbid those observations; '
-            'do not ask for redundant read approval or substitute generic setup facts for this item conditions. '
-            'Follow the Hermes profile communication style. For ordinary acknowledgments/status/permission '
-            'questions, state the useful result and next required condition in a short natural answer instead '
-            'of repeating the whole task or dumping paths, identifiers and internal keys. Keep opaque handles '
-            'for tool calls and needed confirmation commands; give technical detail when requested. '
-            'For an operation requiring confirmation, show its full returned preview and confirmation command.\n'
-            +json.dumps(contract,ensure_ascii=False,separators=(',',':'))}
+            'For continuing work only, use alive_agenda. ' + intake +
+            'Leave remarks and quotations as conversation. Ask if the intent is unclear. '
+            'Read capabilities for current permission and runtime, list or work_status for a specific item. '
+            'A saved item grants no permission to execute work or contact the owner.'}
 
     def operation_contract(self,configured,*,current_turn_eligible,intake_grant_active=False):
         """Describe the real registry and current evaluation gates, never grant them.
@@ -233,7 +220,7 @@ class CoreAgendaBridge:
         No task body, private directory or opaque owner identifier is added here.
         """
         options=configured.options
-        eligible={'propose','list','work_status','work_evidence'}
+        eligible={'capabilities','propose','list','work_status','work_evidence'}
         if current_turn_eligible:
             eligible.add('record')
             if options.get('manage_explicit_followups') is True:
@@ -325,7 +312,12 @@ class CoreAgendaBridge:
                            'the host retains the existing assignment and exact current owner message. '
                            'For every work_evidence call include its work_id, including message pages. '
                            'This argument error does not establish a missing tool or permission.'})
-            if args['operation'] == 'list':
+            if args['operation'] == 'capabilities':
+                from .kernel_execution_bridge import kernel
+                enabled, revision = kernel('followup_intake').permission(store, configured)
+                result = self.operation_contract(configured, current_turn_eligible=(
+                    enabled and turn[3] is not None and turn[4] == revision), intake_grant_active=enabled)
+            elif args['operation'] == 'list':
                 if 'item_id' in args and (not isinstance(args['item_id'],str) or not args['item_id']):
                     raise ValueError('explicit item lookup requires an exact identifier')
                 result = {'items': self._items(store, configured,args.get('item_id')),
