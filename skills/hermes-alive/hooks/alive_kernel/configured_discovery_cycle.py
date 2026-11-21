@@ -139,6 +139,7 @@ class _DiscoveryObservation:
     deeper_reading: bool = False
     search_purpose: bool = False
     listing_recovery: bool = False
+    unread_listing_followup: bool = False
 
 
 class ConfiguredDiscoveryCycle:
@@ -273,7 +274,8 @@ class ConfiguredDiscoveryCycle:
     async def _select(self,*,operation_id,evidence,search_receipt_id,parameters,call,current,
                       followup=False,visited=(),citation_references=False,source_refinement=False,
                       public_only=False,deeper_reading=False,search_purpose=False,
-                      public_refinement=None,listing_recovery=False,recovery_available=False):
+                      public_refinement=None,listing_recovery=False,recovery_available=False,
+                      unread_listings=()):
         journal,vault=self.ingestor.journal,self.ingestor.vault
         if listing_recovery and not (source_refinement and not deeper_reading and search_purpose):
             raise HostDiscoveryError('listing recovery requires bounded public search scope')
@@ -285,6 +287,9 @@ class ConfiguredDiscoveryCycle:
                 read_scope_metadata(e.content).get('reported_read_scope') not in ('search_listing','webpage_extract')
                 for e in evidence):
             raise HostDiscoveryError('public source planning requires current public collector material')
+        if unread_listings and (not deeper_reading or any(
+                read_scope_metadata(e.content).get('reported_read_scope') != 'search_listing' for e in unread_listings)):
+            raise HostDiscoveryError('unread alternatives require retained public search listings')
         read_context=parameters['expression_parameters'].get('read_context')
         digest=await context_value(read_context,lambda:self.inquiries.context_digest(subject=self.subject))
         prefix='discovery.reading-choice:'+vault.digest_json(dict(subject=self.subject,operation=operation_id))[:40]
@@ -334,6 +339,8 @@ class ConfiguredDiscoveryCycle:
             prompt+='\nThe reserved citation already uses one read. Select at most one additional result.'
         if copy_search:
             prompt+=source_reading_depth.PUBLIC_COPY_GUIDANCE
+        if unread_listings:
+            prompt+=source_reading_depth.LISTING_OPTIONS_GUIDANCE
         eligible_depth=source_reading_depth.eligible_sources(evidence,read_scope_metadata) if deeper_reading else {}
         snapshot=dict(method='cited-public-followup-v1' if followup else 'public-reading-choice-v1',
             search_receipt_id=search_receipt_id,system_prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
@@ -380,12 +387,22 @@ class ConfiguredDiscoveryCycle:
                     or any(e.observation_event_id not in collection.event.payload['observations'] for e in evidence)):
                 raise HostDiscoveryError('listing recovery must use a completed search and its own results')
         refs={e.observation_event_id:e for e in evidence}
+        listing_urls={}
+        if unread_listings:
+            from .discovery_opportunities import canonicalize_discovery_url
+            listing_urls={item.observation_event_id:canonicalize_discovery_url(item.content['url']) for item in unread_listings}
+            refs.update((item.observation_event_id,item) for item in unread_listings)
+            snapshot['unread_search_listings']=[dict(source_ref=e.observation_event_id,title=e.content['title'],
+                url=e.content['url'],excerpt=source_prompt_excerpt(e.content),published_at=e.content.get('published_at'))
+                for e in unread_listings]
         if deeper_reading:
             snapshot['method']=source_reading_depth.METHOD
             snapshot['deeper_read_sources']=[dict(source_ref=identity,
                 requested_extract_chars=source_reading_depth.EXTRACT_CHARS,whole_resource_read_proven=False)
                 for identity in eligible_depth]
-        parse_choice=lambda raw:(source_reading_depth.normalize(raw,catalogs,self.queries,eligible_depth,
+        parse_choice=lambda raw:(source_reading_depth.normalize_with_listings(raw,catalogs,self.queries,eligible_depth,
+            listing_urls,allow_query_with_citation=copy_search) if listing_urls else
+            source_reading_depth.normalize(raw,catalogs,self.queries,eligible_depth,
             allow_query_with_citation=copy_search) if deeper_reading else
             public_source_refinement.normalize(raw,catalogs,self.queries) if source_refinement else
             citation_selection.normalize(raw,catalogs) if followup and citation_references else
@@ -411,7 +428,9 @@ class ConfiguredDiscoveryCycle:
             result=resolve(done,'discovery.reading-choice')
             if result['input_digest']!=vault.digest_json(snapshot):
                 raise HostDiscoveryError('reading result differs from its original input')
-            choice=(source_reading_depth.validate(result['choice'],catalogs,self.queries,eligible_depth,
+            choice=(source_reading_depth.validate_with_listings(result['choice'],catalogs,self.queries,eligible_depth,
+                listing_urls,allow_query_with_citation=copy_search) if listing_urls else
+                source_reading_depth.validate(result['choice'],catalogs,self.queries,eligible_depth,
                 allow_query_with_citation=copy_search) if deeper_reading else
                 public_source_refinement.validate(result['choice'],catalogs,self.queries) if source_refinement else
                 citation_selection.validate(result['choice'],catalogs)
@@ -452,13 +471,13 @@ class ConfiguredDiscoveryCycle:
                 raise
         await context_value(read_context,validate_context)
         if followup and citation_references:
-            ordinary_choice={k:v for k,v in choice.items() if k!='deepen_source_ref'}
+            ordinary_choice={k:v for k,v in choice.items() if k not in ('deepen_source_ref','listing_source_refs')}
             if copy_search and choice.get('search_query') and choice['read_targets']:
                 anchor=citation_selection.normalize(dict(read_targets=choice['read_targets'],
                     reason=choice['reason']),catalogs)
                 targets=citation_selection.read_targets(anchor,catalogs)
             else:
-                targets=(() if choice.get('deepen_source_ref') is not None else
+                targets=(() if choice.get('deepen_source_ref') is not None or choice.get('listing_source_refs') else
                     public_source_refinement.read_targets(ordinary_choice,catalogs,self.queries) if source_refinement else
                          citation_selection.read_targets(choice,catalogs))
             choice={**choice,'read_targets':list(targets)}
@@ -509,6 +528,9 @@ class ConfiguredDiscoveryCycle:
         listing_recovery=(public_refinement and citation_references and search_purpose and self._cycle_mode(
             cycle,prefix='discovery.listing-recovery:',kind='discovery.listing_recovery_opened',
             payload=dict(method=public_source_refinement.LISTING_RECOVERY_METHOD,authority_granted=False)))
+        unread_listing_followup=(deeper_reading and search_purpose and self._cycle_mode(
+            cycle,prefix='discovery.unread-listing-followup:',kind='discovery.unread_listing_followup_opened',
+            payload=dict(method='unread-listing-followup-v1',authority_granted=False)))
         if self.tools is not None:self.tools.close()
         def allow_refinement_query(query):
             current()
@@ -535,11 +557,12 @@ class ConfiguredDiscoveryCycle:
             assessment_enabled=assessment_enabled,**({'public_refinement':True} if public_refinement else {}),
             **({'scoped_search_views':True} if scoped_search_views else {}),
             **({'search_purpose':SEARCH_PURPOSE_METHOD} if search_purpose else {}),
-            **({'listing_recovery':public_source_refinement.LISTING_RECOVERY_METHOD} if listing_recovery else {})))
+            **({'listing_recovery':public_source_refinement.LISTING_RECOVERY_METHOD} if listing_recovery else {}),
+            **({'unread_listing_followup':True} if unread_listing_followup else {})))
             if found.failures==0 else None)
         result=_DiscoveryObservation(cycle.operation_id,expected,found,tuple(evidence),reader,current,
             research_enabled,citation_references,public_refinement,group_enabled,assessment_enabled,fingerprint,
-            deeper_reading,search_purpose,listing_recovery)
+            deeper_reading,search_purpose,listing_recovery,unread_listing_followup)
         self._observation=result
         return result
 
@@ -731,24 +754,35 @@ class ConfiguredDiscoveryCycle:
                     or any(read_scope_metadata(e.content).get('reported_read_scope')!='webpage_extract' for e in extracts)):
                 raise HostDiscoveryError('follow-up input is not current retained page evidence')
             followup_evidence=extracts
+            unread_listings=()
             if observed.public_refinement:
                 # A failed page read still leaves real public listing material.
                 # Do not substitute the private inquiry or recipient profile.
                 followup_evidence=tuple({e.observation_event_id:e for e in (*selected,*extracts)}.values())
+                if observed.unread_listing_followup:
+                    from .discovery_opportunities import canonicalize_discovery_url
+                    visited_urls={canonicalize_discovery_url(e.content['url']) for e in selected}
+                    unread_listings=tuple(e for e in evidence
+                        if canonicalize_discovery_url(e.content['url']) not in visited_urls)
             followup,_,_=await self._select(operation_id=cycle.operation_id+':followup',evidence=followup_evidence,
                 search_receipt_id=read.receipt_id,parameters=parameters,call=call,current=current,followup=True,
                 visited=tuple(dict.fromkeys(e.content['url'] for e in selected)),citation_references=citation_references,
                 source_refinement=observed.public_refinement,deeper_reading=observed.deeper_reading,
-                search_purpose=observed.search_purpose)
+                search_purpose=observed.search_purpose,unread_listings=unread_listings)
             query=followup.get('search_query')
             deeper_source=followup.get('deepen_source_ref')
-            if deeper_source:
-                by_ref={e.observation_event_id:e for e in followup_evidence}
-                item=by_ref[deeper_source]
-                if read_scope_metadata(item.content).get('reported_read_scope')!='webpage_extract':
-                    raise HostDiscoveryError('deeper read lost original page provenance')
+            listing_refs=followup.get('listing_source_refs',[])
+            if deeper_source or listing_refs:
+                if deeper_source:
+                    by_ref={e.observation_event_id:e for e in extracts}
+                    if deeper_source not in by_ref:
+                        raise HostDiscoveryError('deeper read lost original page provenance')
+                    urls=(by_ref[deeper_source].content['url'],)
+                else:
+                    by_ref={e.observation_event_id:e for e in unread_listings}
+                    urls=tuple(by_ref[ref].content['url'] for ref in listing_refs)
                 followed=await reader.collect(operation_id=cycle.operation_id+':followup-read',
-                    read_urls=(item.content['url'],),inquiry_item_ids=(item_id,),
+                    read_urls=urls,inquiry_item_ids=(item_id,),
                     read_depth=source_reading_depth.WINDOW)
                 if group_enabled and followed.observation_ids:read_receipts.append(followed.receipt_id)
                 current()
@@ -756,7 +790,8 @@ class ConfiguredDiscoveryCycle:
                 # _select has retained and reopened the exact public-only choice.
                 # The capability is usable only during this canonical search;
                 # its start-before-IO receipt prevents replay replenishment.
-                refined,listings=await self._refine_listings(observed,query,followup_evidence,inquiry_item_ids=(item_id,))
+                refined,listings=await self._refine_listings(observed,query,(*followup_evidence,*unread_listings),
+                    inquiry_item_ids=(item_id,))
                 from .discovery_opportunities import canonicalize_discovery_url
                 visited={canonicalize_discovery_url(e.content['url']) for e in selected}
                 anchors=tuple(target['url'] for target in followup['read_targets'])

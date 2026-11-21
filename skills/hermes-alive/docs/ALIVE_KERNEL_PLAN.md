@@ -64,6 +64,12 @@ source attribution and evidence-of-reading in the quality rubric, separately
 from message length and answer relevance. ADR0210 records the remaining output
 boundary.
 
+Follow-up reading can now choose an unread eligible result from the same
+original public search when the first page reads are thin or incomplete. The
+choice uses the existing budget and requires a real page read before its
+content can ground a message. This preserves a useful recovery route without
+granting access to cache-file paths embedded in tool output. See ADR0276.
+
 An isolated ordinary owner conversation exercised first-grant intake,
 task revision, one model-only Core submission and cancellation of pending
 execution, with the item still active and no outbound activity. A comparable

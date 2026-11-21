@@ -39,6 +39,51 @@ Never assume a DOI, abstract label or publisher name means the result contains
 the part needed. Use the exact public title or identifier if it is supplied.
 '''
 
+LISTING_OPTIONS_GUIDANCE = '''
+unread_search_listings contains other eligible results from the original public
+search. They are listings, not pages you have read. If an initial page was too
+thin, inaccessible or off topic, choose up to two distinct listing references
+in listing_source_refs to read those pages instead. Compare their likely
+evidence against a deeper read or cited link, not only the publisher's name.
+This uses the same follow-up allowance. Do not combine listing_source_refs
+with a query, citations, or deepen_source_ref. Leave it empty when choosing
+another action. Never reconstruct the missing page from a listing's preview.
+'''
+
+
+def normalize_with_listings(raw, catalogs, already_queried, eligible, listings, *, allow_query_with_citation=False):
+    from . import public_source_refinement as legacy
+    options = raw.get('listing_source_refs', []) if isinstance(raw, dict) else []
+    if options == []:
+        return {**normalize(raw, catalogs, already_queried, eligible,
+                            allow_query_with_citation=allow_query_with_citation), 'listing_source_refs': []}
+    rejected = {**legacy._invalid(), 'deepen_source_ref': None, 'listing_source_refs': []}
+    if (not isinstance(options, list) or not 1 <= len(options) <= 2
+            or any(not isinstance(ref, str) or ref not in listings for ref in options)
+            or len(set(options)) != len(options)
+            or len({listings[ref] for ref in options}) != len(options)
+            or raw.get('search_query') is not None or raw.get('read_targets', []) != []
+            or raw.get('deepen_source_ref') is not None):
+        return rejected
+    reason = raw.get('reason')
+    if not isinstance(reason, str) or not 1 <= len(reason.strip()) <= 1200:
+        return rejected
+    return dict(search_query=None, read_targets=[], deepen_source_ref=None, listing_source_refs=options,
+                reason=reason, rejected_count=0, decision_status='unread_listings_selected')
+
+
+def validate_with_listings(value, catalogs, already_queried, eligible, listings, *, allow_query_with_citation=False):
+    from .host_discovery import HostDiscoveryError
+    if not isinstance(value, dict) or 'listing_source_refs' not in value:
+        raise HostDiscoveryError('invalid retained unread-listing decision')
+    if value['listing_source_refs'] != []:
+        if normalize_with_listings(value, catalogs, already_queried, eligible, listings) != value:
+            raise HostDiscoveryError('retained unread-listing choice changed or lost its source')
+    else:
+        validate({key: item for key, item in value.items() if key != 'listing_source_refs'},
+                 catalogs, already_queried, eligible, allow_query_with_citation=allow_query_with_citation)
+    return value
+
 
 def eligible_sources(evidence, read_scope):
     return {e.observation_event_id:e.content['url'] for e in evidence

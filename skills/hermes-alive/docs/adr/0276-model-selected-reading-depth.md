@@ -63,3 +63,23 @@ recovery, revocation, erasure and no repeated IO/inference. Exercise actual Core
 dispatch and then inherited-model discovery/continuation. Only useful faithful
 behavior can count toward quality acceptance; exposing a new action is not itself
 a passed round or whole-assistant acceptance.
+
+## Reconsider an unread original search result
+
+The Yunmeng excavation trial illustrates why the initial full-text fetch is not
+the last opportunity to choose an evidence source. A government briefing index
+returned a stale page template, and a news extract omitted the substantive
+middle. The original search had also returned a dated National Cultural
+Heritage Administration release carried by CCTV. The follow-up selector was
+given only the pages it had tried and the original listings for those pages.
+It could neither directly select that other result nor use it as page evidence.
+
+Make unread, still eligible results from the same original search available as
+separate listing references. The model can choose up to two instead of
+deepening, following citations, or searching again. The host resolves each
+reference against its authenticated listing, rejects aliases and mixed
+actions, and uses the normal bounded public extract. A selected listing is
+not evidence of page contents. The normal research group accepts only
+observed page reads. Core-owned cache paths in returned page text do not
+grant filesystem access. The chosen scope is pinned for new cycles and an
+existing decision is replayed from its receipts.

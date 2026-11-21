@@ -35,6 +35,17 @@ def contracts():
     authorized=depth.normalize(copy,citations,(),eligible,allow_query_with_citation=True)
     assert authorized['search_query']==copy['search_query'] and authorized['read_targets']==copy['read_targets']
     assert depth.validate(authorized,citations,(),eligible,allow_query_with_citation=True)==authorized
+    listings={'original':'https://example.invalid/original','mirror':'https://example.invalid/original'}
+    alternate={'listing_source_refs':['original'],'reason':'Read the original announcement.'}
+    bounded=depth.normalize_with_listings(alternate,citations,(),eligible,listings)
+    assert bounded['decision_status']=='unread_listings_selected'
+    assert depth.validate_with_listings(bounded,citations,(),eligible,listings)==bounded
+    for refs in (['original','mirror'],['original']*3,['https://example.invalid/original'],['page1']):
+        invalid=depth.normalize_with_listings({**alternate,'listing_source_refs':refs},citations,(),eligible,listings)
+        assert invalid['decision_status']=='invalid' and invalid['listing_source_refs']==[]
+    try:depth.validate_with_listings(bounded,citations,(),eligible,{})
+    except HostDiscoveryError:pass
+    else:raise AssertionError('a withdrawn listing remained a valid alternative')
     assert depth.normalize({**copy,'read_targets':copy['read_targets']*2},citations,(),eligible,
                            allow_query_with_citation=True)['decision_status']=='invalid'
     for raw in (dict(deepen_source_ref='foreign',reason='unknown'),
@@ -90,12 +101,17 @@ async def exercise(root,mode):
     anchor='https://example.invalid/publisher'
     copy_search=mode in ('public-copy','public-copy-empty')
     recovery=mode.startswith('recovery-')
+    unread=mode.startswith('unread-')
     research_reason='Check whether the claimed effect was measured or inferred.'
     def dispatch(name,args):
         network.append((name,dict(args)))
         assert 'PRIVATE_' not in json.dumps(args)
         if name=='web_search':
             assert args['query'] in ('public seed','public original project')
+            if args['query']=='public seed' and unread:
+                return {'success':True,'data':{'web':[
+                    dict(url=seed,title='Publisher index',description='The search term appears in the listing.'),
+                    dict(url=original,title='Public announcement',description='The original material may clarify the point.')]}}
             if args['query']=='public seed' and mode=='recovery-provider-failed':
                 return {'success':False,'error':'synthetic search failed before yielding results'}
             if args['query']=='public seed' and mode in ('recovery-empty','recovery-empty-off'):
@@ -197,6 +213,17 @@ async def exercise(root,mode):
         elif recovery and data['method']=='public-reading-choice-v1':
             assert 'The host can separately reformulate once' in kw['messages'][0]['content']
             value=dict(source_refs=[],question=None,value_hypothesis='No material match.')
+        elif unread and data['method']==depth.METHOD:
+            assert 'PRIVATE_' not in json.dumps(kw['messages'])
+            alternatives=data.get('unread_search_listings',[])
+            assert [row['url'] for row in alternatives]==([] if mode=='unread-cooldown' else [original])
+            value=dict(search_query=None,read_targets=[],reason='Read the announcement rather than the thin index.')
+            if alternatives:
+                value['listing_source_refs']=[alternatives[0]['source_ref']]
+                if mode=='unread-mixed':value['search_query']='public original project'
+                if mode=='unread-erased':
+                    source=journal.get(alternatives[0]['source_ref'])
+                    ingestor.vault.erase_item(source.event.payload['content']['content_id'])
         elif data['method'] in (selection.METHOD,depth.METHOD):
             if mode=='old-depth-cycle':
                 assert data['method']==selection.METHOD and 'deeper_read_sources' not in data
@@ -253,7 +280,9 @@ async def exercise(root,mode):
             if copy_search and data['method']=='public-source-read-choice-v1':
                 value['source_refs']=[s['source_ref'] for s in sorted(data['sources'],key=lambda s:s['url']!=original)]
         return NS(model='synthetic/model',choices=[NS(message=NS(content=json.dumps(value)))])
-    task=asyncio.create_task(preparation.reason(observed,cycle=cycle,parameters=parameters,call=call,read_binding=binding))
+    excluded=(original,) if mode=='unread-cooldown' else ()
+    task=asyncio.create_task(preparation.reason(observed,cycle=cycle,parameters=parameters,call=call,
+        read_binding=binding,excluded_urls=excluded))
     if mode=='uncertain-search':
         for _ in range(2000):
             if entered.is_set() or task.done():break
@@ -282,12 +311,30 @@ async def exercise(root,mode):
             assert [name for name,_ in network]==['web_search'] and len(models)==2
             assert not preparation.pending
             return
-        assert mode in ('revoked','erased','deeper-revoked','deeper-erased')
+        assert mode in ('revoked','erased','deeper-revoked','deeper-erased','unread-erased')
         assert len(network)==2 and len(models)==2
         assert not preparation.pending
         return
     assert mode not in ('revoked','erased')
-    if recovery:
+    if unread:
+        assert len(models)==2
+        usable=mode=='unread-usable'
+        assert [name for name,_ in network]==['web_search','web_extract']+(['web_extract'] if usable else [])
+        assert network[1][1]['urls']==[seed]
+        if usable:
+            assert network[-1][1]==dict(urls=[original],char_limit=depth.EXTRACT_CHARS)
+            assert len(result['expression_parameters']['research_read_receipt_ids'])==1
+        else:
+            assert not result['expression_parameters'].get('research_read_receipt_ids')
+        before=list(network)
+        preparation.close()
+        preparation=make(refinement_enabled)
+        restored=await preparation.observe(cycle=cycle,parameters=parameters,read_binding=binding)
+        async def forbidden_unread_replay(**kw):raise AssertionError('unread selection must not rerun inference')
+        assert await preparation.reason(restored,cycle=cycle,parameters=parameters,
+            call=forbidden_unread_replay,read_binding=binding)==result
+        assert network==before
+    elif recovery:
         if mode in ('recovery-invalid','recovery-empty-off','recovery-provider-failed'):
             assert [name for name,_ in network]==['web_search']
             assert not result['expression_parameters'].get('research_read_receipt_ids')
@@ -432,7 +479,7 @@ async def allow_synthetic_url(self,url):
 contracts()
 with tempfile.TemporaryDirectory(prefix='alive-public-refinement-') as folder:
     parent=Path(folder)
-    for mode in ('off','old-cycle','old-depth-cycle','legacy-search','on','overlap','only-overlap','conflicting-report','public-copy','public-copy-empty','cited','all-cited-reads-failed','deeper','deeper-revoked','deeper-erased','deeper-oversized','malformed','revoked','erased','search-failed','refined-page-failed','uncertain-search','recovery-mismatch','recovery-empty','recovery-empty-off','recovery-provider-failed','recovery-revoked','recovery-invalid'):
+    for mode in ('off','old-cycle','old-depth-cycle','legacy-search','on','overlap','only-overlap','conflicting-report','public-copy','public-copy-empty','cited','all-cited-reads-failed','deeper','deeper-revoked','deeper-erased','deeper-oversized','malformed','revoked','erased','search-failed','refined-page-failed','uncertain-search','recovery-mismatch','recovery-empty','recovery-empty-off','recovery-provider-failed','recovery-revoked','recovery-invalid','unread-usable','unread-mixed','unread-cooldown','unread-erased'):
         home=parent/mode
         with patch.dict(sys.modules,hermes_constants=NS(get_hermes_home=lambda:home)):
             with patch.object(CoreDiscoveryTools,'allow_url',allow_synthetic_url):
