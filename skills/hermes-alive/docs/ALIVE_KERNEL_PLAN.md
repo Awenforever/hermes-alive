@@ -64,6 +64,14 @@ source attribution and evidence-of-reading in the quality rubric, separately
 from message length and answer relevance. ADR0210 records the remaining output
 boundary.
 
+The creator-video trial initially followed an unrelated voice-model page.
+Replaying the original search results against the bounded recovery path made
+one live reformulation that found platform-specific results without reading
+the unrelated page. The selection still found no suitable original
+demonstration and stayed silent. This is evidence of query recovery and restraint,
+not a fresh sharing pass. See ADR0285 for the initial receipt and permission
+boundary.
+
 With official Core 0.23.3, the Windows VM has passed public-Git install,
 upgrade, removal and reinstall with twelve state fingerprints unchanged.
 It also passed lifecycle controls and each installed continuation case after

@@ -5,7 +5,7 @@ read evidence; the existing agenda retains model research intent. Selection is
 durable before spending and never silently repeated after an uncertain outcome.
 """
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import timedelta, timezone
 import hashlib
 import json
@@ -138,6 +138,7 @@ class _DiscoveryObservation:
     listing_fingerprint: str | None
     deeper_reading: bool = False
     search_purpose: bool = False
+    listing_recovery: bool = False
 
 
 class ConfiguredDiscoveryCycle:
@@ -272,8 +273,10 @@ class ConfiguredDiscoveryCycle:
     async def _select(self,*,operation_id,evidence,search_receipt_id,parameters,call,current,
                       followup=False,visited=(),citation_references=False,source_refinement=False,
                       public_only=False,deeper_reading=False,search_purpose=False,
-                      public_refinement=None):
+                      public_refinement=None,listing_recovery=False,recovery_available=False):
         journal,vault=self.ingestor.journal,self.ingestor.vault
+        if listing_recovery and not (source_refinement and not deeper_reading and search_purpose):
+            raise HostDiscoveryError('listing recovery requires bounded public search scope')
         if deeper_reading and not (followup and citation_references and source_refinement):
             raise HostDiscoveryError('deeper reading requires the existing public refinement scope')
         if public_refinement is not None and not (public_only and not followup):
@@ -304,10 +307,14 @@ class ConfiguredDiscoveryCycle:
         prompt=(_FOLLOWUP_REFERENCES_PROMPT if citation_references else _FOLLOWUP_PROMPT) if followup else _PROMPT_V1
         if source_refinement:
             if not followup or not citation_references:raise HostDiscoveryError('bounded public refinement mode required')
-            prompt=public_source_refinement.PROMPT
+            prompt=(public_source_refinement.LISTING_RECOVERY_PROMPT if listing_recovery
+                    else public_source_refinement.PROMPT)
             if deeper_reading:prompt+='\n'+source_reading_depth.GUIDANCE
         if search_purpose:
             prompt += _SEARCH_PURPOSE_GUIDANCE
+        if recovery_available:
+            prompt += ('\nIf no listing could plausibly satisfy the material search scope, return empty '
+                       'source_refs. The host can separately reformulate once without reading an irrelevant page.')
         # This entry point collects configured discovery routes, not current
         # owner research orders. Bind that distinction at the first read too.
         # Already-started operations reconstruct their original input/prompt.
@@ -352,9 +359,12 @@ class ConfiguredDiscoveryCycle:
         catalogs={}
         if followup and citation_references:
             snapshot['method']=public_source_refinement.METHOD if source_refinement else citation_selection.METHOD
-            for source in snapshot['sources']:
-                source['citations']=citation_selection.citations(source['excerpt'],visited)
-                catalogs[source['source_ref']]=source['citations']
+            if listing_recovery:
+                snapshot['method']=public_source_refinement.LISTING_RECOVERY_METHOD
+            else:
+                for source in snapshot['sources']:
+                    source['citations']=citation_selection.citations(source['excerpt'],visited)
+                    catalogs[source['source_ref']]=source['citations']
         if source_refinement:snapshot['already_queried']=list(self.queries)
         elif public_only:snapshot['method']='public-source-read-choice-v1'
         if source_refinement or public_only:
@@ -366,6 +376,9 @@ class ConfiguredDiscoveryCycle:
                 raise HostDiscoveryError('owning public collection clock unavailable')
             snapshot['collection_as_of']=collection.event.observed_at.astimezone(timezone.utc).isoformat()
             snapshot['collection_clock_is_not_publication_date']=True
+            if listing_recovery and (collection.event.payload['failures'] != 0
+                    or any(e.observation_event_id not in collection.event.payload['observations'] for e in evidence)):
+                raise HostDiscoveryError('listing recovery must use a completed search and its own results')
         refs={e.observation_event_id:e for e in evidence}
         if deeper_reading:
             snapshot['method']=source_reading_depth.METHOD
@@ -381,8 +394,8 @@ class ConfiguredDiscoveryCycle:
             current()
             if self.inquiries.context_digest(subject=self.subject)!=digest:
                 raise HostDiscoveryError('owner context changed during reading choice')
-            active=self.ingestor.active_evidence(subject=self.subject,clearance=Sensitivity.PRIVATE,
-                limit=32,observation_event_ids=tuple(refs))
+            active=(self.ingestor.active_evidence(subject=self.subject,clearance=Sensitivity.PRIVATE,
+                limit=32,observation_event_ids=tuple(refs)) if refs else ())
             if {e.observation_event_id for e in active}!=set(refs):
                 raise HostDiscoveryError('reading choice sources no longer current')
         await context_value(read_context,validate_context)
@@ -406,7 +419,8 @@ class ConfiguredDiscoveryCycle:
             model=result['actual_model']
         else:
             if done is not None:raise HostDiscoveryError('reading result has no canonical start')
-            expiry=min(e.expires_at for e in evidence)
+            expiry=(min(e.expires_at for e in evidence) if evidence
+                    else collection.event.observed_at+timedelta(days=7))
             ref=vault.put_json(snapshot,subject=self.subject,purpose='discovery.reading-input',
                 retention_until=expiry,content_id=prefix+':input')
             started=journal.append(EventEnvelope(event_id=prefix+':started',event_type='discovery.reading_choice_started',
@@ -492,13 +506,16 @@ class ConfiguredDiscoveryCycle:
         search_purpose=self._cycle_mode(cycle,prefix=SEARCH_PURPOSE_PREFIX,
             kind=SEARCH_PURPOSE_EVENT,payload=dict(method=SEARCH_PURPOSE_METHOD,
                 query_digest=self.ingestor.vault.digest_json(list(self.queries)),authority_granted=False))
+        listing_recovery=(public_refinement and citation_references and search_purpose and self._cycle_mode(
+            cycle,prefix='discovery.listing-recovery:',kind='discovery.listing_recovery_opened',
+            payload=dict(method=public_source_refinement.LISTING_RECOVERY_METHOD,authority_granted=False)))
         if self.tools is not None:self.tools.close()
         def allow_refinement_query(query):
             current()
             grant=self._refinement_query
             if not public_refinement or grant is None or grant[:2]!=(cycle.operation_id,query):return False
-            active=self.ingestor.active_evidence(subject=self.subject,clearance=Sensitivity.PRIVATE,
-                limit=32,observation_event_ids=grant[2])
+            active=(self.ingestor.active_evidence(subject=self.subject,clearance=Sensitivity.PRIVATE,
+                limit=32,observation_event_ids=grant[2]) if grant[2] else ())
             return {e.observation_event_id for e in active}==set(grant[2])
         self.tools=CoreDiscoveryTools(self.context,read_binding=current,approved_queries=self.queries,
             **({'query_validator':allow_refinement_query} if public_refinement else {}))
@@ -517,11 +534,12 @@ class ConfiguredDiscoveryCycle:
             citation_references=citation_references,group_enabled=group_enabled,
             assessment_enabled=assessment_enabled,**({'public_refinement':True} if public_refinement else {}),
             **({'scoped_search_views':True} if scoped_search_views else {}),
-            **({'search_purpose':SEARCH_PURPOSE_METHOD} if search_purpose else {})))
+            **({'search_purpose':SEARCH_PURPOSE_METHOD} if search_purpose else {}),
+            **({'listing_recovery':public_source_refinement.LISTING_RECOVERY_METHOD} if listing_recovery else {})))
             if found.failures==0 else None)
         result=_DiscoveryObservation(cycle.operation_id,expected,found,tuple(evidence),reader,current,
             research_enabled,citation_references,public_refinement,group_enabled,assessment_enabled,fingerprint,
-            deeper_reading,search_purpose)
+            deeper_reading,search_purpose,listing_recovery)
         self._observation=result
         return result
 
@@ -640,6 +658,22 @@ class ConfiguredDiscoveryCycle:
             raise HostDiscoveryError('read eligibility lacks original current provenance')
         return tuple(e for e in observed.evidence if e.observation_event_id in data['eligible_ids'])
 
+    async def _refine_listings(self, observed, query, basis, *, inquiry_item_ids=()):
+        # One durable collection ID for either entry into the refinement budget.
+        self._refinement_query=(observed.operation_id,query,tuple(e.observation_event_id for e in basis))
+        try:
+            found=await observed.reader.collect(operation_id=observed.operation_id+':refinement-search',
+                queries=(query,),inquiry_item_ids=inquiry_item_ids)
+        finally:
+            self._refinement_query=None
+        observed.current()
+        evidence=(self.ingestor.active_evidence(subject=self.subject,clearance=Sensitivity.PRIVATE,
+            limit=32,observation_event_ids=found.observation_ids) if found.observation_ids else ())
+        if ({e.observation_event_id for e in evidence}!=set(found.observation_ids)
+                or any(read_scope_metadata(e.content).get('reported_read_scope')!='search_listing' for e in evidence)):
+            raise HostDiscoveryError('refined search is not current public listing evidence')
+        return found,evidence
+
     async def reason(self,observed,*,cycle,parameters,call,read_binding,excluded_urls=()):
         """Explicit cognition phase, using this generation's exact observation."""
         if (observed is not self._observation or not isinstance(observed,_DiscoveryObservation)
@@ -649,18 +683,36 @@ class ConfiguredDiscoveryCycle:
         found,evidence,reader=observed.found,observed.evidence,observed.reader
         research_enabled,citation_references=observed.research_enabled,observed.citation_references
         group_enabled,assessment_enabled=observed.group_enabled,observed.assessment_enabled
-        expected=observed.binding
-        if not found.observation_ids:return self._retain_parameters(observed,parameters)
+        can_recover=observed.listing_recovery and found.failures==0
+        if not found.observation_ids and not can_recover:return self._retain_parameters(observed,parameters)
         if observed.search_purpose:
             parameters = {**parameters, 'expression_parameters': {
                 **parameters['expression_parameters'], 'search_purpose_receipt_id': found.receipt_id}}
-        retained=self.ingestor.active_evidence(subject=self.subject,clearance=Sensitivity.PRIVATE,
-            limit=32,observation_event_ids=found.observation_ids)
+        retained=(self.ingestor.active_evidence(subject=self.subject,clearance=Sensitivity.PRIVATE,
+            limit=32,observation_event_ids=found.observation_ids) if found.observation_ids else ())
         if tuple(retained)!=evidence:raise HostDiscoveryError('observed listing material changed before cognition')
         evidence=self._read_scope(observed,excluded_urls)
-        if not evidence:return self._retain_parameters(observed,parameters)
-        choice,model,digest=await self._select(operation_id=cycle.operation_id,evidence=evidence,search_receipt_id=found.receipt_id,
-            parameters=parameters,call=call,current=current,search_purpose=observed.search_purpose)
+        if not evidence and found.observation_ids:
+            return self._retain_parameters(observed,parameters)  # Cooldown is not a failed search.
+        choice={'source_refs':[]}
+        if evidence:
+            choice,model,digest=await self._select(operation_id=cycle.operation_id,evidence=evidence,search_receipt_id=found.receipt_id,
+                parameters=parameters,call=call,current=current,search_purpose=observed.search_purpose,
+                recovery_available=can_recover)
+        recovered=can_recover and not choice['source_refs']
+        if recovered:
+            rewrite,_,_=await self._select(operation_id=cycle.operation_id+':listing-recovery',
+                evidence=evidence,search_receipt_id=found.receipt_id,parameters=parameters,call=call,current=current,
+                followup=True,citation_references=True,source_refinement=True,search_purpose=True,listing_recovery=True)
+            query=rewrite['search_query']
+            if not query:return self._retain_parameters(observed,parameters)
+            refined,listings=await self._refine_listings(observed,query,evidence)
+            retry=replace(observed, operation_id=cycle.operation_id+':recovery-reading',found=refined,evidence=listings)
+            evidence=self._read_scope(retry,excluded_urls)
+            if not evidence:return self._retain_parameters(observed,parameters)
+            choice,model,digest=await self._select(operation_id=retry.operation_id,evidence=evidence,
+                search_receipt_id=refined.receipt_id,parameters=parameters,call=call,current=current,
+                public_only=True,search_purpose=True,public_refinement=dict(query=query,reason=rewrite['reason']))
         if not choice['source_refs']:return self._retain_parameters(observed,parameters)
         by_id={e.observation_event_id:e for e in evidence}
         selected=[by_id[r] for r in choice['source_refs']]
@@ -672,7 +724,7 @@ class ConfiguredDiscoveryCycle:
             read_urls=tuple(dict.fromkeys(e.content['url'] for e in selected)),inquiry_item_ids=(item_id,))
         current()
         read_receipts=[read.receipt_id] if read.observation_ids and group_enabled else []
-        if research_enabled and (read.observation_ids or observed.public_refinement):
+        if not recovered and research_enabled and (read.observation_ids or observed.public_refinement):
             extracts=self.ingestor.active_evidence(subject=self.subject,clearance=Sensitivity.PRIVATE,
                 limit=32,observation_event_ids=read.observation_ids) if read.observation_ids else ()
             if ({e.observation_event_id for e in extracts}!=set(read.observation_ids)
@@ -704,19 +756,7 @@ class ConfiguredDiscoveryCycle:
                 # _select has retained and reopened the exact public-only choice.
                 # The capability is usable only during this canonical search;
                 # its start-before-IO receipt prevents replay replenishment.
-                self._refinement_query=(cycle.operation_id,query,
-                    tuple(e.observation_event_id for e in followup_evidence))
-                try:
-                    refined=await reader.collect(operation_id=cycle.operation_id+':refinement-search',
-                        queries=(query,),inquiry_item_ids=(item_id,))
-                finally:
-                    self._refinement_query=None
-                current()
-                listings=self.ingestor.active_evidence(subject=self.subject,clearance=Sensitivity.PRIVATE,
-                    limit=32,observation_event_ids=refined.observation_ids) if refined.observation_ids else ()
-                if ({e.observation_event_id for e in listings}!=set(refined.observation_ids)
-                        or any(read_scope_metadata(e.content).get('reported_read_scope')!='search_listing' for e in listings)):
-                    raise HostDiscoveryError('refined search is not current public listing evidence')
+                refined,listings=await self._refine_listings(observed,query,followup_evidence,inquiry_item_ids=(item_id,))
                 from .discovery_opportunities import canonicalize_discovery_url
                 visited={canonicalize_discovery_url(e.content['url']) for e in selected}
                 anchors=tuple(target['url'] for target in followup['read_targets'])

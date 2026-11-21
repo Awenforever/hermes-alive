@@ -89,12 +89,17 @@ async def exercise(root,mode):
     secondary='https://example.invalid/other-report'
     anchor='https://example.invalid/publisher'
     copy_search=mode in ('public-copy','public-copy-empty')
+    recovery=mode.startswith('recovery-')
     research_reason='Check whether the claimed effect was measured or inferred.'
     def dispatch(name,args):
         network.append((name,dict(args)))
         assert 'PRIVATE_' not in json.dumps(args)
         if name=='web_search':
             assert args['query'] in ('public seed','public original project')
+            if args['query']=='public seed' and mode=='recovery-provider-failed':
+                return {'success':False,'error':'synthetic search failed before yielding results'}
+            if args['query']=='public seed' and mode in ('recovery-empty','recovery-empty-off'):
+                return {'success':True,'data':{'web':[]}}
             if args['query']=='public original project' and mode=='uncertain-search':
                 entered.set();assert release.wait(10),'fixture did not release public query worker'
             if args['query']=='public original project' and mode=='search-failed':
@@ -152,7 +157,8 @@ async def exercise(root,mode):
         return ConfiguredDiscoveryCycle(context,ingestor,subject='user:test',approved_queries=('public seed',),
             validate_consent=consent,follow_citations=True,refine_public_sources=enabled,
             record_reading_assessment=True)
-    preparation=make(mode not in ('off','old-cycle'))
+    refinement_enabled=mode not in ('off','old-cycle','recovery-empty-off')
+    preparation=make(refinement_enabled)
     cycle=NS(operation_id='synthetic-source-refinement')
     parameters={'expression_parameters':{'model_timeout_seconds':30}}
     binding=lambda:'synthetic-current-owner'
@@ -180,7 +186,18 @@ async def exercise(root,mode):
         assert not observed.public_refinement
     async def call(**kw):
         data=json.loads(kw['messages'][1]['content']);models.append(kw['task'])
-        if data['method'] in (selection.METHOD,depth.METHOD):
+        if data['method']==selection.LISTING_RECOVERY_METHOD:
+            assert recovery and 'PRIVATE_' not in json.dumps(kw['messages'])
+            assert data['approved_search_queries']==['public seed'] and not data['already_read_urls']
+            assert all(s['reported_read_scope']=='search_listing' and 'citations' not in s for s in data['sources'])
+            assert bool(data['sources'])==(mode!='recovery-empty')
+            value=dict(search_query='public original project',read_targets=[],reason=research_reason)
+            if mode=='recovery-invalid':value['search_query']='public seed'
+            if mode=='recovery-revoked':state['consent']=False
+        elif recovery and data['method']=='public-reading-choice-v1':
+            assert 'The host can separately reformulate once' in kw['messages'][0]['content']
+            value=dict(source_refs=[],question=None,value_hypothesis='No material match.')
+        elif data['method'] in (selection.METHOD,depth.METHOD):
             if mode=='old-depth-cycle':
                 assert data['method']==selection.METHOD and 'deeper_read_sources' not in data
             assert 'PRIVATE_OWNER_PREFERENCE' not in json.dumps(kw['messages'])
@@ -261,12 +278,36 @@ async def exercise(root,mode):
         preparation.close();replacement.close()
         return
     except HostDiscoveryError:
+        if mode=='recovery-revoked':
+            assert [name for name,_ in network]==['web_search'] and len(models)==2
+            assert not preparation.pending
+            return
         assert mode in ('revoked','erased','deeper-revoked','deeper-erased')
         assert len(network)==2 and len(models)==2
         assert not preparation.pending
         return
     assert mode not in ('revoked','erased')
-    if mode=='deeper':
+    if recovery:
+        if mode in ('recovery-invalid','recovery-empty-off','recovery-provider-failed'):
+            assert [name for name,_ in network]==['web_search']
+            assert not result['expression_parameters'].get('research_read_receipt_ids')
+            assert len(models)==(2 if mode=='recovery-invalid' else 0)
+            if mode=='recovery-provider-failed':
+                assert observed.found.failures==1 and observed.listing_fingerprint is None
+        else:
+            assert [name for name,_ in network]==['web_search','web_search','web_extract']
+            assert network[-1][1]['urls']==[original] and len(models)==(2 if mode=='recovery-empty' else 3)
+            assert len(result['expression_parameters']['research_read_receipt_ids'])==1
+            assert result['expression_parameters']['search_purpose_receipt_id']==observed.found.receipt_id
+        before=list(network)
+        preparation.close()
+        preparation=make(refinement_enabled)
+        restored=await preparation.observe(cycle=cycle,parameters=parameters,read_binding=binding)
+        async def forbidden_replay(**kw):raise AssertionError('listing recovery must not rerun inference')
+        assert await preparation.reason(restored,cycle=cycle,parameters=parameters,
+            call=forbidden_replay,read_binding=binding)==result
+        assert network==before,'listing recovery must not replenish network budget'
+    elif mode=='deeper':
         assert len(network)==3 and len(models)==2
         assert network[-1]==('web_extract',dict(urls=[seed],char_limit=depth.EXTRACT_CHARS))
         expression=result['expression_parameters']
@@ -391,7 +432,7 @@ async def allow_synthetic_url(self,url):
 contracts()
 with tempfile.TemporaryDirectory(prefix='alive-public-refinement-') as folder:
     parent=Path(folder)
-    for mode in ('off','old-cycle','old-depth-cycle','legacy-search','on','overlap','only-overlap','conflicting-report','public-copy','public-copy-empty','cited','all-cited-reads-failed','deeper','deeper-revoked','deeper-erased','deeper-oversized','malformed','revoked','erased','search-failed','refined-page-failed','uncertain-search'):
+    for mode in ('off','old-cycle','old-depth-cycle','legacy-search','on','overlap','only-overlap','conflicting-report','public-copy','public-copy-empty','cited','all-cited-reads-failed','deeper','deeper-revoked','deeper-erased','deeper-oversized','malformed','revoked','erased','search-failed','refined-page-failed','uncertain-search','recovery-mismatch','recovery-empty','recovery-empty-off','recovery-provider-failed','recovery-revoked','recovery-invalid'):
         home=parent/mode
         with patch.dict(sys.modules,hermes_constants=NS(get_hermes_home=lambda:home)):
             with patch.object(CoreDiscoveryTools,'allow_url',allow_synthetic_url):

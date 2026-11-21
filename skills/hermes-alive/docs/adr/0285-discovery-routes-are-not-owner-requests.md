@@ -89,3 +89,24 @@ no final assessment, submission or ordinary followup was completed. An isolated
 control selects that same already configured official model to separate semantic
 behavior from provider latency. Neither production configuration nor stage/send
 authority is changed. This remains a regression, not a fresh quality round.
+
+## Recover a search before reading the wrong material
+
+The November creator-video trial received a podcast listing, a voice-model
+homepage, and a finance PDF. It read the homepage and followed its unrelated
+voice-model link. Final review caught the scope mismatch. The initial reader
+could abstain but that branch never reached the separately allowed public
+query refinement. Reading something merely to earn a second query rewards
+drift and spends time on evidence the intended topic cannot use.
+
+On newly started cycles with public refinement permission, a successful empty
+search or a selection with no suitable listing can use the same single
+refinement budget before any page read. The recovery reasoning sees only the
+original public query and retained public listings. It can propose a new query
+or stop. It cannot select a cited page in that branch. The host records that
+decision against the original search receipt, revalidates consent and sources,
+and admits at most one refined search under its existing collection ID. A failed
+provider response and a read suppressed by cooldown have separate meanings and
+do not take this path. Recovery retains the original search purpose for final
+assessment. Replaying the cycle reopens its original receipts, while operations
+that began before this behavior was introduced keep their original contract.
