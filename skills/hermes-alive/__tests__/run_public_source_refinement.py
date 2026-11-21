@@ -216,6 +216,11 @@ async def exercise(root,mode):
         elif unread and data['method']==depth.METHOD:
             assert 'PRIVATE_' not in json.dumps(kw['messages'])
             alternatives=data.get('unread_search_listings',[])
+            assert data['initial_search_listings']
+            assert all(s['reported_read_scope']=='search_listing' for s in data['initial_search_listings'])
+            assert {s['source_ref'] for s in data['initial_search_listings']}.isdisjoint(
+                s['source_ref'] for s in data['sources'])
+            assert all(s['reported_read_scope']=='webpage_extract' for s in data['sources'])
             assert [row['url'] for row in alternatives]==([] if mode=='unread-cooldown' else [original])
             value=dict(search_query=None,read_targets=[],reason='Read the announcement rather than the thin index.')
             if alternatives:
@@ -235,8 +240,11 @@ async def exercise(root,mode):
             assert data['public_evidence_focus']==(2 if data['method']==depth.METHOD else 1)
             assert 'underlying evidence' in kw['messages'][0]['content']
             assert all(s['reported_read_scope'] in ('search_listing','webpage_extract') for s in data['sources'])
+            material=(*data['sources'],*data.get('initial_search_listings',[]))
+            if mode=='all-cited-reads-failed':
+                assert not data['sources'] and data['initial_search_listings']
             if copy_search:
-                source=next(s for s in data['sources'] if s.get('citations'))
+                source=next(s for s in material if s.get('citations'))
                 value=dict(search_query='public original project',reason=research_reason,
                     read_targets=[dict(source_ref=source['source_ref'],citation_ref=source['citations'][0]['citation_ref'])])
             elif mode.startswith('deeper'):
@@ -248,7 +256,7 @@ async def exercise(root,mode):
                     event=journal.get(source['source_ref'])
                     ingestor.vault.erase_item(event.event.payload['content']['content_id'])
             elif mode in ('cited','all-cited-reads-failed'):
-                source=next(s for s in data['sources'] if s.get('citations'))
+                source=next(s for s in material if s.get('citations'))
                 value=dict(search_query=None,read_targets=[dict(source_ref=source['source_ref'],
                     citation_ref=source['citations'][0]['citation_ref'])],reason='Read the original link.')
             elif mode=='malformed':value={'unknown_action':'no authorized network action'}
@@ -256,7 +264,7 @@ async def exercise(root,mode):
                 value=dict(search_query='public original project',read_targets=[],reason=research_reason)
                 if mode=='revoked':state['consent']=False
                 if mode=='erased':
-                    source=journal.get(data['sources'][0]['source_ref'])
+                    source=journal.get(material[0]['source_ref'])
                     ingestor.vault.erase_item(source.event.payload['content']['content_id'])
         else:
             assert kw['task']=='alive_discovery_reading'

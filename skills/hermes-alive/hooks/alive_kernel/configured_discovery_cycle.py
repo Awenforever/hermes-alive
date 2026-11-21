@@ -140,6 +140,7 @@ class _DiscoveryObservation:
     search_purpose: bool = False
     listing_recovery: bool = False
     unread_listing_followup: bool = False
+    separated_read_scope: bool = False
 
 
 class ConfiguredDiscoveryCycle:
@@ -275,12 +276,14 @@ class ConfiguredDiscoveryCycle:
                       followup=False,visited=(),citation_references=False,source_refinement=False,
                       public_only=False,deeper_reading=False,search_purpose=False,
                       public_refinement=None,listing_recovery=False,recovery_available=False,
-                      unread_listings=()):
+                      unread_listings=(),separated_read_scope=False):
         journal,vault=self.ingestor.journal,self.ingestor.vault
         if listing_recovery and not (source_refinement and not deeper_reading and search_purpose):
             raise HostDiscoveryError('listing recovery requires bounded public search scope')
         if deeper_reading and not (followup and citation_references and source_refinement):
             raise HostDiscoveryError('deeper reading requires the existing public refinement scope')
+        if separated_read_scope and not deeper_reading:
+            raise HostDiscoveryError('separated read scope requires bounded public follow-up')
         if public_refinement is not None and not (public_only and not followup):
             raise HostDiscoveryError('refinement decision requires public-only listing selection')
         if (source_refinement or public_only) and any(
@@ -341,6 +344,8 @@ class ConfiguredDiscoveryCycle:
             prompt+=source_reading_depth.PUBLIC_COPY_GUIDANCE
         if unread_listings:
             prompt+=source_reading_depth.LISTING_OPTIONS_GUIDANCE
+        if separated_read_scope:
+            prompt+=source_reading_depth.SEPARATED_SCOPE_GUIDANCE
         eligible_depth=source_reading_depth.eligible_sources(evidence,read_scope_metadata) if deeper_reading else {}
         snapshot=dict(method='cited-public-followup-v1' if followup else 'public-reading-choice-v1',
             search_receipt_id=search_receipt_id,system_prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
@@ -372,6 +377,11 @@ class ConfiguredDiscoveryCycle:
                 for source in snapshot['sources']:
                     source['citations']=citation_selection.citations(source['excerpt'],visited)
                     catalogs[source['source_ref']]=source['citations']
+        if separated_read_scope:
+            snapshot['initial_search_listings']=[source for source in snapshot['sources']
+                if source['reported_read_scope']=='search_listing']
+            snapshot['sources']=[source for source in snapshot['sources']
+                if source['reported_read_scope']=='webpage_extract']
         if source_refinement:snapshot['already_queried']=list(self.queries)
         elif public_only:snapshot['method']='public-source-read-choice-v1'
         if source_refinement or public_only:
@@ -531,6 +541,9 @@ class ConfiguredDiscoveryCycle:
         unread_listing_followup=(deeper_reading and search_purpose and self._cycle_mode(
             cycle,prefix='discovery.unread-listing-followup:',kind='discovery.unread_listing_followup_opened',
             payload=dict(method='unread-listing-followup-v1',authority_granted=False)))
+        separated_read_scope=(unread_listing_followup and self._cycle_mode(
+            cycle,prefix='discovery.separated-read-scope:',kind='discovery.separated_read_scope_opened',
+            payload=dict(method='separated-public-read-scope-v1',authority_granted=False)))
         if self.tools is not None:self.tools.close()
         def allow_refinement_query(query):
             current()
@@ -558,11 +571,12 @@ class ConfiguredDiscoveryCycle:
             **({'scoped_search_views':True} if scoped_search_views else {}),
             **({'search_purpose':SEARCH_PURPOSE_METHOD} if search_purpose else {}),
             **({'listing_recovery':public_source_refinement.LISTING_RECOVERY_METHOD} if listing_recovery else {}),
-            **({'unread_listing_followup':True} if unread_listing_followup else {})))
+            **({'unread_listing_followup':True} if unread_listing_followup else {}),
+            **({'separated_read_scope':True} if separated_read_scope else {})))
             if found.failures==0 else None)
         result=_DiscoveryObservation(cycle.operation_id,expected,found,tuple(evidence),reader,current,
             research_enabled,citation_references,public_refinement,group_enabled,assessment_enabled,fingerprint,
-            deeper_reading,search_purpose,listing_recovery,unread_listing_followup)
+            deeper_reading,search_purpose,listing_recovery,unread_listing_followup,separated_read_scope)
         self._observation=result
         return result
 
@@ -768,7 +782,8 @@ class ConfiguredDiscoveryCycle:
                 search_receipt_id=read.receipt_id,parameters=parameters,call=call,current=current,followup=True,
                 visited=tuple(dict.fromkeys(e.content['url'] for e in selected)),citation_references=citation_references,
                 source_refinement=observed.public_refinement,deeper_reading=observed.deeper_reading,
-                search_purpose=observed.search_purpose,unread_listings=unread_listings)
+                search_purpose=observed.search_purpose,unread_listings=unread_listings,
+                separated_read_scope=observed.separated_read_scope)
             query=followup.get('search_query')
             deeper_source=followup.get('deepen_source_ref')
             listing_refs=followup.get('listing_source_refs',[])

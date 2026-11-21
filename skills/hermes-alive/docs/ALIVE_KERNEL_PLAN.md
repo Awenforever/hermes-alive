@@ -1062,3 +1062,10 @@ unverified linked media as separate evidence and keeps only the cursor
 needed for paging. Reading the last page of an excerpt does not establish
 coverage of the original. No account or vision tool is required to use
 retained references, and this change claims no semantic pass.
+
+The archaeology replay exposed a different gap: the reading selector
+mistook details in search snippets for material in the actual extracts.
+Separate initial snippets from returned page text in the public follow-up
+input while preserving eligible citation links and the existing read limit.
+Verify with a fixed replay and then fresh topics. Test separately whether
+ordinary Main follow-ups preserve the provenance of cross-study comparisons.

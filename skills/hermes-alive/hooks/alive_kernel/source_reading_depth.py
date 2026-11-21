@@ -50,6 +50,17 @@ with a query, citations, or deepen_source_ref. Leave it empty when choosing
 another action. Never reconstruct the missing page from a listing's preview.
 '''
 
+SEPARATED_SCOPE_GUIDANCE = '''
+Only sources contains what the initial page reads actually returned.
+initial_search_listings contains search snippets for those attempted pages,
+including attempts that returned no extract. A snippet can identify a candidate
+or contain a link worth reading, but cannot fill a gap in the page extract.
+Before stopping, identify the relevant passage actually present in sources.
+Headings, clipping markers, an unrelated index, and missing article text do not
+establish the proposed substantive claim. If a material passage is missing,
+choose a bounded follow-up likely to supply it, or stop with that gap explicit.
+'''
+
 
 def normalize_with_listings(raw, catalogs, already_queried, eligible, listings, *, allow_query_with_citation=False):
     from . import public_source_refinement as legacy

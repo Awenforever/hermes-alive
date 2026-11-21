@@ -83,3 +83,14 @@ not evidence of page contents. The normal research group accepts only
 observed page reads. Core-owned cache paths in returned page text do not
 grant filesystem access. The chosen scope is pinned for new cycles and an
 existing decision is replayed from its receipts.
+
+## Separate attempted results from returned page text
+
+In the fixed Yunmeng replay the selector stopped, citing details from the
+search snippets as if the attempted pages had returned them. Supply the
+retained page extracts and the initial search snippets in separate lists.
+Snippets remain available to identify a relevant page or follow an eligible
+link. The selector checks what passage the page actually returned before
+deciding whether to stop. Pin the input shape and its prompt for new cycles
+before the network search. This changes neither the read allowance nor
+the treatment of already-started cycles.
