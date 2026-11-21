@@ -509,7 +509,7 @@ class SemanticComparator:
         discovery = bool(expression_context and expression_context.get('method') in (
             'discovery-source-authoring-v1','discovery-source-authoring-v2','discovery-source-authoring-v3'))
         if correction_method == SOURCE_REVISION_METHOD and (not discovery or not source_revision_eligible(correction)):
-            raise SemanticReviewError('source-led revision needs a current discovery fit conflict')
+            raise SemanticReviewError('source-led revision needs a current discovery wording or evidence finding')
         # Durable start still precedes inference. Its clock cannot slide during
         # recovery, and an old unclocked start never acquires a new prompt.
         authoring_as_of=self._start_authoring(operation,subject,selection_event_id,

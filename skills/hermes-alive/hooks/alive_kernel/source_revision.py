@@ -1,4 +1,4 @@
-"""Source-led revision of an explicitly assessed global communication mismatch.
+"""Source-led revision for mismatched form or incomplete evidence coverage.
 
 This selects the form of the existing one correction, not another attempt or
 authority. Owner, live sources and the negative review are validated by callers.
@@ -21,6 +21,9 @@ authority of its own. Decide what belongs in this turn before writing.
 You may change the opening, focus, ordering and depth. Develop the observation
 with a concrete explanation and the uncertainty that matters to it. Leave
 supporting material for a reply when it does not help that observation land.
+When numeric evidence is unresolved, use only figures and comparisons that
+the same source supports at the stated scope. Keep the whole result intelligible
+if you omit optional figures or express an established result qualitatively.
 The editorial brief is not a required inventory. Preserve the required speech
 act, exact protected literals, source attribution and actual user boundaries.
 Use only retained source evidence; do not invent details, recipient interests,
@@ -45,8 +48,9 @@ def revision_author_view(author_context, correction, *, configured_route):
         author.pop('approved_search_queries', None)
         author.pop('search_context', None)
     review = correction['findings']
-    findings = {'communication_fit': review['communication_fit']}
-    for field, positive in (('factual_support', 'supported'), ('claim_scope', 'preserved')):
+    findings = {}
+    for field, positive in (('communication_fit', 'fits'), ('factual_support', 'supported'),
+                            ('claim_scope', 'preserved'), ('numeric_evidence_coverage', 'covered')):
         finding = review.get(field)
         if finding is not None and finding['assessment'] != positive:
             findings[field] = finding
@@ -70,7 +74,8 @@ def eligible(context):
             witness_snapshot=snapshot if binding['final_assessment_scope'] in WITNESS_ASSESSMENTS else None)
     except ValueError:
         return False
-    return findings['communication_fit']['assessment'] == 'conflicts'
+    return (findings['communication_fit']['assessment'] == 'conflicts'
+            or findings.get('numeric_evidence_coverage', {}).get('assessment') == 'unresolved')
 
 
 def revised_text(proposal, *, protected_literals=()):

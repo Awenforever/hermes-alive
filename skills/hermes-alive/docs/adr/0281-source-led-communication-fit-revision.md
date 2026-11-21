@@ -131,3 +131,17 @@ witnesses and full judgment in the durable review for audit and reconstruction.
 Both fresh post-revision reviews still run before any delivery authorization.
 The change caps neither length nor technical depth and uses the existing single
 rewrite slot. Actual-model behavior requires a fresh qualification.
+
+The first fresh post-training trial was stopped before submission. Both
+reviewer responses called the draft supported and fitting. Replaying each
+against the exact labelled passages reconstructed the unresolved numeric
+coverage in both results. The localized edit added attribution but retained
+repeated figures with missing occurrence witnesses, so it could not resolve
+the problem. The gate correctly stopped both drafts.
+
+A discovery with unresolved numeric coverage may now use its one current
+rewrite slot to reauthor from the source. Only unresolved findings reach the
+author, including the coverage finding. It can omit figures that do not
+carry the point or restate a supported result at the scope the source
+establishes. Both reviews still operate on the complete new text. No
+automatic number substitution, witness inference or retry loop is introduced.

@@ -14,13 +14,16 @@ import run_core_session_routing as core
 from run_core_guided_setup import cli
 
 
-async def test(home,*,fit_revision=False,revoke_after_capture=False,search_alignment='matches',
+async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_capture=False,search_alignment='matches',
                claim_scope_conflict=False):
     feedback_case=os.environ.get('HERMES_ALIVE_TEST_NATIVE_FEEDBACK')=='1'
     assert search_alignment in ('matches','justified_pivot','conflicts','uncertain')
-    assert search_alignment=='matches' or not (fit_revision or revoke_after_capture)
+    source_revision = fit_revision or numeric_revision
+    assert not (fit_revision and numeric_revision)
+    assert not numeric_revision or not feedback_case
+    assert search_alignment=='matches' or not (source_revision or revoke_after_capture)
     search_negative=search_alignment in ('conflicts','uncertain')
-    assert not claim_scope_conflict or (search_alignment=='matches' and not (fit_revision or revoke_after_capture or feedback_case))
+    assert not claim_scope_conflict or (search_alignment=='matches' and not (source_revision or revoke_after_capture or feedback_case))
     review_negative=search_negative or claim_scope_conflict
     import httpx
     home.mkdir(exist_ok=True)
@@ -155,13 +158,18 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                 if not data.get('correction'):
                     assert body['messages'][0]['content'].startswith('Open a conversation with a worthwhile discovery.')
                 if feedback_probe['expected'] is None:
-                    if fit_revision and data.get('correction'):
+                    if source_revision and data.get('correction'):
                         assert 'search_context' not in data['expression_context']
                         findings = data['correction']['findings']
-                        assert findings['communication_fit']['assessment'] == 'conflicts'
-                        assert findings['factual_support']['assessment'] == 'uncertain'
                         assert set(data['correction']) == {'findings'}
                         assert 'source_witnesses' not in findings
+                        if fit_revision:
+                            assert findings['communication_fit']['assessment'] == 'conflicts'
+                            assert findings['factual_support']['assessment'] == 'uncertain'
+                        else:
+                            assert set(findings) == {'numeric_evidence_coverage'}
+                            assert findings['numeric_evidence_coverage']['assessment'] == 'unresolved'
+                            assert '473' in findings['numeric_evidence_coverage']['reason']
                     else:
                         assert data['expression_context']['search_context']['kind']=='configured-discovery-route-v1'
                         assert 'not a current research request' in body['messages'][0]['content']
@@ -193,11 +201,12 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                     else:
                         assert isinstance(data['correction'],dict)
                     stage='abstain';value={'abstain':True}
-                if fit_revision:
+                if source_revision:
                     if data.get('correction'):
                         assert 'may change the opening, focus, ordering and depth' in body['messages'][0]['content']
                         stage='revision';value={'text':'One concrete finding: '+value}
-                    else:value='DENSE_TEST_OPENING. '+value
+                    else:
+                        value = ('DENSE_TEST_OPENING. ' if fit_revision else 'The purported trial covered 473 sites. ') + value
             elif 'candidate' in data and 'evidence' in data:
                 stage='source';assert qualifier in raw
                 value=dict(verdict='supported',unsupported_claims=[],uncertainties=[],reason='Synthetic source verdict')
@@ -265,9 +274,10 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
         assert reads==[('web_search',dict(query='synthetic public observation',limit=3)),
             ('web_extract',dict(urls=[url],char_limit=6000)),('web_extract',dict(urls=[url],char_limit=15000))]
         assert len(sent)==1 and qualifier in sent[0][1]
-        assert stages.count('final')==(2 if fit_revision else 1)
-        assert stages.count('revision')==int(fit_revision)
+        assert stages.count('final')==(2 if source_revision else 1)
+        assert stages.count('revision')==int(source_revision)
         if fit_revision:assert 'DENSE_TEST_OPENING' not in sent[0][1]
+        if numeric_revision:assert '473' not in sent[0][1]
         assert stages.count('reading')==stages.count('deepen')==1
         assert all(stage in stages for stage in ('interpret','select','author','semantic','final'))
         if not feedback_case:
@@ -439,7 +449,7 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
         print('HERMES_ALIVE_CORE_SOURCE_READING_DEPTH_OK '+json.dumps(dict(stages=stages,
             requested_windows=[6000,15000],local_adapter_submissions=1,physical_sends=0,actual_model_inference=False,
             qualification_after_old_window_preserved=True,untitled_extracts_retained=True,
-            final_facts_and_fit_exercised=True,source_led_revision_exercised=fit_revision,
+            final_facts_and_fit_exercised=True,source_led_revision_exercised=source_revision,
             search_alignment=search_alignment,quality_rounds=0)),flush=True)
     finally:
         if manager is not None:manager.unload()
@@ -460,6 +470,7 @@ if __name__=='__main__':
     succeeded=False
     try:
         asyncio.run(test(directory,fit_revision=os.environ.get('HERMES_ALIVE_TEST_FIT_REVISION')=='1',
+                         numeric_revision=os.environ.get('HERMES_ALIVE_TEST_NUMERIC_REVISION')=='1',
                          revoke_after_capture=os.environ.get('HERMES_ALIVE_TEST_CAPTURE_REVOCATION')=='1',
                          search_alignment=os.environ.get('HERMES_ALIVE_TEST_SEARCH_ALIGNMENT','matches'),
                          claim_scope_conflict=os.environ.get('HERMES_ALIVE_TEST_CLAIM_SCOPE_CONFLICT')=='1'))
