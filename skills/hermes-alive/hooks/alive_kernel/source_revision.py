@@ -44,8 +44,10 @@ def configured_route_author_view(author_context, correction):
               if key not in internal_collection_fields}
     grounding = {key: value for key, value in correction['grounding_context'].items()
                  if key not in internal_collection_fields}
+    # The combined verdict, reason and issue lists also carry route reasons.
+    revision_findings = ('factual_support', 'communication_fit', 'claim_scope', 'source_witnesses')
     findings = {key: value for key, value in correction['findings'].items()
-                if key != 'search_alignment'}
+                if key in revision_findings}
     grounding['collection_scope'] = 'unsolicited discovery, use the source’s positively supported role'
     return author, {**correction, 'grounding_context': grounding, 'findings': findings}
 

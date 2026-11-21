@@ -30,10 +30,13 @@ def pure():
     correction = copy.deepcopy(context)
     correction['grounding_context'].update(search_context=route, approved_search_queries=['internal route'])
     correction['findings']['search_alignment'] = {'assessment': 'conflicts', 'reason': 'internal adjudication'}
+    correction['findings']['unsupported_claims'].append('internal adjudication')
+    correction['findings']['reason'] = 'internal adjudication'
     original = copy.deepcopy(correction)
     author_view, correction_view = configured_route_author_view(author, correction)
     assert author_view == {'source_evidence': author['source_evidence']}
     assert 'search_alignment' not in correction_view['findings']
+    assert 'internal adjudication' not in repr(correction_view)
     assert correction_view['findings']['communication_fit'] == original['findings']['communication_fit']
     assert correction_view['findings']['factual_support'] == original['findings']['factual_support']
     assert correction_view['grounding_context']['evidence'] == original['grounding_context']['evidence']
