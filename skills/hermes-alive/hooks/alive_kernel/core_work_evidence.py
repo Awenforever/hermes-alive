@@ -171,7 +171,7 @@ class CoreWorkEvidence:
         if not state.is_file() or state.resolve()!=state:
             raise ValueError('exact owning Core state store unavailable')
         from hermes_state import SessionDB
-        db=SessionDB(state)
+        db=SessionDB(state, read_only=True)
         try:
             session=db.get_session(association['session_id'])
             if session is None or session.get('source')!='cron':

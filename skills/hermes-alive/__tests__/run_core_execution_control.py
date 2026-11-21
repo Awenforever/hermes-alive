@@ -406,8 +406,8 @@ if __name__=='__main__':
             asyncio.run(test_native_wait(Path(directory)/'refinement-wait-profile',refinement=True))
             asyncio.run(test_native_wait(Path(directory)/'settled-timeout-profile',settled_timeout=True))
         finally:
-            from hermes_state_registry import close_all_under
-            close_all_under(directory)
+            from core_fixture_cleanup import close_test_stores
+            close_test_stores(directory)
             if os.name=='nt':
                 spec=importlib.util.spec_from_file_location('alive_control_filesystem',
                     core.repo/'skills/hermes-alive/scripts/portable_filesystem.py')

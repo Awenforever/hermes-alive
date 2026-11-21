@@ -126,8 +126,8 @@ def run(home):
     finally:
         if manager:manager.unload()
         core.reset_hermes_home_override(token)
-        from hermes_state_registry import close_all_under
-        close_all_under(home)
+        from core_fixture_cleanup import close_test_stores
+        close_test_stores(home)
         if server:server.shutdown();server.server_close();worker.join(timeout=5)
 
 if __name__=='__main__':run(Path(os.environ['HERMES_HOME']))

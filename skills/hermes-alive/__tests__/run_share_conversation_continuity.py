@@ -550,6 +550,6 @@ if __name__ == '__main__':
                 asyncio.run(test(Path(directory)/mode, mode))
             asyncio.run(test(Path(directory)/'long-reference', 'success', long_reference=True))
         finally:
-            from hermes_state_registry import close_all_under
-            close_all_under(directory)
+            from core_fixture_cleanup import close_test_stores
+            close_test_stores(directory)
     print('HERMES_ALIVE_SHARE_CONVERSATION_CONTINUITY_OK')

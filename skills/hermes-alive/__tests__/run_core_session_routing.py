@@ -270,6 +270,6 @@ if __name__ == '__main__':
             asyncio.run(multiplex(Path(directory)/'multiplex-primary'))
         finally:
             # Windows cannot remove open SQLite/WAL files. Only this fixture.
-            from hermes_state_registry import close_all_under
-            close_all_under(directory)
+            from core_fixture_cleanup import close_test_stores
+            close_test_stores(directory)
     print('HERMES_ALIVE_CORE_SESSION_ROUTING_OK')

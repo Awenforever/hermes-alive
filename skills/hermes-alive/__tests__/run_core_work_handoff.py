@@ -864,8 +864,8 @@ async def test(home):
         if 'variables' in locals() and variables:core.clear_session_vars(variables)
         if manager:manager.unload()
         core.reset_hermes_home_override(token)
-        from hermes_state_registry import close_all_under
-        close_all_under(home)
+        from core_fixture_cleanup import close_test_stores
+        close_test_stores(home)
         server.shutdown();server.server_close();server_thread.join(timeout=5)
         assert not server_thread.is_alive()
 
