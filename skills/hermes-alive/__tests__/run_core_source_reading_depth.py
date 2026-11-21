@@ -138,6 +138,8 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                 stage='final';value=controlled_final_findings(data,
                     fit='conflicts' if conflict else 'fits',
                     reason='Synthetic whole-form mismatch.' if conflict else 'Synthetic form fits the situation.')
+                if fit_revision and conflict:
+                    value['source_witnesses'][0]['claim'] = 'Words absent from the original draft.'
                 if search_alignment!='matches':
                     assert data.get('approved_search_queries')==['synthetic public observation']
                     value.update(search_alignment=search_alignment,scope_reason='Synthetic unresolved search scope.')
@@ -153,8 +155,15 @@ async def test(home,*,fit_revision=False,revoke_after_capture=False,search_align
                 if not data.get('correction'):
                     assert body['messages'][0]['content'].startswith('Open a conversation with a worthwhile discovery.')
                 if feedback_probe['expected'] is None:
-                    assert data['expression_context']['search_context']['kind']=='configured-discovery-route-v1'
-                    assert 'not a current research request' in body['messages'][0]['content']
+                    if fit_revision and data.get('correction'):
+                        assert 'search_context' not in data['expression_context']
+                        findings = data['correction']['findings']
+                        assert findings['communication_fit']['assessment'] == 'conflicts'
+                        assert findings['factual_support']['assessment'] == 'uncertain'
+                        assert not findings['source_witnesses']
+                    else:
+                        assert data['expression_context']['search_context']['kind']=='configured-discovery-route-v1'
+                        assert 'not a current research request' in body['messages'][0]['content']
                     assert any(e['provenance_metadata'].get('title_is_placeholder') is True
                         for e in data['expression_context']['source_evidence'])
                 if feedback_probe['expected'] is not None:
