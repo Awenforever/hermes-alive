@@ -963,3 +963,20 @@ the recognized Core footer before applying the retained excerpt budget.
 Stored source observations and prior decision evidence stay intact. A
 format-specific recognizer is needed until Core returns out-of-band coverage
 metadata. Its success is separate from the real-model continuation gate.
+
+Actual 0.23.3 session routing, execution control, share reference handling,
+work handoff and cold inspection passed in an isolated source-based run.
+0.23.3 moved fixture store cleanup to its persistence API. The work evidence
+reader now opens the owning session store read-only. The declared version
+range and public installation remain separate pending checks.
+
+The subsequent retained-source comparison completed two real main turns. The
+model recognized that the extraction omitted its middle and still opened by
+saying there was no demonstration before limiting that claim to the retained
+materials. It also gave more reading detail than the question needed. Keep
+this result as a failed quality regression. Future qualification should
+exercise both a retained-only turn and a turn permitted to resolve a public
+question through Core's normal web tools. In the retained-only case, the
+answer must still express uncertainty in its first sentence. Do not require a
+live lookup that the conversation does not authorize. Preserve normal
+streaming outside any future opt-in review path.

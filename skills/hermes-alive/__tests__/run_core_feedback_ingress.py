@@ -105,5 +105,5 @@ if __name__ == '__main__':
         try:
             asyncio.run(exercise(Path(directory)/'profile'))
         finally:
-            from hermes_state_registry import close_all_under
+            from core_fixture_cleanup import close_test_stores as close_all_under
             close_all_under(directory)

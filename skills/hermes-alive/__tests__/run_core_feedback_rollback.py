@@ -41,7 +41,7 @@ def digest(path):
 async def phase(home, stage):
     from gateway.hooks import HookRegistry
     from hermes_cli.plugins import get_plugin_command_handler
-    from hermes_state_registry import close_all_under
+    from core_fixture_cleanup import close_test_stores as close_all_under
 
     manager = core.get_plugin_manager()
     try:

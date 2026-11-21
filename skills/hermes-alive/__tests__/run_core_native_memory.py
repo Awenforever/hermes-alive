@@ -235,7 +235,7 @@ async def exercise(home):
             'jobs':0,'external_deliveries':0,'real_model_calls':0,'cycle_context_closed':True}),flush=True)
     finally:
         if manager is not None:manager.unload()
-        from hermes_state_registry import close_all_under
+        from core_fixture_cleanup import close_test_stores as close_all_under
         close_all_under(home)
         core.reset_hermes_home_override(token)
 

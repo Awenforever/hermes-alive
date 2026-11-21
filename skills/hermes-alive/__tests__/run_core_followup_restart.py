@@ -122,7 +122,7 @@ async def phase(home,number):
     finally:
         if manager:manager.unload()
         core.reset_hermes_home_override(token)
-        from hermes_state_registry import close_all_under
+        from core_fixture_cleanup import close_test_stores as close_all_under
         close_all_under(home)
 
 
