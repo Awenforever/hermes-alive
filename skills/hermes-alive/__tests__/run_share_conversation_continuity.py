@@ -292,7 +292,14 @@ async def test(home, mode, *, exercise=None, long_reference=False):
                 for args in ({'reference':'unknown'}, {'source_index':0}, {'offset':True},
                              {'part':'source','source_index':True}, {'max_chars':65536},
                              {'scope':scope.binding_document()}):
-                    assert read_reference(args) == {'error':'alive_reference_unavailable'}
+                    refused = read_reference(args)
+                    assert set(refused) == {'error'}, (tuple(args), refused)
+                    error = refused['error']
+                    if 'scope' in args and error != 'alive_reference_unavailable':
+                        assert error.startswith('scope: not a parameter of alive_read_reference.')
+                        assert 'The tool was NOT invoked.' in error
+                    else:
+                        assert error == 'alive_reference_unavailable', (tuple(args), refused)
                 assert read_reference(task_id='other-task') == {'error':'alive_reference_unavailable'}
                 assert read_reference(session_id='other-session') == {'error':'alive_reference_unavailable'}
                 # A slow legitimate Core task does not acquire an unrelated
