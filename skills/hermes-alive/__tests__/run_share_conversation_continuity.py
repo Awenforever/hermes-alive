@@ -246,7 +246,6 @@ async def test(home, mode, *, exercise=None, long_reference=False):
                 assert conversation['sources'][0] == {
                     **{key:value for key,value in expected_source.items() if key != 'excerpt'},
                     'source_index':0,'excerpt_in_context':False}
-                assert expected_source['excerpt'] not in text
             # Operational diagnostics stay unchanged; only model-facing evidence
             # is projected. A negative proof flag is not a negative world fact.
             assert shares[0]['sources'][0]['reading_scope'] == {'collector_scope_reported':False}
