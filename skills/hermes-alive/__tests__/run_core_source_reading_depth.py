@@ -454,7 +454,7 @@ if __name__=='__main__':
                          claim_scope_conflict=os.environ.get('HERMES_ALIVE_TEST_CLAIM_SCOPE_CONFLICT')=='1'))
         succeeded=True
     finally:
-        from hermes_state_registry import close_all_under
-        close_all_under(directory)
+        from core_fixture_cleanup import close_test_stores
+        close_test_stores(directory)
         if succeeded:shutil.rmtree(directory)
         else:print('preserved failed synthetic profile: '+str(directory),file=sys.stderr)
