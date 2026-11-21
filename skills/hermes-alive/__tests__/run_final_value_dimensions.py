@@ -356,6 +356,38 @@ def test_visible_markdown_claim_witness():
     assert parse(json.dumps(response), witness_snapshot=snapshot)['verdict'] == 'uncertain'
 
 
+def test_named_identifiers_do_not_supply_measurements():
+    from alive_kernel.review_contracts import (CLAIM_COVERAGE_ASSESSMENT,
+        FIRST_CLAIM_COVERAGE_ASSESSMENT)
+
+    text = 'In this evaluation, Orion-3.8 scored 42.8%.'
+    snapshot = dict(candidate={'text': text}, evidence=[
+        {'event_id':'trial', 'excerpt':'Trial results: 42.8%.' + ' ' * 500
+            + 'The tested model identifier is Orion-3.8.'},
+        {'event_id':'unrelated', 'excerpt':'A different trial used Orion-3.9.'},
+    ])
+    response = dict(facts='supported', fact_reason='The measured score is stated.', fit='fits',
+        fit_reason='One focused result.', recipient_evidence=[], search_alignment='not_applicable',
+        scope_reason='No query.', claim_scope='preserved', claim_scope_reason='Same evaluation.',
+        source_witnesses=[dict(claim=text, passage_id='P1.1')])
+
+    def assess(scope, wording, evidence=snapshot['evidence']):
+        current = {**snapshot, 'candidate': {'text': wording}, 'evidence': evidence,
+            'expression_binding': {'final_assessment_scope': scope}}
+        wire = {**response, 'source_witnesses': [dict(claim=wording, passage_id='P1.1')]}
+        result = parse(json.dumps(wire), witness_snapshot=current)
+        assert validate_retained(result, witness_snapshot=current) == result
+        return result
+
+    assert assess(FIRST_CLAIM_COVERAGE_ASSESSMENT, text)['verdict'] == 'uncertain'
+    assert assess(CLAIM_COVERAGE_ASSESSMENT, text)['verdict'] == 'supported'
+    wrong_model = assess(CLAIM_COVERAGE_ASSESSMENT, text.replace('Orion-3.8','Orion-3.9'))
+    assert wrong_model['verdict'] == 'uncertain' and 'Orion-3.9' in wrong_model['reason']
+    identifier_only = [{'event_id':'trial', 'excerpt':'The evaluated model is Orion-3.8.'}]
+    wrong_score = assess(CLAIM_COVERAGE_ASSESSMENT, text.replace('42.8%','3.8%'), identifier_only)
+    assert wrong_score['verdict'] == 'uncertain' and '3.8' in wrong_score['reason']
+
+
 if __name__ == '__main__':
     test_dimensions()
     test_old_and_new_contracts()
@@ -367,4 +399,5 @@ if __name__ == '__main__':
     test_only_explicit_communication_choices_shape_new_discovery_openings()
     test_numeric_coverage_of_actual_draft()
     test_visible_markdown_claim_witness()
+    test_named_identifiers_do_not_supply_measurements()
     print('FINAL_VALUE_DIMENSIONS_OK')

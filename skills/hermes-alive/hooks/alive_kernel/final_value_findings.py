@@ -8,7 +8,8 @@ from unicodedata import normalize
 
 from .model_json import parse_model_json
 from .review_contracts import (CLAIM_SCOPE_ASSESSMENTS, FLAT_ASSESSMENTS, SEARCH_ASSESSMENTS,
-                               CLAIM_COVERAGE_ASSESSMENT, LABELLED_ASSESSMENTS, PASSAGE_FIT_ASSESSMENT)
+                               CLAIM_COVERAGE_ASSESSMENT, COVERAGE_ASSESSMENTS, LABELLED_ASSESSMENTS,
+                               PASSAGE_FIT_ASSESSMENT)
 
 
 PROMPT = """Assess this actual message under the supplied source evidence,
@@ -214,6 +215,7 @@ unavailable evidence or an unsupported conversion, flag it for revision.
 """
 
 _NUMBER = re.compile(r'\d+(?:,\d{3})*(?:\.\d+)?')
+_IDENTIFIER = re.compile(r'(?<![A-Za-z0-9_.-])[A-Za-z][A-Za-z0-9]*(?:[-_.][A-Za-z0-9]+)+')
 _NON_PROSE = re.compile(r'https?://[^\s<>\])]+|(?m:^[ \t]*\d+[.)][ \t]+)', re.IGNORECASE)
 
 
@@ -225,23 +227,43 @@ def _number_value(match):
     return match[0].replace(',', '')
 
 
+def _coverage_tokens(text, typed):
+    identifiers = [token for token in _IDENTIFIER.finditer(text)
+                   if any(character.isdigit() for character in token[0])] if typed else []
+    values = [(token.span(), ('identifier', token[0])) for token in identifiers]
+    for number in _NUMBER.finditer(text):
+        if not any(token.start() <= number.start() < token.end() for token in identifiers):
+            values.append((number.span(), ('number', _number_value(number))))
+    return sorted(values)
+
+
 def _apply_numeric_coverage(findings, snapshot):
     """Give each visible numeric occurrence a local evidence witness."""
+    typed = snapshot['expression_binding']['final_assessment_scope'] == CLAIM_COVERAGE_ASSESSMENT
     text = _normalized_numeric_text(snapshot['candidate']['text'])
-    uncovered = {number.span(): _number_value(number) for number in _NUMBER.finditer(text)}
+    uncovered = dict(_coverage_tokens(text, typed))
+    sources = {}
+    if typed:
+        for item in snapshot['evidence']:
+            sources[item['event_id']] = {
+                value for _, value in _coverage_tokens(_normalized_numeric_text(item['excerpt']), True)
+                if value[0] == 'identifier'}
     for witness in findings['source_witnesses']:
         claim = _normalized_numeric_text(witness['claim'])
-        evidence_values = {_number_value(number)
-                           for number in _NUMBER.finditer(_normalized_numeric_text(witness['quote']))}
-        witnessed_numbers = [number for number in _NUMBER.finditer(claim)
-                             if _number_value(number) in evidence_values]
+        evidence_values = {value for _, value in _coverage_tokens(
+            _normalized_numeric_text(witness['quote']), typed) if value[0] == 'number'}
+        if typed:
+            evidence_values.update(sources[witness['source_event_id']])
+        witnessed = [(span, value) for span, value in _coverage_tokens(claim, typed)
+                     if value in evidence_values]
         for occurrence in re.finditer(re.escape(claim), text):
-            for number in witnessed_numbers:
-                start, end = number.span()
+            for (start, end), value in witnessed:
                 offset = occurrence.start()
-                uncovered.pop((offset + start, offset + end), None)
+                span = (offset + start, offset + end)
+                if uncovered.get(span) == value:
+                    del uncovered[span]
 
-    missing = list(dict.fromkeys(uncovered.values()))
+    missing = list(dict.fromkeys(value for _, value in uncovered.values()))
     coverage = dict(assessment='unresolved' if missing else 'covered',
         reason=('These numeric expressions lack an evidence witness at their occurrence: ' +
                 ', '.join(missing)[:1200] + '. Remove or source the affected assertions.'
@@ -251,7 +273,7 @@ def _apply_numeric_coverage(findings, snapshot):
 
 def _coverage_scope(snapshot):
     return (snapshot is not None and snapshot.get('expression_binding', {}).get(
-        'final_assessment_scope') == CLAIM_COVERAGE_ASSESSMENT)
+        'final_assessment_scope') in COVERAGE_ASSESSMENTS)
 
 
 def _search_scope(snapshot):

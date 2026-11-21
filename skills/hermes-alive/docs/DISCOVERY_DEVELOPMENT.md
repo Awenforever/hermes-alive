@@ -29,6 +29,12 @@ parser and retains the original message and passage identifiers. A witness
 cannot join separate blocks or span an image. Evidence quotations and numeric
 occurrence coverage still use the original retained material.
 
+Numeric coverage distinguishes structured names from quantities. A witnessed
+model or version name must occur as a whole in the same retained source.
+Measurements still need local evidence in the cited passage. The source review
+also checks whether that measurement applies to the named model, track and
+conditions. Retained decisions use the contract under which they were made.
+
 ## Topic identity
 
 Identity combines:

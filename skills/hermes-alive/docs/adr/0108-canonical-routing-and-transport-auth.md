@@ -28,8 +28,8 @@ gate readers only consult profile secrets when that bootstrap mode is active.
 Config truthiness and a profile scope alone are not a running gateway.
 
 The probe now calls the real set_multiplex_active(True) in its disposable process
-before scoped gate reads, as the gateway bootstrap does. It neither monkeypatches
-the auth result nor writes the grant into ambient os.environ to mask isolation.
+before scoped gate reads, as the gateway bootstrap does. The probe leaves the
+authorization result and process environment unchanged.
 This test setup correction must not be mistaken for an Alive runtime fix: Alive
 does not own/publish the gateway's process mode.
 
