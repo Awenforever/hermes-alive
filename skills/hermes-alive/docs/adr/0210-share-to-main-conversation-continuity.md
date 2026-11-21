@@ -198,3 +198,20 @@ Alive. The send bridge now uses the outbound resolver from
 The integration test checks the module comes from the selected Core checkout
 so a module left behind by an earlier installation cannot satisfy the test.
 The active session and its authorized channel still determine the route.
+
+## 2026-11-22 — Why the ordinary response stays on Core's existing path
+
+An isolated 0.23.3 probe sent controlled streaming completions through the
+actual SDK and local stream consumer. An ordinary output transform ran after
+the consumer saw the original words. A registered holding transform withheld
+those words before the callback ran. The same registration also withheld
+streaming in a second session where its callback returned no rewrite. All three
+observations used the same built-in plugin registration and finalizer.
+
+The holding decision is made for the profile before the turn. Retained-source
+review needs a turn scope established before the first visible output, with
+unrelated sessions retaining their ordinary streaming behavior. Keep Alive's
+current continuity hook on Core's normal reply path until that scope can be
+enforced. A separate held profile can validate a reviewer without changing
+ordinary behavior for existing users. Such a profile does not qualify the
+general follow-up path.

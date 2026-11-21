@@ -56,7 +56,8 @@ independent Linux/Docker service exercises, external transport and the final
 platform matrix remain open.
 
 The isolated Windows Desktop now completes an actual `/alive setup` command
-over its Gateway after a managed Git upgrade and uninstall/reinstall. The
+over its Gateway after a managed Git upgrade and uninstall/reinstall in the
+earlier Core qualification. The
 separate Docker cross-Core trial from Hermes 0.21.3 to 0.22.5 preserved a
 synthetic session, pairing, user memory and legacy Alive state, and a separate
 snapshot restore reopened them on the old versions. Active Native cutover is
@@ -68,11 +69,14 @@ Adaptive legacy profiles need a separate plan/state import and cutover proof.
 [ADR0289](adr/0289-migrate-adaptive-contact-policy-with-its-state.md) records the
 read-only preview, ownership and replay requirements.
 
-Existing installed-Core qualifications use official Core 0.22.5. The official
-latest stable release checked on 2026-11-18 is 0.23.2. Qualify its actual APIs
-and managed installation before updating the supported range or completing
-distribution acceptance. No production upgrade follows from this check.
-Its held-output transform is a prospective pre-exposure seam, but its declared
+The current cold rollback exercise uses separate official 0.22.5 and 0.23.3
+processes. It preserves the same enrolled session and its protected state with
+Alive dormant on the old pair. The newer pair resumes managed erasure on return.
+The active production migration and external account proofs remain open.
+See [ADR0286](adr/0286-ordinary-feedback-ingress-is-not-yet-connected.md).
+
+Core 0.23.3 is the current stable qualification baseline. Its held-output
+transform is a prospective pre-exposure seam, but its declared
 hold covers every session in a profile. Source inspection alone does not
 qualify a selective conversation reviewer or justify changing ordinary stream
 behavior. Existing source-context improvements remain under real-model test.

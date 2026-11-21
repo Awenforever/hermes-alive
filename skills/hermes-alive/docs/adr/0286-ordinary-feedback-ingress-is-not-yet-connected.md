@@ -411,3 +411,23 @@ that contribution. Ground a claim about what a whole source omits in whole
 source evidence. Additional details can be recovered in an ordinary follow-up
 when they are relevant. This was a synthetic-source regression with actual
 models and no physical delivery. It adds no fresh sharing round.
+
+## 2026-11-22 — Separate Core versions across a dormant rollback
+
+The r1140 profile started on actual Core 0.22.5 and then opened on 0.23.3.
+Each cold phase used a separate process and verified that its Core constants
+and gateway came from that phase's source tree. The two plugin revisions were
+`2b51137` and `f047f85`. The test used synthetic feedback, a linked derivative
+and an interrupted managed-backup purge.
+
+The old Core could reopen its original session after the migration. Its old
+Alive runtime refused the migrated vault. With Alive deselected, the old
+gateway had no Alive command or active host. Restoring the newer pair kept the
+same session, signed owner configuration, vault key and unrelated history.
+It finished the interrupted purge and kept both erased bodies unavailable.
+No dispatch began.
+
+This qualifies a dormant rollback and a forward return on the same retained
+state. An active rollback would require a compatible state format or a separately
+preserved pre-upgrade state. A pre-upgrade backup can lack later erasure
+receipts. Keep that distinction explicit in production rollback planning.

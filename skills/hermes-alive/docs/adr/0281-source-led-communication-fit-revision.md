@@ -145,3 +145,12 @@ author, including the coverage finding. It can omit figures that do not
 carry the point or restate a supported result at the scope the source
 establishes. Both reviews still operate on the complete new text. No
 automatic number substitution, witness inference or retry loop is introduced.
+
+Replaying the four original, audited public responses with real models reached
+both reviews and one simulated adapter submission. The new author received
+one source bundle and unresolved findings on fact, scope, fit and numeric
+coverage. Its revision passed, with the comparison limited to the evaluated
+states. This run does not isolate numeric coverage as the only review failure.
+The ordinary replies still exceeded an explicit sentence and link limit and
+gave unsupported cost estimates. The replay therefore qualifies neither live
+search for this run nor a clean complete sharing round.
