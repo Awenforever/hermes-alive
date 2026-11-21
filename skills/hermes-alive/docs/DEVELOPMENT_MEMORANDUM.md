@@ -520,6 +520,13 @@ any install stamp. The candidate now declares >=0.22.5,<0.23; unsupported older
 hosts should get a clear admission refusal, not a silent legacy execution path.
 Version acceptance alone does not prove dependency resolution or installation.
 
+2026-11-21 (Asia/Shanghai), Codex. The development candidate now targets the
+0.23 line, beginning at 0.23.3. The isolated official Ubuntu installer returned
+success and the resulting launcher reported the exact 0.23.3 Git revision.
+Controlled tests exercised the 0.23.3 task, memory and conversation APIs.
+Consumer package admission, dependency resolution and the full lifecycle on
+the installed build still require verification before release.
+
 2026-10-23 (Asia/Shanghai), Codex. The earlier crypto50.0.0 equality avoided forcing
 a newer patch onto the then-supported Core. Current stable supply instead locks
 50.0.1. Keeping the equality now conflicts with the host instead of protecting it.
