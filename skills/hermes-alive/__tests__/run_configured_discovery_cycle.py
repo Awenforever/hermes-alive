@@ -290,6 +290,13 @@ async def exercise(root,mode,*,primary_url=None):
                 if pressure or mode in ('primary-read','replay','private-followup','erase-group-after-final'):
                     assert 'PRIMARY_READ_EVIDENCE' in raw and 'DEEP_READ_EVIDENCE' in raw
                 value='The museum describes observing without intervention: [conservation method]('+url+').'
+                if mode=='route-revision' and models.count(task)>1:
+                    assert 'correction' in data
+                    assert 'CONFIGURED_ROUTE_MISMATCH_MARKER' not in raw
+                    assert 'public museum methods' not in raw
+                    assert 'Keep the focus on the public evidence.' in raw
+                    assert 'DEEP_READ_EVIDENCE' in raw
+                    value=dict(text=value)
             elif task=='alive_semantic_review':
                 if mode not in ('page-failed','legacy-replay','unconsented-followup','historical-followup-replay'):
                     assert 'source_context' not in data
@@ -298,7 +305,7 @@ async def exercise(root,mode,*,primary_url=None):
                 value=dict(atom_reviews=[dict(atom_id=a['atom_id'],preserved=True,risks=[]) for a in data['meaning']['atoms']],
                     added_claims_detected=False,speech_act_preserved=True,protected_literals_preserved=True)
             elif task=='alive_source_support':
-                if mode in ('share', 'primary-read', 'replay'):
+                if mode in ('share', 'primary-read', 'replay', 'route-revision'):
                     assert data['approved_search_queries'] == ['public museum methods']
                     assert data['search_context']['kind']=='configured-discovery-route-v1'
                     assert data['search_context']['current_owner_search_request_supplied'] is False
@@ -307,6 +314,14 @@ async def exercise(root,mode,*,primary_url=None):
                     else 'discovery-source-and-value-v3')
                 from alive_kernel_testkit import controlled_final_findings
                 value=controlled_final_findings(data)
+                if mode=='route-revision':
+                    if models.count(task)==1:
+                        value.update(fit='conflicts', fit_reason='Keep the focus on the public evidence.',
+                            search_alignment='conflicts', scope_reason='CONFIGURED_ROUTE_MISMATCH_MARKER')
+                    else:
+                        assert models.count(task)==2
+                        value.update(search_alignment='justified_pivot',
+                                     scope_reason='Public original protocol is a useful adjacent contribution.')
             else:raise AssertionError(task)
             if 'route_info' in kw:kw['route_info']['provider']='synthetic'
             return NS(model='synthetic-model',choices=[NS(message=NS(content=value if isinstance(value,str) else json.dumps(value)))])
@@ -438,7 +453,10 @@ async def exercise(root,mode,*,primary_url=None):
                 assert len(tools)==(3 if pressure or mode in ('primary-read','replay','followup-failed','private-followup','erase-group-after-final','historical-followup-replay','mixed-followup') else 2)
                 assert models.count('alive_discovery_reading')==1
                 assert models.count('alive_discovery_followup')==(0 if mode in ('page-failed','legacy-replay','unconsented-followup','reading-assessment-no-followup') else 1)
-                assert models.count('alive_source_support')==1
+                assert models.count('alive_source_support')==(2 if mode=='route-revision' else 1)
+                if mode=='route-revision':
+                    assert models.count('alive_semantic_render')==2
+                    assert len(journal.read(event_type='expression.source_revision_completed'))==1
                 if mode in ('invented-followup','foreign-followup','malformed-followup','nonjson-followup','mixed-followup'):
                     rows=journal.read(event_type='discovery.reading_choice_completed')
                     retained=vault.resolve_json(rows[-1].event.payload['content']['content_id'],
@@ -546,7 +564,7 @@ parser.add_argument('--case',action='append',default=[],help='Run only named syn
 selected_cases=parser.parse_args().case
 with tempfile.TemporaryDirectory(prefix='alive-configured-discovery-') as folder:
     modes=('budget-pressure',) if os.getenv('ALIVE_REPRODUCE_OLD_RECALL')=='1' else (
-                 'share','reading-assessment','reading-assessment-no-followup','reading-assessment-budget-pressure','reading-assessment-invalid','reading-assessment-missing','reading-assessment-recovery','primary-read','private-followup','budget-pressure','fair-budget-pressure','erase-group-after-final','followup-failed','replay','legacy-replay','historical-followup-replay','unconsented-followup','page-failed','abstain','paused',
+                 'share','route-revision','reading-assessment','reading-assessment-no-followup','reading-assessment-budget-pressure','reading-assessment-invalid','reading-assessment-missing','reading-assessment-recovery','primary-read','private-followup','budget-pressure','fair-budget-pressure','erase-group-after-final','followup-failed','replay','legacy-replay','historical-followup-replay','unconsented-followup','page-failed','abstain','paused',
                  'search-failed','search-empty','abstain-with-prior-evidence','invalid-choice','revoked-choice','forgotten-choice','erased-choice','uncertain-read',
                  *TIMEOUT_STAGES,'invented-followup','foreign-followup','mixed-followup','malformed-followup','nonjson-followup',
                  'revoked-followup','forgotten-followup','erased-followup','interrupted-followup','historical-invalid-followup')
