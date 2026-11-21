@@ -27,6 +27,15 @@ remain an acceptance requirement under ADR0286.
 Actual model judgment on ambiguous replies, multi-turn adaptation, and
 production acceptance remain open.
 
+One controlled longitudinal run kept the same public source and synthetic
+feedback across three native model decisions. It proposed a candidate, then
+withheld it under a newer explicit topic pause, then proposed it again after
+the pause was removed from memory. The recorded model inputs carried the pause
+only during the middle decision. No durable preference was added by the
+feedback interpreter and no delivery authority was granted. This tests memory
+precedence and reconstruction. Qualification still needs a real conversational
+pause and restoration, cold recovery, and sustained outcomes.
+
 The latest runtime candidate separates factual support, communication fit and
 search-purpose alignment in one model assessment. Source witnesses establish
 exact retained passage identity, not independent truth or semantic entailment.
@@ -46,12 +55,23 @@ claims about that fixture's behavior.
 **Fresh complete sharing-quality streak remains 0/10.** Non-sharing journeys,
 longitudinal memory and the full production gates are independently required.
 
+The latest local-service round completed three ordinary real-model follow-ups
+with about 2,200 characters in each current user request, down from about 7,900
+in the preceding multi-source round. It kept the distinction between an announced
+schedule and observed operation, but treated two outlets covering the same event
+as one publisher. The failure was visible in the original tool results. Keep
+source attribution and evidence-of-reading in the quality rubric, separately
+from message length and answer relevance. ADR0210 records the remaining output
+boundary.
+
 With official Core 0.23.3, the Windows VM has passed public-Git install,
 upgrade, removal and reinstall with twelve state fingerprints unchanged.
 It also passed lifecycle controls and each installed continuation case after
 fixing the outdated outbound import. The WSL2 profile separately preserved its
 twelve state fingerprints across the public-Git lifecycle. The Windows Desktop
-source build is a separate lane. The signed stable Desktop distribution,
+source build separately passed real Gateway startup and command execution after
+upgrade, uninstall and reinstall, preserving twelve state fingerprints. The
+signed stable Desktop distribution,
 independent Linux/Docker service exercises, external transport and the final
 platform matrix remain open.
 

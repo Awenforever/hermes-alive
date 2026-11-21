@@ -22,7 +22,7 @@ f9be399a3ab743d56465ae6c9aea0fa89fdb3d920641165e68d61529f79736f5  ./gateway_feed
 4b656c3a4de15c1dfbd94334e5b1439d370f53b9144bb3ec91ebc30201d529a1  ./gateway_session_bridge.py
 e1047584437369210d498e85b4cd6708f0675f49140bbbc099392895e341c897  ./kernel_execution_bridge.py
 11f10a25405d1dcfe1d7812fe655a7ad08702edcd3d26b79e509b9a19f0dc968  ./kernel_setup_bridge.py
-74c6ffc1508621f19dbf7c281e3c97879ed510e045c428b85f57425cef8a46dd  ./metadata/hermes-alive-source.sha256
+31660db65322ebb58a23aef6bbeae23c1f47d7d84ba158d52ba4032773b0254c  ./metadata/hermes-alive-source.sha256
 5cba4486635fe54faef4cbb05cfb645c315d9ad4dd3316817f12bc81c44b220e  ./metadata/hermes-alive.json
 b4c36fbfcd49732ac0fba78a715122292798fde07a5037d953df3e58a8b5eb93  ./plugin.yaml
 c35956da60eb6efa62e68e4c763f620cb0556ba4d6785ac7b3871cab819d13bf  ./plugin_cli.py
@@ -335,7 +335,7 @@ fbabb024702d8394fe6af3f145afb25fcb11b0674369aa0d2ece030b485f9f64  ./skills/herme
 c820346cb0721a679f22c1e15a59f23616f6d7a70adf2511e45e4a15a13c0e2c  ./skills/hermes-alive/__tests__/run_transport_publisher_withdrawal.py
 6210bc2e2fb0f3c78fe10a87ac68b007982a555a90e5c3245924e2c6c71c372f  ./skills/hermes-alive/__tests__/run_transport_reconciliation_runtime.py
 ed5065f1271617efd9df6f0c5ef5473d73e343f122df77f5668aa292abca617e  ./skills/hermes-alive/__tests__/run_watcher_retention_maintenance.py
-51170e18b4255d9729324d492a8365287290b4a0e2dcd51e32392637b3f154fa  ./skills/hermes-alive/docs/ALIVE_KERNEL_PLAN.md
+2847e61cfea2389f027b46b7851738f714c1def09b482fcddf4d585cbf63d45b  ./skills/hermes-alive/docs/ALIVE_KERNEL_PLAN.md
 bb1240b8645d5bde807e126c36ee12164e2ad602609064402df28740e0e3b315  ./skills/hermes-alive/docs/ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-25.md
 a7115842a8cd05021e657b281efb86655a48bd86294b917a3a324935b8a5383b  ./skills/hermes-alive/docs/ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-27.md
 861ecc2a8cdee6d997501ac564de7d11c6ac94b1a202fd5d143c8520acd7f1e5  ./skills/hermes-alive/docs/ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-11-05.md
@@ -563,7 +563,7 @@ f261dfc31f46da3551420d5e9e65195dd7852d01f03bd6d43011dfcec60f467c  ./skills/herme
 80bdee61db3895ab41830ab4f56f4074f151b5e11e97a57da47d0deb4623f4ff  ./skills/hermes-alive/docs/adr/0207-current-core-channel-lifecycle.md
 c0b4d13b3bf1c3965697ff282b7d09ef1ca7f0138fa4a2755704c0406b3806c2  ./skills/hermes-alive/docs/adr/0208-submission-authority-and-standard-channel.md
 f923612bda1dea7ff30a8ec357a4f3cc54e3799e48ec4f072b43f605b45e86b8  ./skills/hermes-alive/docs/adr/0209-core-channel-capability-lifetime.md
-e65550fa32ce549d179b29179f644c4aaf076ab7c862b9df68a58def28506832  ./skills/hermes-alive/docs/adr/0210-share-to-main-conversation-continuity.md
+1a8afadc72f44e38a046d3337661cd8c10ed6e9b9722f3790725283718d9137b  ./skills/hermes-alive/docs/adr/0210-share-to-main-conversation-continuity.md
 495e032c5667125c2cb1f3069e98b169e078fe794c73824392316a8d2d39cd2e  ./skills/hermes-alive/docs/adr/0211-guided-setup-before-live-activation.md
 ad611304248ebca9d2cacc2772dc098730f5d96a4c9139efffda777d8a98ca2d  ./skills/hermes-alive/docs/adr/0212-explicit-continuous-native-lifetime.md
 bb0ee5b80ef45d72fc2a84405c818f710660caf51f23f0e8268d0d0bc96c1b26  ./skills/hermes-alive/docs/adr/0213-core-execution-control-and-finite-activation.md

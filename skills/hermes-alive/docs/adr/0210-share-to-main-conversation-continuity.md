@@ -243,3 +243,27 @@ intake and work validators still verify authority before action. The shorter
 context reduces interference. Continuation accuracy still requires live
 evidence, including whether Main uses the best available source when an
 earlier answer and the original evidence diverge.
+
+## The read proves the page, not a relationship between sources
+
+The following local-service trial reduced the current-turn request to
+2,170–2,183 characters. Main used search and an exact page extract and kept an
+announced opening date distinct from field observation. Yet it called the
+extracted outlet the publisher of the original share. Both public bylines
+were available in the recorded request and identified different outlets.
+Completing a read and matching the event were insufficient to establish
+publisher identity. This trial does not count as a clean round.
+
+Qualification should separately check the relationship claimed in an answer:
+the source issued the announcement, independently reported it, or reproduced
+another outlet's coverage. A successful partial read establishes only the
+retained page and observed portion. An assertion that a prior answer verified
+something must be accountable to its tool evidence. A concise clarification is
+the preferred outcome when the requested original cannot be established.
+
+If ordinary Main needs pre-exposure review, require support for a turn-scoped
+hold before adopting it. The supported Core interface would have to select the
+turn using its established conversation and tool evidence, keep the review
+under the existing permissions and cancellation rules, and leave unrelated
+sessions on their existing stream path. Releasing an unreviewed draft after
+that review failed would invalidate the claim of pre-exposure verification.
