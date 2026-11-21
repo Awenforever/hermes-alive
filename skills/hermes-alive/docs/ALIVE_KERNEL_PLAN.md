@@ -949,3 +949,17 @@ Treat zero as uninitialized in both freshness and scheduling. The observation
 test now fixes the monotonic clock at a low uptime and checks initial
 eligibility, stale-cache exclusion and the in-progress guard. Recheck the clean
 CI after this correction; earlier partial CI runs remain failed evidence.
+
+The corrected Windows and Linux CI jobs passed on the same runtime. The
+official 0.23.2 installer completed in an isolated Ubuntu home, and an
+independent launcher check confirmed its version after the test driver stopped
+before its version check. Official stable moved to 0.23.3 on the next
+qualification window. Validate that version before changing the declared range.
+
+An audited follow-up showed that Core's web extraction included pagination
+instructions for a temporary cache inside retained reference text. The
+conversation projection now preserves both excerpts and their gap, and drops
+the recognized Core footer before applying the retained excerpt budget.
+Stored source observations and prior decision evidence stay intact. A
+format-specific recognizer is needed until Core returns out-of-band coverage
+metadata. Its success is separate from the real-model continuation gate.

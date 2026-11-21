@@ -462,6 +462,35 @@ def test_collection_limits_are_not_world_negatives():
     assert continuation_context([]) == ''
 
 
+def test_core_extract_projection():
+    from tools import web_tools_truncate
+    from alive_kernel.conversation_continuity import _conversation_extract
+
+    source_body = 'Head detail.\n' * 400 + 'Middle detail.\n' * 400 + 'Tail detail.\n' * 400
+    scope = {'reported_read_scope': 'webpage_extract'}
+    for path in (None, '/previous/core/cache/web/example.md'):
+        with patch.object(web_tools_truncate, '_store_full_text', return_value=path):
+            with patch('tools.credential_files.to_agent_visible_cache_path', side_effect=lambda value: value):
+                raw, truncated = web_tools_truncate._truncate_with_footer(
+                    source_body, 'https://example.invalid/report', 4000)
+        assert truncated
+        original = {'summary': raw}
+        projected, projected_scope = _conversation_extract(original, scope)
+        head, tail = projected['summary'].split('\n\n[Middle of extraction omitted.]\n\n')
+        assert source_body.startswith(head) and source_body.endswith(tail)
+        assert len(head) + len(tail) < len(source_body)
+        assert projected_scope['extract_has_omitted_middle'] is True
+        assert original['summary'] == raw
+        assert 'TRUNCATED' not in projected['summary'] and 'read_file' not in projected['summary']
+        source = {'reading_status': 'retained_excerpt', 'reading_scope': projected_scope,
+                  'excerpt': projected['summary']}
+        visible = continuation_context([{'text': 'A share', 'sources': [source]}])
+        assert 'extract_has_omitted_middle' in visible and 'cache/web' not in visible
+        for unchanged, other_scope in ((original, {}), ({'summary': raw + '\nQuoted text'}, scope),
+                                       ({'summary': 'extra' + raw}, scope)):
+            assert _conversation_extract(unchanged, other_scope) == (unchanged, other_scope)
+
+
 def test_atomic_context_budget():
     sources = [{'title': 'Long source', 'url': 'https://example.invalid/long',
         'excerpt': 'Full source clause; ' * 1200, 'reading_status': 'retained_excerpt',
@@ -506,6 +535,7 @@ def test_atomic_context_budget():
 
 if __name__ == '__main__':
     test_collection_limits_are_not_world_negatives()
+    test_core_extract_projection()
     test_atomic_context_budget()
     with tempfile.TemporaryDirectory(prefix='alive-share-continuity-') as directory:
         try:

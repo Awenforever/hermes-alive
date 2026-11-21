@@ -7,6 +7,7 @@ dispatch. Historical reads do not revive that dispatch or re-run planning.
 from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
 import json
+import re
 
 from .content_vault import ContentReference, ContentUnavailableError
 from .events import EventEnvelope, Sensitivity, _thaw_json
@@ -25,6 +26,38 @@ _OPTIONAL_SCOPE = frozenset(('thread_id', 'scope_id', 'guild_id', 'parent_chat_i
 _PURPOSE = 'conversation.share_context'
 _EVENT = 'conversation.share_prepared'
 _SIGNATURE = 'conversation.share_context.v1'
+
+# Core web_extract's rendered pagination envelope. The cache path and read_file
+# instructions belong to the extraction turn and are never a retained capability.
+_CORE_OMISSION = '\n\n[... middle omitted — see footer ...]\n\n'
+_CORE_FOOTER = re.compile(
+    r'\n\n──────── \[TRUNCATED\] ────────\n'
+    r'Showing (?P<head>[0-9]{1,3}(?:,[0-9]{3}){0,3}) chars \(head\) \+ '
+    r'(?P<tail>[0-9]{1,3}(?:,[0-9]{3}){0,3}) chars \(tail\) '
+    r'of (?P<total>[0-9]{1,3}(?:,[0-9]{3}){0,3}) total clean characters\.\n'
+    r'(?:Full text saved to: (?P<path>[^\n]+)\n'
+    r'To read the omitted middle: read_file path="(?P=path)" offset=[0-9]+ limit=200  '
+    r'\(the file is the complete page; raise/lower offset to page through it\)\.'
+    r'|Full text could not be stored; re-run web_extract on a more specific URL '
+    r'or open it in the browser for the complete page\.)\n' + '─' * 29 + r'\Z')
+
+
+def _conversation_extract(content, scope):
+    """Project recognized Core extraction windows without changing stored evidence."""
+    summary = content['summary']
+    if scope.get('reported_read_scope') != 'webpage_extract':
+        return content, scope
+    footer = _CORE_FOOTER.search(summary)
+    if footer is None:
+        return content, scope
+    head, tail, total = (int(footer[name].replace(',', '')) for name in ('head', 'tail', 'total'))
+    body = summary[:footer.start()]
+    after_head = head + len(_CORE_OMISSION)
+    if (head + tail >= total or len(body) != after_head + tail
+            or body[head:after_head] != _CORE_OMISSION):
+        return content, scope
+    excerpt = body[:head] + '\n\n[Middle of extraction omitted.]\n\n' + body[after_head:]
+    return {**content, 'summary': excerpt}, {**scope, 'extract_has_omitted_middle': True}
 
 
 def _scope(document):
@@ -411,11 +444,13 @@ class ShareContinuityStore:
             except ContentUnavailableError:
                 result.append({'event_id': source['event_id'], 'reading_status': 'no_longer_retained'})
                 continue
+            reading_scope = read_scope_metadata(content) or {'collector_scope_reported': False}
+            projected, reading_scope = _conversation_extract(content, reading_scope)
             result.append({'event_id': source['event_id'], 'title': content['title'], 'url': content['url'],
                 'linked_in_share':has_inline_citation(body['text'],content['url']),
-                'excerpt': source_prompt_excerpt(content, policy=source.get('excerpt_policy')),
+                'excerpt': source_prompt_excerpt(projected, policy=source.get('excerpt_policy')),
                 'excerpt_policy': source.get('excerpt_policy'), 'reading_status': 'retained_excerpt',
-                'reading_scope': read_scope_metadata(content) or {'collector_scope_reported': False},
+                'reading_scope': reading_scope,
                 'published_at': content.get('published_at')})
         return result
 
@@ -437,7 +472,8 @@ def _conversation_source(source):
             'evidence_basis': 'retained_excerpt',
             'coverage': 'retained_material_only',
             **{key: reported[key] for key in (
-                'reported_read_scope', 'reported_content_representation') if key in reported}}
+                'reported_read_scope', 'reported_content_representation',
+                'extract_has_omitted_middle') if key in reported}}
         if reported.get('reported_read_scope') == 'search_listing':
             result['reading_scope'].update(
                 evidence_basis='search_result_excerpt',
