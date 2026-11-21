@@ -116,8 +116,10 @@ async def exercise(root,mode):
                     dict(url=secondary,title='New report',description='A public report repeats the claimed effect.'),
                     dict(url=original,title='Original method',description='The study defines what was measured.') ]}}
             url=seed if args['query']=='public seed' else original
-            return {'success':True,'data':{'web':[dict(url=url,title='Public method',
-                description='A public account names a method whose original evidence is worth reading.')]}}
+            snippet = 'A public account names a method whose original evidence is worth reading.'
+            if mode=='all-cited-reads-failed':
+                snippet += ' [Original]('+original+')'
+            return {'success':True,'data':{'web':[dict(url=url,title='Public method',description=snippet)]}}
         assert name=='web_extract' and args['urls'] in ([seed],[original],[anchor])
         url=args['urls'][0]
         if copy_search:
@@ -125,7 +127,8 @@ async def exercise(root,mode):
                      anchor:'Publisher page contains only its data availability statement.',
                      original:'PUBLIC_PRIMARY_BODY: The proxy changed; the underlying effect was not measured.'}[url]
             return {'results':[dict(url=url,title='Public observations',content=content)]}
-        if url==original and mode=='refined-page-failed':return {'results':[dict(url=url,error='unavailable')]}
+        if url==original and mode in ('refined-page-failed','all-cited-reads-failed'):
+            return {'results':[dict(url=url,error='unavailable')]}
         if url==seed and mode not in ('cited','overlap','only-overlap','conflicting-report','deeper','deeper-revoked','deeper-erased','deeper-oversized'):
             return {'results':[dict(url=url,error='unavailable')]}
         if mode.startswith('deeper'):
@@ -200,7 +203,7 @@ async def exercise(root,mode):
                 if mode=='deeper-erased':
                     event=journal.get(source['source_ref'])
                     ingestor.vault.erase_item(event.event.payload['content']['content_id'])
-            elif mode=='cited':
+            elif mode in ('cited','all-cited-reads-failed'):
                 source=next(s for s in data['sources'] if s.get('citations'))
                 value=dict(search_query=None,read_targets=[dict(source_ref=source['source_ref'],
                     citation_ref=source['citations'][0]['citation_ref'])],reason='Read the original link.')
@@ -299,6 +302,13 @@ async def exercise(root,mode):
     elif mode=='cited':
         assert len(network)==3 and len(models)==2
         assert len(result['expression_parameters']['research_read_receipt_ids'])==2
+    elif mode=='all-cited-reads-failed':
+        assert len(network)==3 and len(models)==2
+        assert network[-1][1]['urls']==[original]
+        assert 'research_read_receipt_ids' not in result['expression_parameters']
+        assert 'record_reading_assessment' not in result['expression_parameters']
+        done=journal.read(event_type='discovery.host_read_completed')[-1]
+        assert done.event.payload['failures']==1 and not done.event.payload['observations']
     elif mode=='search-failed':
         assert len(network)==3 and len(models)==2
         assert not result['expression_parameters'].get('research_read_receipt_ids')
@@ -348,7 +358,7 @@ async def exercise(root,mode):
             receipt_ids=receipts,inquiries=inquiries)
         except HostDiscoveryError:pass
         else:raise AssertionError('erased expanded source remained in research group')
-    if mode in ('overlap','only-overlap','conflicting-report') or copy_search:
+    if mode in ('overlap','only-overlap','conflicting-report','all-cited-reads-failed') or copy_search:
         before=list(network)
         preparation.close()
         preparation=make(True)
@@ -381,7 +391,7 @@ async def allow_synthetic_url(self,url):
 contracts()
 with tempfile.TemporaryDirectory(prefix='alive-public-refinement-') as folder:
     parent=Path(folder)
-    for mode in ('off','old-cycle','old-depth-cycle','legacy-search','on','overlap','only-overlap','conflicting-report','public-copy','public-copy-empty','cited','deeper','deeper-revoked','deeper-erased','deeper-oversized','malformed','revoked','erased','search-failed','refined-page-failed','uncertain-search'):
+    for mode in ('off','old-cycle','old-depth-cycle','legacy-search','on','overlap','only-overlap','conflicting-report','public-copy','public-copy-empty','cited','all-cited-reads-failed','deeper','deeper-revoked','deeper-erased','deeper-oversized','malformed','revoked','erased','search-failed','refined-page-failed','uncertain-search'):
         home=parent/mode
         with patch.dict(sys.modules,hermes_constants=NS(get_hermes_home=lambda:home)):
             with patch.object(CoreDiscoveryTools,'allow_url',allow_synthetic_url):

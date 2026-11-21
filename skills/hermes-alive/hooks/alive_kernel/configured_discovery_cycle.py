@@ -563,6 +563,16 @@ class ConfiguredDiscoveryCycle:
             raise HostDiscoveryError('discovery receipt exceeds derived argument scope')
         if 'search_purpose_receipt_id' in delta and delta['search_purpose_receipt_id'] != expected_search:
             raise HostDiscoveryError('discovery purpose belongs to another collection')
+        reads = delta.get('research_read_receipt_ids')
+        if reads:
+            from .research_evidence import research_read_headers
+            headers = research_read_headers(self.ingestor.journal, subject=self.subject,
+                clearance=Sensitivity.PRIVATE, receipt_ids=tuple(reads), before_sequence=record.sequence)
+            if not any(done.event.payload['observations'] for _, done in headers):
+                # Earlier cycles could retain a failed follow-up as their sole
+                # research receipt. Preserve its record without reusing it as evidence.
+                delta = {key: item for key, item in delta.items()
+                         if key not in ('research_read_receipt_ids', 'record_reading_assessment')}
         return {k:tuple(v) if k in ('inquiry_item_ids','research_read_receipt_ids') else v
             for k,v in delta.items()}
 
@@ -732,7 +742,8 @@ class ConfiguredDiscoveryCycle:
                 followed=await reader.collect(operation_id=cycle.operation_id+':followup-read',
                     read_urls=tuple(t['url'] for t in followup['read_targets']),inquiry_item_ids=(item_id,),
                     read_depth=source_reading_depth.WINDOW if observed.deeper_reading else None)
-                if group_enabled:read_receipts.append(followed.receipt_id)
+                if group_enabled and (followed.observation_ids or read_receipts):
+                    read_receipts.append(followed.receipt_id)
                 current()
         return self._retain_parameters(observed,{**parameters,'expression_parameters':{**parameters['expression_parameters'],'inquiry_item_ids':(item_id,),
             **({'record_reading_assessment':True} if assessment_enabled and read_receipts else {}),

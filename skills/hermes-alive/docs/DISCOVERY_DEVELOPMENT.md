@@ -21,6 +21,12 @@ collect batch
 The complete cached batch is not mutated when an item is shared. Exhausted
 caches return no external candidates instead of replaying old content.
 
+Public search leads can direct another reading attempt. If every page read
+fails, keep the attempt receipts for diagnosis and leave the research evidence
+unset. A search lead or failed fetch cannot become authoring evidence. An
+earlier retained cycle with only empty read receipts follows the same rule
+without rewriting its event history.
+
 ## Final source witnesses
 
 A source reviewer can cite the exact Markdown wording or the contiguous visible
