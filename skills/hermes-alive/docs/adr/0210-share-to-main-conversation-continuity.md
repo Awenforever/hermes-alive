@@ -182,3 +182,10 @@ Both ordinary turns with a Core web tool and turns without it need real-model
 qualification. The former can read the exact public source and support a richer
 answer. The latter must answer honestly from the available material. A passing
 reference retrieval or a structurally complete turn proves neither behavior.
+
+A subsequent native multi-turn exercise changed the available tools between
+turns. The model repeated its earlier claim that lookup was unavailable even
+though the current request listed Core web tools. Continuation guidance now
+binds capability statements to the current turn and keeps explicit response
+limits in view. Verify changes to tool access in both directions. An answer
+that cites a retained link can be useful without claiming a fresh verification.
