@@ -328,6 +328,32 @@ def test_numeric_coverage_of_actual_draft():
     assert evaluate(CLAIM_COVERAGE_ASSESSMENT, witnessed)['verdict'] == 'uncertain'
 
 
+def test_passage_locator_does_not_replace_the_review_witness():
+    from alive_kernel.final_value_findings import passage_request
+    from alive_kernel.review_contracts import CLAIM_COVERAGE_ASSESSMENT, PASSAGE_LOCATOR_ASSESSMENT
+
+    claim = 'In survey sector R7, 622 objects were found.'
+    original = {'candidate': {'text': claim + ' The condition was good.'},
+        'evidence': [{'event_id': 'report', 'excerpt':
+            'In survey sector R7 there were 622 objects. '.ljust(500) + 'Most were in good condition.'}]}
+    previous = {**original, 'expression_binding': {'final_assessment_scope': CLAIM_COVERAGE_ASSESSMENT}}
+    current = {**original, 'expression_binding': {'final_assessment_scope': PASSAGE_LOCATOR_ASSESSMENT}}
+    assert 'numeric_passage_locations' not in passage_request(previous, labelled=True)
+    located = passage_request(current, labelled=True)
+    assert located['numeric_passage_locations'] == [
+        {'kind': 'number', 'literal': value, 'matching_passage_ids': ['P1.1']} for value in ('7', '622')]
+    wire = dict(facts='supported', fact_reason='Both details are in the supplied report.',
+        fit='fits', fit_reason='One point.', recipient_evidence=[], search_alignment='not_applicable',
+        scope_reason='No query.', claim_scope='preserved', claim_scope_reason='Survey items are in scope.',
+        source_witnesses=[dict(claim=claim, passage_id='P1.2')])
+    assert parse(json.dumps(wire), witness_snapshot=current)['verdict'] == 'uncertain'
+    wire['source_witnesses'] = [dict(claim=claim, passage_id='P1.1'),
+                               dict(claim='The condition was good.', passage_id='P1.2')]
+    result = parse(json.dumps(wire), witness_snapshot=current)
+    assert result['verdict'] == 'supported'
+    assert validate_retained(result, witness_snapshot=current) == result
+
+
 def test_visible_markdown_claim_witness():
     from alive_kernel.review_contracts import CLAIM_COVERAGE_ASSESSMENT
 
@@ -422,6 +448,7 @@ if __name__ == '__main__':
     test_claim_scope_veto()
     test_only_explicit_communication_choices_shape_new_discovery_openings()
     test_numeric_coverage_of_actual_draft()
+    test_passage_locator_does_not_replace_the_review_witness()
     test_visible_markdown_claim_witness()
     test_named_identifiers_do_not_supply_measurements()
     test_rejection_survives_invalid_factual_witness()

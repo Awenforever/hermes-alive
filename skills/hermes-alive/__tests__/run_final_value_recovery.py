@@ -13,7 +13,8 @@ from alive_kernel.review_contracts import (LEGACY_SPLIT_SOURCE_REVIEW, FIRST_FAC
     FIRST_SEARCH_REVIEW, SEARCH_FIT_ASSESSMENT, CLAIM_SCOPE_REVIEW, CLAIM_SCOPE_ASSESSMENT,
     CONTRIBUTION_REVIEW, CONTRIBUTION_ASSESSMENT, PRESENTATION_ASSESSMENT,
     CLAIM_COVERAGE_REVIEW, CLAIM_COVERAGE_ASSESSMENT, FIRST_CLAIM_COVERAGE_REVIEW,
-    FIRST_CLAIM_COVERAGE_ASSESSMENT, IDENTIFIER_COVERAGE_REVIEW, IDENTIFIER_COVERAGE_ASSESSMENT)
+    FIRST_CLAIM_COVERAGE_ASSESSMENT, IDENTIFIER_COVERAGE_REVIEW, IDENTIFIER_COVERAGE_ASSESSMENT,
+    PASSAGE_LOCATOR_REVIEW, PASSAGE_LOCATOR_ASSESSMENT)
 
 
 async def test(root, original_contract, original_scope):
@@ -23,13 +24,13 @@ async def test(root, original_contract, original_scope):
     async def historical_start(self, **kwargs):
         # Only interpretation generation runs with the previous default. Its
         # stored method must determine later author/review/recovery semantics.
-        with patch('alive_kernel.opportunity_synthesis.CLAIM_COVERAGE_REVIEW', original_contract):
+        with patch('alive_kernel.opportunity_synthesis.PASSAGE_LOCATOR_REVIEW', original_contract):
             return await original(self, **kwargs)
 
     with patch.object(OpportunitySynthesizer, 'run', historical_start):
         await exercise(root, 'supported')  # Includes cold completed recovery, no new calls.
     import alive_kernel.opportunity_synthesis as synthesis
-    assert synthesis.CLAIM_COVERAGE_REVIEW == CLAIM_COVERAGE_REVIEW
+    assert synthesis.PASSAGE_LOCATOR_REVIEW == PASSAGE_LOCATOR_REVIEW
     journal = ExperienceJournal(root / 'journal.sqlite3')
     starts = [r for r in journal.read() if 'interpreter_method' in r.event.payload]
     assert starts and any(r.event.payload['interpreter_method'].get('discovery_source_review')
@@ -57,5 +58,6 @@ if __name__ == '__main__':
         asyncio.run(test(Path(directory) / 'previous-presentation', SPLIT_SOURCE_REVIEW, PRESENTATION_ASSESSMENT))
         asyncio.run(test(Path(directory) / 'initial-coverage', FIRST_CLAIM_COVERAGE_REVIEW, FIRST_CLAIM_COVERAGE_ASSESSMENT))
         asyncio.run(test(Path(directory) / 'identifier-coverage', IDENTIFIER_COVERAGE_REVIEW, IDENTIFIER_COVERAGE_ASSESSMENT))
-        asyncio.run(test(Path(directory) / 'current-coverage', CLAIM_COVERAGE_REVIEW, CLAIM_COVERAGE_ASSESSMENT))
+        asyncio.run(test(Path(directory) / 'previous-coverage', CLAIM_COVERAGE_REVIEW, CLAIM_COVERAGE_ASSESSMENT))
+        asyncio.run(test(Path(directory) / 'passage-locator', PASSAGE_LOCATOR_REVIEW, PASSAGE_LOCATOR_ASSESSMENT))
     print('FINAL_VALUE_RECOVERY_OK')

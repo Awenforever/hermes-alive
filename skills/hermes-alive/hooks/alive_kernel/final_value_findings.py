@@ -9,7 +9,8 @@ from unicodedata import normalize
 from .model_json import parse_model_json
 from .review_contracts import (CLAIM_SCOPE_ASSESSMENTS, FLAT_ASSESSMENTS, SEARCH_ASSESSMENTS,
                                CLAIM_COVERAGE_ASSESSMENT, COVERAGE_ASSESSMENTS, LABELLED_ASSESSMENTS,
-                               PASSAGE_FIT_ASSESSMENT, TYPED_COVERAGE_ASSESSMENTS)
+                               PASSAGE_FIT_ASSESSMENT, PASSAGE_LOCATOR_ASSESSMENT,
+                               TYPED_COVERAGE_ASSESSMENTS)
 
 
 PROMPT = """Assess this actual message under the supplied source evidence,
@@ -214,6 +215,16 @@ Numbers may keep the source's notation. If a material comparison depends on
 unavailable evidence or an unsupported conversion, flag it for revision.
 """
 
+PASSAGE_LOCATOR_PROMPT = CLAIM_COVERAGE_PROMPT + """
+numeric_passage_locations is a bounded navigation index of literal matches in
+the supplied excerpts. Check the indexed passages in context. A matching
+number or identifier is not proof about its entity, unit or measurement method.
+When one sentence combines facts drawn from distinct passages, use separate
+short verbatim claim spans with their actual supporting passage IDs. Associate
+each value with its own entity and condition. Never select a passage just
+because it is next to a passage that states the value.
+"""
+
 _NUMBER = re.compile(r'\d+(?:,\d{3})*(?:\.\d+)?')
 _IDENTIFIER = re.compile(r'(?<![A-Za-z0-9_.-])[A-Za-z][A-Za-z0-9]*(?:[-_.][A-Za-z0-9]+)+')
 _NON_PROSE = re.compile(r'https?://[^\s<>\])]+|(?m:^[ \t]*\d+[.)][ \t]+)', re.IGNORECASE)
@@ -323,11 +334,33 @@ def _labelled_passages(source_number, excerpt):
 
 
 def passage_request(request, *, labelled=False):
-    return {**request, 'evidence': [
+    result = {**request, 'evidence': [
         {**{key: value for key, value in source.items() if key != 'excerpt'},
          'passages': (_labelled_passages(number, source['excerpt']) if labelled
                       else _passages(source['excerpt']))}
         for number, source in enumerate(request['evidence'], 1)]}
+    if (labelled and request.get('expression_binding', {}).get('final_assessment_scope')
+            == PASSAGE_LOCATOR_ASSESSMENT):
+        result['numeric_passage_locations'] = _numeric_passage_locations(
+            request['candidate']['text'], result['evidence'])
+    return result
+
+
+def _numeric_passage_locations(text, evidence):
+    """Locate literals without judging which passage supports a claim."""
+    values = dict.fromkeys(value for _, value in _coverage_tokens(_normalized_numeric_text(text), True))
+    locations = {value: [] for value in tuple(values)[:24] if len(value[1]) <= 80}
+    if not locations:
+        return []
+    for source in evidence:
+        for passage in source['passages']:
+            matches = {value for _, value in _coverage_tokens(
+                _normalized_numeric_text(passage['text']), True)}
+            for value in locations.keys() & matches:
+                if len(locations[value]) < 8:
+                    locations[value].append(passage['passage_id'])
+    return [{'kind': kind, 'literal': literal, 'matching_passage_ids': passage_ids}
+            for (kind, literal), passage_ids in locations.items()]
 
 
 def _reason(value):
@@ -476,7 +509,7 @@ def parse(text, *, witness_snapshot=None):
         try:
             verified = _validate_witnesses(witnesses, witness_snapshot, findings['factual_support']['assessment'])
         except ValueError:
-            if (assessment_scope != CLAIM_COVERAGE_ASSESSMENT
+            if (assessment_scope not in (CLAIM_COVERAGE_ASSESSMENT, PASSAGE_LOCATOR_ASSESSMENT)
                     or findings['communication_fit']['assessment'] != 'conflicts'):
                 raise
             # A communication veto can guide rewriting. It cannot certify

@@ -1077,3 +1077,11 @@ background references in the projected context and reference tool catalog.
 Preserve original indices, source excerpts and exact share text. Test the two
 real failure shapes separately before treating this as an improvement in
 ordinary conversation.
+
+The deeper-read archaeology replay reached final review. Its revised wording
+was withheld when a reviewer pointed at the paragraph next to the recorded
+count and identifiers. Keep that gate and add a literal-to-passage lookup to
+new review inputs. Recheck the same draft and a fresh source before assuming
+this helps a reviewer identify the right evidence. The separate Main
+follow-up defect still needs a test that distinguishes direct observations,
+derived quantities, and explanations.

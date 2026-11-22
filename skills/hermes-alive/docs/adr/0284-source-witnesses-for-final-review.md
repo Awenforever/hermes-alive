@@ -254,3 +254,21 @@ the reported finding and what it makes of it, including attributed prose.
 Further calibration needs both genuine overclaiming and legitimate concise
 attribution, along with independent fresh cases. A repeated solar case does
 not increase the sharing streak.
+
+## Locate numeric literals before reviewing their evidence
+
+In the actual archaeology replay, a revised draft mentioned several tomb IDs
+and a count. The reviewer selected the next passage, which discussed the
+condition of the finds. The IDs and count were in the preceding passage.
+The host correctly withheld the draft because the cited passage lacked the
+values. A compound sentence can require separate witnesses for separate
+facts, even within one article.
+
+For new interpretations, include a bounded index that maps numeric literals
+and structured identifiers from the draft to passages containing those
+strings after existing lexical normalization. The reviewer still reads the
+passage and selects the exact claim span, entity and condition. Literal
+matches cannot substitute for those witnesses or make a verdict pass.
+Keep the original passage boundaries and coverage checks, including those
+used when reopening earlier interpretations. The index adds no source
+reads, model calls or delivery authority.
