@@ -221,15 +221,42 @@ async def test(home, mode, *, exercise=None, long_reference=False):
             session_key=entry.session_key, session_id=entry.session_id)
         try:
             from agent.turn_context import _collect_pre_llm_call_context
+            from hermes_cli.middleware import apply_llm_request_middleware
             agent = SimpleNamespace(session_id=entry.session_id, model='not-called',
                                     platform='telegram', _user_id=source.user_id)
             messages = [{'role':'system','content':'unchanged'}, {'role':'user','content':'What can they repair?'}]
             original = json.dumps(messages)
             def collect():
-                return _collect_pre_llm_call_context(agent, effective_task_id='task', turn_id='turn',
+                opaque = _collect_pre_llm_call_context(agent, effective_task_id='task', turn_id='turn',
                     original_user_message=messages[-1]['content'], messages=messages,
                     conversation_history=messages[:-1])
+                if not opaque:
+                    return ''
+                assert opaque.startswith('[[hermes-alive-context:') and expressed.text not in opaque
+                prefix = messages[-1]['content'] + '\n\n'
+                extra = '\n\nAnother plugin context.'
+                request = {'messages': [{'role': 'user', 'content': prefix + opaque + extra}]}
+                projection = apply_llm_request_middleware(request, session_id=entry.session_id,
+                    task_id='task', turn_id='turn', api_mode='chat_completions')
+                assert projection.original_payload['messages'][0]['content'] == prefix + opaque + extra
+                if not projection.changed:
+                    return ''
+                content = projection.payload['messages'][0]['content']
+                assert content.startswith(prefix) and content.endswith(extra)
+                return content[len(prefix):-len(extra)]
             text = collect()
+            opaque = _collect_pre_llm_call_context(agent, effective_task_id='task', turn_id='turn',
+                original_user_message=messages[-1]['content'], messages=messages, conversation_history=messages[:-1])
+            for mode_name, request in (
+                    ('chat_completions', {'messages': [
+                        {'role':'user', 'content': opaque}, {'role':'user', 'content': opaque}]}),
+                    ('chat_completions', {'messages': [{'role':'tool', 'content': opaque}]}),
+                    ('unknown', {'messages': [{'role':'user', 'content': opaque}]})):
+                assert not apply_llm_request_middleware(request, session_id=entry.session_id,
+                    task_id='task', turn_id='turn', api_mode=mode_name).changed
+            assert not apply_llm_request_middleware(
+                {'messages': [{'role':'user', 'content': opaque}]}, session_id=entry.session_id,
+                task_id='task', turn_id='next-turn', api_mode='chat_completions').changed
             conversation = json.loads(text if long_reference else text.split('\n',1)[1])['alive_shares'][0]
             if long_reference:
                 assert len(expressed.text) > 10000 and len(text) <= 10000

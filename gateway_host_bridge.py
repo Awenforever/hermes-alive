@@ -95,6 +95,7 @@ class GatewayHostBinding:
             if registered is None:
                 fresh.close()
                 raise ValueError('Core reference reader registration unavailable')
+            self.context.register_middleware('llm_request', self._continuity_wire_request)
             self.context.register_hook('pre_llm_call',self._conversation_context)
         if previous is not None:previous.close()
         self._continuity=fresh
@@ -153,10 +154,17 @@ class GatewayHostBinding:
         if self.closed or self._continuity is None:return None
         try:
             self._require_home()
-            return self._continuity.context(**values)
+            return self._continuity.capture_wire_context(**values)
         except Exception as exc:
             logging.getLogger(__name__).warning('Alive conversation context unavailable: %s',type(exc).__name__)
             return None
+
+    def _continuity_wire_request(self, *, request, session_id, task_id, turn_id, api_mode):
+        if self.closed or self._continuity is None:
+            return None
+        self._require_home()
+        return self._continuity.expand_wire_context(
+            request=request, session_id=session_id, task_id=task_id, turn_id=turn_id, api_mode=api_mode)
 
     def _agenda_context(self,**values):
         if self.closed or self._agenda is None:return None

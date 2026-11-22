@@ -137,3 +137,12 @@ fallback reconstruction, path-specific tool results, owner and profile
 binding, and cold resume. Historical plaintext from older releases remains
 a separate migration concern. Provider retention, visible prior replies,
 and user-authorized exports remain independently governed.
+
+The development candidate uses this pattern for the share context hook.
+Only a bounded reference and its admission envelope are kept in memory.
+An exact current-session, current-task and current-turn marker resolves
+against the current store and router. Duplicate markers, unmatched scope,
+unknown carriers and retired registrations leave only the inert marker.
+Sibling hook text can remain alongside a marker. This implementation
+does not yet protect previously stored plaintext or change how Core
+retains explicit reference-tool results, agenda text or feedback context.

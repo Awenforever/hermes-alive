@@ -33,6 +33,36 @@ READ_REFERENCE_SCHEMA = {
                       'description': 'Maximum text characters in this page; bounded metadata is separate.'}},
         'required': ['reference'], 'additionalProperties': False}}
 
+_WIRE_CONTEXT_PREFIX = '[[hermes-alive-context:'
+_WIRE_CONTEXT_MARKER_LENGTH = len(_WIRE_CONTEXT_PREFIX) + 34
+_WIRE_MESSAGE_KEYS = {
+    'chat_completions': ('messages', 'text'),
+    'anthropic_messages': ('messages', 'text'),
+    'bedrock_converse': ('messages', None),
+    'codex_responses': ('input', 'input_text'),
+}
+
+
+def _wire_user_text(request, api_mode):
+    """Yield user text slots from a known provider request, never tool output."""
+    if api_mode not in _WIRE_MESSAGE_KEYS or not isinstance(request, dict):
+        return
+    key, part_type = _WIRE_MESSAGE_KEYS[api_mode]
+    messages = request.get(key)
+    if not isinstance(messages, list):
+        return
+    for message in messages:
+        if not isinstance(message, dict) or message.get('role') != 'user':
+            continue
+        content = message.get('content')
+        if isinstance(content, str) and api_mode != 'bedrock_converse':
+            yield message, 'content'
+        elif isinstance(content, list):
+            for part in content:
+                if (isinstance(part, dict) and part.get('type') == part_type
+                        and isinstance(part.get('text'), str)):
+                    yield part, 'text'
+
 
 def _context_budget(store, config=None):
     """Respect Core's resolved per-hook cap without writing its configuration."""
@@ -53,6 +83,7 @@ class CoreShareContinuity:
         self.store, self.router, self.clearance = store, router, clearance
         self._closed = False
         self._references = OrderedDict()
+        self._wire_turns = OrderedDict()
         self._reference_lock = threading.RLock()
         expected = Path(router.home) / 'plugin-data/hermes-alive/runtime/kernel'
         if Path(store.journal.path).resolve().parent != expected.resolve():
@@ -62,6 +93,7 @@ class CoreShareContinuity:
         with self._reference_lock:
             self._closed = True
             self._references.clear()
+            self._wire_turns.clear()
 
     def for_target(self, scope):
         """Bind a trusted target, not a user/model-selected scope document."""
@@ -117,6 +149,70 @@ class CoreShareContinuity:
             import logging
             logging.getLogger(__name__).warning('Alive conversation reference cannot fit the active Core hook budget')
         return {'context': text} if text else None
+
+    def capture_wire_context(self, **values):
+        """Store a turn binding and return only a marker for Core's history."""
+        identity = tuple(values.get(k) for k in ('session_id', 'task_id', 'turn_id'))
+        if any(not isinstance(k, str) or not 0 < len(k) <= 4096 for k in identity):
+            return None
+        scope = self.router.scope_for_hook(values)
+        if scope is None or _context_budget(self.store) < _WIRE_CONTEXT_MARKER_LENGTH:
+            return None
+        envelope = {k: values.get(k) for k in ('session_id', 'task_id', 'turn_id',
+                    'sender_id', 'platform', 'parent_session_id')}
+        with self._reference_lock:
+            if self._closed:
+                return None
+            binding = self._wire_turns.get(identity)
+            if binding is None:
+                marker = _WIRE_CONTEXT_PREFIX + uuid4().hex + ']]'
+                binding = (marker, scope, envelope)
+                self._wire_turns[identity] = binding
+                while len(self._wire_turns) > 64:
+                    self._wire_turns.popitem(last=False)
+            elif binding[1:] != (scope, envelope):
+                return None
+            return {'context': binding[0]}
+
+    def expand_wire_context(self, *, request, session_id, task_id, turn_id, api_mode):
+        """Resolve only this live turn's marker in the copied provider payload."""
+        identity = (session_id, task_id, turn_id)
+        with self._reference_lock:
+            binding = self._wire_turns.get(identity)
+        if binding is None:
+            return None
+        marker, scope, envelope = binding
+        matches = [(slot, key) for slot, key in _wire_user_text(request, api_mode)
+                   if marker in slot[key]]
+        if len(matches) != 1:
+            return None
+        slot, key = matches[0]
+        pieces = slot[key].split('\n\n')
+        if marker not in pieces or slot[key].count(marker) != 1:
+            return None
+        if self.router.scope_for_hook(envelope) != scope:
+            return None
+        result = self.context(**envelope)
+        if result is None:
+            return None
+        text = result['context']
+        # Core's request sanitizer has already run. Keep invalid Unicode or
+        # control characters out of a late-injected context.
+        try:
+            text.encode('utf-8')
+        except UnicodeEncodeError:
+            return None
+        if any(ord(c) < 32 and c not in '\t\r\n' for c in text):
+            return None
+        if api_mode == 'codex_responses':
+            from agent.codex_responses_adapter import _neutralize_harmony_tokens
+            text = _neutralize_harmony_tokens(text)
+        with self._reference_lock:
+            if self._closed or self._wire_turns.get(identity) is not binding:
+                return None
+            pieces[pieces.index(marker)] = text
+            slot[key] = '\n\n'.join(pieces)
+        return {'request': request, 'source': 'hermes-alive'}
 
     def _reference(self, scope, task, share_id):
         with self._reference_lock:
