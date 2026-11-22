@@ -109,3 +109,31 @@ reference-tool results and actual visible chat history separately. The plugin
 should never seize the profile's single context engine or rewrite ordinary
 messages to simulate erasure. A future reference-only mode would still need
 to account for material returned through tools and retained by Core.
+
+## Qualify request-time reference resolution
+
+Core 0.23.3 exposes the public `llm_request` middleware after provider
+payload construction. A prototype writes an opaque reference into the Core
+API-facing user row, then resolves it at request time. The prototype binds
+the reference to the current session, task and turn. When the record cannot
+be revalidated, the request contains only the inert reference. The ordinary
+message text and previous replies retain their normal Core history.
+
+A controlled run passed with a current grant and refused on withdrawal,
+expiry, a different session, a later turn and middleware retirement. A
+separate real-model run used an actual synthetic Alive share, opened an
+erasure event, and made a second ordinary Core request with the same
+history. The first request contained the authorized material. The second
+contained neither that material nor the private test marker while both
+stored user rows retained their exact ordinary text and opaque references.
+Only Chat Completions was exercised end to end.
+
+Real Core transport conversion retained the synthetic context and tool
+markers across Chat Completions, Anthropic Messages, Bedrock Converse and
+Responses. The carrier differs for each, especially for tool outputs. This
+establishes usable locations, not a complete provider matrix. Before
+adoption, qualify output sanitization after request middleware, retry and
+fallback reconstruction, path-specific tool results, owner and profile
+binding, and cold resume. Historical plaintext from older releases remains
+a separate migration concern. Provider retention, visible prior replies,
+and user-authorized exports remain independently governed.

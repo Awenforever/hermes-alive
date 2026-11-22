@@ -1102,3 +1102,11 @@ both factual and conversational checks. There is no causal evidence yet for
 reducing the author evidence set by default. Evaluate deliberate choice of a
 single contribution independently of context reduction and reuse the existing
 selection stage if it proves helpful.
+
+Core's request middleware offers a path for read-time authority. The
+isolated prototype stored only a reference, resolved it for a real model's
+current authorized turn, then refused a real follow-up after synthetic
+erasure while preserving the prior ordinary conversation. Qualify the
+provider payload carriers and bounded tool-result handling before changing
+the production integration. A new reference contract does not remediate
+plaintext already materialized in older Core histories.

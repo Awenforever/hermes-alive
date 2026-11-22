@@ -303,7 +303,7 @@ fbabb024702d8394fe6af3f145afb25fcb11b0674369aa0d2ece030b485f9f64  ./__tests__/ru
 c820346cb0721a679f22c1e15a59f23616f6d7a70adf2511e45e4a15a13c0e2c  ./__tests__/run_transport_publisher_withdrawal.py
 6210bc2e2fb0f3c78fe10a87ac68b007982a555a90e5c3245924e2c6c71c372f  ./__tests__/run_transport_reconciliation_runtime.py
 ed5065f1271617efd9df6f0c5ef5473d73e343f122df77f5668aa292abca617e  ./__tests__/run_watcher_retention_maintenance.py
-7cf5ff9107fd542461fc9c17f998dd2a30e24b3121a0c458c0212433b379eb83  ./docs/ALIVE_KERNEL_PLAN.md
+dc585cf8bf851b363c8e15b02f34dea73bfd0d9b7166b15330e8a6b65173d980  ./docs/ALIVE_KERNEL_PLAN.md
 bb1240b8645d5bde807e126c36ee12164e2ad602609064402df28740e0e3b315  ./docs/ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-25.md
 a7115842a8cd05021e657b281efb86655a48bd86294b917a3a324935b8a5383b  ./docs/ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-10-27.md
 861ecc2a8cdee6d997501ac564de7d11c6ac94b1a202fd5d143c8520acd7f1e5  ./docs/ALIVE_KERNEL_PROGRESS_ARCHIVE_2026-11-05.md
@@ -600,7 +600,7 @@ d72bb905a7a8aa075b3643e2ae17fad9e248dcf23222ef5845c6dbdab3952445  ./docs/adr/027
 ff4c6f4934ac76457b6067b89890d577298ca571c578ab4629519e8c06b00106  ./docs/adr/0276-model-selected-reading-depth.md
 09217903a3bf65b3b7cf9b50019e55d51a36fff78b0a0409f2f5103356cfde4d  ./docs/adr/0277-scoped-sqlite-resources.md
 2a3ab4df64a587b7994bafa79fe691a27546afc2f342987ed366ef4a0129fd26  ./docs/adr/0278-optional-source-presentation-metadata.md
-21ba08e789dd4c7fa66a3c6ae2024fe80f9a8dd99d9664d264b32522aa69f949  ./docs/adr/0279-citation-priority-conversation-grounding.md
+8343ce97fec6d9814340fe3f066d0bb679273c778343aa41f46e1e4d09f6046a  ./docs/adr/0279-citation-priority-conversation-grounding.md
 77565b6656eae55cd084fabde7bd6fa1fd11bfbd414646f9f2cb51110df4c23f  ./docs/adr/0280-final-assessment-facts-and-communication.md
 4ffa5754bcecdaa67109d9cb1b007d9b6b6686b8f6fa5df624e8ec623c00ac1f  ./docs/adr/0281-source-led-communication-fit-revision.md
 805263fc587d3dd31ac5bd732de0d16844573beee2f2860cdd068c3d19d63efa  ./docs/adr/0282-standard-channel-deadline.md
