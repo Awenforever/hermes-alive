@@ -250,3 +250,15 @@ expose binding availability, not a raw cwd. Core's independent job record retain
 its workdir and instructions under Core retention. Deleting an Alive source does
 not delete Core records or arbitrary backups. Coordinated derived erasure and
 portable identity rebinding remain explicit migration/release gates.
+
+### Continuation and Core conversation history
+
+Alive controls access to the share and source records in its vault. A
+scope change or erasure can withhold later direct reads. Hermes Core
+separately owns its conversation history. On Core 0.23.3, a new model
+request can replay the earlier API-facing user row, including the
+continuation context it carried. A network-disabled control reproduced this
+with synthetic text and an empty current hook result. Qualifying erasure
+and expiry for continuation therefore requires checking replayed history
+and earlier tool results as well as new Alive reads. Already visible
+conversation messages and external systems keep their own retention.

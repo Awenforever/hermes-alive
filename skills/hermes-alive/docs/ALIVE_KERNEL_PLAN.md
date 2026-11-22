@@ -1085,3 +1085,20 @@ new review inputs. Recheck the same draft and a fresh source before assuming
 this helps a reviewer identify the right evidence. The separate Main
 follow-up defect still needs a test that distinguishes direct observations,
 derived quantities, and explanations.
+
+The fresh supercomputing chain completed a simulated share and three ordinary
+turns. It failed the requested one-sentence and one-link limits. Tool receipts
+also distinguish the actual lookup in the second turn from the third turn's
+claim of a new lookup. Core retained past Alive augmentation bytes in current
+requests; a network-disabled control independently reproduced the replay even
+with empty current augmentation. Treat future prompt replay after withdrawal
+or expiry as a production gate for continuation, alongside conversational
+quality. Scope remediation through the Core history contract.
+
+In a controlled retained-source contrast, two selected passages yielded a
+more focused opener than the older failed draft. Giving the same writer the
+same proposed point and the full evidence was shorter still, and cleared
+both factual and conversational checks. There is no causal evidence yet for
+reducing the author evidence set by default. Evaluate deliberate choice of a
+single contribution independently of context reduction and reuse the existing
+selection stage if it proves helpful.

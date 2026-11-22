@@ -85,3 +85,27 @@ refusal rules and Core ownership of the ordinary reply are unaffected.
 Controlled packing and reference reads establish projection behavior. Repeat
 the same factual questions on actual Core and verify with fresh cases before
 crediting conversational quality.
+
+## Core can replay older hook text
+
+The isolated supercomputing trial recorded the exact requests for three
+ordinary turns. Core included each earlier Alive augmentation in the
+conversation prefix as well as the current augmentation. The third turn
+presented a page read from the second as though it had just performed it.
+The request and tool receipts show that no new read occurred in the third
+turn. The trial also failed separate explicit brevity requirements.
+
+Core 0.23.3 stamps user-row `api_content` for prompt-cache replay. A
+network-disabled control replayed a synthetic marker from the historical
+sidecar with an empty current hook response. The original user text lacked
+the marker. Thus omitting an Alive reference now and stopping replay of
+already-materialized context are two different operations.
+
+Qualify this boundary before production. A Core-owned mechanism must
+distinguish ordinary message content from plugin-supplied transient evidence
+and handle expiry, erasure and revalidation on new turns, including after a
+restart. Investigate whether a supported host mechanism suffices. Track
+reference-tool results and actual visible chat history separately. The plugin
+should never seize the profile's single context engine or rewrite ordinary
+messages to simulate erasure. A future reference-only mode would still need
+to account for material returned through tools and retained by Core.
