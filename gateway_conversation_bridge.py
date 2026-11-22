@@ -15,7 +15,8 @@ READ_REFERENCE_SCHEMA = {
     'description': 'Read exact retained Alive text or one retained source excerpt in your current conversation. '
                    'Use a reference handle from Alive context. Paged fragments must be read in order; '
                    'text recovers what Alive prepared, not independent verification. Use source pages to inspect '
-                   'the collected evidence; its catalog identifies source indices. A null next_offset ends '
+                   'the collected evidence. The catalog separates sources_linked_in_share from '
+                   'background_sources; use their source_index values. A null next_offset ends '
                    'the retained text, not the original source. If material is missing, a permitted Core '
                    'web read of the exact public source can add evidence independently. Image links and '
                    'alt text require separate image inspection to say what an image shows. Cite the source name. '
@@ -162,16 +163,20 @@ class CoreShareContinuity:
             if part == 'text':
                 text = item['text']
                 catalog = []
-                for position, original in enumerate(item['sources']):
+                indexed = sorted(enumerate(item['sources']),
+                                 key=lambda entry: entry[1].get('linked_in_share') is not True)
+                for position, original in indexed:
                     source = module._conversation_source(original)
                     if 'excerpt' in source:
                         source.pop('excerpt')
                         source['excerpt_in_context'] = False
                     candidate = {'source_index': position, **source}
-                    if len(json.dumps(catalog + [candidate], ensure_ascii=False)) <= 4096:
+                    if len(json.dumps(module._source_groups(catalog + [candidate]),
+                                      ensure_ascii=False)) <= 4096:
                         catalog.append(candidate)
                 metadata = {'content_kind': 'exact_prepared_share_not_source_verification',
-                            'source_catalog': catalog, 'source_catalog_complete': len(catalog) == item['source_count']}
+                            'source_catalog': module._source_groups(catalog),
+                            'source_catalog_complete': len(catalog) == item['source_count']}
             else:
                 if index >= item['source_count']:
                     raise ValueError('source index unavailable')

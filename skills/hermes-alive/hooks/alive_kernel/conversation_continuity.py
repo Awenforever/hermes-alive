@@ -483,6 +483,15 @@ def _conversation_source(source):
     return result
 
 
+def _source_groups(sources):
+    """Keep the original indices while separating citations from other material."""
+    groups = {'sources_linked_in_share': [], 'background_sources': []}
+    for source in sources:
+        key = 'sources_linked_in_share' if source.get('linked_in_share') is True else 'background_sources'
+        groups[key].append(source)
+    return groups
+
+
 def continuation_context(shares, *, max_chars=None, inline_source_excerpts=True):
     """Conversational evidence, separated from the store's operational receipt.
 
@@ -500,8 +509,9 @@ def continuation_context(shares, *, max_chars=None, inline_source_excerpts=True)
         sources = []
         for index, raw in enumerate(share['sources']):
             source = _conversation_source(raw)
+            source['source_index'] = index
+            source['linked_in_share'] = has_inline_citation(share['text'], source.get('url'))
             if not inline_source_excerpts and 'reference' in share:
-                source['source_index'] = index
                 if source.pop('excerpt', None) is not None:
                     source['excerpt_in_context'] = False
             sources.append(source)
@@ -512,17 +522,21 @@ def continuation_context(shares, *, max_chars=None, inline_source_excerpts=True)
         'at the requested depth and honor explicit limits on length or number of links. '
         'Distinguish what the source reports, what an available tool just verified, and your inference. '
         'For a comparison, keep the measure, baseline and tested conditions together. '
+        'Leave a missing baseline or measurement method unresolved. '
         'Assess tools from this turn’s tool definitions; an earlier reply about access does not describe '
         'current access. If a lookup would help, use a current permitted Core tool on the exact public source. '
         'If you did not read something, say it is unverified only when that limit matters. '
         'Do not infer whole-source or world conclusions from missing excerpts, links or related results. '
-        'Refer to sources by name. linked_in_share identifies a citation, not verification.\n')
+        'Use exact share text for what was said or linked. sources_linked_in_share describes links '
+        'in that text. background_sources supplies context for follow-up questions only.\n')
     if any('reference' in item for item in references):
         header = header.rstrip('\n') + (' When available, use alive_read_reference with the turn’s handle '
             'for omitted text or part=source and source_index for needed evidence. An unread excerpt '
             'is not evidence you have read. If a read fails, state the relevant limit.\n')
     def encode(items):
-        return header + json.dumps({'alive_shares': items}, ensure_ascii=False, separators=(',', ':'))
+        projected = [{key: value for key, value in item.items() if key != 'sources'}
+                     | _source_groups(item['sources']) for item in items]
+        return header + json.dumps({'alive_shares': projected}, ensure_ascii=False, separators=(',', ':'))
     complete = encode(references)
     if max_chars is None or len(complete) <= max_chars:
         return complete
@@ -556,8 +570,7 @@ def continuation_context(shares, *, max_chars=None, inline_source_excerpts=True)
     available = []
     for index in reversed(range(len(packed))):
         sources = selected[index]['sources']
-        order = sorted(range(len(sources)), key=lambda i: not has_inline_citation(
-            selected[index]['text'], sources[i].get('url')))
+        order = sorted(range(len(sources)), key=lambda i: not sources[i]['linked_in_share'])
         admitted = {}
         for source_index in order:
             source = sources[source_index]

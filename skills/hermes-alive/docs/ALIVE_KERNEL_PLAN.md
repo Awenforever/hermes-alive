@@ -1069,3 +1069,11 @@ Separate initial snippets from returned page text in the public follow-up
 input while preserving eligible citation links and the existing read limit.
 Verify with a fixed replay and then fresh topics. Test separately whether
 ordinary Main follow-ups preserve the provenance of cross-study comparisons.
+
+The second archaeology replay retrieved the alternative source and completed a
+simulated share with real Main follow-ups. One reply wrongly characterized a
+background index as the shared link. Distinguish matching citations and
+background references in the projected context and reference tool catalog.
+Preserve original indices, source excerpts and exact share text. Test the two
+real failure shapes separately before treating this as an improvement in
+ordinary conversation.

@@ -236,14 +236,16 @@ async def test(home, mode, *, exercise=None, long_reference=False):
                 assert conversation['text_in_context'] is False and 'text' not in conversation
             else:
                 assert conversation['text'] == expressed.text
-                assert set(conversation) == {'prepared_at','text','sources','reference'}
+                assert set(conversation) == {
+                    'prepared_at','text','sources_linked_in_share','background_sources','reference'}
             expected_source = {
                 key:value for key,value in shares[0]['sources'][0].items()
                 if key not in ('event_id','excerpt_policy','reading_scope')}
             expected_source['reading_scope'] = {'evidence_basis':'retained_excerpt','coverage':'retained_material_only',
                 'available_material':'text','linked_media':'appearance_unverified_by_this_excerpt'}
+            source_group = 'sources_linked_in_share' if expected_source['linked_in_share'] else 'background_sources'
             if not long_reference:
-                assert conversation['sources'][0] == {
+                assert conversation[source_group][0] == {
                     **{key:value for key,value in expected_source.items() if key != 'excerpt'},
                     'source_index':0,'excerpt_in_context':False}
             # Operational diagnostics stay unchanged; only model-facing evidence
@@ -267,7 +269,7 @@ async def test(home, mode, *, exercise=None, long_reference=False):
                     disabled = {'agent': {'disabled_toolsets': ['hermes_alive']}}
                     with patch('hermes_cli.config.load_config_readonly', return_value=disabled):
                         inline = json.loads(collect().split('\n',1)[1])['alive_shares'][0]
-                    assert inline['sources'][0] == expected_source
+                    assert inline[source_group][0] == {**expected_source, 'source_index':0}
                     assert 'reference' not in inline
                 sequence = journal.last_sequence()
                 handle = conversation['reference']
@@ -281,9 +283,9 @@ async def test(home, mode, *, exercise=None, long_reference=False):
                     assert page['offset'] == offset and len(page['text']) <= 256
                     assert page['content_kind'] == 'exact_prepared_share_not_source_verification'
                     assert page['source_catalog_complete'] is True
-                    assert page['source_catalog'][0]['source_index'] == 0
-                    assert page['source_catalog'][0]['url'] == expected_source['url']
-                    assert 'excerpt' not in page['source_catalog'][0]
+                    assert page['source_catalog'][source_group][0]['source_index'] == 0
+                    assert page['source_catalog'][source_group][0]['url'] == expected_source['url']
+                    assert 'excerpt' not in page['source_catalog'][source_group][0]
                     pages.append(page['text'])
                     if page['next_offset'] is None: break
                     offset = page['next_offset']
@@ -340,9 +342,9 @@ async def test(home, mode, *, exercise=None, long_reference=False):
                         body = json.loads(bounded.split('\n',1)[1])['alive_shares'][0]
                         assert body['text'] == expressed.text
                         if raw_cap in (2000, '2200'):
-                            assert body['sources'][0]['excerpt_in_context'] is False
-                            assert 'excerpt' not in body['sources'][0]
-                            assert body['sources'][0]['url'] == shares[0]['sources'][0]['url']
+                            assert body[source_group][0]['excerpt_in_context'] is False
+                            assert 'excerpt' not in body[source_group][0]
+                            assert body[source_group][0]['url'] == shares[0]['sources'][0]['url']
                     assert json.dumps(messages) == original
                 # This retrieval helper itself never calls Core's write-capable
                 # convenience loader. The collector owns its own config loading.
@@ -403,7 +405,7 @@ async def test(home, mode, *, exercise=None, long_reference=False):
                 retained_text = json.loads(context.dispatch_tool('alive_read_reference',
                     {'reference':conversation['reference']},task_id='task',session_id=entry.session_id))
                 assert retained_text['content_kind'] == 'exact_prepared_share_not_source_verification'
-                assert retained_text['source_catalog'][0]['reading_status'] == 'no_longer_retained'
+                assert retained_text['source_catalog']['background_sources'][0]['reading_status'] == 'no_longer_retained'
                 assert retained_text['text'] == expressed.text[:4096]
             finally:
                 core.clear_session_vars(lookup_vars)
@@ -469,13 +471,15 @@ def test_collection_limits_are_not_world_negatives():
     text = continuation_context(shares)
     references = json.loads(text.split('\n',1)[1])['alive_shares']
     assert references[0]['text'] == 'Exact shared words.'
-    assert references[0]['sources'][0]['reading_scope'] == {
+    assert references[0]['background_sources'][0]['reading_scope'] == {
         'evidence_basis':'search_result_excerpt','coverage':'retained_material_only',
         'available_material':'text','linked_media':'appearance_unverified_by_this_excerpt',
         'original_page_body_read':False,'reported_read_scope':'search_listing',
         'reported_content_representation':'machine_summary'}
-    assert references[0]['sources'][0]['excerpt'] == shares[0]['sources'][0]['excerpt']
-    assert references[0]['sources'][1] == {'reading_status':'no_longer_retained'}
+    assert references[0]['background_sources'][0]['excerpt'] == shares[0]['sources'][0]['excerpt']
+    assert references[0]['background_sources'][1] == {
+        'reading_status':'no_longer_retained', 'source_index':1, 'linked_in_share':False}
+    assert references[0]['sources_linked_in_share'] == []
     assert 'independent_verification_proven' not in text and 'video_consumption_proven' not in text
     assert 'private-source-id' not in text and 'private-erased-id' not in text
     assert json.dumps(shares) == original  # No rewriting of the protected trace.
@@ -529,7 +533,7 @@ def test_atomic_context_budget():
             continue
         references = json.loads(text.split('\n',1)[1])['alive_shares']
         assert references[-1]['text'] == shares[-1]['text']
-        for source in references[-1]['sources']:
+        for source in references[-1]['background_sources']:
             if 'excerpt' in source:
                 assert source['excerpt'] in tuple(s['excerpt'] for s in sources)
             else:

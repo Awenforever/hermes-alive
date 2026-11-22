@@ -67,3 +67,21 @@ quality and production gates remain open.
 Clarification of the earlier unchanged-context statement: complete share/source
 representation is unchanged when it fits. The reference-tool instruction header
 also gains the explicit omitted-excerpt reading instruction in those contexts.
+
+## Distinguish the share from its background material
+
+In the actual archaeology replay, a successful second read supplied the link
+used in the share. In ordinary follow-up, the model gave the background index
+as the link that had been shared, even though the index was marked uncited.
+The exact wording and Markdown destinations remain the record of what the
+share says. The context and reference tool catalog now expose the retained
+sources matching those destinations apart from the other material. The original
+source index remains the address for paged reads. A source may help answer a
+question regardless of which group it belongs to. If a comparison's method or
+baseline is absent, the ordinary turn should leave it unresolved.
+
+The groups describe the model-facing projection. Stored receipts, clearances,
+refusal rules and Core ownership of the ordinary reply are unaffected.
+Controlled packing and reference reads establish projection behavior. Repeat
+the same factual questions on actual Core and verify with fresh cases before
+crediting conversational quality.
