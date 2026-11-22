@@ -35,6 +35,8 @@ READ_REFERENCE_SCHEMA = {
 
 _WIRE_CONTEXT_PREFIX = '[[hermes-alive-context:'
 _WIRE_CONTEXT_MARKER_LENGTH = len(_WIRE_CONTEXT_PREFIX) + 34
+_WIRE_PAGE_KEY = 'alive_retained_page'
+_REFERENCE_ERROR = {'error': 'alive_reference_unavailable'}
 _WIRE_MESSAGE_KEYS = {
     'chat_completions': ('messages', 'text'),
     'anthropic_messages': ('messages', 'text'),
@@ -64,6 +66,52 @@ def _wire_user_text(request, api_mode):
                     yield part, 'text'
 
 
+def _wire_tool_text(request, api_mode):
+    """Yield only the result carriers established by Core's converters."""
+    key, _ = _WIRE_MESSAGE_KEYS[api_mode]
+    rows = request.get(key)
+    if not isinstance(rows, list):
+        return
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if api_mode == 'chat_completions' and row.get('role') == 'tool':
+            yield row, 'content', row.get('tool_call_id')
+        elif api_mode == 'codex_responses' and row.get('type') == 'function_call_output':
+            yield row, 'output', row.get('call_id')
+        elif api_mode in ('anthropic_messages', 'bedrock_converse') and row.get('role') == 'user':
+            parts = row.get('content')
+            for part in parts if isinstance(parts, list) else ():
+                if not isinstance(part, dict):
+                    continue
+                if api_mode == 'anthropic_messages' and part.get('type') == 'tool_result':
+                    if isinstance(part.get('content'), str):
+                        yield part, 'content', part.get('tool_use_id')
+                    elif isinstance(part.get('content'), list):
+                        for block in part['content']:
+                            if isinstance(block, dict) and block.get('type') == 'text':
+                                yield block, 'text', part.get('tool_use_id')
+                if api_mode == 'bedrock_converse' and isinstance(part.get('toolResult'), dict):
+                    blocks = part['toolResult'].get('content')
+                    for block in blocks if isinstance(blocks, list) else ():
+                        if isinstance(block, dict):
+                            yield block, 'text', part['toolResult'].get('toolUseId')
+
+
+def _wire_safe_text(text, api_mode):
+    # This middleware runs after Core's outgoing text sanitation.
+    try:
+        text.encode('utf-8')
+    except UnicodeEncodeError:
+        return None
+    if any(ord(c) < 32 and c not in '\t\r\n' for c in text):
+        return None
+    if api_mode == 'codex_responses':
+        from agent.codex_responses_adapter import _neutralize_harmony_tokens
+        return _neutralize_harmony_tokens(text)
+    return text
+
+
 def _context_budget(store, config=None):
     """Respect Core's resolved per-hook cap without writing its configuration."""
     from hermes_cli.config import load_config_readonly
@@ -84,6 +132,7 @@ class CoreShareContinuity:
         self._closed = False
         self._references = OrderedDict()
         self._wire_turns = OrderedDict()
+        self._wire_pages = OrderedDict()
         self._reference_lock = threading.RLock()
         expected = Path(router.home) / 'plugin-data/hermes-alive/runtime/kernel'
         if Path(store.journal.path).resolve().parent != expected.resolve():
@@ -94,6 +143,7 @@ class CoreShareContinuity:
             self._closed = True
             self._references.clear()
             self._wire_turns.clear()
+            self._wire_pages.clear()
 
     def for_target(self, scope):
         """Bind a trusted target, not a user/model-selected scope document."""
@@ -175,44 +225,85 @@ class CoreShareContinuity:
             return {'context': binding[0]}
 
     def expand_wire_context(self, *, request, session_id, task_id, turn_id, api_mode):
-        """Resolve only this live turn's marker in the copied provider payload."""
+        """Resolve current-turn supplements in the copied provider payload."""
+        if api_mode not in _WIRE_MESSAGE_KEYS or not isinstance(request, dict):
+            return None
         identity = (session_id, task_id, turn_id)
         with self._reference_lock:
             binding = self._wire_turns.get(identity)
         if binding is None:
             return None
         marker, scope, envelope = binding
-        matches = [(slot, key) for slot, key in _wire_user_text(request, api_mode)
-                   if marker in slot[key]]
-        if len(matches) != 1:
-            return None
-        slot, key = matches[0]
-        pieces = slot[key].split('\n\n')
-        if marker not in pieces or slot[key].count(marker) != 1:
-            return None
         if self.router.scope_for_hook(envelope) != scope:
             return None
-        result = self.context(**envelope)
-        if result is None:
+        replacements = []
+        matches = [(slot, key) for slot, key in _wire_user_text(request, api_mode)
+                   if marker in slot[key]]
+        if len(matches) == 1:
+            slot, key = matches[0]
+            pieces = slot[key].split('\n\n')
+            if marker in pieces and slot[key].count(marker) == 1:
+                result = self.context(**envelope)
+                text = _wire_safe_text(result['context'], api_mode) if result else None
+                if text is not None:
+                    pieces[pieces.index(marker)] = text
+                    replacements.append((slot, key, '\n\n'.join(pieces)))
+        pages = {}
+        for slot, key, call_id in _wire_tool_text(request, api_mode):
+            content = slot.get(key)
+            if not isinstance(content, str) or not 0 < len(content) <= 128:
+                continue
+            try:
+                document = json.loads(content)
+            except ValueError:
+                continue
+            if isinstance(document, dict) and set(document) == {_WIRE_PAGE_KEY}:
+                handle = document[_WIRE_PAGE_KEY]
+                if isinstance(handle, str):
+                    pages.setdefault(handle, []).append((slot, key, call_id))
+        for handle, slots in pages.items():
+            with self._reference_lock:
+                entry = self._wire_pages.get(handle)
+            if len(slots) != 1 or entry is None or entry[:2] != (identity, slots[0][2]):
+                continue
+            result = self.read_reference(entry[2], task_id=task_id, session_id=session_id)
+            text = _wire_safe_text(json.dumps(result, ensure_ascii=False, separators=(',', ':')), api_mode)
+            if text is not None:
+                replacements.append((*slots[0][:2], text))
+        if not replacements or self.router.scope_for_hook(envelope) != scope:
             return None
-        text = result['context']
-        # Core's request sanitizer has already run. Keep invalid Unicode or
-        # control characters out of a late-injected context.
-        try:
-            text.encode('utf-8')
-        except UnicodeEncodeError:
-            return None
-        if any(ord(c) < 32 and c not in '\t\r\n' for c in text):
-            return None
-        if api_mode == 'codex_responses':
-            from agent.codex_responses_adapter import _neutralize_harmony_tokens
-            text = _neutralize_harmony_tokens(text)
         with self._reference_lock:
             if self._closed or self._wire_turns.get(identity) is not binding:
                 return None
-            pieces[pieces.index(marker)] = text
-            slot[key] = '\n\n'.join(pieces)
+            for slot, key, text in replacements:
+                slot[key] = text
         return {'request': request, 'source': 'hermes-alive'}
+
+    def queue_reference(self, args, *, task_id=None, session_id=None, **_ignored):
+        """Core may retain the marker. The actual page is read on each attempt."""
+        from tools import approval_context
+        turn_id = approval_context._approval_turn_id.get()
+        tool_call_id = approval_context._approval_tool_call_id.get()
+        identity = (session_id, task_id, turn_id)
+        if (approval_context._approval_session_id.get() != session_id
+                or not all(isinstance(k, str) and 0 < len(k) <= 4096 for k in identity)
+                or not isinstance(tool_call_id, str) or not 0 < len(tool_call_id) <= 4096
+                or not isinstance(args, dict) or set(args) - {'reference', 'part', 'source_index', 'offset', 'max_chars'}
+                or not isinstance(args.get('reference'), str) or len(args['reference']) > 64):
+            return _REFERENCE_ERROR
+        if any(type(value) not in (str, int) or isinstance(value, str) and len(value) > 64
+               for value in args.values()):
+            return _REFERENCE_ERROR
+        with self._reference_lock:
+            binding = self._wire_turns.get(identity)
+            entry = self._references.get(args['reference'])
+            if self._closed or binding is None or entry is None or entry[:2] != (binding[1], task_id):
+                return _REFERENCE_ERROR
+            marker = uuid4().hex
+            self._wire_pages[marker] = (identity, tool_call_id, dict(args))
+            while len(self._wire_pages) > 64:
+                self._wire_pages.popitem(last=False)
+        return {_WIRE_PAGE_KEY: marker}
 
     def _reference(self, scope, task, share_id):
         with self._reference_lock:

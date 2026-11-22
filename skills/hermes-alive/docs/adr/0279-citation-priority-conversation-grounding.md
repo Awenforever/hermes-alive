@@ -145,4 +145,15 @@ against the current store and router. Duplicate markers, unmatched scope,
 unknown carriers and retired registrations leave only the inert marker.
 Sibling hook text can remain alongside a marker. This implementation
 does not yet protect previously stored plaintext or change how Core
-retains explicit reference-tool results, agenda text or feedback context.
+retains agenda text or feedback context.
+
+For the reference tool, Core histories keep an opaque receipt rather
+than the retained page. The actual model request resolves it for the
+same session, task, turn and tool call. Offset, source index, and the
+original research scope are revalidated when rereading the vault.
+The supported carriers are Chat Completions tool text, Anthropic
+tool-result text, Bedrock tool-result text, and Responses function
+output. A stale receipt remains inert even when Core keeps it among
+ordinary tool history. Content previously materialized by older
+versions and independently retained assistant replies have their own
+migration and withdrawal requirements.

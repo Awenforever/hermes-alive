@@ -285,7 +285,7 @@ c1bbd53dac48c7b19318174b649c36af43cfa985657873d9b35043ee27e1401a  ./__tests__/ru
 ab724b805c081d0df743777711a025dc0afe1f378c0ed9c2ae7a3207deecb41d  ./__tests__/run_semantic_user_correction.py
 3e835fbcd7aa162822851fa981c130fb94adf38ae84e8d4c9f1340f08ad5bb6c  ./__tests__/run_send_preflight.py
 e12e76f7c149d6ac84fd6d3cde3ed1412a804fc0d6a287667a33908fc9d0222f  ./__tests__/run_shadow_final_quality.py
-c6c19215edac19a2cadad9a2c82dfd8bb320451ca68f7c4e49777bd5dc626c9b  ./__tests__/run_share_conversation_continuity.py
+a7c26f6f837cdfc5fb68bc7a67b3499ca9ac2d6cd0a5ae336c82be1e3d85f7d9  ./__tests__/run_share_conversation_continuity.py
 17ea7849d0f8fbdfdccaa9a3a0b9dd3e94a2dad34bed99538e8748ae925f384e  ./__tests__/run_source_excerpt_scope.py
 fbc8bef18c0b7b3a573b04131bc6f35427ece290eec6e60e7a19fd716bb2912e  ./__tests__/run_source_led_revision.py
 a9124949923d881f5fa504384153d59d2a44c7772756d079ae2db83bf6c569b5  ./__tests__/run_source_review_recovery.py
@@ -600,7 +600,7 @@ d72bb905a7a8aa075b3643e2ae17fad9e248dcf23222ef5845c6dbdab3952445  ./docs/adr/027
 ff4c6f4934ac76457b6067b89890d577298ca571c578ab4629519e8c06b00106  ./docs/adr/0276-model-selected-reading-depth.md
 09217903a3bf65b3b7cf9b50019e55d51a36fff78b0a0409f2f5103356cfde4d  ./docs/adr/0277-scoped-sqlite-resources.md
 2a3ab4df64a587b7994bafa79fe691a27546afc2f342987ed366ef4a0129fd26  ./docs/adr/0278-optional-source-presentation-metadata.md
-0f91061745450f3bd00269ae4a9be9bfb21752bf64697e197c6684519ae628e9  ./docs/adr/0279-citation-priority-conversation-grounding.md
+b32a2f7c8ca411f396ec0ef8496ffa402c7fcc5e8f40a575343c1fcf2c462c0a  ./docs/adr/0279-citation-priority-conversation-grounding.md
 77565b6656eae55cd084fabde7bd6fa1fd11bfbd414646f9f2cb51110df4c23f  ./docs/adr/0280-final-assessment-facts-and-communication.md
 4ffa5754bcecdaa67109d9cb1b007d9b6b6686b8f6fa5df624e8ec623c00ac1f  ./docs/adr/0281-source-led-communication-fit-revision.md
 805263fc587d3dd31ac5bd732de0d16844573beee2f2860cdd068c3d19d63efa  ./docs/adr/0282-standard-channel-deadline.md

@@ -281,6 +281,31 @@ async def test(home, mode, *, exercise=None, long_reference=False):
             assert 'submission_status' not in text and 'success_reported' not in text
             assert shares[0]['submission_status'] and shares[0]['share_id']
             assert json.dumps(messages) == original
+            def read_reference(arguments=None, **ids):
+                from tools.approval_context import (
+                    reset_current_observability_context, set_current_observability_context)
+                args = {'reference': conversation['reference'], **(arguments or {})}
+                route = {'task_id':'task', 'session_id':entry.session_id, **ids}
+                tokens = set_current_observability_context(
+                    turn_id='turn', tool_call_id='test-read-call', session_id=entry.session_id)
+                try:
+                    raw = context.dispatch_tool('alive_read_reference', args, **route)
+                finally:
+                    reset_current_observability_context(tokens)
+                receipt = json.loads(raw)
+                if 'error' in receipt:
+                    return receipt
+                assert set(receipt) == {'alive_retained_page'} and expressed.text not in raw
+                request = {'messages': [{'role':'tool','tool_call_id':'test-read-call','content':raw}]}
+                wrong_call = {'messages': [{'role':'tool','tool_call_id':'not-the-call','content':raw}]}
+                assert not apply_llm_request_middleware(wrong_call, **route,
+                    turn_id='turn', api_mode='chat_completions').changed
+                assert not apply_llm_request_middleware(request, **route,
+                    turn_id='later', api_mode='chat_completions').changed
+                result = apply_llm_request_middleware(request, **route,
+                    turn_id='turn', api_mode='chat_completions')
+                assert result.original_payload == request
+                return json.loads(result.payload['messages'][0]['content'])
             if mode == 'success':
                 # Real Core platform defaults admit a newly registered plugin
                 # toolset. Its saved/global suppression remains authoritative.
@@ -299,11 +324,6 @@ async def test(home, mode, *, exercise=None, long_reference=False):
                     assert inline[source_group][0] == {**expected_source, 'source_index':0}
                     assert 'reference' not in inline
                 sequence = journal.last_sequence()
-                handle = conversation['reference']
-                def read_reference(arguments=None, **ids):
-                    args = {'reference': handle, **(arguments or {})}
-                    return json.loads(context.dispatch_tool('alive_read_reference', args,
-                        **{'task_id':'task', 'session_id':entry.session_id, **ids}))
                 pages, offset = [], 0
                 while True:
                     page = read_reference({'offset':offset,'max_chars':256})
@@ -425,12 +445,10 @@ async def test(home, mode, *, exercise=None, long_reference=False):
             lookup_vars = core.set_session_vars(platform='telegram',chat_id=source.chat_id,user_id=source.user_id,
                 session_key=entry.session_key,session_id=entry.session_id)
             try:
-                unavailable = json.loads(context.dispatch_tool('alive_read_reference',
-                    {'reference':conversation['reference'],'part':'source','source_index':0},
-                    task_id='task',session_id=entry.session_id))
+                unavailable = read_reference(
+                    {'reference':conversation['reference'],'part':'source','source_index':0})
                 assert unavailable == {'error':'alive_reference_unavailable'}
-                retained_text = json.loads(context.dispatch_tool('alive_read_reference',
-                    {'reference':conversation['reference']},task_id='task',session_id=entry.session_id))
+                retained_text = read_reference({'reference':conversation['reference']})
                 assert retained_text['content_kind'] == 'exact_prepared_share_not_source_verification'
                 assert retained_text['source_catalog']['background_sources'][0]['reading_status'] == 'no_longer_retained'
                 assert retained_text['text'] == expressed.text[:4096]

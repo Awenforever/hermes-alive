@@ -144,7 +144,7 @@ class GatewayHostBinding:
         if not self.closed and self._continuity is not None:
             try:
                 self._require_home()
-                result = self._continuity.read_reference(args, **values)
+                result = self._continuity.queue_reference(args, **values)
             except ValueError:
                 pass
         # Core registry handlers return JSON text, unlike hook context values.
