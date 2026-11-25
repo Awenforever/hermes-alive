@@ -8,8 +8,22 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 
+def collect_model_context(session, source, task, text, message_id):
+    from agent.turn_context import _collect_pre_llm_call_context, compose_user_api_content
+    from hermes_cli.middleware import apply_llm_request_middleware
+
+    opaque = _collect_pre_llm_call_context(SimpleNamespace(session_id=session.session_id,
+        model='configured-primary', platform='telegram', _user_id=source.user_id),
+        effective_task_id=task, turn_id=task, original_user_message=text,
+        messages=[{'role': 'user', 'content': text, 'platform_message_id': message_id}],
+        conversation_history=[])
+    request = {'messages': [{'role': 'user',
+                            'content': compose_user_api_content(text, '', opaque) or text}]}
+    return apply_llm_request_middleware(request, session_id=session.session_id,
+        task_id=task, turn_id=task, api_mode='chat_completions')
+
+
 async def exercise_unconsented(core, loaded, binding, runner, source, session):
-    from agent.turn_context import _collect_pre_llm_call_context
     from gateway.run_inbound_consumer import run_post_admission_hook
     from model_tools import handle_function_call
 
@@ -27,11 +41,7 @@ async def exercise_unconsented(core, loaded, binding, runner, source, session):
         user_id=source.user_id, session_key=session.session_key, session_id=session.session_id)
     task = 'native-feedback-without-consent'
     try:
-        _collect_pre_llm_call_context(SimpleNamespace(session_id=session.session_id,
-            model='configured-primary', platform='telegram', _user_id=source.user_id),
-            effective_task_id=task, turn_id=task, original_user_message=text,
-            messages=[{'role': 'user', 'content': text, 'platform_message_id': message_id}],
-            conversation_history=[])
+        assert collect_model_context(session, source, task, text, message_id).changed
         references = [handle for handle, item in binding._continuity._references.items() if item[1] == task]
         assert len(references) == 1, references
         result = json.loads(handle_function_call('alive_record_feedback', dict(reference=references[0],
@@ -48,7 +58,6 @@ async def exercise_unconsented(core, loaded, binding, runner, source, session):
 
 async def exercise(core, loaded, binding, runner, source, session, command, before_forgetting=None):
     from gateway.run_inbound_consumer import run_post_admission_hook
-    from agent.turn_context import _collect_pre_llm_call_context
     import model_tools
     setup=importlib.import_module(loaded.module.__name__+'.kernel_setup_bridge')
     store=setup.setup_store(binding)
@@ -68,10 +77,7 @@ async def exercise(core, loaded, binding, runner, source, session, command, befo
     task='native-feedback-current-turn'
     try:
         def collect(message_id=None):
-            _collect_pre_llm_call_context(SimpleNamespace(session_id=session.session_id,model='configured-primary',
-                platform='telegram',_user_id=source.user_id),effective_task_id=task,turn_id=task,
-                original_user_message=text,messages=[{'role':'user','content':text,
-                    'platform_message_id':message_id or event.message_id}],conversation_history=[])
+            collect_model_context(session, source, task, text, message_id or event.message_id)
         collect()
         targets=[handle for handle,item in binding._continuity._references.items() if item[1]==task]
         assert len(targets)==1,targets

@@ -272,3 +272,14 @@ matches cannot substitute for those witnesses or make a verdict pass.
 Keep the original passage boundaries and coverage checks, including those
 used when reopening earlier interpretations. The index adds no source
 reads, model calls or delivery authority.
+
+## Retain compact identifier spelling
+
+The weather-model replay treated the digit inside `One2N` as a
+measurement. The draft still needed a witness for the name. Treat
+letter-led compact names as whole literals in the new assessment
+version, and keep a witness tied to the occurrence and its retained
+source. A number inside a named item cannot support a numeric claim.
+Changing the identifier fails the check even when the substituted
+number appears elsewhere. Numeric-led quantities still need passage
+witnesses. Prior assessments preserve their recorded token rules.

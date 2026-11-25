@@ -108,8 +108,11 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
             CONVERSATIONAL_FIT_ASSESSMENT, GROUNDED_FIT_ASSESSMENT, PASSAGE_FIT_ASSESSMENT,
             LABELLED_FIT_ASSESSMENT, FLAT_FIT_ASSESSMENT, SEARCH_FIT_ASSESSMENT, ROUTE_FIT_ASSESSMENT,
             CLAIM_SCOPE_ASSESSMENT, CONTRIBUTION_ASSESSMENT, PRESENTATION_ASSESSMENT, COVERAGE_ASSESSMENTS,
-            PASSAGE_LOCATOR_ASSESSMENT)
+            PASSAGE_LOCATOR_ASSESSMENT, COMPACT_IDENTIFIER_ASSESSMENT)
         scope = snapshot.get('expression_binding', {}).get('final_assessment_scope')
+        if scope == COMPACT_IDENTIFIER_ASSESSMENT:
+            from .final_value_findings import COMPACT_IDENTIFIER_PROMPT
+            return COMPACT_IDENTIFIER_PROMPT
         if scope == PASSAGE_LOCATOR_ASSESSMENT:
             from .final_value_findings import PASSAGE_LOCATOR_PROMPT
             return PASSAGE_LOCATOR_PROMPT
@@ -422,10 +425,13 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
                 PRESENTATION_ASSESSMENT, CLAIM_COVERAGE_REVIEW, CLAIM_COVERAGE_ASSESSMENT,
                 IDENTIFIER_COVERAGE_REVIEW, IDENTIFIER_COVERAGE_ASSESSMENT,
                 FIRST_CLAIM_COVERAGE_REVIEW, FIRST_CLAIM_COVERAGE_ASSESSMENT,
-                PASSAGE_LOCATOR_REVIEW, PASSAGE_LOCATOR_ASSESSMENT)
+                PASSAGE_LOCATOR_REVIEW, PASSAGE_LOCATOR_ASSESSMENT,
+                COMPACT_IDENTIFIER_REVIEW, COMPACT_IDENTIFIER_ASSESSMENT)
             if method.get('discovery_source_review') in SPLIT_SOURCE_REVIEW_CONTRACTS:
                 data['expression_binding']['semantic_assessment_scope']=BOUNDARY_ASSESSMENT
-                if method['discovery_source_review'] == PASSAGE_LOCATOR_REVIEW:
+                if method['discovery_source_review'] == COMPACT_IDENTIFIER_REVIEW:
+                    data['expression_binding']['final_assessment_scope']=COMPACT_IDENTIFIER_ASSESSMENT
+                elif method['discovery_source_review'] == PASSAGE_LOCATOR_REVIEW:
                     data['expression_binding']['final_assessment_scope']=PASSAGE_LOCATOR_ASSESSMENT
                 elif method['discovery_source_review'] == CLAIM_COVERAGE_REVIEW:
                     data['expression_binding']['final_assessment_scope']=CLAIM_COVERAGE_ASSESSMENT

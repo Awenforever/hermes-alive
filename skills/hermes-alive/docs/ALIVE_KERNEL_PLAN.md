@@ -1110,3 +1110,8 @@ erasure while preserving the prior ordinary conversation. Qualify the
 provider payload carriers and bounded tool-result handling before changing
 the production integration. A new reference contract does not remediate
 plaintext already materialized in older Core histories.
+
+The weather case demonstrated a separate review classification defect:
+digits within a compact letter-led model name must be witnessed as the
+whole name. Keep numerical occurrence checks for measurements, and
+verify the exact old review and the new assessment independently.

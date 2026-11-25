@@ -354,6 +354,38 @@ def test_passage_locator_does_not_replace_the_review_witness():
     assert validate_retained(result, witness_snapshot=current) == result
 
 
+def test_compact_identifiers_keep_measurements_separate():
+    from alive_kernel.final_value_findings import passage_request
+    from alive_kernel.review_contracts import COMPACT_IDENTIFIER_ASSESSMENT, PASSAGE_LOCATOR_ASSESSMENT
+
+    claim = 'R72N produced a 0.07° grid on an 80GB card.'
+    source = 'R72N produced a 0.07° grid on an 80GB card. There were 71 test stations.'
+    wire = dict(facts='supported', fact_reason='The release documents its test.',
+        fit='fits', fit_reason='One concrete point.', recipient_evidence=[], search_alignment='not_applicable',
+        scope_reason='No query.', claim_scope='preserved', claim_scope_reason='The grid is reported.',
+        source_witnesses=[dict(claim=claim, passage_id='P1.1')])
+
+    def assess(text, assessment):
+        snapshot = dict(candidate={'text': text}, evidence=[{'event_id': 'release', 'excerpt': source}],
+            expression_binding={'final_assessment_scope': assessment})
+        wire['source_witnesses'][0]['claim'] = text
+        parsed = parse(json.dumps(wire), witness_snapshot=snapshot)
+        assert validate_retained(parsed, witness_snapshot=snapshot) == parsed
+        return parsed, passage_request(snapshot, labelled=True)['numeric_passage_locations']
+
+    result, locator = assess(claim, COMPACT_IDENTIFIER_ASSESSMENT)
+    assert result['verdict'] == 'supported'
+    assert [(v['kind'], v['literal']) for v in locator] == [
+        ('identifier', 'R72N'), ('number', '0.07'), ('number', '80')]
+    result, _ = assess(claim.replace('R72N', 'R71N'), COMPACT_IDENTIFIER_ASSESSMENT)
+    assert result['verdict'] == 'uncertain' and 'R71N' in result['reason']
+    result, _ = assess(claim.replace('0.07°', '72°'), COMPACT_IDENTIFIER_ASSESSMENT)
+    assert result['verdict'] == 'uncertain' and '72' in result['reason']
+    result, legacy = assess(claim.replace('R72N', 'R71N'), PASSAGE_LOCATOR_ASSESSMENT)
+    assert result['verdict'] == 'supported'
+    assert legacy[0]['kind'] == 'number' and legacy[0]['literal'] == '71'
+
+
 def test_visible_markdown_claim_witness():
     from alive_kernel.review_contracts import CLAIM_COVERAGE_ASSESSMENT
 
@@ -449,6 +481,7 @@ if __name__ == '__main__':
     test_only_explicit_communication_choices_shape_new_discovery_openings()
     test_numeric_coverage_of_actual_draft()
     test_passage_locator_does_not_replace_the_review_witness()
+    test_compact_identifiers_keep_measurements_separate()
     test_visible_markdown_claim_witness()
     test_named_identifiers_do_not_supply_measurements()
     test_rejection_survives_invalid_factual_witness()

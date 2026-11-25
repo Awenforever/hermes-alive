@@ -9,7 +9,8 @@ from unicodedata import normalize
 from .model_json import parse_model_json
 from .review_contracts import (CLAIM_SCOPE_ASSESSMENTS, FLAT_ASSESSMENTS, SEARCH_ASSESSMENTS,
                                CLAIM_COVERAGE_ASSESSMENT, COVERAGE_ASSESSMENTS, LABELLED_ASSESSMENTS,
-                               PASSAGE_FIT_ASSESSMENT, PASSAGE_LOCATOR_ASSESSMENT,
+                               PASSAGE_FIT_ASSESSMENT, PASSAGE_LOCATOR_ASSESSMENTS,
+                               COMPACT_IDENTIFIER_ASSESSMENT,
                                TYPED_COVERAGE_ASSESSMENTS)
 
 
@@ -225,8 +226,17 @@ each value with its own entity and condition. Never select a passage just
 because it is next to a passage that states the value.
 """
 
+COMPACT_IDENTIFIER_PROMPT = PASSAGE_LOCATOR_PROMPT + """
+For a compact alphanumeric identifier such as a model name or sample ID,
+witness its whole spelling in the claim. Match that name and its role to the
+source; the digit inside the name does not support a separate quantity.
+Include the name in a short verbatim witness even when the associated measure
+is explained in another sentence. The eight-witness limit still applies.
+"""
+
 _NUMBER = re.compile(r'\d+(?:,\d{3})*(?:\.\d+)?')
 _IDENTIFIER = re.compile(r'(?<![A-Za-z0-9_.-])[A-Za-z][A-Za-z0-9]*(?:[-_.][A-Za-z0-9]+)+')
+_COMPACT_IDENTIFIER = re.compile(r'(?<![A-Za-z0-9_])[A-Za-z][A-Za-z0-9]*(?:[-_.][A-Za-z0-9]+)*')
 _NON_PROSE = re.compile(r'https?://[^\s<>\])]+|(?m:^[ \t]*\d+[.)][ \t]+)', re.IGNORECASE)
 
 
@@ -238,8 +248,9 @@ def _number_value(match):
     return match[0].replace(',', '')
 
 
-def _coverage_tokens(text, typed):
-    identifiers = [token for token in _IDENTIFIER.finditer(text)
+def _coverage_tokens(text, typed, *, compact=False):
+    pattern = _COMPACT_IDENTIFIER if compact else _IDENTIFIER
+    identifiers = [token for token in pattern.finditer(text)
                    if any(character.isdigit() for character in token[0])] if typed else []
     values = [(token.span(), ('identifier', token[0])) for token in identifiers]
     for number in _NUMBER.finditer(text):
@@ -250,22 +261,25 @@ def _coverage_tokens(text, typed):
 
 def _apply_numeric_coverage(findings, snapshot):
     """Give each visible numeric occurrence a local evidence witness."""
-    typed = snapshot['expression_binding']['final_assessment_scope'] in TYPED_COVERAGE_ASSESSMENTS
+    scope = snapshot['expression_binding']['final_assessment_scope']
+    typed = scope in TYPED_COVERAGE_ASSESSMENTS
+    compact = scope == COMPACT_IDENTIFIER_ASSESSMENT
     text = _normalized_numeric_text(snapshot['candidate']['text'])
-    uncovered = dict(_coverage_tokens(text, typed))
+    uncovered = dict(_coverage_tokens(text, typed, compact=compact))
     sources = {}
     if typed:
         for item in snapshot['evidence']:
             sources[item['event_id']] = {
-                value for _, value in _coverage_tokens(_normalized_numeric_text(item['excerpt']), True)
+                value for _, value in _coverage_tokens(
+                    _normalized_numeric_text(item['excerpt']), True, compact=compact)
                 if value[0] == 'identifier'}
     for witness in findings['source_witnesses']:
         claim = _normalized_numeric_text(witness['claim'])
         evidence_values = {value for _, value in _coverage_tokens(
-            _normalized_numeric_text(witness['quote']), typed) if value[0] == 'number'}
+            _normalized_numeric_text(witness['quote']), typed, compact=compact) if value[0] == 'number'}
         if typed:
             evidence_values.update(sources[witness['source_event_id']])
-        witnessed = [(span, value) for span, value in _coverage_tokens(claim, typed)
+        witnessed = [(span, value) for span, value in _coverage_tokens(claim, typed, compact=compact)
                      if value in evidence_values]
         for occurrence in re.finditer(re.escape(claim), text):
             for (start, end), value in witnessed:
@@ -339,23 +353,24 @@ def passage_request(request, *, labelled=False):
          'passages': (_labelled_passages(number, source['excerpt']) if labelled
                       else _passages(source['excerpt']))}
         for number, source in enumerate(request['evidence'], 1)]}
-    if (labelled and request.get('expression_binding', {}).get('final_assessment_scope')
-            == PASSAGE_LOCATOR_ASSESSMENT):
+    scope = request.get('expression_binding', {}).get('final_assessment_scope')
+    if labelled and scope in PASSAGE_LOCATOR_ASSESSMENTS:
         result['numeric_passage_locations'] = _numeric_passage_locations(
-            request['candidate']['text'], result['evidence'])
+            request['candidate']['text'], result['evidence'], compact=scope == COMPACT_IDENTIFIER_ASSESSMENT)
     return result
 
 
-def _numeric_passage_locations(text, evidence):
+def _numeric_passage_locations(text, evidence, *, compact=False):
     """Locate literals without judging which passage supports a claim."""
-    values = dict.fromkeys(value for _, value in _coverage_tokens(_normalized_numeric_text(text), True))
+    values = dict.fromkeys(value for _, value in _coverage_tokens(
+        _normalized_numeric_text(text), True, compact=compact))
     locations = {value: [] for value in tuple(values)[:24] if len(value[1]) <= 80}
     if not locations:
         return []
     for source in evidence:
         for passage in source['passages']:
             matches = {value for _, value in _coverage_tokens(
-                _normalized_numeric_text(passage['text']), True)}
+                _normalized_numeric_text(passage['text']), True, compact=compact)}
             for value in locations.keys() & matches:
                 if len(locations[value]) < 8:
                     locations[value].append(passage['passage_id'])
@@ -509,7 +524,7 @@ def parse(text, *, witness_snapshot=None):
         try:
             verified = _validate_witnesses(witnesses, witness_snapshot, findings['factual_support']['assessment'])
         except ValueError:
-            if (assessment_scope not in (CLAIM_COVERAGE_ASSESSMENT, PASSAGE_LOCATOR_ASSESSMENT)
+            if (assessment_scope not in (CLAIM_COVERAGE_ASSESSMENT, *PASSAGE_LOCATOR_ASSESSMENTS)
                     or findings['communication_fit']['assessment'] != 'conflicts'):
                 raise
             # A communication veto can guide rewriting. It cannot certify

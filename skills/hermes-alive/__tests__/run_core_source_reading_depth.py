@@ -129,7 +129,7 @@ async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_cap
                         for n in ('user_value','urgency','novelty','confidence','risk','interruption_cost')})]}
             elif 'expression_binding' in data:
                 from final_review_fixture import controlled_final_findings
-                assert data['expression_binding']['final_assessment_scope'] == 'factual-support-and-communication-fit-v15'
+                assert data['expression_binding']['final_assessment_scope'] == 'factual-support-and-communication-fit-v16'
                 assert 'numeric_passage_locations' in data
                 assert 'test fit as an opening in a real conversation' in body['messages'][0]['content']
                 if feedback_probe['expected'] is not None:
