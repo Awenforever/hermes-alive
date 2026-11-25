@@ -244,6 +244,9 @@ async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_cap
                     if data.get('correction'):
                         assert 'may change the opening, focus, ordering and depth' in body['messages'][0]['content']
                         stage='revision';value={'text':'One concrete finding: '+value}
+                        source = data['expression_context']['source_evidence'][0]
+                        value.update(point='A concrete finding from the original source.',
+                            evidence={'event_id':source['event_id'],'quote':source['excerpt'][:80]})
                     else:
                         value = ('DENSE_TEST_OPENING. ' if fit_revision else 'The purported trial covered 473 sites. ') + value
             elif 'candidate' in data and 'evidence' in data:

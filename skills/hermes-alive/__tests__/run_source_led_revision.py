@@ -13,7 +13,7 @@ from alive_kernel.events import _thaw_json
 from alive_kernel.expression_support import ExpressionSourceSupportReviewer
 from alive_kernel.source_support import SourceSupportError
 from alive_kernel.final_value_findings import combine
-from alive_kernel.source_revision import revision_author_view, eligible, revised_text, METHOD
+from alive_kernel.source_revision import revision_author_view, eligible, revised_text, method_for, METHOD, FOCUSED_METHOD
 from alive_kernel.review_contracts import FACTS_AND_FIT_ASSESSMENT
 
 
@@ -24,6 +24,7 @@ def pure():
         'expression_binding':{'final_assessment_scope':FACTS_AND_FIT_ASSESSMENT},
         'assessment_scope':{'kind':'final_discovery_source_and_value'},'evidence':[{'source':'synthetic'}]}}
     assert eligible(context)
+    assert method_for(context) == FOCUSED_METHOD
     route = {'kind': 'configured-discovery-route-v1'}
     author = {'search_context': route, 'approved_search_queries': ['internal route'],
               'source_evidence': [{'excerpt': 'Authors describe a prototype.'}]}
@@ -60,13 +61,29 @@ def pure():
         try:revised_text(value,protected_literals=('exact-source',))
         except ValueError:pass
         else:raise AssertionError('invalid revision or literal loss admitted')
+    proposal = {'text':'A new opening. exact-source','point':'Private focus.',
+                'evidence':{'event_id':'source:a','quote':'describe a prototype'}}
+    options = {'method':FOCUSED_METHOD,'protected_literals':('exact-source',),
+               'sources':[{'event_id':'source:a','excerpt':'Authors describe a prototype.'}]}
+    assert revised_text(proposal, **options) == proposal['text']
+    for mutation in ({'point':''},{'point':'x'*321},{'text':'lost the source'},
+                     {'evidence':{'event_id':'source:b','quote':'describe a prototype'}},
+                     {'evidence':{'event_id':'source:a','quote':'describe a result'}}):
+        try:revised_text({**proposal, **mutation}, **options)
+        except ValueError:pass
+        else:raise AssertionError('invalid focus, evidence or literal loss admitted')
 
 
 async def test(root,mode):
-    await exercise(root,'repair',fit_revision=mode)
+    if mode == 'legacy-proof':
+        with patch('alive_kernel.expression_runtime.source_revision_method_for', return_value=METHOD):
+            await exercise(root,'repair',fit_revision=mode)
+    else:
+        await exercise(root,'repair',fit_revision=mode)
     journal=ExperienceJournal(root/'journal.sqlite3')
     starts=[r for r in journal.read(event_type='expression.runtime_started') if 'correction_method' in r.event.payload]
-    assert len(starts)==1 and starts[0].event.payload['correction_method']==METHOD
+    expected_method = METHOD if mode == 'legacy-proof' else FOCUSED_METHOD
+    assert len(starts)==1 and starts[0].event.payload['correction_method']==expected_method
     if mode in ('abstain','erase'):
         assert not journal.read(event_type='expression.source_revision_completed')
         return
@@ -74,6 +91,7 @@ async def test(root,mode):
     reviewer=ExpressionSourceSupportReviewer(journal)
     candidate=reviewer.expressions.resolve_model_candidate(proof.event.causation_id)
     assert candidate is not None
+    assert 'Private focus on continued observation.' not in candidate.text
     args=dict(subject='user:test',selection_event_id=candidate.selection_event_id)
     assert reviewer.current_correction_binding(candidate,**args)
     get=journal.get
@@ -89,7 +107,7 @@ async def test(root,mode):
 
 
 if __name__=='__main__':
-    cases = ('success', 'reject-again', 'abstain', 'erase', 'invalid-witness')
+    cases = ('success', 'reject-again', 'abstain', 'erase', 'invalid-witness', 'legacy-proof')
     parser=argparse.ArgumentParser();parser.add_argument('--case',choices=cases)
     selected=parser.parse_args().case
     pure()

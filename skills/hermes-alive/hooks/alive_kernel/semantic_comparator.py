@@ -18,7 +18,7 @@ from .content_vault import ContentReference
 from .presentation import PresentationProjection
 from .model_json import parse_model_json
 from .localized_correction import METHOD as LOCAL_CORRECTION_METHOD, CORRECTION_PROMPT, apply_correction, text_digest
-from .source_revision import (METHOD as SOURCE_REVISION_METHOD, PROMPT as SOURCE_REVISION_PROMPT,
+from .source_revision import (METHODS as SOURCE_REVISION_METHODS, FOCUSED_METHOD, FOCUSED_PROMPT, PROMPT as SOURCE_REVISION_PROMPT,
     eligible as source_revision_eligible, revised_text)
 from .semantic_rendering import deterministic_text, serialize_meaning
 from .semantic_review import (
@@ -477,7 +477,7 @@ class SemanticComparator:
             raise SemanticReviewError('invalid independence mode')
         if type(protocol_recovery) is not bool:
             raise SemanticReviewError('invalid protocol recovery mode')
-        if correction_method is not None and (correction_method not in (LOCAL_CORRECTION_METHOD, SOURCE_REVISION_METHOD)
+        if correction_method is not None and (correction_method not in (LOCAL_CORRECTION_METHOD, *SOURCE_REVISION_METHODS)
                 or correction_review_event_id is None):
             raise SemanticReviewError('unknown or unbound local correction method')
         operation = str(operation_id or uuid4())
@@ -508,7 +508,8 @@ class SemanticComparator:
             (item['outcome_event_id'] for item in (expression_context or {}).get('literal_feedback_context', ())))
         discovery = bool(expression_context and expression_context.get('method') in (
             'discovery-source-authoring-v1','discovery-source-authoring-v2','discovery-source-authoring-v3'))
-        if correction_method == SOURCE_REVISION_METHOD and (not discovery or not source_revision_eligible(correction)):
+        revision = correction_method in SOURCE_REVISION_METHODS
+        if revision and (not discovery or not source_revision_eligible(correction)):
             raise SemanticReviewError('source-led revision needs a current discovery wording or evidence finding')
         # Durable start still precedes inference. Its clock cannot slide during
         # recovery, and an old unclocked start never acquires a new prompt.
@@ -518,9 +519,9 @@ class SemanticComparator:
         author_context = self._author_context(expression_context) if expression_context else None
         configured_route = bool(discovery and expression_context.get('search_context', {}).get(
             'kind') == 'configured-discovery-route-v1')
-        configured_rewrite = configured_route and correction_method == SOURCE_REVISION_METHOD
+        configured_rewrite = configured_route and revision
         prompt_correction = None
-        if correction_method == SOURCE_REVISION_METHOD:
+        if revision:
             from .source_revision import revision_author_view
             author_context, prompt_correction = revision_author_view(
                 author_context, correction, configured_route=configured_route)
@@ -575,8 +576,8 @@ class SemanticComparator:
                     'from background. Do not imply the source is current or in scope without evidence.')
             if correction_method == LOCAL_CORRECTION_METHOD:
                 render_system=CORRECTION_PROMPT
-            elif correction_method == SOURCE_REVISION_METHOD:
-                render_system += '\n' + SOURCE_REVISION_PROMPT
+            elif revision:
+                render_system += '\n' + (FOCUSED_PROMPT if correction_method == FOCUSED_METHOD else SOURCE_REVISION_PROMPT)
             if configured_route and not configured_rewrite:
                 from .research_evidence import ROUTE_SEARCH_GUIDANCE
                 render_system += ROUTE_SEARCH_GUIDANCE
@@ -597,7 +598,8 @@ class SemanticComparator:
                 if previous is None or previous.text != correction['grounding_context']['candidate']['text']:
                     raise SemanticReviewError('local correction original is no longer available')
                 literals=tuple(literal for atom in document.atoms for literal in atom.protected_literals)
-                text=(revised_text(proposal,protected_literals=literals) if correction_method == SOURCE_REVISION_METHOD else
+                text=(revised_text(proposal,protected_literals=literals,method=correction_method,
+                    sources=author_context['source_evidence']) if revision else
                     apply_correction(previous.text,expected_digest=previous.digest,
                         findings=correction['findings'],response=proposal,protected_literals=literals))
             domain = resolve_domain(provider, actual_model)
@@ -616,7 +618,6 @@ class SemanticComparator:
             if proposal is not None:
                 # Retain reconstruction evidence in the existing encrypted vault
                 # and journal, not a new backend, reviewer or delivery mechanism.
-                revision=correction_method == SOURCE_REVISION_METHOD
                 ref=self.store.content_vault.put_json(proposal,subject=subject,
                     purpose='semantic.source-revision' if revision else 'semantic.local-correction',sensitivity=source.event.sensitivity,
                     retention_until=candidate.expires_at,content_id=('semantic-source-revision:' if revision else 'semantic-local-correction:')+operation,

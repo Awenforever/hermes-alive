@@ -8,7 +8,7 @@ from .opportunity_expression import OpportunityExpressionStore
 from .planning_runtime import PlanningRuntime, PlanningRuntimeResult, validate_model_timeout
 from .semantic_comparator import SemanticComparator
 from .localized_correction import METHOD as LOCAL_CORRECTION_METHOD
-from .source_revision import METHOD as SOURCE_REVISION_METHOD, eligible as source_revision_eligible
+from .source_revision import METHODS as SOURCE_REVISION_METHODS, method_for as source_revision_method_for
 
 
 class ExpressionRuntimeError(ValueError):
@@ -130,9 +130,9 @@ class ExpressionRuntime:
             # recorded method, even if failed or incomplete.
             correction_method=(retained_start.event.payload.get('correction_method')
                 if retained_start is not None else
-                SOURCE_REVISION_METHOD if source_revision_eligible(correction) else LOCAL_CORRECTION_METHOD)
+                source_revision_method_for(correction) or LOCAL_CORRECTION_METHOD)
             if correction_method is not None:
-                if correction_method not in (LOCAL_CORRECTION_METHOD, SOURCE_REVISION_METHOD):
+                if correction_method not in (LOCAL_CORRECTION_METHOD, *SOURCE_REVISION_METHODS):
                     raise ExpressionRuntimeError('unknown retained correction method')
                 binding['correction_method']=correction_method
         self._bound_record(start_id, 'expression.runtime_started', subject,

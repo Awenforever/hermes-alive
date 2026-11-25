@@ -296,7 +296,9 @@ async def exercise(root,mode,*,primary_url=None):
                     assert 'public museum methods' not in raw
                     assert 'Keep the focus on the public evidence.' in raw
                     assert 'DEEP_READ_EVIDENCE' in raw
-                    value=dict(text=value)
+                    source = data['expression_context']['source_evidence'][0]
+                    value=dict(text=value, point='The observational conservation method.',
+                               evidence={'event_id':source['event_id'],'quote':source['excerpt'][:80]})
             elif task=='alive_semantic_review':
                 if mode not in ('page-failed','legacy-replay','unconsented-followup','historical-followup-replay'):
                     assert 'source_context' not in data

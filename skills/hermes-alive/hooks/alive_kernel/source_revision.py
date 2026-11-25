@@ -8,13 +8,15 @@ from .localized_correction import text_digest
 from .review_contracts import FACTS_AND_FIT_ASSESSMENTS, WITNESS_ASSESSMENTS
 
 METHOD = 'source-led-fit-revision-v1'
+FOCUSED_METHOD = 'source-led-fit-revision-v2'
+METHODS = (METHOD, FOCUSED_METHOD)
 
 
 class SourceRevisionAbstained(ValueError):
     """A deliberate decline, distinguishable from malformed output in receipts."""
 
 
-PROMPT = '''Write a fresh message from the source evidence, current recipient
+_REVISION_INSTRUCTIONS = '''Write a fresh message from the source evidence, current recipient
 context and required meaning. The supplied assessment explains why an earlier
 draft did not serve this conversation. It is advisory, without evidence or
 authority of its own. Decide what belongs in this turn before writing.
@@ -30,10 +32,29 @@ Use only retained source evidence; do not invent details, recipient interests,
 experience, completed actions or promises to make a revision seem worthwhile.
 An explicitly requested detailed account can remain detailed. No word quota,
 compulsory hook, criticism, opinion, advice or closing question.
-For this revision, the response format replaces the ordinary plain-message
+'''
+
+PROMPT = _REVISION_INSTRUCTIONS + '''For this revision, the response format replaces the ordinary plain-message
 format: return exactly {"text":"the complete revised message"} or, if the
 evidence cannot support a worthwhile revision, {"abstain":true}. The message
 will be reviewed again in full. You cannot send or grant any authority.'''
+
+FOCUSED_PROMPT = _REVISION_INSTRUCTIONS + '''Choose one
+worthwhile point before writing. It can be a concrete consequence, a
+relationship worth understanding, or an uncertainty that changes the takeaway.
+Select one short exact quote from a source_evidence excerpt for that point,
+using the source's event_id. Carry only details that help explain the point.
+Findings about the rejected draft do not require carrying over its examples,
+statistics, or topic emphasis. Write the outward message in normal chat
+language with its required source link. Keep the point and quote private.
+Return exactly {"point":"brief private focus","evidence":{"event_id":"supplied source id",
+"quote":"exact contiguous excerpt"},"text":"complete outward message"} or
+{"abstain":true}. The message will be reviewed again in full. You cannot send
+or grant any authority.'''
+
+
+def method_for(context):
+    return FOCUSED_METHOD if eligible(context) else None
 
 
 def revision_author_view(author_context, correction, *, configured_route):
@@ -79,11 +100,22 @@ def eligible(context):
             or findings.get('numeric_evidence_coverage', {}).get('assessment') == 'unresolved')
 
 
-def revised_text(proposal, *, protected_literals=()):
+def revised_text(proposal, *, protected_literals=(), method=METHOD, sources=()):
     if isinstance(proposal, dict) and proposal == {'abstain': True} and proposal['abstain'] is True:
         raise SourceRevisionAbstained('source-led revision abstained')
-    if not isinstance(proposal, dict) or set(proposal) != {'text'}:
+    fields = {'text', 'point', 'evidence'} if method == FOCUSED_METHOD else {'text'}
+    if method not in METHODS or not isinstance(proposal, dict) or set(proposal) != fields:
         raise ValueError('source-led revision requires complete text or explicit abstention')
+    if method == FOCUSED_METHOD:
+        point, evidence = proposal['point'], proposal['evidence']
+        if (not isinstance(point, str) or not point.strip() or len(point) > 320
+                or not isinstance(evidence, dict) or set(evidence) != {'event_id', 'quote'}):
+            raise ValueError('focused revision requires a bounded point and evidence reference')
+        event_id, quote = evidence['event_id'], evidence['quote']
+        if (not isinstance(event_id, str) or not isinstance(quote, str)
+                or not quote.strip() or len(quote) > 320
+                or not any(item['event_id'] == event_id and quote in item['excerpt'] for item in sources)):
+            raise ValueError('focused revision evidence is outside the authoring snapshot')
     text = proposal['text']
     text_digest(text)  # Same UTF-8 boundary as model candidates; no truncation.
     if not text.strip() or any(literal not in text for literal in protected_literals):

@@ -154,3 +154,26 @@ states. This run does not isolate numeric coverage as the only review failure.
 The ordinary replies still exceeded an explicit sentence and link limit and
 gave unsupported cost estimates. The replay therefore qualifies neither live
 search for this run nor a clean complete sharing round.
+
+## 2026-11-26 — Choose a point before rewriting
+
+For a new source-led revision, the same call now selects one worthwhile
+point and an exact excerpt before composing the outward message. The point
+and excerpt remain in the protected revision proof.
+Replay rechecks the excerpt against the selected authoring snapshot.
+Required meaning and the complete factual and communication checks still
+judge the outward text. An exact excerpt alone cannot qualify a message.
+
+Existing v1 proofs and starts keep their original contract. The focused
+method uses the same single revision slot, model route and deadline.
+In two isolated retained-source controls, independently checked drafts kept a
+useful point and attributed it accurately. Those controls did not exercise
+the live Markdown handoff or an ordinary conversation.
+
+Two later runs exposed the importance of using the same rewrite for unresolved
+numeric coverage. In each run, the first reviewer accepted the fit while the
+evidence check withheld the draft. The original v1 rewrite then added lists of
+background facts, and the second fit review withheld it again. Choosing the
+one point before writing applies to both reasons for a whole-message revision.
+Local claim corrections still use the exact-span editor. These failed cases
+provide regression inputs but no clean sharing rounds.

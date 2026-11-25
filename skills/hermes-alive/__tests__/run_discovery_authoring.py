@@ -152,13 +152,20 @@ async def exercise(root,mode,*,historical=False,fit_revision=False):
             # unused source specification and operational caveat need not appear.
             if mode=='repair' and data.get('correction'):
                 if fit_revision:
-                    from alive_kernel.source_revision import PROMPT
-                    assert PROMPT in kw['messages'][0]['content'] and 'issues' not in data
+                    from alive_kernel.source_revision import FOCUSED_PROMPT, PROMPT
+                    prompt = PROMPT if fit_revision == 'legacy-proof' else FOCUSED_PROMPT
+                    assert prompt in kw['messages'][0]['content'] and 'issues' not in data
                     if fit_revision=='abstain':return response(json.dumps({'abstain':True}))
                     if fit_revision=='erase':
                         ingestor.vault.erase_item(journal.get(source.observation_event_id).event.payload['content']['content_id'])
-                    return response(json.dumps({'text':'A concrete observation: the project keeps watching '
-                        'when evidence is insufficient. [Design](https://example.invalid/design)'}))
+                    revision = {'text':'A concrete observation: the project keeps watching '
+                        'when evidence is insufficient. [Design](https://example.invalid/design)'}
+                    if fit_revision != 'legacy-proof':
+                        evidence = data['expression_context']['source_evidence'][0]
+                        revision.update(point='Private focus on continued observation.',
+                            evidence={'event_id': evidence['event_id'],
+                                      'quote': evidence['excerpt'][:80]})
+                    return response(json.dumps(revision))
                 return response(json.dumps({'edits':[dict(exact_text='I shared this yesterday. ',
                     claim_index=0,replacement='')]}))
             if mode in ('bare-citation','legacy-bare'):

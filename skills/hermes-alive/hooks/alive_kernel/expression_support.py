@@ -293,9 +293,9 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
 
     def _verify_correction_evidence(self,expression,context,method,subject,selection_event_id,start):
         from .localized_correction import METHOD, apply_correction, text_digest
-        from .source_revision import METHOD as SOURCE_METHOD, eligible, revised_text
-        revision=method == SOURCE_METHOD
-        if method not in (METHOD, SOURCE_METHOD) or revision and not eligible(context):
+        from .source_revision import METHODS as SOURCE_METHODS, FOCUSED_METHOD, eligible, revised_text
+        revision=method in SOURCE_METHODS
+        if method not in (METHOD, *SOURCE_METHODS) or revision and not eligible(context):
             raise SourceSupportError('unknown retained local correction method')
         operation=expression.renderer_execution_id.removeprefix('execution:').removesuffix(':render')
         proof=self.journal.get(('message.source_revision:' if revision else 'message.local_correction:')+operation)
@@ -329,7 +329,11 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
             _,document,_,_=self.expressions._selection_context(selection_event_id=selection_event_id,
                 meaning_event_id=expression.meaning_event_id,subject=subject,observed_at=event.observed_at)
             literals=tuple(literal for atom in document.atoms for literal in atom.protected_literals)
-            reconstructed=(revised_text(proposal,protected_literals=literals) if revision else
+            sources=()
+            if method == FOCUSED_METHOD:
+                author_context=self.expressions.expression_context_for_selection(selection_event_id,subject)
+                sources=author_context['source_evidence']
+            reconstructed=(revised_text(proposal,protected_literals=literals,method=method,sources=sources) if revision else
                 apply_correction(previous_text,expected_digest=previous_digest,
                     findings=context['findings'],response=proposal,protected_literals=literals))
             if self.vault.digest_json(proposal)!=ref.digest or reconstructed!=expression.text:
