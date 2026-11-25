@@ -36,7 +36,7 @@ from . import reading_assessment
 
 _DISCOVERY_AUTHORING = 'source-led-v2'
 _DISCOVERY_AUTHORING_MODES = ('source-led-v1','source-led-v2','source-led-v3')
-from .review_contracts import (CLAIM_COVERAGE_REVIEW, SUBSTANTIVE_DISCOVERY_REVIEW,
+from .review_contracts import (CLAIM_COVERAGE_REVIEW, BOUNDED_INFERENCE_REVIEW,
                                DISCOVERY_AUTHOR_SOURCE_INPUT, SPLIT_SOURCE_REVIEW_CONTRACTS)
 
 
@@ -1426,7 +1426,7 @@ class OpportunitySynthesizer:
             recipient_output='intent-only-v1' if recipient_meaning else None,
             editorial_context='origin-purpose-v1' if recipient_meaning else None,
             discovery_authoring=('source-led-v3' if focus else _DISCOVERY_AUTHORING) if recipient_meaning else None,
-            **({'discovery_source_review':SUBSTANTIVE_DISCOVERY_REVIEW}
+            **({'discovery_source_review':BOUNDED_INFERENCE_REVIEW}
                if recipient_meaning and (focus or _DISCOVERY_AUTHORING=='source-led-v2') else {}),
             **({'discovery_author_input':DISCOVERY_AUTHOR_SOURCE_INPUT}
                if recipient_meaning and (focus or _DISCOVERY_AUTHORING=='source-led-v2') else {}),

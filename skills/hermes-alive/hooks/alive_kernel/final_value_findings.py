@@ -284,6 +284,17 @@ evidence and the real conversation, without requiring technical depth or
 assuming that a configured collection route is a request to track an item.
 """
 
+BOUNDED_INFERENCE_PROMPT = SUBSTANTIVE_DISCOVERY_PROMPT + """
+An explanation can be supported by a passage through a short and transparent
+inference, even when the source does not use the same words. Accept it only if
+the supporting passage supplies the premises, the actual wording signals an
+interpretation or illustration rather than a reported demonstration, and the
+inference adds no new tested capability, causal result, place, sample, quantity
+or date. Witness both its exact outward wording and the passage with the
+premises. Weak, speculative or overgeneralized inferences remain unresolved.
+Judge whether the actual wording signals the limits; do not silently rewrite it.
+"""
+
 _NUMBER = re.compile(r'\d+(?:,\d{3})*(?:\.\d+)?')
 _IDENTIFIER = re.compile(r'(?<![A-Za-z0-9_.-])[A-Za-z][A-Za-z0-9]*(?:[-_.][A-Za-z0-9]+)+')
 _COMPACT_IDENTIFIER = re.compile(r'(?<![A-Za-z0-9_])[A-Za-z][A-Za-z0-9]*(?:[-_.][A-Za-z0-9]+)*')

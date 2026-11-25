@@ -1155,3 +1155,12 @@ Judge the actual value rather than rejecting all listings. Compact supported
 announcements and explicitly requested tracking may still merit a message.
 Keep the user's current answer-format constraints in the continuation
 evaluation, even when the agent has found useful new evidence.
+
+Factual review must leave room for an explanation the reader can check against
+its premises. Evaluate transparent analogies and narrow interpretations
+against the same source passages, and keep exact wording witnesses. An
+interpretation cannot create a measurement, location, causal finding or
+demonstrated capability. In the observed tower case, the fixed platforms and
+moving cabin support a vertical-profile analogy while the planned commissioning
+rules out calling it a measured pollution profile. Replay both outcomes
+without changing the retained source or granting delivery.
