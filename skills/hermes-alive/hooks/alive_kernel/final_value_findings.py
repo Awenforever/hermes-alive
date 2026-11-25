@@ -320,8 +320,12 @@ def _coverage_tokens(text, typed, *, compact=False):
     return sorted(values)
 
 
-def _apply_numeric_coverage(findings, snapshot):
-    """Give each visible numeric occurrence a local evidence witness."""
+def numeric_witness_literals(text):
+    return {value for _, value in _coverage_tokens(_normalized_numeric_text(text), True, compact=True)}
+
+
+def missing_numeric_witnesses(findings, snapshot):
+    """Return the literal and kind of each still-unwitnessed occurrence."""
     scope = snapshot['expression_binding']['final_assessment_scope']
     typed = scope in TYPED_COVERAGE_ASSESSMENTS
     compact = scope in COMPACT_IDENTIFIER_ASSESSMENTS
@@ -349,7 +353,11 @@ def _apply_numeric_coverage(findings, snapshot):
                 if uncovered.get(span) == value:
                     del uncovered[span]
 
-    missing = list(dict.fromkeys(value for _, value in uncovered.values()))
+    return tuple(dict.fromkeys(uncovered.values()))
+
+
+def _apply_numeric_coverage(findings, snapshot):
+    missing = list(dict.fromkeys(value for _, value in missing_numeric_witnesses(findings, snapshot)))
     coverage = dict(assessment='unresolved' if missing else 'covered',
         reason=('These numeric expressions lack an evidence witness at their occurrence: ' +
                 ', '.join(missing)[:1200] + '. Remove or source the affected assertions.'

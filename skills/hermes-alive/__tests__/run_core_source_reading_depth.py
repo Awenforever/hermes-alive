@@ -15,7 +15,7 @@ from run_core_guided_setup import cli
 
 
 async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_capture=False,search_alignment='matches',
-               claim_scope_conflict=False):
+               claim_scope_conflict=False,witness_completion=False):
     feedback_case=os.environ.get('HERMES_ALIVE_TEST_NATIVE_FEEDBACK')=='1'
     assert search_alignment in ('matches','justified_pivot','conflicts','uncertain')
     source_revision = fit_revision or numeric_revision
@@ -25,6 +25,7 @@ async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_cap
     search_negative=search_alignment in ('conflicts','uncertain')
     assert not claim_scope_conflict or (search_alignment=='matches' and not (source_revision or revoke_after_capture or feedback_case))
     review_negative=search_negative or claim_scope_conflict
+    assert not witness_completion or not (source_revision or revoke_after_capture or review_negative or feedback_case)
     import httpx
     home.mkdir(exist_ok=True)
     assert not any(home.iterdir()),'fixture requires its newly reserved empty profile'
@@ -43,6 +44,7 @@ async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_cap
     feedback_probe={'expected':None,'seen':False,'author_seen':False}
     fixture_errors=[]
     qualifier='The trial used an existing instrument, not a newly constructed one.'
+    named_instrument='The instrument was named V37Q.'
     overstatement='The trial used a newly constructed instrument.'
     try:
         manager=core.get_plugin_manager();manager.discover_and_load()
@@ -73,6 +75,8 @@ async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_cap
                 assert args['urls']==[url] and args['char_limit'] in (6000,15000)
                 text=('An introduction describes observing before intervention.' if args['char_limit']==6000
                     else 'Public background. '*510+qualifier)
+                if witness_completion and args['char_limit']==15000:
+                    text += '\n'+named_instrument
                 return json.dumps({'results':[dict(url=url,title='',content=text)]})
             return operation
         for name in ('web_search','web_extract'):
@@ -142,6 +146,10 @@ async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_cap
                 stage='final';value=controlled_final_findings(data,
                     fit='conflicts' if conflict else 'fits',
                     reason='Synthetic whole-form mismatch.' if conflict else 'Synthetic form fits the situation.')
+                if witness_completion:
+                    passage_id=next(p['passage_id'] for row in data['evidence'] for p in row['passages']
+                                    if qualifier in p['text'])
+                    value['source_witnesses']=[{'claim':qualifier,'passage_id':passage_id}]
                 if fit_revision and conflict:
                     value['source_witnesses'][0]['claim'] = 'Words absent from the original draft.'
                 if search_alignment!='matches':
@@ -195,6 +203,8 @@ async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_cap
                     assert len(urls)==1,urls
                     source_url=next(iter(urls))
                 value=qualifier+' [Source](<'+source_url+'>)'
+                if witness_completion:
+                    value=named_instrument+' '+value
                 if claim_scope_conflict:
                     value=overstatement+' '+value
                 if (review_negative or feedback_probe['expected'] is not None) and data.get('correction'):
@@ -209,6 +219,14 @@ async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_cap
                         stage='revision';value={'text':'One concrete finding: '+value}
                     else:
                         value = ('DENSE_TEST_OPENING. ' if fit_revision else 'The purported trial covered 473 sites. ') + value
+            elif 'additional_witness_limit' in data:
+                assert witness_completion and data['additional_witness_limit']==7
+                assert stages.count('final')==1 and named_instrument in data['candidate']['text']
+                locate=data['numeric_passage_locations']
+                assert len(locate)==1 and locate[0]['literal']=='V37Q'
+                stage='complete_witness'
+                value={'additional_witnesses':[{'claim':named_instrument,
+                                                'passage_id':locate[0]['matching_passage_ids'][0]}]}
             elif 'candidate' in data and 'evidence' in data:
                 stage='source';assert qualifier in raw
                 value=dict(verdict='supported',unsupported_claims=[],uncertainties=[],reason='Synthetic source verdict')
@@ -278,6 +296,33 @@ async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_cap
         assert len(sent)==1 and qualifier in sent[0][1]
         assert stages.count('final')==(2 if source_revision else 1)
         assert stages.count('revision')==int(source_revision)
+        if witness_completion:
+            assert stages.count('complete_witness')==1 and named_instrument in sent[0][1]
+            setup=importlib.import_module(loaded.module.__name__+'.kernel_setup_bridge')
+            store=setup.setup_store(binding)
+            review_id=result.prepared.final_review_event_id
+            review=store.journal.get(review_id).event
+            recovery=store.journal.get(review_id.removesuffix(':completed')+':protocol-recovery').event
+            assert review.payload['verdict']=='supported' and review.payload['protocol_recovered'] is True
+            assert recovery.payload['recovery_method']=='missing-witnesses-v1'
+            body=store.vault.resolve_json(review.payload['content']['content_id'])
+            assert body['snapshot']['candidate']['text']==sent[0][1]
+            assert body['findings']['numeric_evidence_coverage']['assessment']=='covered'
+            assert body['raw_witness_completion']
+            reopened=setup.setup_store(binding)
+            preparation=execution.kernel('send_preparation_runtime').SendPreparationRuntime(
+                reopened.journal,content_vault=reopened.vault)
+            subject,origin,clearance=preparation._expression_origin(result.prepared.expression)
+            reviewer=execution.kernel('expression_support').ExpressionSourceSupportReviewer(
+                reopened.journal,content_vault=reopened.vault)
+            args=dict(subject=subject,interpretation_id=origin,
+                      candidate_id=result.prepared.expression.expression_event_id,
+                      clearance=clearance,allow_correlated=True)
+            assert reviewer.verify_current(review_id,**args)==body['findings']
+            reopened.vault.erase_item(recovery.payload['content']['content_id'])
+            assert reviewer.verify_current(review_id,**args) is None
+            print('HERMES_ALIVE_CORE_WITNESS_COMPLETION_OK',flush=True)
+            return
         if fit_revision:assert 'DENSE_TEST_OPENING' not in sent[0][1]
         if numeric_revision:assert '473' not in sent[0][1]
         assert stages.count('reading')==stages.count('deepen')==1
@@ -475,7 +520,8 @@ if __name__=='__main__':
                          numeric_revision=os.environ.get('HERMES_ALIVE_TEST_NUMERIC_REVISION')=='1',
                          revoke_after_capture=os.environ.get('HERMES_ALIVE_TEST_CAPTURE_REVOCATION')=='1',
                          search_alignment=os.environ.get('HERMES_ALIVE_TEST_SEARCH_ALIGNMENT','matches'),
-                         claim_scope_conflict=os.environ.get('HERMES_ALIVE_TEST_CLAIM_SCOPE_CONFLICT')=='1'))
+                         claim_scope_conflict=os.environ.get('HERMES_ALIVE_TEST_CLAIM_SCOPE_CONFLICT')=='1',
+                         witness_completion=os.environ.get('HERMES_ALIVE_TEST_WITNESS_COMPLETION')=='1'))
         succeeded=True
     finally:
         from core_fixture_cleanup import close_test_stores

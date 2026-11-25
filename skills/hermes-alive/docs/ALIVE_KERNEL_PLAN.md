@@ -1164,3 +1164,12 @@ demonstrated capability. In the observed tower case, the fixed platforms and
 moving cabin support a vertical-profile analogy while the planned commissioning
 rules out calling it a measured pollution profile. Replay both outcomes
 without changing the retained source or granting delivery.
+
+An otherwise supported model-card share was held because the review omitted
+an exact model-name witness. Within the existing protocol recovery slot,
+permit completion of missing witness locations for a supported background
+discovery when the retained passages contain every missing literal. Keep
+the first substantive judgments and original wording intact. Reject foreign
+passages and new verdict fields. Retain the original review and the witness
+addition separately so reopening can replay the same checks. This does not
+increase the two-call review budget or repair a negative factual finding.

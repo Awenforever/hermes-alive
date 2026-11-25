@@ -15,6 +15,7 @@ from .model_json import parse_model_json
 from .host_discovery import read_scope_metadata, source_prompt_excerpt, provenance_metadata
 from .communication_plan import communication_situation
 from .model_timeouts import MAX_STAGE_SECONDS
+from . import source_witness_completion
 
 
 class SourceSupportError(ValueError):
@@ -227,7 +228,8 @@ class SourceSupportReviewer:
                     or start.event.payload.get('assessment_clock')!=clock
                     or record.event.observed_at<start.event.observed_at):return None
             review_until=self._stored_review_until(start,record,data)
-            expected_prompt,_=self._assessment_request(data,start.event.observed_at if has_clock else None,review_until)
+            expected_prompt, wire = self._assessment_request(data, start.event.observed_at if has_clock else None,
+                                                              review_until)
             independent = bool(payload['reviewer_domain'] != payload['generator_domain']
                                and payload['reviewer_model'] != payload['generator_model'])
             required = payload.get('require_independence', True)
@@ -264,9 +266,14 @@ class SourceSupportReviewer:
                         or recovery.event.actor != record.event.actor
                         or recovery.event.event_type != 'opportunity.source_support_protocol_recovery'
                         or recovery.event.causation_id != start.event.event_id
-                        or recovery.event.payload.get('snapshot_digest') != payload['snapshot_digest']
-                        or recovery.event.payload.get('recovery_prompt_digest') !=
-                            hashlib.sha256(PROTOCOL_RECOVERY_PROMPT.encode()).hexdigest()):
+                        or recovery.event.payload.get('snapshot_digest') != payload['snapshot_digest']):
+                    return None
+                recovery_payload = recovery.event.payload
+                method = recovery_payload.get('recovery_method')
+                if method not in (None, source_witness_completion.METHOD):
+                    return None
+                recovery_prompt = PROTOCOL_RECOVERY_PROMPT if method is None else source_witness_completion.PROMPT
+                if recovery_payload.get('recovery_prompt_digest') != hashlib.sha256(recovery_prompt.encode()).hexdigest():
                     return None
                 invalid_ref = ContentReference.from_event_payload(recovery.event.payload['content'])
                 invalid = self.vault.resolve_json(invalid_ref.content_id, expected_subject=subject,
@@ -274,12 +281,25 @@ class SourceSupportReviewer:
                     expected_sensitivity=Sensitivity(clearance))
                 if self.vault.digest_json(invalid) != invalid_ref.digest or invalid['snapshot'] != data:
                     return None
-                try:
-                    self.parse_findings(invalid['raw_review'], data)
-                except SourceSupportError:
-                    pass
+                if method == source_witness_completion.METHOD:
+                    if (not start.sequence < recovery.sequence < record.sequence
+                            or recovery_payload.get('delivery_authority_granted') is not False
+                            or any(recovery_payload.get(key) != payload.get(key) for key in
+                                   ('reviewer_model', 'reviewer_provider', 'reviewer_domain'))):
+                        return None
+                    original = self.parse_findings(invalid['raw_review'], data)
+                    completion = source_witness_completion.request_for(data, wire, original)
+                    if (completion is None or self.vault.digest_json(completion) != recovery_payload.get('request_digest')
+                            or source_witness_completion.merge(invalid['raw_review'],
+                                retained['raw_witness_completion'], data, completion) != retained['raw_review']):
+                        return None
                 else:
-                    return None
+                    try:
+                        self.parse_findings(invalid['raw_review'], data)
+                    except SourceSupportError:
+                        pass
+                    else:
+                        return None
                 if self.parse_findings(retained['raw_review'], data) != findings:
                     return None
             elif recovery is not None:
@@ -448,6 +468,8 @@ class SourceSupportReviewer:
             messages = [{'role':'system','content':review_prompt},{'role':'user',
                          'content':json.dumps(request, ensure_ascii=False)}]
             recovered = False
+            witness_request = None
+            raw_supplement = None
             for attempt in range(2 if protocol_recovery else 1):
                 current, result = current_snapshot()
                 if (self.vault.digest_json(current)!=digest or result!=generated
@@ -477,32 +499,54 @@ class SourceSupportReviewer:
                 independent = bool(domain and domain != generator_domain and model != generated.actual_model)
                 if not domain or (require_independence and not independent):
                     raise SourceSupportError('source reviewer is not independent')
+                if witness_request is not None:
+                    if (model, provider, domain) != original_route:
+                        raise SourceSupportError('witness completion changed the reviewer route')
+                    raw_supplement = text
+                    try:
+                        text = source_witness_completion.merge(invalid['raw_review'], text, snapshot, witness_request)
+                    except ValueError as error:
+                        raise SourceSupportError('invalid additional evidence witnesses') from error
+                    findings = self.parse_findings(text, snapshot)
+                    break
                 try:
                     findings = self.parse_findings(text, snapshot)
                 except SourceSupportError as error:
                     if attempt or not protocol_recovery or len(text.encode('utf-8')) > 131072:
                         raise
-                    invalid_ref = self.vault.put_json({'snapshot':snapshot,'raw_review':text},
-                        subject=subject, purpose='opportunity.source-support-invalid',
-                        sensitivity=Sensitivity(clearance), retention_until=bundle.retention_until,
-                        content_id=prefix + ':invalid', depends_on=feedback_dependencies)
-                    recovery = self.journal.append(EventEnvelope(event_id=prefix+':protocol-recovery',
-                        event_type='opportunity.source_support_protocol_recovery',
-                        causation_id=prefix+':started', payload={'content':invalid_ref.to_event_payload(),
-                            'error_class':type(error).__name__, 'snapshot_digest':digest,
-                            'reviewer_model':model, 'reviewer_provider':provider, 'reviewer_domain':domain,
-                            'recovery_prompt_digest':hashlib.sha256(PROTOCOL_RECOVERY_PROMPT.encode()).hexdigest(),
-                            'delivery_authority_granted':False}, **base))
-                    if not recovery.created:
-                        raise SourceSupportError('source-review recovery already attempted')
-                    # Fresh evidence is reconsidered; never mutate an invalid verdict in code.
+                    recovery_prompt = PROTOCOL_RECOVERY_PROMPT
+                    recovery_details = {'error_class': type(error).__name__}
                     messages = [{'role':'system','content':review_prompt + '\n' + PROTOCOL_RECOVERY_PROMPT},
                         {'role':'user','content':json.dumps({'original_evidence':request,
                             'invalid_review':text}, ensure_ascii=False)}]
-                    recovered = True
-                    continue
-                break
+                else:
+                    if attempt or not protocol_recovery:
+                        break
+                    witness_request = source_witness_completion.request_for(snapshot, request, findings)
+                    if witness_request is None:
+                        break
+                    original_route = (model, provider, domain)
+                    recovery_prompt = source_witness_completion.PROMPT
+                    recovery_details = {'recovery_method': source_witness_completion.METHOD,
+                                        'request_digest': self.vault.digest_json(witness_request)}
+                    messages = [{'role':'system', 'content':recovery_prompt},
+                        {'role':'user', 'content':json.dumps(witness_request, ensure_ascii=False)}]
+                invalid_ref = self.vault.put_json({'snapshot':snapshot,'raw_review':text},
+                    subject=subject, purpose='opportunity.source-support-invalid',
+                    sensitivity=Sensitivity(clearance), retention_until=bundle.retention_until,
+                    content_id=prefix + ':invalid', depends_on=feedback_dependencies)
+                recovery = self.journal.append(EventEnvelope(event_id=prefix+':protocol-recovery',
+                    event_type='opportunity.source_support_protocol_recovery',
+                    causation_id=prefix+':started', payload={'content':invalid_ref.to_event_payload(),
+                        **recovery_details, 'snapshot_digest':digest,
+                        'reviewer_model':model, 'reviewer_provider':provider, 'reviewer_domain':domain,
+                        'recovery_prompt_digest':hashlib.sha256(recovery_prompt.encode()).hexdigest(),
+                        'delivery_authority_granted':False}, **base))
+                if not recovery.created:
+                    raise SourceSupportError('source-review recovery already attempted')
+                recovered = True
             ref = self.vault.put_json({'snapshot':snapshot,'findings':findings,'raw_review':text,
+                **({'raw_witness_completion': raw_supplement} if raw_supplement is not None else {}),
                 **({'review_as_of':review_as_of.isoformat()} if review_as_of is not None else {}),
                 **({'review_valid_until':review_until.isoformat()} if review_until is not None else {})}, subject=subject,
                 purpose='opportunity.source-support', sensitivity=Sensitivity(clearance),

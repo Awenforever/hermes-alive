@@ -553,6 +553,48 @@ def test_passage_boundaries_keep_the_measured_clause_together():
     assert parse(json.dumps(response), witness_snapshot=snapshot)['verdict'] == 'uncertain'
 
 
+def test_witness_completion_keeps_the_original_judgments():
+    from alive_kernel.final_value_findings import passage_request
+    from alive_kernel.research_evidence import configured_route_context
+    from alive_kernel.review_contracts import BOUNDED_INFERENCE_ASSESSMENT, BOUNDED_INFERENCE_REVIEW
+    from alive_kernel.source_witness_completion import merge, request_for
+
+    snapshot = {'expression_binding': {'final_assessment_scope': BOUNDED_INFERENCE_ASSESSMENT},
+                'search_context': configured_route_context(BOUNDED_INFERENCE_REVIEW),
+                'candidate': {'text': 'Instrument X41P was used. The test finished.'},
+                'evidence': [{'event_id': 'used', 'excerpt': 'Instrument X41P was used. The test finished.'},
+                             {'event_id': 'other', 'excerpt': 'The control was X41Q.'}],
+                'approved_search_queries': ['instrument test']}
+    raw = dict(facts='supported', fact_reason='The report confirms both sentences.',
+               fit='fits', fit_reason='One concrete observation.', recipient_evidence=[],
+               search_alignment='matches', scope_reason='The test is relevant.',
+               claim_scope='preserved', claim_scope_reason='Same test.',
+               source_witnesses=[dict(claim='The test finished.', passage_id='P1.1')])
+    original = json.dumps(raw)
+    request = request_for(snapshot, passage_request(snapshot, labelled=True), parse(original, witness_snapshot=snapshot))
+    assert request['additional_witness_limit'] == 7
+    extra = dict(claim='Instrument X41P was used.', passage_id='P1.1')
+    merged = merge(original, json.dumps({'additional_witnesses': [extra]}), snapshot, request)
+    assert json.loads(merged) == {**raw, 'source_witnesses': [*raw['source_witnesses'], extra]}
+    assert parse(merged, witness_snapshot=snapshot)['verdict'] == 'supported'
+    for invalid in ({'facts': 'supported', 'additional_witnesses': [extra]},
+                    {'additional_witnesses': [{**extra, 'passage_id': 'P2.1'}]},
+                    {'additional_witnesses': [extra, extra]},
+                    {'additional_witnesses': [{**extra, 'claim': 'Made-up wording X41P'}]}):
+        try:
+            merge(original, json.dumps(invalid), snapshot, request)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError('unscoped witness completion was accepted')
+    for negative in (dict(facts='uncertain'), dict(fit='conflicts'), dict(search_alignment='uncertain')):
+        findings = parse(json.dumps({**raw, **negative}), witness_snapshot=snapshot)
+        assert request_for(snapshot, passage_request(snapshot, labelled=True), findings) is None
+    unsupported = {**snapshot, 'candidate': {'text': 'Instrument X41Z was used. The test finished.'}}
+    assert request_for(unsupported, passage_request(unsupported, labelled=True),
+                       parse(original, witness_snapshot=unsupported)) is None
+
+
 if __name__ == '__main__':
     test_dimensions()
     test_old_and_new_contracts()
@@ -570,4 +612,5 @@ if __name__ == '__main__':
     test_named_identifiers_do_not_supply_measurements()
     test_rejection_survives_invalid_factual_witness()
     test_passage_boundaries_keep_the_measured_clause_together()
+    test_witness_completion_keeps_the_original_judgments()
     print('FINAL_VALUE_DIMENSIONS_OK')
