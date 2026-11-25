@@ -10,7 +10,7 @@ from .model_json import parse_model_json
 from .review_contracts import (CLAIM_SCOPE_ASSESSMENTS, FLAT_ASSESSMENTS, SEARCH_ASSESSMENTS,
                                CLAIM_COVERAGE_ASSESSMENT, COVERAGE_ASSESSMENTS, LABELLED_ASSESSMENTS,
                                PASSAGE_FIT_ASSESSMENT, PASSAGE_LOCATOR_ASSESSMENTS,
-                               COMPACT_IDENTIFIER_ASSESSMENT,
+                               COHERENT_PASSAGE_ASSESSMENT, COMPACT_IDENTIFIER_ASSESSMENTS,
                                TYPED_COVERAGE_ASSESSMENTS)
 
 
@@ -91,6 +91,21 @@ them. If the retained passages leave a material scope unclear, mark it uncertain
 
 def _passages(excerpt):
     return [excerpt[start:start + 500] for start in range(0, len(excerpt), 500)]
+
+
+_SENTENCE_BOUNDARY = re.compile(r'(?<=[\n。！？])|(?<=[.!?])(?=\s)')
+
+
+def _coherent_passages(excerpt):
+    """Prefer a nearby sentence or line ending without resizing the evidence."""
+    start = 0
+    while start < len(excerpt):
+        end = min(start + 500, len(excerpt))
+        if end < len(excerpt):
+            end = max((match.start() for match in
+                       _SENTENCE_BOUNDARY.finditer(excerpt, start + 300, end)), default=end)
+        yield excerpt[start:end]
+        start = end
 
 
 LABELLED_PROMPT = CONVERSATIONAL_PROMPT + """
@@ -263,7 +278,7 @@ def _apply_numeric_coverage(findings, snapshot):
     """Give each visible numeric occurrence a local evidence witness."""
     scope = snapshot['expression_binding']['final_assessment_scope']
     typed = scope in TYPED_COVERAGE_ASSESSMENTS
-    compact = scope == COMPACT_IDENTIFIER_ASSESSMENT
+    compact = scope in COMPACT_IDENTIFIER_ASSESSMENTS
     text = _normalized_numeric_text(snapshot['candidate']['text'])
     uncovered = dict(_coverage_tokens(text, typed, compact=compact))
     sources = {}
@@ -342,21 +357,23 @@ def _with_finding(findings, key, finding, rejected, unresolved):
     return result
 
 
-def _labelled_passages(source_number, excerpt):
+def _labelled_passages(source_number, excerpt, *, coherent=False):
+    passages = _coherent_passages(excerpt) if coherent else _passages(excerpt)
     return [{'passage_id': f'P{source_number}.{number}', 'text': text}
-            for number, text in enumerate(_passages(excerpt), 1)]
+            for number, text in enumerate(passages, 1)]
 
 
 def passage_request(request, *, labelled=False):
+    scope = request.get('expression_binding', {}).get('final_assessment_scope')
+    coherent = scope == COHERENT_PASSAGE_ASSESSMENT
     result = {**request, 'evidence': [
         {**{key: value for key, value in source.items() if key != 'excerpt'},
-         'passages': (_labelled_passages(number, source['excerpt']) if labelled
+         'passages': (_labelled_passages(number, source['excerpt'], coherent=coherent) if labelled
                       else _passages(source['excerpt']))}
         for number, source in enumerate(request['evidence'], 1)]}
-    scope = request.get('expression_binding', {}).get('final_assessment_scope')
     if labelled and scope in PASSAGE_LOCATOR_ASSESSMENTS:
         result['numeric_passage_locations'] = _numeric_passage_locations(
-            request['candidate']['text'], result['evidence'], compact=scope == COMPACT_IDENTIFIER_ASSESSMENT)
+            request['candidate']['text'], result['evidence'], compact=scope in COMPACT_IDENTIFIER_ASSESSMENTS)
     return result
 
 
@@ -446,7 +463,8 @@ def _validate_witnesses(witnesses, snapshot, assessment, *, retained=False):
             fields.add('source_event_id')
         catalog = {row['passage_id']: (source['event_id'], row['text'])
                    for number, source in enumerate(snapshot['evidence'], 1)
-                   for row in _labelled_passages(number, source['excerpt'])}
+                   for row in _labelled_passages(number, source['excerpt'],
+                                                 coherent=scope == COHERENT_PASSAGE_ASSESSMENT)}
     elif indexed:
         fields.add('passage')
     if retained or not (indexed or labelled):

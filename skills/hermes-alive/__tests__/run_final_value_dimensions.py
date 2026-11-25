@@ -470,6 +470,39 @@ def test_rejection_survives_invalid_factual_witness():
         else: raise AssertionError('the invalid witness escaped its review contract')
 
 
+def test_passage_boundaries_keep_the_measured_clause_together():
+    from alive_kernel.final_value_findings import passage_request
+    from alive_kernel.review_contracts import COHERENT_PASSAGE_ASSESSMENT, COMPACT_IDENTIFIER_ASSESSMENT
+
+    sentence = 'Across the 15 held-out workloads measured under the same pre-silicon assumptions, the median was 3.83 watts.'
+    excerpt = 'Background: ' + 'a' * 420 + '. ' + sentence + '\n' + 'b' * 1100
+    text = 'The median was 3.83 watts on the 15 held-out workloads.'
+    response = dict(facts='supported', fact_reason='The retained comparison reports both values.', fit='fits',
+        fit_reason='One focused result.', recipient_evidence=[], search_alignment='not_applicable',
+        scope_reason='No query.', claim_scope='preserved', claim_scope_reason='Same held-out workload group.',
+        source_witnesses=[dict(claim=text, passage_id='P1.2')])
+
+    def wire(scope):
+        snapshot = dict(expression_binding={'final_assessment_scope': scope}, candidate={'text': text},
+                        evidence=[{'event_id': 'held-out-study', 'excerpt': excerpt}])
+        request = passage_request(snapshot, labelled=True)
+        passages = request['evidence'][0]['passages']
+        assert ''.join(p['text'] for p in passages) == excerpt
+        assert all(0 < len(p['text']) <= 500 for p in passages)
+        return snapshot, passages
+
+    old, previous = wire(COMPACT_IDENTIFIER_ASSESSMENT)
+    assert not any(sentence in passage['text'] for passage in previous)
+    assert parse(json.dumps(response), witness_snapshot=old)['verdict'] == 'uncertain'
+    snapshot, current = wire(COHERENT_PASSAGE_ASSESSMENT)
+    assert sentence in current[1]['text']
+    findings = parse(json.dumps(response), witness_snapshot=snapshot)
+    assert findings['verdict'] == 'supported'
+    assert validate_retained(findings, witness_snapshot=snapshot) == findings
+    response['source_witnesses'][0]['passage_id'] = 'P1.1'
+    assert parse(json.dumps(response), witness_snapshot=snapshot)['verdict'] == 'uncertain'
+
+
 if __name__ == '__main__':
     test_dimensions()
     test_old_and_new_contracts()
@@ -485,4 +518,5 @@ if __name__ == '__main__':
     test_visible_markdown_claim_witness()
     test_named_identifiers_do_not_supply_measurements()
     test_rejection_survives_invalid_factual_witness()
+    test_passage_boundaries_keep_the_measured_clause_together()
     print('FINAL_VALUE_DIMENSIONS_OK')

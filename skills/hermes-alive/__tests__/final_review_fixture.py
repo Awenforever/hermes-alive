@@ -7,7 +7,8 @@ def controlled_final_findings(snapshot, *, factual='supported', fit='fits', reas
                      'factual-support-and-communication-fit-v9', 'factual-support-and-communication-fit-v10',
                      'factual-support-and-communication-fit-v11', 'factual-support-and-communication-fit-v12',
                      'factual-support-and-communication-fit-v13', 'factual-support-and-communication-fit-v14',
-                     'factual-support-and-communication-fit-v15', 'factual-support-and-communication-fit-v16')
+                     'factual-support-and-communication-fit-v15', 'factual-support-and-communication-fit-v16',
+                     'factual-support-and-communication-fit-v17')
     if scope in ('factual-support-and-communication-fit-v6', *search_scopes):
         witnesses = []
         if factual == 'supported':

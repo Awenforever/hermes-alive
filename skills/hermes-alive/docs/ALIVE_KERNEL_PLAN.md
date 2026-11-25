@@ -1129,3 +1129,11 @@ and the reader discarded the entire listing. Preserve a bounded preview and
 its URL, labeled as a truncated search listing. Leave extract limits and URL
 authorization intact. Qualify the selected source and its actual read before
 attributing a later fact or communication failure to the writer.
+
+After the primary source returned, a held-out benchmark comparison still
+failed local evidence verification because the exact supporting sentence was
+cut between fixed-width passage labels. Prefer sentence or line endings
+within the existing size bound. Keep the source bytes in order, version the
+labeling rule for new reviews, and reconstruct past reviews with their former
+boundaries. The reviewer still has to select a passage supporting the exact
+comparison.
