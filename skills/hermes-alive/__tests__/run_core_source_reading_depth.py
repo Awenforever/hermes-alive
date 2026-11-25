@@ -15,7 +15,7 @@ from run_core_guided_setup import cli
 
 
 async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_capture=False,search_alignment='matches',
-               claim_scope_conflict=False,witness_completion=False):
+               claim_scope_conflict=False,witness_completion=False,event_status_conflict=False):
     feedback_case=os.environ.get('HERMES_ALIVE_TEST_NATIVE_FEEDBACK')=='1'
     assert search_alignment in ('matches','justified_pivot','conflicts','uncertain')
     source_revision = fit_revision or numeric_revision
@@ -24,7 +24,9 @@ async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_cap
     assert search_alignment=='matches' or not (source_revision or revoke_after_capture)
     search_negative=search_alignment in ('conflicts','uncertain')
     assert not claim_scope_conflict or (search_alignment=='matches' and not (source_revision or revoke_after_capture or feedback_case))
-    review_negative=search_negative or claim_scope_conflict
+    assert not event_status_conflict or not (
+        source_revision or revoke_after_capture or search_negative or claim_scope_conflict or feedback_case)
+    review_negative=search_negative or claim_scope_conflict or event_status_conflict
     assert not witness_completion or not (source_revision or revoke_after_capture or review_negative or feedback_case)
     import httpx
     home.mkdir(exist_ok=True)
@@ -45,6 +47,8 @@ async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_cap
     fixture_errors=[]
     qualifier='The trial used an existing instrument, not a newly constructed one.'
     named_instrument='The instrument was named V37Q.'
+    future_quote='A replacement instrument is planned.'
+    premature_claim='A replacement instrument is already in operation.'
     overstatement='The trial used a newly constructed instrument.'
     try:
         manager=core.get_plugin_manager();manager.discover_and_load()
@@ -77,6 +81,8 @@ async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_cap
                     else 'Public background. '*510+qualifier)
                 if witness_completion and args['char_limit']==15000:
                     text += '\n'+named_instrument
+                if event_status_conflict and args['char_limit']==15000:
+                    text += '\n'+future_quote
                 return json.dumps({'results':[dict(url=url,title='',content=text)]})
             return operation
         for name in ('web_search','web_extract'):
@@ -133,7 +139,7 @@ async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_cap
                         for n in ('user_value','urgency','novelty','confidence','risk','interruption_cost')})]}
             elif 'expression_binding' in data:
                 from final_review_fixture import controlled_final_findings
-                assert data['expression_binding']['final_assessment_scope'] == 'factual-support-and-communication-fit-v20'
+                assert data['expression_binding']['final_assessment_scope'] == 'factual-support-and-communication-fit-v21'
                 assert 'numeric_passage_locations' in data
                 assert 'test fit as an opening in a real conversation' in body['messages'][0]['content']
                 if feedback_probe['expected'] is not None:
@@ -159,6 +165,25 @@ async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_cap
                     assert data['candidate']['text'].startswith(overstatement)
                     assert qualifier in data['candidate']['text']
                     value.update(claim_scope='overstated',claim_scope_reason='The opening contradicts the retained passage.')
+            elif body['messages'][0]['content'].startswith('Check event status in the exact share'):
+                assert set(data) == ({'candidate', 'evidence', 'witness_completion'} if witness_completion
+                                     else {'candidate', 'evidence'})
+                assert set(data['candidate']) == {'text'}
+                assert stages[-1] == 'final'
+                stage='status';value={'events':[]}
+                if event_status_conflict:
+                    assert premature_claim in data['candidate']['text']
+                    passage=next(p for row in data['evidence'] for p in row['passages']
+                                 if future_quote in p['text'])
+                    value['events']=[dict(wording_quote=premature_claim,wording_status='completed',
+                        source_quote=future_quote,passage_id=passage['passage_id'],
+                        source_status='planned',assessment='consistent')]
+                if witness_completion:
+                    locate=data['witness_completion']['numeric_passage_locations']
+                    assert data['witness_completion']['additional_witness_limit']==7
+                    assert len(locate)==1 and locate[0]['literal']=='V37Q'
+                    value['additional_witnesses']=[{'claim':named_instrument,
+                                                    'passage_id':locate[0]['matching_passage_ids'][0]}]
             elif 'meaning' in data and 'candidate' in data:
                 stage='semantic';value=dict(atom_reviews=[dict(atom_id=x['atom_id'],preserved=True,risks=[])
                     for x in data['meaning']['atoms']],added_claims_detected=False,speech_act_preserved=True,protected_literals_preserved=True)
@@ -205,6 +230,8 @@ async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_cap
                 value=qualifier+' [Source](<'+source_url+'>)'
                 if witness_completion:
                     value=named_instrument+' '+value
+                if event_status_conflict:
+                    value=premature_claim+' '+value
                 if claim_scope_conflict:
                     value=overstatement+' '+value
                 if (review_negative or feedback_probe['expected'] is not None) and data.get('correction'):
@@ -219,14 +246,6 @@ async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_cap
                         stage='revision';value={'text':'One concrete finding: '+value}
                     else:
                         value = ('DENSE_TEST_OPENING. ' if fit_revision else 'The purported trial covered 473 sites. ') + value
-            elif 'additional_witness_limit' in data:
-                assert witness_completion and data['additional_witness_limit']==7
-                assert stages.count('final')==1 and named_instrument in data['candidate']['text']
-                locate=data['numeric_passage_locations']
-                assert len(locate)==1 and locate[0]['literal']=='V37Q'
-                stage='complete_witness'
-                value={'additional_witnesses':[{'claim':named_instrument,
-                                                'passage_id':locate[0]['matching_passage_ids'][0]}]}
             elif 'candidate' in data and 'evidence' in data:
                 stage='source';assert qualifier in raw
                 value=dict(verdict='supported',unsupported_claims=[],uncertainties=[],reason='Synthetic source verdict')
@@ -278,6 +297,7 @@ async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_cap
                 assert result.prepared is not None and result.prepared.authorization is None
                 assert result.prepared.attempt_event_id is None and result.submission is None
                 assert stages.count('final')==1 and stages.count('abstain')==1 and not sent
+                assert stages.count('status') == int(event_status_conflict)
                 setup=importlib.import_module(loaded.module.__name__+'.kernel_setup_bridge')
                 journal=setup.setup_store(binding).journal
                 review=journal.get(result.prepared.initial_final_review_event_id)
@@ -285,7 +305,8 @@ async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_cap
                 assert not journal.read(event_type='dispatch.started')
                 assert not journal.read(event_type='action.authorization_evaluated')
                 assert not native.pending
-                marker=('HERMES_ALIVE_CORE_CLAIM_SCOPE_REFUSAL_OK' if claim_scope_conflict
+                marker=('HERMES_ALIVE_CORE_EVENT_STATUS_REFUSAL_OK' if event_status_conflict else
+                        'HERMES_ALIVE_CORE_CLAIM_SCOPE_REFUSAL_OK' if claim_scope_conflict
                         else 'HERMES_ALIVE_CORE_SEARCH_ALIGNMENT_REFUSAL_OK '+search_alignment)
                 print(marker,flush=True)
                 return
@@ -296,19 +317,20 @@ async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_cap
         assert len(sent)==1 and qualifier in sent[0][1]
         assert stages.count('final')==(2 if source_revision else 1)
         assert stages.count('revision')==int(source_revision)
+        assert stages.count('status')==1
         if witness_completion:
-            assert stages.count('complete_witness')==1 and named_instrument in sent[0][1]
+            assert named_instrument in sent[0][1]
             setup=importlib.import_module(loaded.module.__name__+'.kernel_setup_bridge')
             store=setup.setup_store(binding)
             review_id=result.prepared.final_review_event_id
             review=store.journal.get(review_id).event
             recovery=store.journal.get(review_id.removesuffix(':completed')+':protocol-recovery').event
             assert review.payload['verdict']=='supported' and review.payload['protocol_recovered'] is True
-            assert recovery.payload['recovery_method']=='missing-witnesses-v1'
+            assert recovery.payload['recovery_method']=='focused-event-status-v1'
             body=store.vault.resolve_json(review.payload['content']['content_id'])
             assert body['snapshot']['candidate']['text']==sent[0][1]
             assert body['findings']['numeric_evidence_coverage']['assessment']=='covered'
-            assert body['raw_witness_completion']
+            assert json.loads(body['raw_event_status_confirmation'])['additional_witnesses']
             reopened=setup.setup_store(binding)
             preparation=execution.kernel('send_preparation_runtime').SendPreparationRuntime(
                 reopened.journal,content_vault=reopened.vault)
@@ -521,7 +543,8 @@ if __name__=='__main__':
                          revoke_after_capture=os.environ.get('HERMES_ALIVE_TEST_CAPTURE_REVOCATION')=='1',
                          search_alignment=os.environ.get('HERMES_ALIVE_TEST_SEARCH_ALIGNMENT','matches'),
                          claim_scope_conflict=os.environ.get('HERMES_ALIVE_TEST_CLAIM_SCOPE_CONFLICT')=='1',
-                         witness_completion=os.environ.get('HERMES_ALIVE_TEST_WITNESS_COMPLETION')=='1'))
+                         witness_completion=os.environ.get('HERMES_ALIVE_TEST_WITNESS_COMPLETION')=='1',
+                         event_status_conflict=os.environ.get('HERMES_ALIVE_TEST_EVENT_STATUS_CONFLICT')=='1'))
         succeeded=True
     finally:
         from core_fixture_cleanup import close_test_stores

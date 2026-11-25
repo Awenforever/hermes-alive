@@ -110,8 +110,12 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
             CLAIM_SCOPE_ASSESSMENT, CONTRIBUTION_ASSESSMENT, PRESENTATION_ASSESSMENT, COVERAGE_ASSESSMENTS,
             PASSAGE_LOCATOR_ASSESSMENT, COMPACT_IDENTIFIER_ASSESSMENTS,
             COLLECTION_ROUTE_ASSESSMENT, COLLECTION_ROUTE_ASSESSMENTS, COLLECTION_ROUTE_REVIEW, SUBSTANTIVE_DISCOVERY_ASSESSMENT,
-            BOUNDED_INFERENCE_ASSESSMENT)
+            BOUNDED_INFERENCE_ASSESSMENT, EVENT_STATUS_ASSESSMENT)
         scope = snapshot.get('expression_binding', {}).get('final_assessment_scope')
+        if scope == EVENT_STATUS_ASSESSMENT:
+            legacy = {**snapshot, 'expression_binding': {**snapshot['expression_binding'],
+                      'final_assessment_scope': BOUNDED_INFERENCE_ASSESSMENT}}
+            return self.prompt_for_snapshot(legacy)
         if scope in COLLECTION_ROUTE_ASSESSMENTS:
             from .research_evidence import configured_route_context
             if (snapshot.get('approved_search_queries')
@@ -441,10 +445,13 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
                 COHERENT_PASSAGE_REVIEW, COHERENT_PASSAGE_ASSESSMENT,
                 COLLECTION_ROUTE_REVIEW, COLLECTION_ROUTE_ASSESSMENT,
                 SUBSTANTIVE_DISCOVERY_REVIEW, SUBSTANTIVE_DISCOVERY_ASSESSMENT,
-                BOUNDED_INFERENCE_REVIEW, BOUNDED_INFERENCE_ASSESSMENT)
+                BOUNDED_INFERENCE_REVIEW, BOUNDED_INFERENCE_ASSESSMENT,
+                EVENT_STATUS_REVIEW, EVENT_STATUS_ASSESSMENT)
             if method.get('discovery_source_review') in SPLIT_SOURCE_REVIEW_CONTRACTS:
                 data['expression_binding']['semantic_assessment_scope']=BOUNDARY_ASSESSMENT
-                if method['discovery_source_review'] == BOUNDED_INFERENCE_REVIEW:
+                if method['discovery_source_review'] == EVENT_STATUS_REVIEW:
+                    data['expression_binding']['final_assessment_scope']=EVENT_STATUS_ASSESSMENT
+                elif method['discovery_source_review'] == BOUNDED_INFERENCE_REVIEW:
                     data['expression_binding']['final_assessment_scope']=BOUNDED_INFERENCE_ASSESSMENT
                 elif method['discovery_source_review'] == SUBSTANTIVE_DISCOVERY_REVIEW:
                     data['expression_binding']['final_assessment_scope']=SUBSTANTIVE_DISCOVERY_ASSESSMENT

@@ -25,6 +25,7 @@ from alive_kernel_testkit import install_terminal_route, controlled_final_findin
 from alive_kernel.agenda import AgendaProjection,AgendaProposal,AgendaItemKind,AgendaAuthority
 from alive_kernel.discovery_inquiry import DiscoveryInquiryContext
 from alive_kernel.semantic_comparator import SemanticComparator
+from alive_kernel.source_support import SourceSupportError
 
 
 def check_review_scopes():
@@ -186,6 +187,9 @@ async def exercise(root,mode,*,historical=False,fit_revision=False):
             return response(dict(atom_reviews=[dict(atom_id=a['atom_id'],preserved=True,risks=[])
                 for a in original['meaning']['atoms']],added_claims_detected=False,
                 speech_act_preserved=True,protected_literals_preserved=True))
+        if task=='alive_source_status_confirmation':
+            assert set(data)=={'candidate','evidence'}
+            return response({'events':[]})
         if task=='alive_source_support':
             assert data['expression_binding']['assessment_mode']=='discovery-source-and-value-v'+('1' if historical else '2')
             assert ('communication_plan' in data['candidate']) is historical
@@ -273,7 +277,16 @@ async def exercise(root,mode,*,historical=False,fit_revision=False):
             forged=replace(semantic,event=replace(semantic.event,payload=payload))
             assert generic.verify_review(forged,allow_correlated=True) is None
     assert calls.count('alive_source_support')==(2 if mode=='repair' else 1)
-    assert len(calls)==(8 if mode=='repair' else 6 if mode in ('recovery','proposal-recovery') else 5)
+    from alive_kernel.review_contracts import EVENT_STATUS_ASSESSMENT
+    from alive_kernel.expression_support import ExpressionSourceSupportReviewer
+    reviewer=ExpressionSourceSupportReviewer(journal,content_vault=ingestor.vault)
+    subject,origin,clearance=runtime._expression_origin(assessed.expression)
+    snapshot,_=reviewer.snapshot(subject=subject,interpretation_id=origin,
+        candidate_id=assessed.expression.expression_event_id,clearance=clearance)
+    confirmations=calls.count('alive_source_status_confirmation')
+    assert confirmations==int(expected_quality=='supported' and
+        snapshot['expression_binding'].get('final_assessment_scope')==EVENT_STATUS_ASSESSMENT)
+    assert len(calls)-confirmations==(8 if mode=='repair' else 6 if mode in ('recovery','proposal-recovery') else 5)
     if mode=='repair':
         assert assessed.repair_disposition=='completed' and assessed.initial_final_review_event_id!=assessed.final_review_event_id
         assert 'I shared this yesterday.' not in expressed.text
@@ -291,6 +304,31 @@ async def exercise(root,mode,*,historical=False,fit_revision=False):
     async def forbidden(**kw):raise AssertionError('completed authoring inferred again')
     reopened=SendPreparationRuntime(ExperienceJournal(journal.path),content_vault=ingestor.vault)
     assert await reopened.assess(allow_repair=mode=='repair',**{**params,'call':forbidden})==assessed
+    if mode=='supported' and confirmations:
+        recovery_calls=[]
+
+        async def incomplete(**kw):
+            recovery_calls.append(kw['task'])
+            kw['route_info']['provider']='synthetic'
+            data=json.loads(kw['messages'][1]['content'])
+            if len(recovery_calls)==1:
+                return response({})
+            assert data['invalid_review']=='{}'
+            return response(controlled_final_findings(data['original_evidence']))
+
+        try:
+            await reviewer.run(subject=subject,interpretation_id=origin,
+                candidate_id=expressed.expression_event_id,clearance=clearance,
+                operation_id='status-without-recovery-slot',call=incomplete,
+                require_independence=False,protocol_recovery=True,resolve_domain=lambda _: 'synthetic-family')
+        except SourceSupportError as error:
+            assert 'focused event status confirmation' in str(error)
+        else:
+            raise AssertionError('full format retry bypassed the required status check')
+        assert recovery_calls==['alive_source_support','alive_source_support']
+        prefix='opportunity.source-support:status-without-recovery-slot'
+        assert journal.get(prefix+':failed') is not None
+        assert journal.get(prefix+':completed') is None
     policy=AutonomyPolicyProjection(journal)
     policy.apply(policy.append_update(subject='user:test',actor='user:test',expected_revision=0,
         enabled=True,context=PolicyContext(can_interrupt=True),operation_id='enable'))

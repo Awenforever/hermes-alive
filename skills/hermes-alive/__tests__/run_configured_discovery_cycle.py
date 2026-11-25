@@ -304,6 +304,9 @@ async def exercise(root,mode,*,primary_url=None):
                     assert 'PRIMARY_READ_EVIDENCE' not in json.dumps(data)
                 value=dict(atom_reviews=[dict(atom_id=a['atom_id'],preserved=True,risks=[]) for a in data['meaning']['atoms']],
                     added_claims_detected=False,speech_act_preserved=True,protected_literals_preserved=True)
+            elif task=='alive_source_status_confirmation':
+                assert set(data)=={'candidate','evidence'}
+                value={'events':[]}
             elif task=='alive_source_support':
                 if mode in ('share', 'primary-read', 'replay', 'route-revision'):
                     assert data['approved_search_queries'] == ['public museum methods']

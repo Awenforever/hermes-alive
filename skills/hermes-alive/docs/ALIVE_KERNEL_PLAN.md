@@ -1173,3 +1173,25 @@ the first substantive judgments and original wording intact. Reject foreign
 passages and new verdict fields. Retain the original review and the witness
 addition separately so reopening can replay the same checks. This does not
 increase the two-call review budget or repair a negative factual finding.
+
+Review the status of the result that makes the contribution worth sharing.
+Dates and statistics can be correct while a closing paraphrase upgrades a
+future action into an apparent completed one. Retain a small set of exact
+wording and source anchors, with each status observed separately. A host
+comparison can prevent an unsupported upgrade or unresolved ambiguity from
+reopening delivery authority even if the model's overall review is positive.
+Do not infer that an event failed to occur just because the source is silent.
+The combined review experiment still treated ongoing visitor participation as
+evidence that later exhibition panels had been made. A separate check, given
+the exact wording and passages without the first verdict, distinguished that
+pair, rail approval versus construction, and a space-station result versus
+planned experiments or observation capability.
+
+Qualify the separate check before changing delivery eligibility. Preserve the
+first substantive verdict and attach the second observation to the same
+candidate and evidence. Use the existing total stage deadline and call
+budget, including when the first result needs witness completion. If the
+second result or its evidence cannot be recovered and validated, defer
+delivery. Preserve older receipts under their recorded contracts. Recheck
+the false and faithful versions, restart recovery, erasure, and an ordinary
+follow-up that asks what actually happened before counting a fresh success.

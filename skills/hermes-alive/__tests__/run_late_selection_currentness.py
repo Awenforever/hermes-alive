@@ -51,6 +51,9 @@ async def exercise(root,*,historical=False,protected=False,window=False,review_s
             +'[Source](https://example.invalid/visual-memory)')
         if task=='alive_semantic_review':return response(dict(atom_reviews=[dict(atom_id=a['atom_id'],preserved=True,risks=[])
             for a in data['meaning']['atoms']],added_claims_detected=False,speech_act_preserved=True,protected_literals_preserved=True))
+        if task=='alive_source_status_confirmation':
+            assert set(data)=={'candidate','evidence'}
+            return response({'events':[]})
         assert task=='alive_source_support'
         if 'expression_binding' in data:
             final_calls.append(task)
@@ -81,7 +84,8 @@ async def exercise(root,*,historical=False,protected=False,window=False,review_s
             SourceSupportReviewer,'_review_clock_enabled',lambda self,data:not historical):
         receipt=await reviewer.run(subject='user:test',interpretation_id=origin,candidate_id=expressed.expression_event_id,
             operation_id='synthetic-final-value',call=call,resolve_domain=lambda *args:'synthetic-family',
-            require_independence=False,timeout_seconds=600,discovery_window_seconds=window_seconds if window else None)
+        require_independence=False,protocol_recovery=True,timeout_seconds=600,
+        discovery_window_seconds=window_seconds if window else None)
     witness=dict(review_event_id=receipt.event_id,interpretation_id=origin,require_independence=False)
     args=dict(selection_event_id=selected.event.event_id,subject='user:test',capability='hermes.channel.send',
         route_binding_id=route,delegation_event_id=grant.event.event_id,

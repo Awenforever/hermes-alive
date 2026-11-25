@@ -10,7 +10,7 @@ from .model_json import parse_model_json
 from .review_contracts import (CLAIM_SCOPE_ASSESSMENTS, FLAT_ASSESSMENTS, SEARCH_ASSESSMENTS,
                                CLAIM_COVERAGE_ASSESSMENT, COVERAGE_ASSESSMENTS, LABELLED_ASSESSMENTS,
                                PASSAGE_FIT_ASSESSMENT, PASSAGE_LOCATOR_ASSESSMENTS,
-                               COHERENT_PASSAGE_ASSESSMENTS, COMPACT_IDENTIFIER_ASSESSMENTS,
+                               COHERENT_PASSAGE_ASSESSMENTS, COMPACT_IDENTIFIER_ASSESSMENTS, EVENT_STATUS_ASSESSMENT,
                                TYPED_COVERAGE_ASSESSMENTS)
 
 
@@ -398,6 +398,15 @@ def _with_claim_scope(findings, scope):
     return _with_finding(findings, 'claim_scope', scope, 'overstated', 'unresolved')
 
 
+def _with_event_status(findings, entries, snapshot):
+    from .event_status_review import findings_for
+    passages = {row['passage_id']: row['text'] for number, source in enumerate(snapshot['evidence'], 1)
+                for row in _labelled_passages(number, source['excerpt'], coherent=True)}
+    entries, assessment = findings_for(entries, snapshot['candidate']['text'], passages)
+    return _with_finding({**findings, 'event_statuses': entries}, 'event_status', assessment,
+                         'overstated', 'unresolved')
+
+
 def _with_finding(findings, key, finding, rejected, unresolved):
     reason = _reason(finding['reason'])
     result = {**findings, key: dict(finding)}
@@ -564,6 +573,7 @@ def parse(text, *, witness_snapshot=None):
     value = parse_model_json(text, max_chars=32000)
     witnesses = value.pop('source_witnesses', None) if witness_snapshot is not None and isinstance(value, dict) else None
     assessment_scope = (witness_snapshot or {}).get('expression_binding', {}).get('final_assessment_scope')
+    statuses = value.pop('event_statuses', []) if assessment_scope == EVENT_STATUS_ASSESSMENT and isinstance(value, dict) else None
     search = None
     scope = None
     if _search_scope(witness_snapshot) and isinstance(value, dict):
@@ -612,6 +622,8 @@ def parse(text, *, witness_snapshot=None):
         findings = _with_search(findings, search, witness_snapshot)
     if _claim_scope(witness_snapshot):
         findings = _with_claim_scope(findings, scope)
+    if assessment_scope == EVENT_STATUS_ASSESSMENT:
+        findings = _with_event_status(findings, statuses, witness_snapshot)
     if _coverage_scope(witness_snapshot):
         findings = _apply_numeric_coverage(findings, witness_snapshot)
     return findings
@@ -623,6 +635,9 @@ def validate_retained(findings, *, witness_snapshot=None):
         witness_fields.add('search_alignment')
     if _claim_scope(witness_snapshot):
         witness_fields.add('claim_scope')
+    status_review = (witness_snapshot or {}).get('expression_binding', {}).get('final_assessment_scope') == EVENT_STATUS_ASSESSMENT
+    if status_review:
+        witness_fields.update(('event_status', 'event_statuses'))
     if _coverage_scope(witness_snapshot):
         witness_fields.add('numeric_evidence_coverage')
     if not isinstance(findings, dict) or set(findings) != {
@@ -634,6 +649,8 @@ def validate_retained(findings, *, witness_snapshot=None):
         rebuilt = _with_search(rebuilt, findings['search_alignment'], witness_snapshot)
     if _claim_scope(witness_snapshot):
         rebuilt = _with_claim_scope(rebuilt, findings['claim_scope'])
+    if status_review:
+        rebuilt = _with_event_status(rebuilt, findings['event_statuses'], witness_snapshot)
     if witness_snapshot is not None:
         rebuilt['source_witnesses'] = _validate_witnesses(
             findings['source_witnesses'], witness_snapshot, rebuilt['factual_support']['assessment'], retained=True)

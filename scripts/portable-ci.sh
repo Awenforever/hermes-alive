@@ -54,6 +54,7 @@ run_and_require() {
   local marker="$2"
   local log="${CI_HOME}/$(basename "${test_file}").log"
 
+  printf 'portable_ci_test=%s\n' "${test_file}"
   if "${PYTHON}" "${SKILL}/__tests__/${test_file}" > "${log}" 2>&1; then
     :
   else

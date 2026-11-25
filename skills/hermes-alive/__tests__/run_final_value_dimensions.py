@@ -595,6 +595,43 @@ def test_witness_completion_keeps_the_original_judgments():
                        parse(original, witness_snapshot=unsupported)) is None
 
 
+def test_future_plan_cannot_witness_completed_event():
+    from alive_kernel.review_contracts import EVENT_STATUS_ASSESSMENT
+    from alive_kernel.source_witness_completion import request_for
+
+    text = 'Visitors have become contributors to the display.'
+    source = 'The exhibit plans to turn visitor feedback into display panels.'
+    snapshot = {'expression_binding': {'final_assessment_scope': EVENT_STATUS_ASSESSMENT},
+                'candidate': {'text': text}, 'evidence': [{'event_id': 'exhibit', 'excerpt': source}]}
+    status = dict(wording_quote=text, wording_status='completed', source_quote=source, passage_id='P1.1',
+                  source_status='planned', assessment='consistent')
+    wire = dict(facts='supported', fact_reason='Synthetic facts.', fit='fits', fit_reason='Synthetic fit.',
+                recipient_evidence=[], search_alignment='not_applicable', scope_reason='No query.',
+                claim_scope='preserved', claim_scope_reason='Synthetic scope.',
+                source_witnesses=[dict(claim=text, passage_id='P1.1')], event_statuses=[status])
+    findings = parse(json.dumps(wire), witness_snapshot=snapshot)
+    assert findings['verdict'] == 'unsupported' and findings['event_status']['assessment'] == 'overstated'
+    assert validate_retained(findings, witness_snapshot=snapshot) == findings
+    assert request_for(snapshot, {}, findings) is None
+    for mode, expected in (('ambiguous', 'uncertain'), ('underway', 'unsupported')):
+        changed = {**wire, 'event_statuses': [{**status, 'wording_status': mode}]}
+        assert parse(json.dumps(changed), witness_snapshot=snapshot)['verdict'] == expected
+    planned = 'If feedback becomes a display panel, visitors will also be contributors.'
+    current = {**snapshot, 'candidate': {'text': planned}}
+    raw = {**wire, 'source_witnesses': [dict(claim=planned, passage_id='P1.1')],
+           'event_statuses': [{**status, 'wording_quote': planned, 'wording_status': 'conditional'}]}
+    yes = parse(json.dumps(raw), witness_snapshot=current)
+    assert yes['verdict'] == 'supported'
+    for wrong in ({**status, 'passage_id': 'P2.1'}, {**status, 'wording_quote': 'Outside the draft.'},
+                  {**status, 'source_quote': 'The panels are installed.'}):
+        try:
+            parse(json.dumps({**wire, 'event_statuses': [wrong]}), witness_snapshot=snapshot)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError('an event status with foreign provenance was accepted')
+
+
 if __name__ == '__main__':
     test_dimensions()
     test_old_and_new_contracts()
@@ -613,4 +650,5 @@ if __name__ == '__main__':
     test_rejection_survives_invalid_factual_witness()
     test_passage_boundaries_keep_the_measured_clause_together()
     test_witness_completion_keeps_the_original_judgments()
+    test_future_plan_cannot_witness_completed_event()
     print('FINAL_VALUE_DIMENSIONS_OK')

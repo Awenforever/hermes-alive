@@ -50,7 +50,8 @@ def revision_author_view(author_context, correction, *, configured_route):
     review = correction['findings']
     findings = {}
     for field, positive in (('communication_fit', 'fits'), ('factual_support', 'supported'),
-                            ('claim_scope', 'preserved'), ('numeric_evidence_coverage', 'covered')):
+                            ('claim_scope', 'preserved'), ('event_status', 'preserved'),
+                            ('numeric_evidence_coverage', 'covered')):
         finding = review.get(field)
         if finding is not None and finding['assessment'] != positive:
             findings[field] = finding

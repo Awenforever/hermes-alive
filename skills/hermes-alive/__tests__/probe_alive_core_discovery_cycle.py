@@ -98,6 +98,9 @@ async def main():
                 findings=[dict(observation_event_id=e['observation_event_id'],passage_id=e['summary_passages'][0]['passage_id'],
                     interpretation='The notice reports observation, not independent validation.')],
                 open_questions=['What independently verifies this method?'])]
+        elif body['messages'][0]['content'].startswith('Check event status in the exact share'):
+            assert set(data)=={'candidate','evidence'}
+            stage='status';value={'events':[]}
         elif 'expression_binding' in data:
             stage='final';assert data['expression_binding']['assessment_mode']=='discovery-source-and-value-v3'
             assert 'communication_plan' not in data['candidate']
@@ -167,7 +170,7 @@ async def main():
             assert len(journal.read(event_type='message.model_candidate'))==1
             assert len(journal.read(event_type='autonomous.host.closed'))==1
             assert not journal.read(event_type='action.attempted')
-            assert [r['stage'] for r in requests]==['reading','followup','generate','select','author','semantic','final'],requests
+            assert [r['stage'] for r in requests]==['reading','followup','generate','select','author','semantic','final','status'],requests
             assert [r['name'] for r in reads]==['web_search','web_extract','web_extract']
             assert reads[-1]['args']['urls']==[primary]
             assert not binding.native.pending
