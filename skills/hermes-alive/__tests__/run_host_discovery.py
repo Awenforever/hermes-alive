@@ -279,6 +279,7 @@ async def main(root):
     await exercise(root)
     await optional_titles(root/'optional-titles')
     await secure_scheme_upgrade(root/'secure-scheme-upgrade')
+    await oversized_listing(root/'oversized-listing')
 
 
 async def secure_scheme_upgrade(root):
@@ -327,6 +328,47 @@ async def secure_scheme_upgrade(root):
     result = await host.collect(operation_id='refused-upgrade', read_urls=(requested,))
     assert result.failures == 1 and not result.observation_ids
     assert checks[-2:] == [requested, upgraded]
+
+
+async def oversized_listing(root):
+    from alive_kernel import DiscoveryOpportunityIngestor, ExperienceJournal, Sensitivity
+    from alive_kernel.host_discovery import HostDiscoveryReader, read_scope_metadata
+
+    original = 'https://example.invalid/original'
+    secondary = 'https://example.invalid/commentary'
+    oversized = 'Public heading. ' + 'x' * 19000
+    ingestor = DiscoveryOpportunityIngestor(ExperienceJournal(root/'experience.sqlite3'))
+
+    async def allowed(url):
+        return url in {original, secondary}
+
+    async def search(query, *, limit):
+        return json.dumps(dict(success=True, data=dict(web=[
+            dict(url=original, title='Original', description=oversized),
+            dict(url=secondary, title='Commentary', description='A short preview.'),
+        ])))
+
+    content = oversized
+
+    async def extract(urls, *, char_limit):
+        return json.dumps(dict(results=[dict(url=urls[0], title='Original', content=content)]))
+
+    host = HostDiscoveryReader(ingestor, subject='user:test', search=search, extract=extract,
+                               allow_url=allowed, is_current=lambda:True)
+    listing = await host.collect(operation_id='oversized-preview', queries=('public topic',))
+    assert listing.failures == 0 and len(listing.observation_ids) == 2
+    evidence = ingestor.active_evidence(subject='user:test', clearance=Sensitivity.PRIVATE, limit=32,
+                                        observation_event_ids=listing.observation_ids)
+    by_url = {item.content['url']:item.content for item in evidence}
+    assert by_url[original]['summary'] == oversized[:8192]
+    assert read_scope_metadata(by_url[original])['search_preview_truncated'] is True
+    assert by_url[secondary]['summary'] == 'A short preview.'
+    assert 'search_preview_truncated' not in read_scope_metadata(by_url[secondary])
+    result = await host.collect(operation_id='oversized-extract', read_urls=(original,))
+    assert result.failures == 1 and not result.observation_ids
+    content = 'Actual page body.'
+    result = await host.collect(operation_id='read-original', read_urls=(original,))
+    assert result.failures == 0 and len(result.observation_ids) == 1
 
 with tempfile.TemporaryDirectory(prefix='alive-host-discovery-') as folder:
     previous={key:os.environ.get(key) for key in ('HERMES_HOME','HERMES_ALIVE_SHARED_DIR')}

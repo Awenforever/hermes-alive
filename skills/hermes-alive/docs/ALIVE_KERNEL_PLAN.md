@@ -1122,3 +1122,10 @@ an index of paper titles for deliberation. Accept an exact HTTP-to-HTTPS
 scheme upgrade after checking the returned URL against the host policy.
 Keep rejecting changes to the authority, port, path, query or fragment.
 Record the abstention separately from the earlier failure to admit evidence.
+
+The Frostbite case exposed a different loss at the same boundary. A search
+adapter supplied a 19,066-character preview for the top primary-source result
+and the reader discarded the entire listing. Preserve a bounded preview and
+its URL, labeled as a truncated search listing. Leave extract limits and URL
+authorization intact. Qualify the selected source and its actual read before
+attributing a later fact or communication failure to the writer.
