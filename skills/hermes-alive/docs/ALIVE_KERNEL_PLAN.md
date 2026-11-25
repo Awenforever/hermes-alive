@@ -1137,3 +1137,12 @@ within the existing size bound. Keep the source bytes in order, version the
 labeling rule for new reviews, and reconstruct past reviews with their former
 boundaries. The reviewer still has to select a passage supporting the exact
 comparison.
+
+A subsequent fresh discovery passed factual, conversational and numeric
+review yet was held solely because the supplied passages did not mention a
+facility used as a retrieval term. Final review inherited both an explicit
+search requirement and the configured background-route instruction. Bind the
+new assessment to verified route provenance and give that route its own
+relevance instruction. The final message still needs evidence for any
+facility it actually names or relies on, and explicit research scope and
+historical receipts retain their existing review rules.

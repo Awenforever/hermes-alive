@@ -228,6 +228,38 @@ def test_configured_route_provenance():
     assert validate_retained(result, witness_snapshot=snapshot) == result
 
 
+def test_current_collection_route_does_not_apply_to_a_request():
+    from alive_kernel.final_value_findings import COLLECTION_ROUTE_PROMPT, COMPACT_IDENTIFIER_PROMPT
+    from alive_kernel.research_evidence import configured_route_context
+    from alive_kernel.review_contracts import (COLLECTION_ROUTE_ASSESSMENT, COLLECTION_ROUTE_REVIEW,
+                                                COHERENT_PASSAGE_ASSESSMENT)
+
+    role = configured_route_context(COLLECTION_ROUTE_REVIEW)
+    reviewer = object.__new__(ExpressionSourceSupportReviewer)
+    snapshot = dict(expression_binding={'final_assessment_scope': COLLECTION_ROUTE_ASSESSMENT},
+                    approved_search_queries=['Instrument calibration example facility'], search_context=role,
+                    candidate={'text': 'The institute reported a calibration test.'},
+                    evidence=[{'event_id': 'test', 'excerpt': 'The institute reported a calibration test.'}])
+    assert reviewer.prompt_for_snapshot(snapshot) == COLLECTION_ROUTE_PROMPT
+    guess = {**snapshot, 'search_context': {'kind': role['kind']}}
+    explicit_request = {**snapshot, 'search_context': {**role, 'current_owner_search_request_supplied': True}}
+    previous = {**snapshot, 'expression_binding': {'final_assessment_scope': COHERENT_PASSAGE_ASSESSMENT}}
+    for other in (guess, explicit_request, previous):
+        assert reviewer.prompt_for_snapshot(other) == COMPACT_IDENTIFIER_PROMPT
+
+    wire = dict(facts='supported', fact_reason='The institute reports the test.', fit='fits',
+                fit_reason='Useful concrete finding.', recipient_evidence=[],
+                search_alignment='matches', scope_reason='The result concerns the sought test.',
+                claim_scope='preserved', claim_scope_reason='Only the institute is named.',
+                source_witnesses=[{'claim': snapshot['candidate']['text'], 'passage_id': 'P1.1'}])
+    findings = parse(json.dumps(wire), witness_snapshot=snapshot)
+    assert findings['verdict'] == 'supported'
+    assert validate_retained(findings, witness_snapshot=snapshot) == findings
+    for negative in (dict(facts='unsupported'), dict(search_alignment='conflicts'),
+                     dict(search_alignment='uncertain'), dict(claim_scope='unresolved')):
+        assert parse(json.dumps({**wire, **negative}), witness_snapshot=snapshot)['verdict'] != 'supported'
+
+
 def test_claim_scope_veto():
     from alive_kernel.final_value_findings import CLAIM_SCOPE_PROMPT, CONTRIBUTION_PROMPT, ROUTE_FIT_PROMPT
     from alive_kernel.review_contracts import CLAIM_SCOPE_ASSESSMENT, CONTRIBUTION_ASSESSMENT, ROUTE_FIT_ASSESSMENT
@@ -510,6 +542,7 @@ if __name__ == '__main__':
     test_source_witness_binding()
     test_independent_search_alignment()
     test_configured_route_provenance()
+    test_current_collection_route_does_not_apply_to_a_request()
     test_claim_scope_veto()
     test_only_explicit_communication_choices_shape_new_discovery_openings()
     test_numeric_coverage_of_actual_draft()

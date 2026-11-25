@@ -10,7 +10,7 @@ from .model_json import parse_model_json
 from .review_contracts import (CLAIM_SCOPE_ASSESSMENTS, FLAT_ASSESSMENTS, SEARCH_ASSESSMENTS,
                                CLAIM_COVERAGE_ASSESSMENT, COVERAGE_ASSESSMENTS, LABELLED_ASSESSMENTS,
                                PASSAGE_FIT_ASSESSMENT, PASSAGE_LOCATOR_ASSESSMENTS,
-                               COHERENT_PASSAGE_ASSESSMENT, COMPACT_IDENTIFIER_ASSESSMENTS,
+                               COHERENT_PASSAGE_ASSESSMENTS, COMPACT_IDENTIFIER_ASSESSMENTS,
                                TYPED_COVERAGE_ASSESSMENTS)
 
 
@@ -142,12 +142,7 @@ review interval. This is advice, without permission to act or proof of delivery.
 """
 
 
-SEARCH_FIT_PROMPT = FLAT_PROMPT.replace(
-    'exactly these six top-level fields:', 'exactly these eight top-level fields:').replace(
-    '"recipient_evidence":["actual supplied context, if any"],',
-    '"search_alignment":"matches|justified_pivot|conflicts|uncertain|not_applicable",\n'
-    ' "scope_reason":"brief grounded explanation",\n'
-    ' "recipient_evidence":["actual supplied context, if any"],') + """
+SEARCH_REQUEST_GUIDANCE = """
 Judge search_alignment independently of facts and recipient interest. Use the
 approved_search_queries supplied in this assessment, including their purpose,
 time and geographic scope. A reliable and interesting source can still fail
@@ -160,6 +155,14 @@ Missing material scope evidence means uncertain, not an assumed match. Use
 not_applicable only when no approved search queries were supplied. scope_reason
 is at most 1500 characters. This third judgment grants no execution authority.
 """
+
+
+SEARCH_FIT_PROMPT = FLAT_PROMPT.replace(
+    'exactly these six top-level fields:', 'exactly these eight top-level fields:').replace(
+    '"recipient_evidence":["actual supplied context, if any"],',
+    '"search_alignment":"matches|justified_pivot|conflicts|uncertain|not_applicable",\n'
+    ' "scope_reason":"brief grounded explanation",\n'
+    ' "recipient_evidence":["actual supplied context, if any"],') + SEARCH_REQUEST_GUIDANCE
 
 
 ROUTE_FIT_PROMPT = SEARCH_FIT_PROMPT + """
@@ -248,6 +251,25 @@ source; the digit inside the name does not support a separate quantity.
 Include the name in a short verbatim witness even when the associated measure
 is explained in another sentence. The eight-witness limit still applies.
 """
+
+COLLECTION_ROUTE_PROMPT = COMPACT_IDENTIFIER_PROMPT.replace(SEARCH_REQUEST_GUIDANCE, """
+Judge search_alignment independently of factual support and conversational fit.
+For this configured background discovery, approved_search_queries describe how
+sources were found. Match the substantive topic of the discovery, including any
+date, place, entity or condition its wording relies on. Search terms used only
+to locate results do not require positive evidence or coverage in the share.
+For example, a query can name an institution and a facility to find a result;
+an attributed finding about the institution need not mention the facility
+unless it relies on that facility as part of the finding. Do not use a query
+as evidence or infer a date, identity or scope from a domain name.
+Use matches for a relevant finding with no such unresolved material mismatch;
+use justified_pivot for a concrete useful departure accurately characterized
+in the message. Use conflicts or uncertain when relevance or that departure
+cannot be established, or when a constraint material to the actual finding is
+contradicted or unproven. The claims still need independent factual support
+and claim-scope assessment. Use not_applicable only when there is no query.
+scope_reason is at most 1500 characters. This grants no execution authority.
+""")
 
 _NUMBER = re.compile(r'\d+(?:,\d{3})*(?:\.\d+)?')
 _IDENTIFIER = re.compile(r'(?<![A-Za-z0-9_.-])[A-Za-z][A-Za-z0-9]*(?:[-_.][A-Za-z0-9]+)+')
@@ -365,7 +387,7 @@ def _labelled_passages(source_number, excerpt, *, coherent=False):
 
 def passage_request(request, *, labelled=False):
     scope = request.get('expression_binding', {}).get('final_assessment_scope')
-    coherent = scope == COHERENT_PASSAGE_ASSESSMENT
+    coherent = scope in COHERENT_PASSAGE_ASSESSMENTS
     result = {**request, 'evidence': [
         {**{key: value for key, value in source.items() if key != 'excerpt'},
          'passages': (_labelled_passages(number, source['excerpt'], coherent=coherent) if labelled
@@ -464,7 +486,7 @@ def _validate_witnesses(witnesses, snapshot, assessment, *, retained=False):
         catalog = {row['passage_id']: (source['event_id'], row['text'])
                    for number, source in enumerate(snapshot['evidence'], 1)
                    for row in _labelled_passages(number, source['excerpt'],
-                                                 coherent=scope == COHERENT_PASSAGE_ASSESSMENT)}
+                                                 coherent=scope in COHERENT_PASSAGE_ASSESSMENTS)}
     elif indexed:
         fields.add('passage')
     if retained or not (indexed or labelled):
