@@ -101,3 +101,26 @@ new response correctly says missing material is not proof of nonexistence, then
 ends with a stronger negative conclusion not justified by that material. Keep
 the clearer evidence projection, but do not report this as a complete repair or
 promote the correct disclaimer into proof that the whole reply is faithful.
+
+## Qualification update, 2026-11-25
+
+An ordinary reply joined the low-temperature result from one preparation
+method to a durability measurement from a second method. The active provider
+request contained the original passage with the correct attribution. Later
+turns held the earlier source page as a scoped reference, which preserved the
+deletion boundary. Both stages matter when diagnosing the reply.
+
+Two retained-input comparisons reopened the same isolated Core session and
+used its actual reference tool. Splitting a page into exact source paragraphs
+left material response-quality problems. Supplying the exact claim-to-source
+witnesses shortened one open-ended reply, which then used a technical term
+absent from the retained passages. Both arms answered a separate exact-link
+request with a single correct link. These results leave evidence presentation
+as a development hypothesis and provide no qualification credit.
+
+Core 0.23.3 exposes a final-output transform. Its documented stream hold
+applies to the whole profile, and transformations without that hold run
+after streaming may already have exposed the response. Keep ordinary
+streaming and Core ownership on this path. A future live verification design
+should prove turn-scoped validation, preserve durable conversation history
+and evidence erasure, and measure latency on unrelated turns as well.
