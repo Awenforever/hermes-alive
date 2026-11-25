@@ -271,6 +271,19 @@ and claim-scope assessment. Use not_applicable only when there is no query.
 scope_reason is at most 1500 characters. This grants no execution authority.
 """)
 
+SUBSTANTIVE_DISCOVERY_PROMPT = COLLECTION_ROUTE_PROMPT + """
+For this unsolicited discovery, judge what the recipient can learn from the
+message itself. A category page, index, or search-result preview can establish
+that an item exists or provide a factual finding. If it only establishes a
+title, date or link, and the stated value is just interpreting the title or
+saying to open it, record a communication-fit conflict. The precise limits of
+the evidence may be true but do not make a source-finding failure worth an
+interruption. A simple, well-supported event or an item the recipient actually
+asked to track can be useful on its own. Judge the message's value using the
+evidence and the real conversation, without requiring technical depth or
+assuming that a configured collection route is a request to track an item.
+"""
+
 _NUMBER = re.compile(r'\d+(?:,\d{3})*(?:\.\d+)?')
 _IDENTIFIER = re.compile(r'(?<![A-Za-z0-9_.-])[A-Za-z][A-Za-z0-9]*(?:[-_.][A-Za-z0-9]+)+')
 _COMPACT_IDENTIFIER = re.compile(r'(?<![A-Za-z0-9_])[A-Za-z][A-Za-z0-9]*(?:[-_.][A-Za-z0-9]+)*')

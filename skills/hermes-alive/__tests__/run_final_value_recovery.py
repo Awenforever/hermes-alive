@@ -17,7 +17,8 @@ from alive_kernel.review_contracts import (LEGACY_SPLIT_SOURCE_REVIEW, FIRST_FAC
     PASSAGE_LOCATOR_REVIEW, PASSAGE_LOCATOR_ASSESSMENT,
     COMPACT_IDENTIFIER_REVIEW, COMPACT_IDENTIFIER_ASSESSMENT,
     COHERENT_PASSAGE_REVIEW, COHERENT_PASSAGE_ASSESSMENT,
-    COLLECTION_ROUTE_REVIEW, COLLECTION_ROUTE_ASSESSMENT)
+    COLLECTION_ROUTE_REVIEW, COLLECTION_ROUTE_ASSESSMENT,
+    SUBSTANTIVE_DISCOVERY_REVIEW, SUBSTANTIVE_DISCOVERY_ASSESSMENT)
 
 
 async def test(root, original_contract, original_scope):
@@ -27,13 +28,13 @@ async def test(root, original_contract, original_scope):
     async def historical_start(self, **kwargs):
         # Only interpretation generation runs with the previous default. Its
         # stored method must determine later author/review/recovery semantics.
-        with patch('alive_kernel.opportunity_synthesis.COLLECTION_ROUTE_REVIEW', original_contract):
+        with patch('alive_kernel.opportunity_synthesis.SUBSTANTIVE_DISCOVERY_REVIEW', original_contract):
             return await original(self, **kwargs)
 
     with patch.object(OpportunitySynthesizer, 'run', historical_start):
         await exercise(root, 'supported')  # Includes cold completed recovery, no new calls.
     import alive_kernel.opportunity_synthesis as synthesis
-    assert synthesis.COLLECTION_ROUTE_REVIEW == COLLECTION_ROUTE_REVIEW
+    assert synthesis.SUBSTANTIVE_DISCOVERY_REVIEW == SUBSTANTIVE_DISCOVERY_REVIEW
     journal = ExperienceJournal(root / 'journal.sqlite3')
     starts = [r for r in journal.read() if 'interpreter_method' in r.event.payload]
     assert starts and any(r.event.payload['interpreter_method'].get('discovery_source_review')
@@ -66,4 +67,5 @@ if __name__ == '__main__':
         asyncio.run(test(Path(directory) / 'compact-identifier', COMPACT_IDENTIFIER_REVIEW, COMPACT_IDENTIFIER_ASSESSMENT))
         asyncio.run(test(Path(directory) / 'coherent-passage', COHERENT_PASSAGE_REVIEW, COHERENT_PASSAGE_ASSESSMENT))
         asyncio.run(test(Path(directory) / 'collection-route', COLLECTION_ROUTE_REVIEW, COLLECTION_ROUTE_ASSESSMENT))
+        asyncio.run(test(Path(directory) / 'substantive-discovery', SUBSTANTIVE_DISCOVERY_REVIEW, SUBSTANTIVE_DISCOVERY_ASSESSMENT))
     print('FINAL_VALUE_RECOVERY_OK')

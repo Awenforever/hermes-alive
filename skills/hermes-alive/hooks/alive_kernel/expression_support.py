@@ -109,14 +109,15 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
             LABELLED_FIT_ASSESSMENT, FLAT_FIT_ASSESSMENT, SEARCH_FIT_ASSESSMENT, ROUTE_FIT_ASSESSMENT,
             CLAIM_SCOPE_ASSESSMENT, CONTRIBUTION_ASSESSMENT, PRESENTATION_ASSESSMENT, COVERAGE_ASSESSMENTS,
             PASSAGE_LOCATOR_ASSESSMENT, COMPACT_IDENTIFIER_ASSESSMENTS,
-            COLLECTION_ROUTE_ASSESSMENT, COLLECTION_ROUTE_REVIEW)
+            COLLECTION_ROUTE_ASSESSMENTS, COLLECTION_ROUTE_REVIEW, SUBSTANTIVE_DISCOVERY_ASSESSMENT)
         scope = snapshot.get('expression_binding', {}).get('final_assessment_scope')
-        if scope == COLLECTION_ROUTE_ASSESSMENT:
+        if scope in COLLECTION_ROUTE_ASSESSMENTS:
             from .research_evidence import configured_route_context
             if (snapshot.get('approved_search_queries')
                     and snapshot.get('search_context') == configured_route_context(COLLECTION_ROUTE_REVIEW)):
-                from .final_value_findings import COLLECTION_ROUTE_PROMPT
-                return COLLECTION_ROUTE_PROMPT
+                from .final_value_findings import COLLECTION_ROUTE_PROMPT, SUBSTANTIVE_DISCOVERY_PROMPT
+                return (SUBSTANTIVE_DISCOVERY_PROMPT if scope == SUBSTANTIVE_DISCOVERY_ASSESSMENT
+                        else COLLECTION_ROUTE_PROMPT)
         if scope in COMPACT_IDENTIFIER_ASSESSMENTS:
             from .final_value_findings import COMPACT_IDENTIFIER_PROMPT
             return COMPACT_IDENTIFIER_PROMPT
@@ -435,10 +436,13 @@ class ExpressionSourceSupportReviewer(SourceSupportReviewer):
                 PASSAGE_LOCATOR_REVIEW, PASSAGE_LOCATOR_ASSESSMENT,
                 COMPACT_IDENTIFIER_REVIEW, COMPACT_IDENTIFIER_ASSESSMENT,
                 COHERENT_PASSAGE_REVIEW, COHERENT_PASSAGE_ASSESSMENT,
-                COLLECTION_ROUTE_REVIEW, COLLECTION_ROUTE_ASSESSMENT)
+                COLLECTION_ROUTE_REVIEW, COLLECTION_ROUTE_ASSESSMENT,
+                SUBSTANTIVE_DISCOVERY_REVIEW, SUBSTANTIVE_DISCOVERY_ASSESSMENT)
             if method.get('discovery_source_review') in SPLIT_SOURCE_REVIEW_CONTRACTS:
                 data['expression_binding']['semantic_assessment_scope']=BOUNDARY_ASSESSMENT
-                if method['discovery_source_review'] == COLLECTION_ROUTE_REVIEW:
+                if method['discovery_source_review'] == SUBSTANTIVE_DISCOVERY_REVIEW:
+                    data['expression_binding']['final_assessment_scope']=SUBSTANTIVE_DISCOVERY_ASSESSMENT
+                elif method['discovery_source_review'] == COLLECTION_ROUTE_REVIEW:
                     data['expression_binding']['final_assessment_scope']=COLLECTION_ROUTE_ASSESSMENT
                 elif method['discovery_source_review'] == COHERENT_PASSAGE_REVIEW:
                     data['expression_binding']['final_assessment_scope']=COHERENT_PASSAGE_ASSESSMENT

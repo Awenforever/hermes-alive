@@ -1146,3 +1146,12 @@ new assessment to verified route provenance and give that route its own
 relevance instruction. The final message still needs evidence for any
 facility it actually names or relies on, and explicit research scope and
 historical receipts retain their existing review rules.
+
+The fresh glacier case then reached the ordinary conversation. Its original
+article fetch failed, and the actual opening could only point to a headline
+on an index. Treat a headline-only lead as internal when it carries no
+substantive finding and no explicit owner request calls for that notice.
+Judge the actual value rather than rejecting all listings. Compact supported
+announcements and explicitly requested tracking may still merit a message.
+Keep the user's current answer-format constraints in the continuation
+evaluation, even when the agent has found useful new evidence.

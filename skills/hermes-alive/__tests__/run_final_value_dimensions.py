@@ -229,10 +229,11 @@ def test_configured_route_provenance():
 
 
 def test_current_collection_route_does_not_apply_to_a_request():
-    from alive_kernel.final_value_findings import COLLECTION_ROUTE_PROMPT, COMPACT_IDENTIFIER_PROMPT
+    from alive_kernel.final_value_findings import (COLLECTION_ROUTE_PROMPT, COMPACT_IDENTIFIER_PROMPT,
+                                                   SUBSTANTIVE_DISCOVERY_PROMPT)
     from alive_kernel.research_evidence import configured_route_context
     from alive_kernel.review_contracts import (COLLECTION_ROUTE_ASSESSMENT, COLLECTION_ROUTE_REVIEW,
-                                                COHERENT_PASSAGE_ASSESSMENT)
+                                                COHERENT_PASSAGE_ASSESSMENT, SUBSTANTIVE_DISCOVERY_ASSESSMENT)
 
     role = configured_route_context(COLLECTION_ROUTE_REVIEW)
     reviewer = object.__new__(ExpressionSourceSupportReviewer)
@@ -258,6 +259,13 @@ def test_current_collection_route_does_not_apply_to_a_request():
     for negative in (dict(facts='unsupported'), dict(search_alignment='conflicts'),
                      dict(search_alignment='uncertain'), dict(claim_scope='unresolved')):
         assert parse(json.dumps({**wire, **negative}), witness_snapshot=snapshot)['verdict'] != 'supported'
+    discovery = {**snapshot, 'expression_binding': {'final_assessment_scope': SUBSTANTIVE_DISCOVERY_ASSESSMENT}}
+    assert reviewer.prompt_for_snapshot(discovery) == SUBSTANTIVE_DISCOVERY_PROMPT
+    assert reviewer.prompt_for_snapshot({**discovery, 'search_context': explicit_request['search_context']}) == COMPACT_IDENTIFIER_PROMPT
+    weak = parse(json.dumps({**wire, 'fit': 'conflicts', 'fit_reason': 'Only reports that a title was listed.'}),
+                 witness_snapshot=discovery)
+    assert weak['verdict'] == 'unsupported' and weak['factual_support']['assessment'] == 'supported'
+    assert validate_retained(weak, witness_snapshot=discovery) == weak
 
 
 def test_claim_scope_veto():
