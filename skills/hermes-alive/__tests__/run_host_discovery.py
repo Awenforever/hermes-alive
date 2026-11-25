@@ -278,6 +278,55 @@ async def optional_titles(root):
 async def main(root):
     await exercise(root)
     await optional_titles(root/'optional-titles')
+    await secure_scheme_upgrade(root/'secure-scheme-upgrade')
+
+
+async def secure_scheme_upgrade(root):
+    from alive_kernel import DiscoveryOpportunityIngestor, ExperienceJournal
+    from alive_kernel.host_discovery import HostDiscoveryReader
+
+    requested = 'http://example.invalid/paper?id=5'
+    upgraded = 'https://example.invalid/paper?id=5'
+    expected = requested
+    returned = upgraded
+    approved = {requested, upgraded}
+    checks = []
+
+    async def allow_url(url):
+        checks.append(url)
+        return url in approved
+
+    async def search(*args, **kwargs):
+        raise AssertionError('extraction should not require another search')
+
+    async def extract(urls, *, char_limit):
+        assert urls == [expected]
+        return json.dumps(dict(results=[dict(url=returned, content='Original article evidence.')]))
+
+    host = HostDiscoveryReader(DiscoveryOpportunityIngestor(ExperienceJournal(root/'experience.sqlite3')),
+        subject='user:test', search=search, extract=extract, allow_url=allow_url, is_current=lambda:True)
+    result = await host.collect(operation_id='scheme-upgrade', read_urls=(requested,))
+    assert result.failures == 0 and len(result.observation_ids) == 1
+    assert checks == [requested, upgraded]
+    assert await host.collect(operation_id='scheme-upgrade', read_urls=(requested,)) == result
+    assert checks == [requested, upgraded]
+
+    for index, (expected, returned) in enumerate((
+        (requested, 'https://elsewhere.invalid/paper?id=5'),
+        (requested, 'https://example.invalid/another-paper?id=5'),
+        (requested, 'https://example.invalid/paper?id=6'),
+        (requested, 'https://example.invalid:8443/paper?id=5'),
+        (upgraded, requested),
+    )):
+        approved = {expected, returned}
+        result = await host.collect(operation_id=f'different-url-{index}', read_urls=(expected,))
+        assert result.failures == 1 and not result.observation_ids
+
+    expected, returned = requested, upgraded
+    approved = {requested}
+    result = await host.collect(operation_id='refused-upgrade', read_urls=(requested,))
+    assert result.failures == 1 and not result.observation_ids
+    assert checks[-2:] == [requested, upgraded]
 
 with tempfile.TemporaryDirectory(prefix='alive-host-discovery-') as folder:
     previous={key:os.environ.get(key) for key in ('HERMES_HOME','HERMES_ALIVE_SHARED_DIR')}

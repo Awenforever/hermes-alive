@@ -1115,3 +1115,10 @@ The weather case demonstrated a separate review classification defect:
 digits within a compact letter-led model name must be witnessed as the
 whole name. Keep numerical occurrence checks for measurements, and
 verify the exact old review and the new assessment independently.
+
+In the SAR discovery trial, the host returned the original institute page
+at HTTPS for the selected HTTP URL. The reader discarded it, leaving only
+an index of paper titles for deliberation. Accept an exact HTTP-to-HTTPS
+scheme upgrade after checking the returned URL against the host policy.
+Keep rejecting changes to the authority, port, path, query or fragment.
+Record the abstention separately from the earlier failure to admit evidence.

@@ -166,9 +166,15 @@ class HostDiscoveryReader:
             parts=urlsplit(url)
             parts.port  # Reject an invalid port before invoking a read capability.
         except ValueError: raise HostDiscoveryError('invalid source URL') from None
+        # A host extractor can report the HTTPS version of an HTTP URL.
+        # Keep all other URL components exact and recheck host policy below.
+        accepted_url = (
+            expected_url is None or url == expected_url
+            or (expected_url.startswith('http://') and url == 'https://' + expected_url[7:])
+        )
         if (parts.scheme not in ('http','https') or not parts.hostname
                 or parts.username is not None or parts.password is not None
-                or (expected_url is not None and url!=expected_url)):
+                or not accepted_url):
             raise HostDiscoveryError('unexpected source URL')
         self._current()
         if await self.allow_url(url) is not True:
