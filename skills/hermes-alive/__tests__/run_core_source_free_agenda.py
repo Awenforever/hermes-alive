@@ -99,6 +99,8 @@ async def test(home,*,direct_intake=False,management=False):
    assert (await native.step(build())).disposition=='waiting_for_change' and len(requests)==count
    events=execution.kernel('events');agenda_module=execution.kernel('agenda')
    from agent.turn_context import _collect_pre_llm_call_context
+   from hermes_cli.middleware import apply_llm_request_middleware
+   from tools.approval_context import reset_current_observability_context, set_current_observability_context
    variables=core.set_session_vars(platform='telegram',chat_id=source.chat_id,user_id=source.user_id,
     session_key=entry.session_key,session_id=entry.session_id)
    tool=lambda args,task='source-free-agenda-intake':json.loads(binding.context.dispatch_tool('alive_agenda',args,
@@ -211,11 +213,37 @@ async def test(home,*,direct_intake=False,management=False):
    try:
     messages=[{'role':'user','content':'刚才那件事原先有什么限制？'}]
     original_messages=json.dumps(messages)
-    context=_collect_pre_llm_call_context(SimpleNamespace(session_id=entry.session_id,model='configured-primary',
+    marker=_collect_pre_llm_call_context(SimpleNamespace(session_id=entry.session_id,model='configured-primary',
      platform='telegram',_user_id=source.user_id),effective_task_id='source-free-followup',turn_id='source-free-turn',
      original_user_message=messages[-1]['content'],messages=messages,conversation_history=[])
-    assert '只提醒，不代为提交' in context and 'historical_request_not_current_status_or_execution_permission' in context
-    assert sent[0] in context and json.dumps(messages)==original_messages
+    assert '[[hermes-alive-context:' in marker and '只提醒，不代为提交' not in marker and sent[0] not in marker
+    wire=dict(session_id=entry.session_id,task_id='source-free-followup',
+              turn_id='source-free-turn',api_mode='chat_completions')
+    request={'messages':[{'role':'user','content':messages[-1]['content']+'\n\n'+marker}]}
+    projected=apply_llm_request_middleware(request,**wire)
+    assert projected.changed and projected.original_payload==request
+    text=projected.payload['messages'][0]['content']
+    document,_=json.JSONDecoder().raw_decode(text[text.index('{"alive_shares":'):])
+    share=document['alive_shares'][-1]
+    assert share['text']==sent[0] and json.dumps(messages)==original_messages
+    source_entry=share['background_sources'][0]
+    assert source_entry['reference_role']=='historical_request_not_current_status_or_execution_permission'
+    assert source_entry['excerpt_in_context'] is False and '只提醒，不代为提交' not in text
+    tool_id='source-free-original'
+    context_tokens=set_current_observability_context(turn_id=wire['turn_id'],tool_call_id=tool_id,session_id=entry.session_id)
+    try:
+     raw_page=binding.context.dispatch_tool('alive_read_reference',
+      {'reference':share['reference'],'part':'source','source_index':source_entry['source_index']},
+      task_id=wire['task_id'],session_id=entry.session_id)
+    finally:reset_current_observability_context(context_tokens)
+    assert set(json.loads(raw_page))=={'alive_retained_page'}
+    tool_request={'messages':[{'role':'tool','tool_call_id':tool_id,'content':raw_page}]}
+    assert not apply_llm_request_middleware(tool_request,**{**wire,'turn_id':'next-turn'}).changed
+    page=apply_llm_request_middleware(tool_request,**wire)
+    assert page.changed and page.original_payload==tool_request
+    recovered=json.loads(page.payload['messages'][0]['content'])
+    assert recovered['source']['reference_role']==source_entry['reference_role']
+    assert json.loads(recovered['text'])==original_context
    finally:core.clear_session_vars(variables)
    # Missing original storage must not silently replace the agenda's key.
    vault_root=agenda.content_vault.base_dir.resolve();saved_vault=vault_root.with_name(vault_root.name+'-temporarily-unavailable')
@@ -311,5 +339,5 @@ if __name__=='__main__':
    asyncio.run(test(Path(root)/'direct-profile',direct_intake=True))
    asyncio.run(test(Path(root)/'management-profile',direct_intake=True,management=True))
   finally:
-   from hermes_state_registry import close_all_under
-   close_all_under(root)
+   from core_fixture_cleanup import close_test_stores
+   close_test_stores(root)
