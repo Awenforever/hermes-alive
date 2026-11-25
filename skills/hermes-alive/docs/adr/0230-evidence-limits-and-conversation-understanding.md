@@ -124,3 +124,26 @@ after streaming may already have exposed the response. Keep ordinary
 streaming and Core ownership on this path. A future live verification design
 should prove turn-scoped validation, preserve durable conversation history
 and evidence erasure, and measure latency on unrelated turns as well.
+
+## Scope review and repair, 2026-11-26
+
+The ordinary reply review worked better when it examined only consequential
+claims and required exact spans from the answer and the evidence. It found
+results assigned to another experimental setup and causal language that went
+beyond the available material. Accurate controls retained the original
+conditions and passed. The combined format and fact review had accepted
+explanatory paragraphs in a link-only turn, so format remains its own
+requirement.
+
+Two retained replies went through one evidence-constrained repair and one
+blind recheck. Both repairs answered in a single sentence and kept
+experimental scope and results separate. These were isolated trials using
+existing evidence, and neither result entered a live conversation.
+
+Core 0.23.4 retains the same profile-wide stream hold and finalization
+behavior as 0.23.3. The upstream before-final proposal remains open.
+Any future live integration needs a turn-specific admission captured before
+output can stream, current evidence and consent checked again at delivery,
+and a bounded attempt to repair the candidate. Rejected drafts and repair
+instructions must stay out of the visible reply, saved conversation and
+compression input. Unrelated turns keep their ordinary delivery path.
