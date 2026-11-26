@@ -1206,3 +1206,16 @@ The old instructions also produced a different judgment on repeat, so this
 diagnosis is a contract distinction with useful controls, not a deterministic
 provider fix. Version the prompt and preserve replay of legacy witnesses.
 The comparison has no delivery or conversation acceptance credit.
+
+A new Mercury case passed the focused status check and reached simulated
+submission. The three real follow-ups also received the exact submitted share.
+The source link could be recovered by itself. The last answer nevertheless
+claimed that the science orbiters were still attached to the transfer module,
+although the material it read mentioned the module only in the launch
+configuration. ESA's arrival timeline records the module's earlier separation.
+The answer must keep the composite science spacecraft, the transfer module,
+and the future separation of the two science orbiters distinct. Apply that
+lesson to entity and phase grounding in later turns. A full chain with this
+error earns no consecutive quality credit.
+
+[ESA's BepiColombo arrival timeline](https://www.esa.int/media/bepicolombo-arrival-at-mercury-timeline)
