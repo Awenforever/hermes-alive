@@ -97,23 +97,25 @@ class _TargetedCompletion:
 
     @property
     def raw_field(self):
-        return ('raw_event_status_confirmation' if self.method == event_status_review.METHOD
+        return ('raw_event_status_confirmation' if self.method in event_status_review.METHODS
                 else 'raw_witness_completion')
 
     def merge(self, original, supplement, snapshot):
-        if self.method == event_status_review.METHOD:
+        if self.method in event_status_review.METHODS:
             return event_status_review.merge(original, supplement, snapshot, self.witnesses)
         return source_witness_completion.merge(original, supplement, snapshot, self.request)
 
 
-def _targeted_completion(snapshot, wire, findings):
+def _targeted_completion(snapshot, wire, findings, *, retained_method=None):
     witnesses = source_witness_completion.request_for(snapshot, wire, findings)
     if event_status_review.enabled(snapshot):
         request = event_status_review.request_for(snapshot, wire, findings, witnesses)
         if request is None:
             return None
-        return _TargetedCompletion(event_status_review.METHOD, event_status_review.prompt_for(request),
-                                   request, witnesses)
+        method = event_status_review.METHOD if retained_method is None else retained_method
+        if method not in event_status_review.METHODS:
+            return None
+        return _TargetedCompletion(method, event_status_review.prompt_for(request, method=method), request, witnesses)
     if witnesses is not None:
         return _TargetedCompletion(source_witness_completion.METHOD, source_witness_completion.PROMPT,
                                    witnesses, witnesses)
@@ -292,7 +294,7 @@ class SourceSupportReviewer:
             recovery = self.journal.get(prefix + ':protocol-recovery')
             method = recovery.event.payload.get('recovery_method') if recovery is not None else None
             if (event_status_review.enabled(data) and findings['verdict'] == 'supported'
-                    and method != event_status_review.METHOD):
+                    and method not in event_status_review.METHODS):
                 return None
             if payload.get('protocol_recovered', False):
                 if (not start.event.payload.get('protocol_recovery_enabled', False)
@@ -318,7 +320,7 @@ class SourceSupportReviewer:
                                    ('reviewer_model', 'reviewer_provider', 'reviewer_domain'))):
                         return None
                     original = self.parse_findings(invalid['raw_review'], data)
-                    completion = _targeted_completion(data, wire, original)
+                    completion = _targeted_completion(data, wire, original, retained_method=method)
                     if (completion is None or completion.method != method
                             or self.vault.digest_json(completion.request) != recovery_payload.get('request_digest')
                             or completion.merge(invalid['raw_review'], retained[completion.raw_field],
@@ -522,7 +524,7 @@ class SourceSupportReviewer:
                 if remaining <= 0:
                     raise TimeoutError('source-review stage budget exhausted')
                 task = ('alive_source_status_confirmation'
-                        if completion is not None and completion.method == event_status_review.METHOD
+                        if completion is not None and completion.method in event_status_review.METHODS
                         else 'alive_source_support')
                 response = await asyncio.wait_for(call(task=task, model=reviewer_model,
                     messages=messages, temperature=0, max_tokens=self.max_tokens,

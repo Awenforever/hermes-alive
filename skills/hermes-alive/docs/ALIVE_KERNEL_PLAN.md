@@ -1195,3 +1195,14 @@ second result or its evidence cannot be recovered and validated, defer
 delivery. Preserve older receipts under their recorded contracts. Recheck
 the false and faithful versions, restart recovery, erasure, and an ordinary
 follow-up that asks what actually happened before counting a fresh success.
+
+November 26 — the actual heritage discovery revision kept the source's
+tentative identification and passed fact and communication review. The
+focused status check still marked both explicit qualifiers ambiguous,
+and delivery was withheld. The retained-input comparison distinguished
+three cases with the clarified instructions: tentative wording preserved,
+categorical confirmation overstated, and contradictory wording unresolved.
+The old instructions also produced a different judgment on repeat, so this
+diagnosis is a contract distinction with useful controls, not a deterministic
+provider fix. Version the prompt and preserve replay of legacy witnesses.
+The comparison has no delivery or conversation acceptance credit.

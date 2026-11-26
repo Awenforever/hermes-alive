@@ -596,7 +596,10 @@ def test_witness_completion_keeps_the_original_judgments():
 
 
 def test_future_plan_cannot_witness_completed_event():
+    from alive_kernel import event_status_review
+    from alive_kernel.final_value_findings import passage_request
     from alive_kernel.review_contracts import EVENT_STATUS_ASSESSMENT
+    from alive_kernel.source_support import _targeted_completion
     from alive_kernel.source_witness_completion import request_for
 
     text = 'Visitors have become contributors to the display.'
@@ -622,6 +625,13 @@ def test_future_plan_cannot_witness_completed_event():
            'event_statuses': [{**status, 'wording_quote': planned, 'wording_status': 'conditional'}]}
     yes = parse(json.dumps(raw), witness_snapshot=current)
     assert yes['verdict'] == 'supported'
+    request = passage_request(current, labelled=True)
+    legacy = _targeted_completion(current, request, yes, retained_method=event_status_review.LEGACY_METHOD)
+    fresh = _targeted_completion(current, request, yes)
+    assert legacy.request == fresh.request
+    assert legacy.raw_field == fresh.raw_field == 'raw_event_status_confirmation'
+    assert 'Tentativeness' not in legacy.prompt and 'Tentativeness' in fresh.prompt
+    assert _targeted_completion(current, request, yes, retained_method='foreign-method') is None
     for wrong in ({**status, 'passage_id': 'P2.1'}, {**status, 'wording_quote': 'Outside the draft.'},
                   {**status, 'source_quote': 'The panels are installed.'}):
         try:

@@ -329,7 +329,7 @@ async def test(home,*,fit_revision=False,numeric_revision=False,revoke_after_cap
             review=store.journal.get(review_id).event
             recovery=store.journal.get(review_id.removesuffix(':completed')+':protocol-recovery').event
             assert review.payload['verdict']=='supported' and review.payload['protocol_recovered'] is True
-            assert recovery.payload['recovery_method']=='focused-event-status-v1'
+            assert recovery.payload['recovery_method']=='focused-event-status-v2'
             body=store.vault.resolve_json(review.payload['content']['content_id'])
             assert body['snapshot']['candidate']['text']==sent[0][1]
             assert body['findings']['numeric_evidence_coverage']['assessment']=='covered'
