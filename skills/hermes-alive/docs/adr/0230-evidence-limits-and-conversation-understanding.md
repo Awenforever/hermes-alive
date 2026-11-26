@@ -147,3 +147,47 @@ output can stream, current evidence and consent checked again at delivery,
 and a bounded attempt to repair the candidate. Rejected drafts and repair
 instructions must stay out of the visible reply, saved conversation and
 compression input. Unrelated turns keep their ordinary delivery path.
+
+## Keep source claims with their entity and phase, 2026-11-26
+
+The Mercury follow-up treated the spacecraft's launch configuration as a
+current relationship. The relevant retained passage described launch. The
+reply could answer that the orbiters' separation was still planned without
+asserting what else remained attached. A retained-input trial kept that
+distinction and passed a blind recheck. The same instruction also preserved
+the subject and conditions of a previously misattributed ceramic result.
+
+The native context experiment added this distinction to the continuation
+prompt and the scoped source-reader description. Its first version displaced
+the source catalog under Core's 2,000-character hook budget. A shorter
+version restored the exact share and source indices at that cap and passed
+the Core retrieval tests. A cold replay of the same Mercury share on the
+shorter version still asserted the launch configuration as current. The
+prompt change was removed from the candidate. Source retention and routing
+continue on the previously qualified implementation.
+
+A fresh snow-cover run reached an actual model continuation and correctly
+separated historical observation from scenario projection. The first answer
+added a separate explanation to a one-sentence request. Keep fact grounding
+and the shape of the full reply as independent acceptance requirements.
+
+In a disposable Core profile, an ordinary model turn produced an unsupported
+claim about the transfer module. The held transform received the final draft
+and exact source pages, made one bounded model call, and replaced the answer.
+Core emitted no nonempty text deltas or interim message and returned the
+replacement in the conversation. An earlier callback failure gave Core's
+controlled withheld response. These are separate controlled outcomes.
+Evidence capture in this experiment was restricted to the particular
+replayed session and turn. A second held native run reopened its SQLite
+transcript and found the final replacement, with the rejected draft absent.
+It also showed a remaining quality requirement: the replacement repeated
+the initial burn duration alongside a later correction. Validate the
+replacement itself against the relevant phase and source revision.
+
+The existing Core hold is profile-wide. A live design needs a host-owned
+decision before the first possible emission, a bounded review deadline, an
+authorized view of the relevant turn and current references, and a safe
+result on timeout. Revalidate references before delivery, prove that neither
+discarded text nor ephemeral repair instructions enter durable history or
+compression, and verify that an unrelated turn can still stream. Preserve
+the upstream hook boundary described in [Core issue #101910](https://github.com/NousResearch/hermes-agent/issues/101910).

@@ -551,7 +551,7 @@ a112d7ecbe444abceab053f7a726ded3335728a6811b94186af0309031e1c2c5  ./docs/adr/022
 ce12cd2b9a2547899c78ea678420eb344ba070823d3a135bb6718da225d1a404  ./docs/adr/0227-test-layout-and-public-install-scanning.md
 0b37747b6b7d3283b64595ae10929ef215157df729ff52055b7cd62ae75320c0  ./docs/adr/0228-evidence-to-recipient-understanding.md
 f25e1b67e9de20f9f04fdbbb308eea89d9adb39b294e2a1205f72ef9202b5170  ./docs/adr/0229-bounded-final-assessment-interval.md
-061fc34e7f9faff27a894ef98a4bcf10dcf607da7c5f1548da55a4f9f45e15a1  ./docs/adr/0230-evidence-limits-and-conversation-understanding.md
+fed22aec67300eb4b31d9d4d434ad11b9036ffa7e73ed742eac9ae6f6ecb8039  ./docs/adr/0230-evidence-limits-and-conversation-understanding.md
 3e7ccd7ad07ad49783fb2b15e35d759fea9645ec0829b8641fa7b606bd194700  ./docs/adr/0231-bounded-public-source-refinement-proposal.md
 91038dbca246670e9df520d72729e7664c0ef4fe6fc65b2962999484df9972ac  ./docs/adr/0232-query-dependent-search-evidence-identity.md
 ebcc240312b619d03f2d124163fe2907354ae5aa8863794dd25fff63cb01a15c  ./docs/adr/0233-standard-worker-lease-within-original-permit.md
